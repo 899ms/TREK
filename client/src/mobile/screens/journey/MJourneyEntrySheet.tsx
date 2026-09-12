@@ -7,6 +7,7 @@ import MToggle from '../../components/MToggle'
 import { useTranslation } from '../../../i18n'
 import { useToast } from '../../../components/shared/Toast'
 import CustomTimePicker from '../../../components/shared/CustomTimePicker'
+import { CustomDatePicker } from '../../../components/shared/CustomDateTimePicker'
 import { journeyApi, mapsApi, weatherApi } from '../../../api/client'
 import { getApiErrorMessage } from '../../../types'
 import { normalizeImageFiles } from '../../../utils/convertHeic'
@@ -721,21 +722,17 @@ export default function MJourneyEntrySheet({
           )}
         </>}
 
-        {/* Date + Time */}
-        <div className="mt-3 flex gap-2">
-          <div className="min-w-0 flex-1">
+        {/* Date + Time. Split in the date's favour: a localized date needs the
+            room ("10. Sept. 2026"), a clock never does. */}
+        <div className="mt-3 grid grid-cols-[minmax(0,1fr)_104px] gap-2">
+          <div className="min-w-0">
             <div className={`${eyebrow} mb-[5px]`}>{t('journey.editor.date')}</div>
-            <div className={`${fieldShell} overflow-hidden`}>
-              <input
-                type="date"
-                value={entryDate}
-                disabled={readOnly}
-                onChange={e => setEntryDate(e.target.value)}
-                className="block min-w-0 w-full box-border border-0 bg-transparent px-3 py-[10px] text-center text-[0.78125rem] font-semibold text-m-ink outline-none [font-variant-numeric:tabular-nums]"
-              />
-            </div>
+            {/* TREK's own picker, like the time field beside it: a native
+                `<input type="date">` paints itself from the OS locale and takes
+                no theme, so the two sat in one row looking like two apps. */}
+            <CustomDatePicker value={entryDate} onChange={setEntryDate} disabled={readOnly} />
           </div>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <div className={`${eyebrow} mb-[5px]`}>{t('mobileJourney.time')}</div>
             {/* A native <input type="time"> paints 12h or 24h from the browser
                 locale, whatever the user picked in settings (#2067). The picker
