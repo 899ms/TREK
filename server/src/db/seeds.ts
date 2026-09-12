@@ -123,6 +123,7 @@ function seedAddons(db: Database.Database): void {
       { id: 'roadtrip', name: 'Road trip', description: 'Drives with stops along the route, driving times, and arrival times that update themselves', type: 'trip', icon: 'Route', enabled: 0, sort_order: 7 },
       { id: 'journey', name: 'Journey', description: 'Trip tracking & travel journal — check-ins, photos, daily stories', type: 'global', icon: 'Compass', enabled: 0, sort_order: 35 },
       { id: 'airtrail', name: 'AirTrail', description: 'Sync flights from your AirTrail instance', type: 'integration', icon: 'Plane', enabled: 0, sort_order: 14 },
+      { id: 'dawarich', name: 'Dawarich', description: 'Read visits and recorded routes from your Dawarich instance — suggested journal entries, places and countries you confirm yourself', type: 'integration', icon: 'Dawarich', enabled: 0, sort_order: 17 },
       { id: 'llm_parsing', name: 'AI Parsing', description: 'LLM fallback for booking imports kitinerary cannot read', type: 'integration', icon: 'Sparkles', enabled: 0, sort_order: 15 },
       { id: 'collections', name: 'Collections', description: 'Personal place library — save places across trips into named lists, copy into any trip, share with others', type: 'global', icon: 'Bookmark', enabled: 0, sort_order: 16 },
     ];

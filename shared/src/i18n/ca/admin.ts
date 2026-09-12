@@ -224,6 +224,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Importa llocs des d’una llista compartida de Naver Maps',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Sincronitza vols des de la teva instància d’AirTrail',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Llegeix estades i recorreguts enregistrats d’una instància de Dawarich que cada lector connecta pel seu compte',
   'admin.addons.catalog.llm_parsing.name': 'Anàlisi amb IA',
   'admin.addons.catalog.llm_parsing.description': 'Llegeix reserves que l’analitzador integrat no entén, amb un model d’IA que triïs',
   'admin.addons.enabled': 'Actiu',

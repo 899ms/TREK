@@ -603,6 +603,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': '從共享的 Naver 地圖清單匯入地點',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': '從你的 AirTrail 執行個體同步航班',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    '從各位使用者自行連接的 Dawarich 執行個體讀取造訪紀錄與記錄的路線',
   'admin.addons.catalog.llm_parsing.name': 'AI 解析',
   'admin.addons.catalog.llm_parsing.description': '用你選擇的 AI 模型讀取內建解析器無法識別的訂位',
   'admin.addons.enabled': '已啟用',

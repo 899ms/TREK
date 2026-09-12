@@ -4620,6 +4620,117 @@ function runMigrations(db: Database.Database): void {
         db.exec('ALTER TABLE places ADD COLUMN amap_poi_id TEXT');
       }
     },
+    // Dawarich connection (#2279). Its own table rather than more `users` columns,
+    // which is where the AirTrail connection lives: that was the right call while
+    // AirTrail was the only integration of this shape, and this is the second. It
+    // also carries sync state (cursor, last error, probed capabilities) that has no
+    // business sitting on the identity row. Credentials for a personal location
+    // archive stay strictly apart from anything shared on a trip.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS dawarich_connections (
+          user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+          url TEXT,
+          api_key TEXT,
+          allow_insecure_tls INTEGER NOT NULL DEFAULT 0,
+          sync_enabled INTEGER NOT NULL DEFAULT 1,
+          last_sync_at TEXT,
+          last_sync_state TEXT NOT NULL DEFAULT 'never',
+          last_sync_error TEXT,
+          capabilities TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    },
+    // Reviewed visit suggestions (#2279). One row per (user, Dawarich visit id) —
+    // the UNIQUE is what makes a repeated sync idempotent instead of duplicating
+    // everything it already imported.
+    //
+    // `source_hash` exists because a Dawarich visit carries no `updated_at`: a
+    // rename or a re-detection is only visible as a different hash of the fields
+    // TREK shows. `source_missing_at` exists because deleting a visit removes it
+    // from the API rather than tombstoning it, so absence from a full re-read of
+    // the same window is the only signal — and it is recorded, not acted on,
+    // because an entry the user already accepted and edited is theirs now.
+    () => {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS dawarich_visit_suggestions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          source_visit_id TEXT NOT NULL,
+          trip_id INTEGER REFERENCES trips(id) ON DELETE SET NULL,
+          name TEXT NOT NULL,
+          lat REAL,
+          lng REAL,
+          started_at TEXT NOT NULL,
+          ended_at TEXT NOT NULL,
+          duration_minutes INTEGER NOT NULL DEFAULT 0,
+          local_date TEXT NOT NULL,
+          source_status TEXT NOT NULL DEFAULT 'suggested',
+          confidence REAL,
+          confidence_band TEXT,
+          country_code TEXT,
+          state TEXT NOT NULL DEFAULT 'new',
+          target TEXT,
+          accepted_place_id INTEGER REFERENCES places(id) ON DELETE SET NULL,
+          accepted_journal_entry_id INTEGER,
+          accepted_bucket_list_item_id INTEGER REFERENCES bucket_list(id) ON DELETE SET NULL,
+          matched_bucket_list_item_id INTEGER REFERENCES bucket_list(id) ON DELETE SET NULL,
+          source_hash TEXT NOT NULL,
+          accepted_hash TEXT,
+          source_missing_at TEXT,
+          first_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(user_id, source_visit_id)
+        )
+      `);
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dawarich_suggestions_user_state ON dawarich_visit_suggestions(user_id, state)');
+      db.exec('CREATE INDEX IF NOT EXISTS idx_dawarich_suggestions_trip ON dawarich_visit_suggestions(trip_id)');
+    },
+    // Bucket-list entries can now be ticked off (#2279). `visited_source` records
+    // who decided — a hand-ticked wish and one confirmed from a recording read the
+    // same on the map otherwise, and re-running a scan must not touch the first.
+    () => {
+      const hasVisitedAt = db.prepare("SELECT 1 FROM pragma_table_info('bucket_list') WHERE name = 'visited_at'").get();
+      if (!hasVisitedAt) db.exec('ALTER TABLE bucket_list ADD COLUMN visited_at TEXT');
+      const hasVisitedSource = db.prepare("SELECT 1 FROM pragma_table_info('bucket_list') WHERE name = 'visited_source'").get();
+      if (!hasVisitedSource) db.exec('ALTER TABLE bucket_list ADD COLUMN visited_source TEXT');
+    },
+    // Where an Atlas country came from (#2279). Everything that exists today was
+    // marked by hand, so 'manual' is the correct backfill rather than a guess;
+    // countries confirmed out of a recording are written as 'dawarich' and the
+    // Atlas can say so. Unmarking still deletes the row either way.
+    () => {
+      const hasSource = db.prepare("SELECT 1 FROM pragma_table_info('visited_countries') WHERE name = 'source'").get();
+      if (!hasSource) db.exec("ALTER TABLE visited_countries ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'");
+    },
+    // Per-key read scopes for /api/v1 (#2279). The `include` parameter picks which
+    // sections a *response* carries; it has never restricted what a key may read,
+    // and handing an integration a key that reads every trip because it wanted day
+    // notes is the thing that needed fixing.
+    //
+    // `scope_mode` is an explicit flag rather than "NULL means everything": a
+    // sentinel here would mean a bug that drops the scopes column silently grants
+    // full access. Every existing key is 'all', so nothing that works today stops
+    // working — the restriction is opt-in at mint time.
+    () => {
+      const hasMode = db.prepare("SELECT 1 FROM pragma_table_info('mcp_tokens') WHERE name = 'scope_mode'").get();
+      if (!hasMode) db.exec("ALTER TABLE mcp_tokens ADD COLUMN scope_mode TEXT NOT NULL DEFAULT 'all'");
+      const hasScopes = db.prepare("SELECT 1 FROM pragma_table_info('mcp_tokens') WHERE name = 'api_scopes'").get();
+      if (!hasScopes) db.exec('ALTER TABLE mcp_tokens ADD COLUMN api_scopes TEXT');
+    },
+    // Where a place came from, when it did not come from a person typing it
+    // (#2279). Only 'dawarich' writes it today; NULL is every place anyone has
+    // ever added by hand, which is what it should stay.
+    //
+    // A column rather than a lookup through dawarich_visit_suggestions: the mark
+    // has to survive the suggestion being deleted, and a place list would
+    // otherwise join an integration's table to render a name.
+    () => {
+      const hasSource = db.prepare("SELECT 1 FROM pragma_table_info('places') WHERE name = 'source'").get();
+      if (!hasSource) db.exec('ALTER TABLE places ADD COLUMN source TEXT');
+    },
   ];
 
   if (currentVersion < migrations.length) {

@@ -655,6 +655,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Paylaşılan bir Naver Haritalar listesinden yerleri içe aktarın',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'AirTrail örneğinizden uçuşları eşitleyin',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Her kullanıcının kendi bağladığı bir Dawarich sunucusundan ziyaretleri ve kaydedilen rotaları okuyun',
   'admin.addons.catalog.llm_parsing.name': 'Yapay zekâ ile ayrıştırma',
   'admin.addons.catalog.llm_parsing.description': 'Yerleşik ayrıştırıcının okuyamadığı rezervasyonları, seçtiğiniz yapay zekâ modeliyle okur',
   'admin.addons.enabled': 'Etkinleştirilmiş',

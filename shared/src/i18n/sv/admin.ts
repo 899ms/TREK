@@ -670,6 +670,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Importera platser från en delad Naver Maps-lista',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Synkronisera flyg från din AirTrail-instans',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Läs vistelser och inspelade rutter från en Dawarich-instans som varje läsare ansluter själv',
   'admin.addons.catalog.llm_parsing.name': 'AI-tolkning',
   'admin.addons.catalog.llm_parsing.description': 'Läser bokningar som den inbyggda tolken inte klarar, med en AI-modell du väljer',
   'admin.addons.enabled': 'Aktiverad',

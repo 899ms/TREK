@@ -657,6 +657,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Impor tempat dari daftar Naver Maps yang dibagikan',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Sinkronkan penerbangan dari instans AirTrail milikmu',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Baca kunjungan dan rute terekam dari instans Dawarich yang dihubungkan sendiri oleh tiap pembaca',
   'admin.addons.catalog.llm_parsing.name': 'Analisis AI',
   'admin.addons.catalog.llm_parsing.description': 'Membaca pemesanan yang tidak dipahami pengurai bawaan, dengan model AI pilihanmu',
   'admin.addons.enabled': 'Aktif',

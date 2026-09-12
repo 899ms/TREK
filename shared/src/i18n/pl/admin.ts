@@ -607,6 +607,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Importuj miejsca z udostępnionej listy Naver Maps',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Synchronizuj loty ze swojej instancji AirTrail',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Odczytuj pobyty i zapisane trasy z instancji Dawarich, którą każdy użytkownik podłącza sam',
   'admin.addons.catalog.llm_parsing.name': 'Analiza AI',
   'admin.addons.catalog.llm_parsing.description': 'Odczytuje rezerwacje, których nie rozumie wbudowany parser, przy użyciu wybranego modelu AI',
   'admin.addons.enabled': 'Włączone',
