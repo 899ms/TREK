@@ -729,19 +729,22 @@ describe('the day stop a booking implies', () => {
     expect(mirror).toEqual({ created: null, removed: [], stamped: null });
   });
 
-  it('ACC-030 a stay booked before any of this existed picks up its stop on the next save', () => {
-    // The deliberate alternative to rewriting everybody finished trips in a migration:
-    // the booking reaches the route the moment somebody opens it and saves.
+  it('ACC-030 a stay whose stop belongs to the traveller does not get a second one', () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
     const day = createDay(testDb, trip.id);
+    const second = createDay(testDb, trip.id);
     const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
-    const old = createDayAccommodation(testDb, trip.id, place.id, day.id, day.id) as any;
+    // The road trip books a night on a place it put on the day first, so the stop is
+    // the traveller's and the booking owns nothing.
+    createDayAssignment(testDb, day.id, place.id);
+    const stay = createDayAccommodation(testDb, trip.id, place.id, day.id, day.id) as any;
 
-    const existing = svc.getAccommodation(old.id, trip.id)!;
-    svc.updateAccommodation(old.id, existing, { check_in: '15:00' });
+    const existing = svc.getAccommodation(stay.id, trip.id)!;
+    svc.updateAccommodation(stay.id, existing, { start_day_id: second.id, end_day_id: second.id });
 
-    expect(stopsOn(day.id)).toEqual([expect.objectContaining({ place_id: place.id, accommodation_id: old.id })]);
+    expect(stopsOn(second.id)).toEqual([]);
+    expect(stopsOn(day.id)).toEqual([expect.objectContaining({ place_id: place.id, accommodation_id: null })]);
   });
 
   it('ACC-031 cancelling a booking takes back its own stop and leaves the other one', () => {

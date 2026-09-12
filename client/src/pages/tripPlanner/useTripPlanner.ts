@@ -55,9 +55,10 @@ import { usePlannerHistory } from '../../hooks/usePlannerHistory'
 import { useAirtrailConnection } from '../../hooks/useAirtrailConnection'
 import { useIsTouch } from '../../hooks/useIsTouch'
 import { usePluginStore } from '../../store/pluginStore'
-import type { Accommodation, TripMember, Day, Place, Reservation } from '../../types'
+import type { Accommodation, Assignment, TripMember, Day, Place, Reservation } from '../../types'
 import { OFM_POSITRON, DEFAULT_MAP_LAT, DEFAULT_MAP_LNG, DEFAULT_MAP_ZOOM } from '../../constants/mapDefaults'
 import { useTileUrl } from '../../hooks/useTileUrl'
+import { applyStayStops } from '../../store/stayStops'
 import { resolvePoolAssignmentId } from './tripPlannerModel'
 import { isDeepLinkableTripTab, TRIP_TAB_LABEL_KEYS } from '../../constants/tripTabs'
 import { isRoutableReservation } from '../../utils/reservationRoutes'
@@ -128,9 +129,27 @@ export function useTripPlanner() {
   // someone planning a road trip stays in it across reloads without it leaking into
   // their next, non-driving trip.
   const [roadtripMode, setRoadtripMode] = useState<boolean>(() => sessionStorage.getItem(`trip-roadtrip-${tripId}`) === '1')
-  const assignments = useMemo(() => roadtripMode || roadtripSettings.roadtrip_service_stops_in_days !== false ? storedAssignments : Object.fromEntries(
-    Object.entries(storedAssignments).map(([dayId, visits]) => [dayId, visits.filter(visit => !isServiceStopType(visit.place?.stop_type))]),
-  ), [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, storedAssignments])
+  // Two reasons a stop can be road-trip-only, and they are not the same reason.
+  //
+  // The switch is the traveller's: it hides the petrol stations and rest areas
+  // they added along the drive from a day list they want to read as a plan.
+  //
+  // A stop a lodging booking put there is hidden whatever the switch says,
+  // because the day already shows that booking as its own overnight block and
+  // the row would be the same hotel a second time. Road trip mode wants it: the
+  // drive has to end somewhere, and that somewhere is where you sleep.
+  const assignments = useMemo(() => {
+    if (roadtripMode) return storedAssignments
+    const hideServiceStops = roadtripSettings.roadtrip_service_stops_in_days === false
+    const hidden = (visit: Assignment) => visit.accommodation_id != null
+      || (hideServiceStops && isServiceStopType(visit.place?.stop_type))
+    // Same object back when nothing is hidden, so a trip without bookings does not
+    // rebuild every day list on each render of this hook.
+    if (!Object.values(storedAssignments).some(visits => visits.some(hidden))) return storedAssignments
+    return Object.fromEntries(
+      Object.entries(storedAssignments).map(([dayId, visits]) => [dayId, visits.filter(v => !hidden(v))]),
+    )
+  }, [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, storedAssignments])
   const places = useMemo(() => roadtripMode || roadtripSettings.roadtrip_service_stops_in_days !== false ? allPlaces : allPlaces.filter(place => !isServiceStopType(place.stop_type)), [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, allPlaces])
   const toggleRoadtripMode = useCallback(() => {
     setRoadtripMode(prev => {
@@ -937,7 +956,9 @@ export function useTripPlanner() {
       if (stopDraft.editing) {
         await tripActions.updatePlace(tripId, stopDraft.editing.placeId, { stop_type: stopType, duration_minutes: dwellMinutes })
         if (stopDraft.editing.accommodationId) {
-          await accommodationsApi.delete(tripId, stopDraft.editing.accommodationId)
+          // The night is what was switched off, not the stop: it stays where it is
+          // in the drive and becomes an ordinary pause.
+          applyStayStops(await accommodationsApi.delete(tripId, stopDraft.editing.accommodationId, { keepStop: true }))
           await loadAccommodations()
         }
         updateRouteForDay(dayId)

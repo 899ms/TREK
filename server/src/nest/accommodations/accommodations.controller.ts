@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Query,
   Get,
   Headers,
   HttpException,
@@ -117,11 +118,15 @@ export class AccommodationsController {
     @Param('tripId') tripId: string,
     @Param('id') id: string,
     @Headers('x-socket-id') socketId?: string,
+    @Query('keepStop') keepStop?: string,
   ) {
     if (!this.accommodations.get(id, tripId)) {
       throw new HttpException({ error: 'Accommodation not found' }, 404);
     }
-    const { linkedReservationIds, deletedBudgetItemIds, mirror } = this.accommodations.remove(id);
+    // Turning a night back into a pause in road trip mode: the booking goes, the
+    // stop stays and becomes the traveller's. Everywhere else a cancelled booking
+    // takes the stop it brought with it.
+    const { linkedReservationIds, deletedBudgetItemIds, mirror } = this.accommodations.remove(id, { keepStop: keepStop === 'true' });
     this.accommodations.announceMirror(tripId, mirror, (event, payload) => this.accommodations.broadcast(tripId, event, payload, socketId), socketId);
     for (const reservationId of linkedReservationIds) {
       this.accommodations.broadcast(tripId, 'reservation:deleted', { reservationId }, socketId);

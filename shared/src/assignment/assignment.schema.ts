@@ -48,6 +48,11 @@ export const assignmentSchema = z.object({
   // not a place (booking arrival / morning hotel). null = inherit the day default.
   // Inert when the previous timeline element is a place.
   incoming_leg_transport_mode: z.string().nullable().optional(),
+  // The lodging booking that put this stop on the day, when one did. The day
+  // planner already shows that booking as its own overnight block, so it hides
+  // this row and leaves it to road trip mode, which is the view that needs the
+  // hotel in the driving chain. Null for every stop a traveller placed.
+  accommodation_id: z.number().nullable().optional(),
   participants: z.array(assignmentParticipantSchema).optional(),
   created_at: z.string().optional(),
   place: assignmentPlaceSchema,

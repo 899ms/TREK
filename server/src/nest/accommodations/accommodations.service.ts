@@ -123,8 +123,8 @@ export class AccommodationsService {
     return this.updateAccommodation(id, existing, fields);
   }
 
-  remove(id: string | number) {
-    return this.deleteAccommodation(id);
+  remove(id: string | number, opts: { keepStop?: boolean } = {}) {
+    return this.deleteAccommodation(id, opts);
   }
 
   /**
@@ -239,15 +239,18 @@ export class AccommodationsService {
   /**
    * Carry the mirrored stop over to wherever the booking now is.
    *
-   * A booking that owns no stop gets one, which is how a stay made before any of
-   * this existed picks one up: re-save it once and it appears. The cost is that a
-   * mirrored stop somebody deleted by hand comes back the next time they touch the
-   * booking, which is the lesser of the two surprises.
+   * Only its own stop moves. A booking that owns none is one whose stop belongs to
+   * the traveller: booked in road trip mode, where the place was put on the day
+   * first, or booked for a place they had already planned there. Moving that is not
+   * ours to do, and putting a second one on the new day next to it is exactly the
+   * duplicate this whole change is meant to remove. Stays booked before any of this
+   * existed get their stop from the migration, not from the next edit.
    *
    * Runs inside the caller's transaction.
    */
   private remirrorStay(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
     const own = this.ownStops(accommodationId);
+    if (own.length === 0) return noMirror();
     if (own.length === 1 && own[0].day_id === dayId && own[0].place_id === placeId) return noMirror();
 
     const mirror = noMirror();
@@ -350,7 +353,7 @@ export class AccommodationsService {
    * that no longer exists. `linkedReservationId` / `deletedBudgetItemId` stay on the
    * result as the first of each, because the RPC, MCP and REST callers read them.
    */
-  deleteAccommodation(id: string | number): {
+  deleteAccommodation(id: string | number, opts: { keepStop?: boolean } = {}): {
     linkedReservationId: number | null;
     deletedBudgetItemId: number | null;
     linkedReservationIds: number[];
@@ -372,8 +375,17 @@ export class AccommodationsService {
       // Only the stops this booking put there itself. A stop the traveller placed
       // and then booked a night at keeps standing, which is how cancelling a night
       // in the road trip has always behaved.
+      //
+      // keepStop hands it to the traveller instead of taking it away. That is the
+      // road trip popup turning a night back into a pause: they asked to drop the
+      // booking, not the place, and the stop is mid-drive where re-adding it would
+      // land it at the end of the day.
       const mirror = noMirror();
       for (const stop of this.ownStops(Number(id))) {
+        if (opts.keepStop) {
+          this.db.run('UPDATE day_assignments SET accommodation_id = NULL WHERE id = ?', stop.id);
+          continue;
+        }
         this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
         mirror.removed.push({ id: stop.id, dayId: stop.day_id });
       }

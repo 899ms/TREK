@@ -4735,12 +4735,52 @@ function runMigrations(db: Database.Database): void {
     // Provenance for a day stop that a lodging booking put there rather than the
     // traveller: it carries the stay's id, so moving or deleting the booking can
     // move or delete exactly that stop and never one somebody placed by hand.
-    // Deliberately left NULL for every row that already exists: everything planned
-    // before this shipped was planned by hand, and a booking must not start
-    // claiming ownership of it.
+    // Every row that already exists stays NULL: those were planned by hand, and a
+    // booking must not start claiming ownership of them. The step below adds the
+    // missing stops instead, which is a different thing from claiming old ones.
     () => {
       const hasColumn = db.prepare("SELECT 1 FROM pragma_table_info('day_assignments') WHERE name = 'accommodation_id'").get();
       if (!hasColumn) db.exec('ALTER TABLE day_assignments ADD COLUMN accommodation_id INTEGER');
+    },
+
+    /*
+     * Give every stay booked before this release the day stop it would get today.
+     *
+     * Road trip mode builds its drive out of day_assignments alone, so a hotel
+     * booked in Days mode was invisible there and the traveller had to add the
+     * same place a second time by hand. New bookings get the stop as they are
+     * written; without this step the fix would only ever apply to trips planned
+     * after the upgrade, and the trips people already have would stay broken.
+     *
+     * Skipped on purpose: a stay whose place is gone (place_id is ON DELETE SET
+     * NULL, and the booking form writes stays that never had one), and a place the
+     * traveller already planned for that day, whose row stays theirs and unmarked.
+     * Re-runnable: the same NOT EXISTS decides both times.
+     */
+    () => {
+      const stays = db.prepare(`
+        SELECT a.id, a.place_id, a.start_day_id
+        FROM day_accommodations a
+        WHERE a.place_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM day_assignments da
+            WHERE da.day_id = a.start_day_id AND da.place_id = a.place_id
+          )
+        ORDER BY a.id
+      `).all() as Array<{ id: number; place_id: number; start_day_id: number }>;
+
+      const insert = db.prepare(
+        `INSERT INTO day_assignments (day_id, place_id, order_index, accommodation_id)
+         VALUES (?, ?, COALESCE((SELECT MAX(order_index) + 1 FROM day_assignments WHERE day_id = ?), 0), ?)`
+      );
+      // Arriving somewhere is what the day was for, so the stop goes last, the same
+      // position a stay booked today lands in.
+      const stamp = db.prepare("UPDATE places SET stop_type = 'hotel' WHERE id = ? AND (stop_type IS NULL OR stop_type = '')");
+      for (const stay of stays) {
+        insert.run(stay.start_day_id, stay.place_id, stay.start_day_id, stay.id);
+        stamp.run(stay.place_id);
+      }
+      if (stays.length > 0) console.log(`[DB] Put ${stays.length} booked night(s) on their check-in day`);
     },
   ];
 
