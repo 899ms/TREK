@@ -205,6 +205,12 @@ export default function SharedTripPage() {
           padding: '32px 20px 28px',
           textAlign: 'center',
           position: 'relative',
+          // The two circles below bleed past this box on purpose (-40 to -60 on
+          // each axis) and nothing else on the page clips them, so without this
+          // the header widened the document by 60px: 390 + 60 = the 450px
+          // scrollWidth a 390px phone reported, and the whole page could be
+          // dragged sideways (#2345).
+          overflow: 'hidden',
         }}
       >
         {/* Cover image background */}
