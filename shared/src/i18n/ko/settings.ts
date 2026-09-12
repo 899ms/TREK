@@ -540,6 +540,21 @@ const settings: TranslationStrings = {
     '항공편, 기차 등 모든 예약의 경로를 개별적으로 켤 필요 없이 지도에 자동으로 표시합니다.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': '이 키가 읽을 수 있는 항목',
+  'settings.apiScopes.hint':
+    '모든 것을 볼 수 있어야 하는 키라면 전부 켜 두세요. 끈 항목은 이 키에 대해 응답에서 빠지는 정도가 아니라 아예 거부됩니다.',
+  'settings.apiScopes.all': '전체',
+  'settings.apiScopes.limited': '{total}개 중 {count}개',
+  'settings.apiScopes.trips': '여행',
+  'settings.apiScopes.days': '일자',
+  'settings.apiScopes.places': '장소',
+  'settings.apiScopes.notes': '일자 메모',
+  'settings.apiScopes.reservations': '예약',
+  'settings.apiScopes.accommodations': '숙소',
+  'settings.apiScopes.travellers': '동행자',
+  'settings.apiScopes.bucket-list': '위시리스트',
+  'settings.apiScopes.stats': '합계',
   'settings.apiKeys.title': 'API 키',
   'settings.apiKeys.description': '공개 API용 키입니다. 다른 소프트웨어가 여행을 읽을 수 있습니다. 읽기 전용이라 무엇도 바꾸거나 지울 수 없습니다.',
   'settings.apiKeys.create': '키 만들기',

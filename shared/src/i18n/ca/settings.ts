@@ -555,6 +555,21 @@ const settings: TranslationStrings = {
     'Dibuixa automàticament al mapa la ruta de cada vol, tren i altra reserva — no cal activar-la una per una.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Què pot llegir aquesta clau',
+  'settings.apiScopes.hint':
+    'Deixa-ho tot activat per a una clau que ho hagi de veure tot. El que desactivis es denega per a aquesta clau, no només es deixa fora de la resposta.',
+  'settings.apiScopes.all': 'Tot',
+  'settings.apiScopes.limited': '{count} de {total}',
+  'settings.apiScopes.trips': 'Viatges',
+  'settings.apiScopes.days': 'Dies',
+  'settings.apiScopes.places': 'Llocs',
+  'settings.apiScopes.notes': 'Notes del dia',
+  'settings.apiScopes.reservations': 'Reserves',
+  'settings.apiScopes.accommodations': 'Allotjament',
+  'settings.apiScopes.travellers': 'Qui hi va',
+  'settings.apiScopes.bucket-list': 'Llista de desitjos',
+  'settings.apiScopes.stats': 'Totals',
   'settings.apiKeys.title': 'Claus API',
   'settings.apiKeys.description': 'Claus per a l\'API pública, perquè altres programes puguin llegir els teus viatges. Només lectura: una clau no pot canviar ni esborrar res.',
   'settings.apiKeys.create': 'Crea una clau',

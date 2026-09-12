@@ -21,6 +21,7 @@ import {
   type RegisterRequest, type LoginRequest, type ForgotPasswordRequest,
   type ResetPasswordRequest, type ChangePasswordRequest,
   type MfaVerifyLoginRequest, type MfaEnableRequest, type McpTokenCreateRequest,
+  type ApiTokenCreateRequest, type PublicApiScope,
   type TripAddMemberRequest, type TripTransferOwnershipRequest,
   type TripCreateGuestRequest, type TripRenameGuestRequest, type AssignmentReorderRequest,
   type PackingReorderRequest, type PackingCreateBagRequest, type TodoReorderRequest,
@@ -342,7 +343,10 @@ export const authApi = {
   // and a key of the wrong kind is refused like one that does not exist.
   apiKeys: {
     list: () => apiClient.get('/auth/api-tokens').then(r => r.data),
-    create: (name: string) => apiClient.post('/auth/api-tokens', { name } satisfies McpTokenCreateRequest).then(r => r.data),
+    // `scopes` narrows what the key may read (#2279). Omitted means everything,
+    // which is what every key minted before scopes existed still does.
+    create: (name: string, scopes?: PublicApiScope[]) =>
+      apiClient.post('/auth/api-tokens', { name, ...(scopes?.length ? { scopes } : {}) } satisfies ApiTokenCreateRequest).then(r => r.data),
     delete: (id: number) => apiClient.delete(`/auth/api-tokens/${id}`).then(r => r.data),
   },
   passkey: {

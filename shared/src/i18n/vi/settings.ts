@@ -554,6 +554,21 @@ const settings: TranslationStrings = {
     'Tự động hiển thị trên bản đồ tuyến đường của mỗi chuyến bay, tàu hỏa và đặt chỗ khác, không cần bật riêng từng mục.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Khóa này được phép đọc gì',
+  'settings.apiScopes.hint':
+    'Hãy bật tất cả cho khóa cần xem được mọi thứ. Bất cứ mục nào bạn tắt sẽ bị từ chối với khóa này, chứ không chỉ là bị lược khỏi câu trả lời.',
+  'settings.apiScopes.all': 'Tất cả',
+  'settings.apiScopes.limited': '{count} trên {total}',
+  'settings.apiScopes.trips': 'Chuyến đi',
+  'settings.apiScopes.days': 'Ngày',
+  'settings.apiScopes.places': 'Địa điểm',
+  'settings.apiScopes.notes': 'Ghi chú theo ngày',
+  'settings.apiScopes.reservations': 'Đặt chỗ',
+  'settings.apiScopes.accommodations': 'Chỗ ở',
+  'settings.apiScopes.travellers': 'Ai cùng đi',
+  'settings.apiScopes.bucket-list': 'Danh sách mong muốn',
+  'settings.apiScopes.stats': 'Tổng hợp',
   'settings.apiKeys.title': 'Khóa API',
   'settings.apiKeys.description': 'Khóa cho API công khai, để phần mềm khác có thể đọc các chuyến đi của bạn. Chỉ đọc: khóa không thể thay đổi hay xóa bất cứ thứ gì.',
   'settings.apiKeys.create': 'Tạo khóa',

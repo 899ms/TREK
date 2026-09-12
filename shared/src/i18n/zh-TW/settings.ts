@@ -517,6 +517,21 @@ const settings: TranslationStrings = {
   'settings.alwaysShowRoutesHint': '自動在地圖上顯示每個航班、火車及其他預訂的路線,不需要逐一手動開啟。',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': '這組金鑰可讀取的內容',
+  'settings.apiScopes.hint':
+    '若希望這組金鑰能看到全部內容，就全部保持開啟。任何你關閉的項目都會對這組金鑰直接拒絕，而不只是從回應中省略。',
+  'settings.apiScopes.all': '全部',
+  'settings.apiScopes.limited': '{total} 項中的 {count} 項',
+  'settings.apiScopes.trips': '旅行',
+  'settings.apiScopes.days': '日期',
+  'settings.apiScopes.places': '地點',
+  'settings.apiScopes.notes': '每日備註',
+  'settings.apiScopes.reservations': '訂位',
+  'settings.apiScopes.accommodations': '住宿',
+  'settings.apiScopes.travellers': '同行者',
+  'settings.apiScopes.bucket-list': '願望清單',
+  'settings.apiScopes.stats': '總計',
   'settings.apiKeys.title': 'API 金鑰',
   'settings.apiKeys.description': '公開 API 的金鑰，讓其他軟體讀取你的行程。唯讀：金鑰無法修改或刪除任何內容。',
   'settings.apiKeys.create': '建立金鑰',

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { KeyRound, Plus, Trash2, Copy, Check } from 'lucide-react'
+import { PUBLIC_API_SCOPES, type PublicApiScope } from '@trek/shared'
 import Section from './Section'
 import { useTranslation } from '../../i18n'
 import { useToast } from '../shared/Toast'
@@ -24,6 +25,9 @@ interface ApiKey {
   token_prefix: string
   created_at: string
   last_used_at: string | null
+  /** 'all' for every key minted before scopes existed, and for any key created without narrowing. */
+  scope_mode?: 'all' | 'limited'
+  scopes?: PublicApiScope[]
 }
 
 export default function ApiKeysSection(): React.ReactElement {
@@ -37,6 +41,12 @@ export default function ApiKeysSection(): React.ReactElement {
   const [created, setCreated] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<number | null>(null)
   const [copied, setCopied] = useState(false)
+  /**
+   * What the new key may read. Starts as everything, because that is what a key
+   * did before this existed and what most integrations want — narrowing is a
+   * deliberate act, and the dialog should not make the common case work harder.
+   */
+  const [newScopes, setNewScopes] = useState<Set<PublicApiScope>>(new Set(PUBLIC_API_SCOPES))
 
   useEffect(() => {
     authApi.apiKeys.list().then(d => setKeys(d.tokens || [])).catch(() => {})
@@ -46,10 +56,23 @@ export default function ApiKeysSection(): React.ReactElement {
     if (!newName.trim() || creating) return
     setCreating(true)
     try {
-      const d = await authApi.apiKeys.create(newName.trim())
+      // All of them selected means "no narrowing", which is what the server
+      // stores as `all` — sending the full list would record it as a limited key
+      // that happens to allow everything, and a section added in a later version
+      // would then be refused for a key nobody meant to restrict.
+      const narrowed = newScopes.size < PUBLIC_API_SCOPES.length ? [...newScopes] : undefined
+      const d = await authApi.apiKeys.create(newName.trim(), narrowed)
       setCreated(d.token.raw_token)
       setKeys(prev => [
-        { id: d.token.id, name: d.token.name, token_prefix: d.token.token_prefix, created_at: d.token.created_at, last_used_at: null },
+        {
+          id: d.token.id,
+          name: d.token.name,
+          token_prefix: d.token.token_prefix,
+          created_at: d.token.created_at,
+          last_used_at: null,
+          scope_mode: d.token.scope_mode,
+          scopes: d.token.scopes,
+        },
         ...prev,
       ])
       setNewName('')
@@ -83,6 +106,16 @@ export default function ApiKeysSection(): React.ReactElement {
     setModalOpen(false)
     setCreated(null)
     setNewName('')
+    setNewScopes(new Set(PUBLIC_API_SCOPES))
+  }
+
+  const toggleScope = (scope: PublicApiScope) => {
+    setNewScopes(prev => {
+      const next = new Set(prev)
+      if (next.has(scope)) next.delete(scope)
+      else next.add(scope)
+      return next
+    })
   }
 
   return (
@@ -114,6 +147,14 @@ export default function ApiKeysSection(): React.ReactElement {
                       <span className="ml-2">· {t('settings.apiKeys.usedAt')} {new Date(key.last_used_at).toLocaleDateString(locale)}</span>
                     )}
                   </p>
+                  {/* What the key may read. Shown on the row rather than behind a
+                      detail view: the whole reason to narrow a key is to be able
+                      to see later that you did. */}
+                  <p className="text-xs mt-1 text-content-muted">
+                    {key.scope_mode === 'limited' && key.scopes
+                      ? key.scopes.map(scope => t(`settings.apiScopes.${scope}`)).join(', ')
+                      : t('settings.apiScopes.all')}
+                  </p>
                 </div>
                 <button type="button" onClick={() => setDeleteId(key.id)}
                   className="p-1.5 rounded-lg transition-colors hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-900/20"
@@ -144,12 +185,31 @@ export default function ApiKeysSection(): React.ReactElement {
                     autoFocus />
                   <p className="mt-1.5 text-xs" style={{ color: 'var(--text-tertiary)' }}>{t('settings.apiKeys.modal.nameHint')}</p>
                 </div>
+
+                <div>
+                  <span className="block text-sm font-medium mb-1 text-content-secondary">
+                    {t('settings.apiScopes.title')}
+                  </span>
+                  <p className="text-xs mb-2 text-content-muted">{t('settings.apiScopes.hint')}</p>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
+                    {PUBLIC_API_SCOPES.map(scope => (
+                      <label key={scope} className="flex items-center gap-2 text-sm text-content-secondary cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={newScopes.has(scope)}
+                          onChange={() => toggleScope(scope)}
+                        />
+                        {t(`settings.apiScopes.${scope}`)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex gap-2 justify-end pt-1">
                   <button type="button" onClick={closeModal}
                     className="px-4 py-2 rounded-lg text-sm border border-edge text-content-secondary">
                     {t('common.cancel')}
                   </button>
-                  <button type="button" onClick={handleCreate} disabled={!newName.trim() || creating}
+                  <button type="button" onClick={handleCreate} disabled={!newName.trim() || creating || newScopes.size === 0}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white bg-slate-900 hover:bg-slate-700 disabled:opacity-50">
                     {creating ? t('settings.apiKeys.modal.creating') : t('settings.apiKeys.modal.create')}
                   </button>

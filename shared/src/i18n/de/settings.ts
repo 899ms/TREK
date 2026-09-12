@@ -555,6 +555,21 @@ const settings: TranslationStrings = {
     'Zeigt die Route für jeden Flug, jede Zugfahrt und jede andere Buchung automatisch auf der Karte an – ohne sie einzeln aktivieren zu müssen.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Was dieser Schlüssel lesen darf',
+  'settings.apiScopes.hint':
+    'Lass alles an, wenn der Schlüssel alles sehen soll. Was du abschaltest, wird für diesen Schlüssel abgelehnt und nicht nur aus der Antwort weggelassen.',
+  'settings.apiScopes.all': 'Alles',
+  'settings.apiScopes.limited': '{count} von {total}',
+  'settings.apiScopes.trips': 'Reisen',
+  'settings.apiScopes.days': 'Tage',
+  'settings.apiScopes.places': 'Orte',
+  'settings.apiScopes.notes': 'Tagesnotizen',
+  'settings.apiScopes.reservations': 'Buchungen',
+  'settings.apiScopes.accommodations': 'Unterkunft',
+  'settings.apiScopes.travellers': 'Wer mitkommt',
+  'settings.apiScopes.bucket-list': 'Wunschliste',
+  'settings.apiScopes.stats': 'Summen',
   'settings.apiKeys.title': 'API-Schlüssel',
   'settings.apiKeys.description': 'Schlüssel für die öffentliche API, damit andere Software deine Reisen lesen kann. Nur lesend: ein Schlüssel kann nichts ändern oder löschen.',
   'settings.apiKeys.create': 'Schlüssel erstellen',

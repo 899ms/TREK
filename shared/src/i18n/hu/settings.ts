@@ -554,6 +554,21 @@ const settings: TranslationStrings = {
     'Automatikusan megjeleníti minden repülőjárat, vonat és egyéb foglalás útvonalát a térképen, nincs szükség egyenkénti bekapcsolásra.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Mit olvashat ez a kulcs',
+  'settings.apiScopes.hint':
+    'Hagyj mindent bekapcsolva, ha a kulcs mindent láthat. Amit kikapcsolsz, azt a rendszer megtagadja ettől a kulcstól, nem csak kihagyja a válaszból.',
+  'settings.apiScopes.all': 'Minden',
+  'settings.apiScopes.limited': '{count} / {total}',
+  'settings.apiScopes.trips': 'Utazások',
+  'settings.apiScopes.days': 'Napok',
+  'settings.apiScopes.places': 'Helyszínek',
+  'settings.apiScopes.notes': 'Napi jegyzetek',
+  'settings.apiScopes.reservations': 'Foglalások',
+  'settings.apiScopes.accommodations': 'Szállás',
+  'settings.apiScopes.travellers': 'Kik utaznak',
+  'settings.apiScopes.bucket-list': 'Kívánságlista',
+  'settings.apiScopes.stats': 'Összesítések',
   'settings.apiKeys.title': 'API-kulcsok',
   'settings.apiKeys.description': 'Kulcsok a nyilvános API-hoz, hogy más szoftverek olvashassák az utazásaidat. Csak olvasható: a kulcs semmit nem módosít és nem töröl.',
   'settings.apiKeys.create': 'Kulcs létrehozása',

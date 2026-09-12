@@ -549,6 +549,21 @@ const settings: TranslationStrings = {
     'Visar automatiskt rutten för varje flyg, tåg och annan bokning på kartan, utan att du behöver aktivera det för varje bokning för sig.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Vad den här nyckeln får läsa',
+  'settings.apiScopes.hint':
+    'Lämna allt påslaget för en nyckel som ska se allt. Det du stänger av nekas för den här nyckeln, det utelämnas inte bara ur svaret.',
+  'settings.apiScopes.all': 'Allt',
+  'settings.apiScopes.limited': '{count} av {total}',
+  'settings.apiScopes.trips': 'Resor',
+  'settings.apiScopes.days': 'Dagar',
+  'settings.apiScopes.places': 'Platser',
+  'settings.apiScopes.notes': 'Dagsanteckningar',
+  'settings.apiScopes.reservations': 'Bokningar',
+  'settings.apiScopes.accommodations': 'Boende',
+  'settings.apiScopes.travellers': 'Vilka som följer med',
+  'settings.apiScopes.bucket-list': 'Önskelista',
+  'settings.apiScopes.stats': 'Totalsummor',
   'settings.apiKeys.title': 'API-nycklar',
   'settings.apiKeys.description': 'Nycklar för det publika API:et, så att annan programvara kan läsa dina resor. Endast läsning: en nyckel kan inte ändra eller ta bort något.',
   'settings.apiKeys.create': 'Skapa nyckel',

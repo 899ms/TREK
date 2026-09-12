@@ -553,6 +553,21 @@ const settings: TranslationStrings = {
     'Автоматично показує на карті маршрут для кожного рейсу, поїзда та іншого бронювання — без потреби вмикати це окремо для кожного елемента.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Що цей ключ може читати',
+  'settings.apiScopes.hint':
+    'Залиште все увімкненим для ключа, який має бачити геть усе. Усе, що ви вимкнете, для цього ключа буде заборонено, а не просто пропущено у відповіді.',
+  'settings.apiScopes.all': 'Усе',
+  'settings.apiScopes.limited': '{count} з {total}',
+  'settings.apiScopes.trips': 'Подорожі',
+  'settings.apiScopes.days': 'Дні',
+  'settings.apiScopes.places': 'Місця',
+  'settings.apiScopes.notes': 'Нотатки дня',
+  'settings.apiScopes.reservations': 'Бронювання',
+  'settings.apiScopes.accommodations': 'Проживання',
+  'settings.apiScopes.travellers': 'Хто їде',
+  'settings.apiScopes.bucket-list': 'Список бажань',
+  'settings.apiScopes.stats': 'Підсумки',
   'settings.apiKeys.title': 'Ключі API',
   'settings.apiKeys.description': 'Ключі для публічного API, щоб інші програми могли читати ваші подорожі. Лише читання: ключ нічого не змінить і не видалить.',
   'settings.apiKeys.create': 'Створити ключ',

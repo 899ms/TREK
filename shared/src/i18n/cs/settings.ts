@@ -544,6 +544,21 @@ const settings: TranslationStrings = {
     'Automaticky zobrazí na mapě trasu každého letu, vlaku a jiné rezervace, aniž byste ji museli zapínat jednotlivě.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Co smí tento klíč číst',
+  'settings.apiScopes.hint':
+    'Pro klíč, který má vidět všechno, nechte vše zapnuté. Cokoli vypnete, bude tomuto klíči odepřeno, nejen vynecháno z odpovědi.',
+  'settings.apiScopes.all': 'Vše',
+  'settings.apiScopes.limited': '{count} z {total}',
+  'settings.apiScopes.trips': 'Cesty',
+  'settings.apiScopes.days': 'Dny',
+  'settings.apiScopes.places': 'Místa',
+  'settings.apiScopes.notes': 'Poznámky ke dni',
+  'settings.apiScopes.reservations': 'Rezervace',
+  'settings.apiScopes.accommodations': 'Ubytování',
+  'settings.apiScopes.travellers': 'Kdo jede',
+  'settings.apiScopes.bucket-list': 'Seznam přání',
+  'settings.apiScopes.stats': 'Souhrny',
   'settings.apiKeys.title': 'Klíče API',
   'settings.apiKeys.description': 'Klíče pro veřejné API, aby jiný software mohl číst tvoje cesty. Jen pro čtení: klíč nemůže nic měnit ani mazat.',
   'settings.apiKeys.create': 'Vytvořit klíč',

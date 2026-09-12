@@ -564,6 +564,21 @@ const settings: TranslationStrings = {
     'Εμφανίζει αυτόματα στον χάρτη τη διαδρομή κάθε πτήσης, τρένου και άλλης κράτησης, χωρίς να χρειάζεται να την ενεργοποιείτε μία προς μία.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Τι μπορεί να διαβάσει αυτό το κλειδί',
+  'settings.apiScopes.hint':
+    'Αφήστε τα όλα ενεργά για ένα κλειδί που πρέπει να τα βλέπει όλα. Ό,τι απενεργοποιήσετε απορρίπτεται για αυτό το κλειδί, δεν παραλείπεται απλώς από την απάντηση.',
+  'settings.apiScopes.all': 'Τα πάντα',
+  'settings.apiScopes.limited': '{count} από {total}',
+  'settings.apiScopes.trips': 'Ταξίδια',
+  'settings.apiScopes.days': 'Ημέρες',
+  'settings.apiScopes.places': 'Τοποθεσίες',
+  'settings.apiScopes.notes': 'Σημειώσεις ημέρας',
+  'settings.apiScopes.reservations': 'Κρατήσεις',
+  'settings.apiScopes.accommodations': 'Διαμονή',
+  'settings.apiScopes.travellers': 'Ποιοι συμμετέχουν',
+  'settings.apiScopes.bucket-list': 'Λίστα επιθυμιών',
+  'settings.apiScopes.stats': 'Σύνολα',
   'settings.apiKeys.title': 'Κλειδιά API',
   'settings.apiKeys.description': 'Κλειδιά για το δημόσιο API, ώστε άλλο λογισμικό να μπορεί να διαβάζει τα ταξίδια σου. Μόνο για ανάγνωση: ένα κλειδί δεν μπορεί να αλλάξει ή να διαγράψει τίποτα.',
   'settings.apiKeys.create': 'Δημιουργία κλειδιού',

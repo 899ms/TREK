@@ -550,6 +550,21 @@ const settings: TranslationStrings = {
     'Menampilkan rute setiap penerbangan, kereta, dan pemesanan lainnya di peta secara otomatis, tanpa perlu mengaktifkannya satu per satu.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Apa yang boleh dibaca kunci ini',
+  'settings.apiScopes.hint':
+    'Biarkan semuanya menyala untuk kunci yang boleh melihat semuanya. Apa pun yang kamu matikan akan ditolak untuk kunci ini, bukan sekadar tidak disertakan dalam jawaban.',
+  'settings.apiScopes.all': 'Semuanya',
+  'settings.apiScopes.limited': '{count} dari {total}',
+  'settings.apiScopes.trips': 'Perjalanan',
+  'settings.apiScopes.days': 'Hari',
+  'settings.apiScopes.places': 'Tempat',
+  'settings.apiScopes.notes': 'Catatan harian',
+  'settings.apiScopes.reservations': 'Pemesanan',
+  'settings.apiScopes.accommodations': 'Akomodasi',
+  'settings.apiScopes.travellers': 'Siapa yang ikut',
+  'settings.apiScopes.bucket-list': 'Daftar keinginan',
+  'settings.apiScopes.stats': 'Total',
   'settings.apiKeys.title': 'Kunci API',
   'settings.apiKeys.description': 'Kunci untuk API publik, agar perangkat lunak lain dapat membaca perjalananmu. Hanya baca: kunci tidak dapat mengubah atau menghapus apa pun.',
   'settings.apiKeys.create': 'Buat kunci',
