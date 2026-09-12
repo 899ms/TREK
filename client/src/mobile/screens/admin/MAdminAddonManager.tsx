@@ -8,11 +8,14 @@ import {
   Puzzle, ListChecks, Wallet, FileText, CalendarDays, Globe, Briefcase, Image, Terminal, Link2, Compass, BookOpen,
   MessageCircle, StickyNote, BarChart3, Sparkles, Luggage, Plane, Server, Cloud, Bookmark, Check, Loader2,
 } from 'lucide-react'
+import DawarichIcon from '../../../components/shared/DawarichIcon'
+import AirTrailIcon from '../../../components/shared/AirTrailIcon'
 import MToggle from '../../components/MToggle'
 import { MAdminButton, MAdminCard, MAdminField, MAdminInput, MAdminSecretInput } from './MAdminUi'
 
 const ICON_MAP = {
   ListChecks, Wallet, FileText, CalendarDays, Puzzle, Globe, Briefcase, Image, Terminal, Link2, Compass, BookOpen, Plane, Bookmark,
+  Dawarich: DawarichIcon,
 }
 
 function ImmichIcon({ size = 14 }: { size?: number }) {
@@ -57,9 +60,16 @@ interface ProviderOption {
 interface AddonIconProps {
   name: string
   size?: number
+  /** A switched-off addon greys its icon out, brand marks included. */
+  enabled?: boolean
 }
 
-function AddonIcon({ name, size = 18 }: AddonIconProps) {
+function AddonIcon({ name, size = 18, enabled = true }: AddonIconProps) {
+  if (name === 'Dawarich') return <DawarichIcon fill muted={!enabled} />
+  // 'Plane' is the icon string airtrail was seeded with, and INSERT OR IGNORE
+  // means every existing install still carries it — so the brand is keyed on
+  // that rather than on a new name no row would ever have.
+  if (name === 'Plane') return <AirTrailIcon fill muted={!enabled} />
   const Icon = ICON_MAP[name] || Puzzle
   return <Icon size={size} />
 }
@@ -304,8 +314,9 @@ function MAddonRow({ addon, onToggle, t, first }: MAddonRowProps) {
     addon.type === 'global' ? t('admin.addons.type.global') : addon.type === 'integration' ? t('admin.addons.type.integration') : t('admin.addons.type.trip')
   return (
     <div className={`flex items-center gap-3 py-[11px] ${first ? '' : 'border-t border-[color:var(--m-rowbr)]'}`}>
-      <span className="flex h-[38px] w-[38px] flex-none items-center justify-center rounded-[11px] bg-[color:var(--m-ic)] text-m-ink">
-        <AddonIcon name={addon.icon} size={18} />
+      {/* overflow-hidden so a brand mark that fills the slot keeps its rounded corners. */}
+      <span className="flex h-[38px] w-[38px] flex-none items-center justify-center overflow-hidden rounded-[11px] bg-[color:var(--m-ic)] text-m-ink">
+        <AddonIcon name={addon.icon} size={18} enabled={addon.enabled} />
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">

@@ -550,6 +550,21 @@ const settings: TranslationStrings = {
     'Haritada her uçuş, tren ve diğer rezervasyonun rotasını, tek tek açmaya gerek kalmadan otomatik olarak gösterir.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Bu anahtar neleri okuyabilir',
+  'settings.apiScopes.hint':
+    'Her şeyi görmesi gereken bir anahtar için hepsini açık bırakın. Kapattığınız her şey bu anahtar için reddedilir, yalnızca yanıttan çıkarılmakla kalmaz.',
+  'settings.apiScopes.all': 'Her şey',
+  'settings.apiScopes.limited': '{total} içinden {count}',
+  'settings.apiScopes.trips': 'Geziler',
+  'settings.apiScopes.days': 'Günler',
+  'settings.apiScopes.places': 'Yerler',
+  'settings.apiScopes.notes': 'Gün notları',
+  'settings.apiScopes.reservations': 'Rezervasyonlar',
+  'settings.apiScopes.accommodations': 'Konaklama',
+  'settings.apiScopes.travellers': 'Kimler geliyor',
+  'settings.apiScopes.bucket-list': 'Dilek listesi',
+  'settings.apiScopes.stats': 'Toplamlar',
   'settings.apiKeys.title': 'API Anahtarları',
   'settings.apiKeys.description': 'Genel API için anahtarlar, böylece başka yazılımlar gezilerini okuyabilir. Yalnızca okuma: bir anahtar hiçbir şeyi değiştiremez veya silemez.',
   'settings.apiKeys.create': 'Anahtar oluştur',

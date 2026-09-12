@@ -552,6 +552,21 @@ const settings: TranslationStrings = {
     'Automatycznie pokazuje na mapie trasę każdego lotu, pociągu i innej rezerwacji, bez konieczności włączania jej pojedynczo.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Co ten klucz może odczytywać',
+  'settings.apiScopes.hint':
+    'Zostaw wszystko włączone dla klucza, który ma widzieć całość. Wszystko, co wyłączysz, jest dla tego klucza odrzucane, a nie tylko pomijane w odpowiedzi.',
+  'settings.apiScopes.all': 'Wszystko',
+  'settings.apiScopes.limited': '{count} z {total}',
+  'settings.apiScopes.trips': 'Podróże',
+  'settings.apiScopes.days': 'Dni',
+  'settings.apiScopes.places': 'Miejsca',
+  'settings.apiScopes.notes': 'Notatki dnia',
+  'settings.apiScopes.reservations': 'Rezerwacje',
+  'settings.apiScopes.accommodations': 'Noclegi',
+  'settings.apiScopes.travellers': 'Kto jedzie',
+  'settings.apiScopes.bucket-list': 'Lista marzeń',
+  'settings.apiScopes.stats': 'Podsumowania',
   'settings.apiKeys.title': 'Klucze API',
   'settings.apiKeys.description': 'Klucze do publicznego API, aby inne oprogramowanie mogło odczytywać Twoje podróże. Tylko odczyt: klucz niczego nie zmieni ani nie usunie.',
   'settings.apiKeys.create': 'Utwórz klucz',

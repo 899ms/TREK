@@ -1271,9 +1271,19 @@ describe('atlas quirk fixes', () => {
 
     const result = atlas.countryPlaces(user.id, 'JP');
 
-    // status rides along since #1048 — a manual mark is a visit even with no trips.
-    expect(result).toEqual({ places: [], trips: [], manually_marked: true, status: 'visited' });
-    expect(atlas.countryPlaces(user.id, 'FR').manually_marked).toBe(false);
+    // status rides along since #1048 — a manual mark is a visit even with no
+    // trips; marked_source since #2279 says who put the mark there, and a row
+    // written before that column existed still reads as 'manual'.
+    expect(result).toEqual({
+      places: [],
+      trips: [],
+      manually_marked: true,
+      marked_source: 'manual',
+      status: 'visited',
+    });
+    const unmarked = atlas.countryPlaces(user.id, 'FR');
+    expect(unmarked.manually_marked).toBe(false);
+    expect(unmarked.marked_source).toBeNull();
   });
 
   it('ATLAS-SVC-032: updateBucketItem persists lat/lng of exactly 0 (equator/prime meridian)', () => {

@@ -33,6 +33,7 @@ export * from './reservation/reservation.schema';
 export * from './reservation/ki-reservation.schema';
 export * from './datetime/datetime-normalize';
 export * from './airtrail/airtrail.schema';
+export * from './dawarich/dawarich.schema';
 export * from './day/day.schema';
 export * from './day/note-colors';
 export * from './assignment/assignment.schema';

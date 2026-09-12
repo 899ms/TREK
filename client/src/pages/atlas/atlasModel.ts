@@ -105,6 +105,10 @@ export interface BucketItem {
   country_code: string | null
   notes: string | null
   target_date: string | null
+  /** ISO-8601 of the stay that fulfilled this wish, or null while it is still a wish. */
+  visited_at?: string | null
+  /** Who decided it was reached: 'manual' or 'dawarich' (#2279). */
+  visited_source?: string | null
 }
 
 // Normalize a region name for matching: strip diacritics (the geocoder and the

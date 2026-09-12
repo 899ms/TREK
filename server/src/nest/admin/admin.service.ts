@@ -548,13 +548,15 @@ export class AdminService {
       // to the operator, so there is no instance decision left to make — not even
       // whether it runs.
       //
-      // AirTrail: the addon exists to reach a server the admin runs themselves,
-      // and a managed instance has no route to one.
+      // AirTrail and Dawarich: both addons exist to reach a server the admin
+      // runs themselves, and a managed instance has no route to one.
       .filter(
         (a) =>
           !(
             readEnv().managed.enabled &&
-            (a.id === ADDON_IDS.LLM_PARSING || a.id === ADDON_IDS.AIRTRAIL)
+            (a.id === ADDON_IDS.LLM_PARSING ||
+              a.id === ADDON_IDS.AIRTRAIL ||
+              a.id === ADDON_IDS.DAWARICH)
           ),
       );
     const providers = this.db.all<{

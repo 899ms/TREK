@@ -606,13 +606,17 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          {/* The date needs the room, not the clock: a long localized date
+              ("12. Sept. 2026") wrapped onto a second line while the time field
+              sat half empty beside it. The row is split in the date's favour and
+              the location, which is a free-text search, gives some back. */}
+          <div className="grid grid-cols-1 sm:grid-cols-[1.3fr_1fr] gap-3">
             {/* Time sat in state and went to the server, it just had no input here — so a
                 draft's auto-stamped clock time showed up in the timeline, the map, the PDF
                 and the public share, and the desktop had no way to correct it (#1614). */}
-            {/* 136px, not 104: the custom picker adds a clock button and, in 12h,
-                shows "2:30 PM" where the native input showed a fixed-width HH:MM. */}
-            <div className="grid grid-cols-[1fr_136px] gap-2">
+            {/* 112px: enough for the clock button plus "2:30 PM" in 12h, and no
+                more — the date column is what needed the space back. */}
+            <div className="grid grid-cols-[minmax(0,1fr)_112px] gap-2">
               <div>
                 <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-500 block mb-1.5">{t('journey.editor.date')}</label>
                 <DatePicker value={entryDate} onChange={setEntryDate} tripDates={tripDates} />

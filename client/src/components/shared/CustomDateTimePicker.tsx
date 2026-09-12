@@ -21,6 +21,8 @@ interface CustomDatePickerProps {
   style?: React.CSSProperties;
   compact?: boolean;
   borderless?: boolean;
+  /** Read-only contexts (a shared journey, a locked form) — same as CustomTimePicker. */
+  disabled?: boolean;
   // Optional inclusive ISO (YYYY-MM-DD) bounds. Dates outside the range are
   // disabled in the calendar and rejected on manual entry.
   min?: string;
@@ -34,6 +36,7 @@ export function CustomDatePicker({
   style = {},
   compact = false,
   borderless = false,
+  disabled = false,
   min,
   max,
 }: CustomDatePickerProps) {
@@ -299,6 +302,7 @@ export function CustomDatePicker({
           <button
             type="button"
             onClick={() => setOpen((o) => !o)}
+            disabled={disabled}
             aria-label={displayValue || placeholder || t('common.date')}
             aria-expanded={open}
             aria-haspopup="dialog"
@@ -320,7 +324,8 @@ export function CustomDatePicker({
               color: displayValue ? 'var(--text-primary)' : 'var(--text-faint)',
               fontSize: 'calc(13px * var(--fs-scale-body, 1))',
               fontFamily: 'inherit',
-              cursor: 'pointer',
+              cursor: disabled ? 'default' : 'pointer',
+              opacity: disabled ? 0.6 : 1,
               outline: 'none',
               transition: 'border-color 0.15s',
             }}

@@ -13,6 +13,8 @@ import { lockBodyScroll } from '../../utils/bodyScrollLock'
 import type { JourneyEntry } from '../../store/journeyStore'
 import { createDraftJourneyEntry } from './JourneyDetailPage.helpers'
 
+import { useDawarichJournalTrail } from '../../hooks/useDawarichJournalTrail'
+
 /** Stable identity for "this journey draws no trip tracks" (#2194). */
 const NO_TRACKS: JourneyTrack[] = []
 
@@ -371,6 +373,17 @@ export function useJourneyDetail() {
     return dates
   }, [current?.trips])
 
+  // The route actually recorded over the journal's own dates (#2279), drawn on
+  // the same layer as the GPX tracks because it is the same kind of thing: a
+  // recording, not a line connecting entries. Gated on `show_trip_tracks` for
+  // the same reason that switch exists — it gates the REQUEST, and a map nobody
+  // asked for should not reach across the network for it.
+  const dawarichTrail = useDawarichJournalTrail(tripDates, showTripTracks)
+  const mapTracks = useMemo(
+    () => (dawarichTrail.tracks.length > 0 ? [...tracks, ...dawarichTrail.tracks] : tracks),
+    [tracks, dawarichTrail.tracks],
+  )
+
   /** Studio's margin to the window on all four sides — see `.st-root` in studio.css. */
   const STUDIO_INSET = 16
 
@@ -412,7 +425,7 @@ export function useJourneyDetail() {
     hideSkeletons, setHideSkeletons,
     mapRef, fullMapRef, galleryUploadRef, galleryProviders, setGalleryProviders, galleryBrowseRef,
     activeLocationId, handleMarkerClick, handleLocationClick,
-    mapEntries, sidebarMapItems, tripDates, isMobile, tracks,
+    mapEntries, sidebarMapItems, tripDates, isMobile, tracks: mapTracks, dawarichTrail,
     feedEdge, scrollFeedTo,
     loadJourney, updateEntry, deleteEntry, reorderEntries, uploadPhotos, deletePhoto,
   }

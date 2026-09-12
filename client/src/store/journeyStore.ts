@@ -131,6 +131,15 @@ interface JourneyState {
   current: JourneyDetail | null
   loading: boolean
   notFound: boolean
+  /**
+   * The phone's journey screen is showing its Gallery tab.
+   *
+   * Lives here because the dock's FAB is a sibling of that screen: on the
+   * Gallery the one big action is uploading a photo, not adding an entry, and a
+   * sibling cannot read another component's state any other way.
+   */
+  mobileGalleryOpen: boolean
+  setMobileGalleryOpen: (open: boolean) => void
 
   loadJourneys: () => Promise<void>
   loadJourney: (id: number) => Promise<void>
@@ -180,6 +189,8 @@ export const useJourneyStore = create<JourneyState>((set, get) => ({
   current: null,
   loading: false,
   notFound: false,
+  mobileGalleryOpen: false,
+  setMobileGalleryOpen: (open: boolean) => set({ mobileGalleryOpen: open }),
 
   loadJourneys: async () => {
     set({ loading: true })

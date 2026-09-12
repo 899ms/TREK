@@ -1,4 +1,5 @@
 import admin from './admin';
+import dawarich from './dawarich';
 import airport from './airport';
 import atlas from './atlas';
 import backup from './backup';
@@ -106,5 +107,6 @@ const locale = {
   ...mobileSettings,
   ...mobileCollections,
   ...storage,
+  ...dawarich,
 };
 export default locale;

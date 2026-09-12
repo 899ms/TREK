@@ -513,6 +513,21 @@ const settings: TranslationStrings = {
   'settings.alwaysShowRoutesHint': '自动在地图上显示每个航班、火车和其他预订的路线,无需逐个手动开启。',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': '此密钥可读取的内容',
+  'settings.apiScopes.hint':
+    '如果希望这个密钥看到全部内容，就保持全部开启。任何被关闭的内容对该密钥都会被拒绝，而不只是不出现在结果里。',
+  'settings.apiScopes.all': '全部',
+  'settings.apiScopes.limited': '{total} 项中的 {count} 项',
+  'settings.apiScopes.trips': '行程',
+  'settings.apiScopes.days': '日程',
+  'settings.apiScopes.places': '地点',
+  'settings.apiScopes.notes': '每日备注',
+  'settings.apiScopes.reservations': '预订',
+  'settings.apiScopes.accommodations': '住宿',
+  'settings.apiScopes.travellers': '同行人员',
+  'settings.apiScopes.bucket-list': '愿望清单',
+  'settings.apiScopes.stats': '统计总计',
   'settings.apiKeys.title': 'API 密钥',
   'settings.apiKeys.description': '公开 API 的密钥，让其他软件读取你的行程。只读：密钥无法修改或删除任何内容。',
   'settings.apiKeys.create': '创建密钥',

@@ -668,6 +668,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Εισαγωγή τοποθεσιών από κοινόχρηστη λίστα Naver Maps',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Συγχρονισμός πτήσεων από τη δική σας εγκατάσταση AirTrail',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Ανάγνωση επισκέψεων και καταγεγραμμένων διαδρομών από μια εγκατάσταση Dawarich που συνδέει ο κάθε χρήστης μόνος του',
   'admin.addons.catalog.llm_parsing.name': 'Ανάλυση με τεχνητή νοημοσύνη',
   'admin.addons.catalog.llm_parsing.description': 'Διαβάζει κρατήσεις που δεν καταλαβαίνει ο ενσωματωμένος αναλυτής, με μοντέλο ΤΝ της επιλογής σας',
   'admin.addons.enabled': 'Ενεργοποιημένο',

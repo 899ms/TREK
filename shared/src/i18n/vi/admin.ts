@@ -611,6 +611,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Nhập địa điểm từ danh sách Naver Maps được chia sẻ',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Đồng bộ chuyến bay từ máy chủ AirTrail của bạn',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Đọc các điểm lưu trú và lộ trình đã ghi từ phiên bản Dawarich mà mỗi người tự kết nối',
   'admin.addons.catalog.llm_parsing.name': 'Phân tích bằng AI',
   'admin.addons.catalog.llm_parsing.description': 'Đọc các đặt chỗ mà bộ phân tích tích hợp không hiểu, bằng mô hình AI bạn chọn',
   'admin.addons.enabled': 'Đã bật',

@@ -530,6 +530,22 @@ async function main() {
       }
     }
 
+    // --- dawarich_connections: api_key ---
+    // Its own table rather than a users column, so it needs its own block. The
+    // table arrived with a later migration, hence the existence check: an older
+    // database simply has nothing to rotate here.
+    if (tableExists('dawarich_connections')) {
+      const connections = db
+        .prepare('SELECT user_id, api_key FROM dawarich_connections WHERE api_key IS NOT NULL')
+        .all() as { user_id: number; api_key: string }[];
+      for (const row of connections) {
+        const newVal = migrateApiKeyValue(row.api_key, `dawarich_connections[${row.user_id}].api_key`);
+        if (newVal !== null) {
+          db.prepare('UPDATE dawarich_connections SET api_key = ? WHERE user_id = ?').run(newVal, row.user_id);
+        }
+      }
+    }
+
     // --- trek_photos: passphrase ---
     const photos = db.prepare('SELECT id, passphrase FROM trek_photos WHERE passphrase IS NOT NULL').all() as { id: number; passphrase: string }[];
     for (const row of photos) {

@@ -42,6 +42,10 @@ const RESET_TABLES = [
   // one case into the next.
   'roadtrip_day_tracks',
   'roadtrip_vias',
+  // Dawarich (#2279). The suggestions reference places and bucket_list, so they
+  // are cleared before both; the connection row hangs off the user.
+  'dawarich_visit_suggestions',
+  'dawarich_connections',
   // Day content
   'day_notes',
   'todo_category_assignees',

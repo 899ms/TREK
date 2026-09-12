@@ -553,6 +553,21 @@ const settings: TranslationStrings = {
     'Toont automatisch de route van elke vlucht, trein en andere boeking op de kaart, zonder dat u dit per boeking hoeft in te schakelen.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'Wat deze sleutel mag lezen',
+  'settings.apiScopes.hint':
+    'Laat alles aan staan voor een sleutel die alles mag zien. Alles wat je uitzet, wordt voor deze sleutel geweigerd en niet alleen uit het antwoord weggelaten.',
+  'settings.apiScopes.all': 'Alles',
+  'settings.apiScopes.limited': '{count} van {total}',
+  'settings.apiScopes.trips': 'Reizen',
+  'settings.apiScopes.days': 'Dagen',
+  'settings.apiScopes.places': 'Plaatsen',
+  'settings.apiScopes.notes': 'Dagnotities',
+  'settings.apiScopes.reservations': 'Boekingen',
+  'settings.apiScopes.accommodations': 'Accommodatie',
+  'settings.apiScopes.travellers': 'Wie er meegaan',
+  'settings.apiScopes.bucket-list': 'Wensenlijst',
+  'settings.apiScopes.stats': 'Totalen',
   'settings.apiKeys.title': 'API-sleutels',
   'settings.apiKeys.description': 'Sleutels voor de publieke API, zodat andere software je reizen kan lezen. Alleen-lezen: een sleutel kan niets wijzigen of verwijderen.',
   'settings.apiKeys.create': 'Sleutel aanmaken',

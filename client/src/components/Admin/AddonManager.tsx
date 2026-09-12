@@ -7,6 +7,8 @@ import { useToast } from '../shared/Toast'
 import { Puzzle, ListChecks, Wallet, FileText, CalendarDays, Globe, Briefcase, Image, Terminal, Link2, Compass, BookOpen, MessageCircle, StickyNote, BarChart3, Sparkles, Luggage, Plane, Server, Cloud, Bookmark, Users, Loader2 } from 'lucide-react'
 import CustomSelect from '../shared/CustomSelect'
 import EmptyState from '../shared/EmptyState'
+import DawarichIcon from '../shared/DawarichIcon'
+import AirTrailIcon from '../shared/AirTrailIcon'
 import AddonTile from './AddonTile'
 import AddonSubRow from './AddonSubRow'
 
@@ -15,6 +17,9 @@ import AddonSubRow from './AddonSubRow'
 // used to land on the fallback.
 const ICON_MAP = {
   ListChecks, Wallet, FileText, CalendarDays, Puzzle, Globe, Briefcase, Image, Terminal, Link2, Compass, BookOpen, Plane, Bookmark, Users, Sparkles,
+  // Dawarich ships a brand mark rather than a lucide name, the same way the photo
+  // providers below do. Keyed by the string in the addons table.
+  Dawarich: DawarichIcon,
 }
 
 function ImmichIcon({ size = 14 }: { size?: number }) {
@@ -59,9 +64,20 @@ interface ProviderOption {
 interface AddonIconProps {
   name: string
   size?: number
+  /** A switched-off addon greys its icon out, brand marks included. */
+  enabled?: boolean
 }
 
-function AddonIcon({ name, size = 20 }: AddonIconProps) {
+function AddonIcon({ name, size = 20, enabled = true }: AddonIconProps) {
+  // The brand marks are badges, not glyphs: they fill the framed slot instead of
+  // sitting in the middle of it at glyph size, and they grey out when the addon
+  // is off — the lucide glyphs get that from the slot's text colour, an <img>
+  // has to be told.
+  if (name === 'Dawarich') return <DawarichIcon fill muted={!enabled} />
+  // 'Plane' is the icon string airtrail was seeded with, and INSERT OR IGNORE
+  // means every existing install still carries it — so the brand is keyed on
+  // that rather than on a new name no row would ever have.
+  if (name === 'Plane') return <AirTrailIcon fill muted={!enabled} />
   const Icon = ICON_MAP[name] || Puzzle
   return <Icon size={size} />
 }
@@ -212,7 +228,7 @@ export default function AddonManager({ bagTrackingEnabled, onToggleBagTracking, 
     return (
       <AddonTile
         key={addon.id}
-        icon={<AddonIcon name={addon.icon} size={18} />}
+        icon={<AddonIcon name={addon.icon} size={18} enabled={addon.enabled} />}
         name={label.name}
         description={label.description}
         enabled={addon.enabled}

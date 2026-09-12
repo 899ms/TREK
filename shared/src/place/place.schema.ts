@@ -138,6 +138,12 @@ export const placeSchema = z.object({
   // The Amap (高德) POI id a place was found by, `amap:`-prefixed. null for every
   // place that came from another provider.
   amap_poi_id: z.string().nullable().optional(),
+  /**
+   * Where the place came from when it was not typed by a person — currently
+   * only `'dawarich'`, for a stay accepted out of someone's own recordings.
+   * null on every place added by hand, which is nearly all of them.
+   */
+  source: z.string().nullable().optional(),
   route_geometry: z.string().nullable().optional(),
   // Manual track colour (#776). null = inherit the category colour like before.
   route_color: hexColorSchema.nullable().optional(),

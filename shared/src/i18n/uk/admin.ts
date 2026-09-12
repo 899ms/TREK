@@ -609,6 +609,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Імпорт місць зі спільного списку Naver Maps',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Синхронізація рейсів із вашого сервера AirTrail',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Читає перебування та записані маршрути із сервера Dawarich, який кожен користувач підключає сам',
   'admin.addons.catalog.llm_parsing.name': 'Розбір за допомогою ШІ',
   'admin.addons.catalog.llm_parsing.description': 'Читає бронювання, які не розпізнає вбудований аналізатор, за допомогою обраної вами моделі ШІ',
   'admin.addons.enabled': 'Увімкнено',

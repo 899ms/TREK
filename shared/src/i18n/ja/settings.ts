@@ -523,6 +523,21 @@ const settings: TranslationStrings = {
     'フライトや電車などすべての予約のルートを、個別にオンにしなくても地図上に自動的に表示します。',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'このキーが読み取れる範囲',
+  'settings.apiScopes.hint':
+    'すべて読み取らせたいキーは、全部オンのままにしてください。オフにした項目は、応答から省かれるのではなく、このキーには拒否されます。',
+  'settings.apiScopes.all': 'すべて',
+  'settings.apiScopes.limited': '{total}件中{count}件',
+  'settings.apiScopes.trips': '旅行',
+  'settings.apiScopes.days': '日程',
+  'settings.apiScopes.places': '場所',
+  'settings.apiScopes.notes': '日ごとのメモ',
+  'settings.apiScopes.reservations': '予約',
+  'settings.apiScopes.accommodations': '宿泊',
+  'settings.apiScopes.travellers': '同行者',
+  'settings.apiScopes.bucket-list': 'ウィッシュリスト',
+  'settings.apiScopes.stats': '合計',
   'settings.apiKeys.title': 'API キー',
   'settings.apiKeys.description': '公開 API 用のキーです。ほかのソフトウェアが旅程を読み取れるようになります。読み取り専用で、変更や削除はできません。',
   'settings.apiKeys.create': 'キーを作成',

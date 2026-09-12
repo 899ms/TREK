@@ -543,6 +543,21 @@ const settings: TranslationStrings = {
     'Automatically draw the route for every flight, train and other booking on the map — no need to switch it on per item.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'What this key may read',
+  'settings.apiScopes.hint':
+    'Leave everything on for a key that should see all of it. Anything you switch off is refused for this key, not just left out of the answer.',
+  'settings.apiScopes.all': 'Everything',
+  'settings.apiScopes.limited': '{count} of {total}',
+  'settings.apiScopes.trips': 'Trips',
+  'settings.apiScopes.days': 'Days',
+  'settings.apiScopes.places': 'Places',
+  'settings.apiScopes.notes': 'Day notes',
+  'settings.apiScopes.reservations': 'Bookings',
+  'settings.apiScopes.accommodations': 'Accommodation',
+  'settings.apiScopes.travellers': 'Who is coming',
+  'settings.apiScopes.bucket-list': 'Wishlist',
+  'settings.apiScopes.stats': 'Totals',
   'settings.apiKeys.title': 'API Keys',
   'settings.apiKeys.description': 'Keys for the public API, so other software can read your trips. Read-only: a key cannot change or delete anything.',
   'settings.apiKeys.create': 'Create key',

@@ -537,6 +537,21 @@ const settings: TranslationStrings = {
     'يعرض تلقائيًا مسار كل رحلة طيران وقطار وحجز آخر على الخريطة، دون الحاجة إلى تفعيله لكل عنصر على حدة.',
 
   // Public API keys (Settings -> Integrations)
+  // ── API keys: what a key may read ─────────────────────────────────────────
+  'settings.apiScopes.title': 'ما يمكن لهذا المفتاح قراءته',
+  'settings.apiScopes.hint':
+    'اترك كل شيء مفعّلاً لمفتاح ينبغي أن يرى كل شيء. أي خيار توقفه يُرفض لهذا المفتاح، لا يُحذف من الإجابة فحسب.',
+  'settings.apiScopes.all': 'كل شيء',
+  'settings.apiScopes.limited': '{count} من {total}',
+  'settings.apiScopes.trips': 'الرحلات',
+  'settings.apiScopes.days': 'الأيام',
+  'settings.apiScopes.places': 'الأماكن',
+  'settings.apiScopes.notes': 'ملاحظات اليوم',
+  'settings.apiScopes.reservations': 'الحجوزات',
+  'settings.apiScopes.accommodations': 'الإقامة',
+  'settings.apiScopes.travellers': 'من سيأتي',
+  'settings.apiScopes.bucket-list': 'قائمة الأمنيات',
+  'settings.apiScopes.stats': 'الإجماليات',
   'settings.apiKeys.title': 'مفاتيح API',
   'settings.apiKeys.description': 'مفاتيح لواجهة API العامة، حتى تتمكن برامج أخرى من قراءة رحلاتك. للقراءة فقط: لا يمكن للمفتاح تغيير أي شيء أو حذفه.',
   'settings.apiKeys.create': 'إنشاء مفتاح',

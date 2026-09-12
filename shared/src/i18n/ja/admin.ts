@@ -621,6 +621,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': '共有された Naver マップのリストから場所をインポート',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': '自分の AirTrail から フライトを同期',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    '各自が接続した Dawarich インスタンスから、滞在と記録されたルートを読み取ります',
   'admin.addons.catalog.llm_parsing.name': 'AI 解析',
   'admin.addons.catalog.llm_parsing.description': '内蔵パーサーが読めない予約を、選んだ AI モデルで読み取ります',
   'admin.addons.enabled': '有効',

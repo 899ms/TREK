@@ -594,6 +594,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'Importujte místa ze sdíleného seznamu Naver Maps',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'Synchronizujte lety ze své instance AirTrail',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'Načtěte návštěvy a zaznamenané trasy z instance Dawarich, kterou si každý čtenář připojí sám',
   'admin.addons.catalog.llm_parsing.name': 'Analýza pomocí AI',
   'admin.addons.catalog.llm_parsing.description': 'Přečte rezervace, které vestavěný analyzátor nezvládne, pomocí zvoleného modelu AI',
   'admin.addons.catalog.roadtrip.name': 'Cesta autem',

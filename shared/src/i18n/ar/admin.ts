@@ -612,6 +612,9 @@ const admin: TranslationStrings = {
   'admin.addons.catalog.naver_list_import.description': 'استيراد الأماكن من قائمة Naver Maps مشتركة',
   'admin.addons.catalog.airtrail.name': 'AirTrail',
   'admin.addons.catalog.airtrail.description': 'مزامنة الرحلات من خادم AirTrail الخاص بك',
+  'admin.addons.catalog.dawarich.name': 'Dawarich',
+  'admin.addons.catalog.dawarich.description':
+    'قراءة الزيارات والمسارات المسجَّلة من خادم Dawarich يربطه كل قارئ بنفسه',
   'admin.addons.catalog.llm_parsing.name': 'التحليل بالذكاء الاصطناعي',
   'admin.addons.catalog.llm_parsing.description': 'يقرأ الحجوزات التي يعجز المحلل المدمج عن فهمها، بنموذج ذكاء اصطناعي تختاره',
   'admin.addons.enabled': 'مفعّل',
