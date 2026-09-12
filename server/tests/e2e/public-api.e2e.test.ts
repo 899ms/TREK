@@ -226,6 +226,20 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
     return token ? req.set('Authorization', `Bearer ${token}`) : req;
   };
 
+  /**
+   * Several reads in a row, one after the other.
+   *
+   * Not `Promise.all`: the Nest app is never told to listen, so supertest binds
+   * an ephemeral port itself on the first request. Fired in parallel, four
+   * requests race four `listen(0)` calls on the same server and the losers come
+   * back as ECONNRESET — reliably on a loaded CI runner, almost never here.
+   */
+  const getEach = async (...calls: Array<[string, string?]>) => {
+    const out = [];
+    for (const [path, token] of calls) out.push(await get(path, token));
+    return out;
+  };
+
   describe('authentication', () => {
     it('401s without a token', async () => {
       const res = await get('/api/v1/trips');
@@ -448,12 +462,12 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
     });
 
     it('PUBAPI-SCOPE-002: and still reads every section, which is the whole promise', async () => {
-      const [trips, bucket, stats, trip] = await Promise.all([
-        get('/api/v1/trips', ADA_TOKEN),
-        get('/api/v1/bucket-list', ADA_TOKEN),
-        get('/api/v1/stats', ADA_TOKEN),
-        get('/api/v1/trips/1', ADA_TOKEN),
-      ]);
+      const [trips, bucket, stats, trip] = await getEach(
+        ['/api/v1/trips', ADA_TOKEN],
+        ['/api/v1/bucket-list', ADA_TOKEN],
+        ['/api/v1/stats', ADA_TOKEN],
+        ['/api/v1/trips/1', ADA_TOKEN],
+      );
       expect([trips.status, bucket.status, stats.status, trip.status]).toEqual([200, 200, 200, 200]);
       expect(stats.body).toMatchObject({ total_trips: 2, total_countries: 2 });
       // The full payload, not a narrowed one: every section is there.
@@ -498,12 +512,12 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
      * 401 and does nothing at all for a 403.
      */
     it('PUBAPI-SCOPE-006: the refusal is a 403 and leaves both 401 bodies exactly as they were', async () => {
-      const [none, unknown, wrongKind, noneOnStats] = await Promise.all([
-        get('/api/v1/trips'),
-        get('/api/v1/trips', 'trek_' + 'z'.repeat(48)),
-        get('/api/v1/trips', MCP_TOKEN),
-        get('/api/v1/stats'),
-      ]);
+      const [none, unknown, wrongKind, noneOnStats] = await getEach(
+        ['/api/v1/trips'],
+        ['/api/v1/trips', 'trek_' + 'z'.repeat(48)],
+        ['/api/v1/trips', MCP_TOKEN],
+        ['/api/v1/stats'],
+      );
       expect(none.status).toBe(401);
       expect(none.body).toEqual({ error: 'API token required', code: 'API_TOKEN_REQUIRED' });
       expect(unknown.status).toBe(401);
@@ -561,10 +575,10 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
       // widen because its list became unreadable — a hand-edited row, or a scope
       // constant a later version renamed away. Failing closed turns that into a
       // support ticket instead of a key quietly reading every trip.
-      const [bucket, trip] = await Promise.all([
-        get('/api/v1/bucket-list', BROKEN_SCOPES_TOKEN),
-        get('/api/v1/trips/1', BROKEN_SCOPES_TOKEN),
-      ]);
+      const [bucket, trip] = await getEach(
+        ['/api/v1/bucket-list', BROKEN_SCOPES_TOKEN],
+        ['/api/v1/trips/1', BROKEN_SCOPES_TOKEN],
+      );
       expect(bucket.status).toBe(403);
       expect(bucket.body).toMatchObject({ code: 'API_SCOPE_FORBIDDEN' });
       expect(trip.status).toBe(403);
