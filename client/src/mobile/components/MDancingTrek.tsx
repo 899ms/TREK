@@ -27,6 +27,7 @@ export type TrekScene =
   | 'packing'
   | 'files'
   | 'notes'
+  | 'links'
   | 'polls'
   | 'journey'
   | 'collections'
@@ -209,6 +210,21 @@ function SceneBack({ scene }: { scene: TrekScene }) {
           </g>
           <g className="trek-wheel">
             <circle cx="79" cy="73.4" r="2" fill="currentColor" />
+          </g>
+        </g>
+      )
+    case 'links':
+      // two chain links clicking into each other beside the body. The lower one
+      // carries a surface-coloured under-stroke so it reads as passing through
+      // the upper one rather than lying flat on top of it.
+      return (
+        <g className="trek-chain">
+          <g transform="rotate(-36 73 56)">
+            <rect x="58" y="49" width="20" height="13" rx="6.5" fill="none" stroke="currentColor" strokeWidth="3" />
+            <g className="trek-link">
+              <rect x="68" y="49" width="20" height="13" rx="6.5" fill="none" stroke="var(--m-bg)" strokeWidth="5.6" />
+              <rect x="68" y="49" width="20" height="13" rx="6.5" fill="none" stroke="currentColor" strokeWidth="3" />
+            </g>
           </g>
         </g>
       )
