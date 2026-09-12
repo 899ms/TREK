@@ -4,6 +4,7 @@ import { renderIconMarkup } from '../../utils/iconMarkup'
 import { MapContainer, TileLayer, Marker, Polyline, CircleMarker, Circle, useMap, Tooltip } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import { makeMarkerDraggable, makePoiDraggable, draggedPoiId } from './markerDrag'
+import { CLUSTER_OPTIONS, createClusterIcon } from './markerCluster'
 import RoadtripViaMarkers from './RoadtripViaMarkers'
 import HazardLayers from './HazardLayers'
 import { ALT_CASING, ALT_LABEL_TEXT } from '../Roadtrip/alternativeColors'
@@ -868,16 +869,6 @@ export const MapView = memo(function MapView({
     }
   }, [placeIds, placesPhotosEnabled])
 
-  const clusterIconCreateFunction = useCallback((cluster) => {
-    const count = cluster.getChildCount()
-    const size = count < 10 ? 36 : count < 50 ? 42 : 48
-    return L.divIcon({
-      html: `<div class="marker-cluster-custom" style="width:${size}px;height:${size}px;"><span>${count}</span></div>`,
-      className: 'marker-cluster-wrapper',
-      iconSize: L.point(size, size),
-    })
-  }, [])
-
   const isTouchDevice = typeof window !== 'undefined' && navigator.maxTouchPoints > 0
   // Drag a marker onto a day (#891). Pointer-driven, so it is off wherever
   // HTML5 drag does not exist — and the day plan is not on screen there anyway.
@@ -1061,18 +1052,7 @@ export const MapView = memo(function MapView({
       <PoiDropTarget onPoiDropOnRoute={onPoiDropOnRoute} />
       <LeafletLocationLayer position={userPosition} mode={trackingMode} />
 
-      <MarkerClusterGroup
-        chunkedLoading
-        chunkInterval={30}
-        chunkDelay={0}
-        maxClusterRadius={20}
-        disableClusteringAtZoom={9}
-        spiderfyOnMaxZoom
-        showCoverageOnHover={false}
-        zoomToBoundsOnClick
-        animate={false}
-        iconCreateFunction={clusterIconCreateFunction}
-      >
+      <MarkerClusterGroup {...CLUSTER_OPTIONS} iconCreateFunction={createClusterIcon}>
         {markers}
       </MarkerClusterGroup>
 

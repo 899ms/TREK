@@ -24,6 +24,16 @@ vi.mock('react-leaflet', () => ({
   }),
 }));
 
+// The markers now reach the map through a cluster group (#2343). The real wrapper
+// asks React Leaflet's context for the map it belongs to, and the stubbed
+// MapContainer above provides none — so it is stubbed for the same reason
+// everything else here is.
+vi.mock('react-leaflet-cluster', () => ({
+  default: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="marker-cluster-group">{children}</div>
+  ),
+}));
+
 // The basemap is a MapLibre style now, and the real component reaches for
 // maplibre-gl through a dynamic import. The page test only cares that it is the
 // thing being rendered.
