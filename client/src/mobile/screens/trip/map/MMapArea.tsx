@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { MapViewAuto } from '../../../../components/Map/MapViewAuto'
 import { MapCompassPill, type CompassMap } from '../../../../components/Map/MapCompassPill'
 import { TripRouteOverviewPill, TripRouteOverviewPanel } from '../../../../components/Map/TripRouteOverview'
+import { DawarichTrailPill } from '../../../../components/Map/DawarichTrailPill'
 import PoiCategoryPill from '../../../../components/Map/PoiCategoryPill'
 import { usePoiExplore } from '../../../../components/Map/usePoiExplore'
 import { useSettingsStore } from '../../../../store/settingsStore'
@@ -44,6 +45,7 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
     <div className="absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--bottom-nav-h:calc(env(safe-area-inset-bottom,0px)+74px)]">
       <MapViewAuto
         tripId={planner.tripId}
+        dawarichTrack={planner.dawarichTrail.track}
         places={planner.mapPlaces}
         dayPlaces={planner.dayPlaces}
         route={planner.overviewActive ? planner.tripOverview.lines : planner.route}
@@ -115,9 +117,9 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
           Tailwind rather than inline because the compass band is identified by being
           the one element with an inline --bottom-nav-h, and a second would make that
           ambiguous. */}
-      {mapActive && !planner.roadtripActive && (
+      {mapActive && (!planner.roadtripActive || planner.dawarichEnabled) && (
         <div className="pointer-events-none absolute left-3 right-3 z-[25] flex flex-col items-end gap-2 bottom-[calc(var(--bottom-nav-h,84px)+58px)]">
-          {planner.overviewActive && (
+          {!planner.roadtripActive && planner.overviewActive && (
             <TripRouteOverviewPanel
               overview={planner.tripOverview}
               unit={distanceUnit}
@@ -128,7 +130,18 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
               maxWidth={240}
             />
           )}
-          <TripRouteOverviewPill active={planner.overviewShown} onToggle={planner.toggleOverview} />
+          {!planner.roadtripActive && (
+            <TripRouteOverviewPill active={planner.overviewShown} onToggle={planner.toggleOverview} />
+          )}
+          {/* Kept in road-trip mode: the recorded route beside the planned one is
+              exactly the comparison a drive invites. */}
+          {planner.dawarichEnabled && (
+            <DawarichTrailPill
+              active={planner.dawarichTrailShown}
+              status={planner.dawarichTrail.status}
+              onToggle={planner.toggleDawarichTrail}
+            />
+          )}
         </div>
       )}
     </div>

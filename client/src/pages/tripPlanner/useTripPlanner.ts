@@ -31,6 +31,7 @@ import { useDayBoundaries } from '../../components/Roadtrip/useDayBoundaries'
 import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
+import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { useRoadtripCorridor } from '../../components/Roadtrip/useRoadtripCorridor'
 import { useRoadtripVias } from '../../components/Roadtrip/useRoadtripVias'
 import { useRefuelSearch } from '../../components/Roadtrip/useRefuelSearch'
@@ -117,7 +118,7 @@ export function useTripPlanner() {
     toast.info(t('undo.done', { action: label ?? '' }))
   }, [undo, lastActionLabel, toast])
 
-  const [enabledAddons, setEnabledAddons] = useState<Record<string, boolean>>({ packing: true, budget: true, documents: true, collab: false, roadtrip: false })
+  const [enabledAddons, setEnabledAddons] = useState<Record<string, boolean>>({ packing: true, budget: true, documents: true, collab: false, roadtrip: false, dawarich: false })
   // The values above are an optimistic guess until the addon feed answers. The
   // tab guard below waits for this before evicting anything, so a tab we were
   // asked to open ('collab' in particular, guessed off) survives the gap.
@@ -164,7 +165,7 @@ export function useTripPlanner() {
     addonsApi.enabled().then(data => {
       const map: Record<string, boolean> = {}
       data.addons.forEach(a => { map[a.id] = true })
-      setEnabledAddons({ packing: !!map.packing, budget: !!map.budget, documents: !!map.documents, collab: !!map.collab, roadtrip: !!map.roadtrip })
+      setEnabledAddons({ packing: !!map.packing, budget: !!map.budget, documents: !!map.documents, collab: !!map.collab, roadtrip: !!map.roadtrip, dawarich: !!map.dawarich })
       if (data.collabFeatures) setCollabFeatures(data.collabFeatures)
     }).catch(() => {}).finally(() => setAddonsLoaded(true))
     authApi.getAppConfig().then(config => {
@@ -391,6 +392,23 @@ export function useTripPlanner() {
       return next
     })
   }, [tripId])
+  // The recorded route from Dawarich (#2279), per trip and per session for the
+  // same reason as the overview above: it answers "what actually happened on
+  // this trip", which is a question about one trip rather than a preference.
+  const [dawarichTrailShown, setDawarichTrailShown] = useState<boolean>(
+    () => sessionStorage.getItem(`trip-dawarich-${tripId}`) === '1',
+  )
+  const toggleDawarichTrail = useCallback(() => {
+    setDawarichTrailShown(prev => {
+      const next = !prev
+      sessionStorage.setItem(`trip-dawarich-${tripId}`, next ? '1' : '0')
+      return next
+    })
+  }, [tripId])
+  // Fetched here rather than in MapViewAuto so the desktop and the phone share
+  // one request, and so the pill that toggles it can show why there is no line.
+  const dawarichTrail = useDawarichTrail(tripId, dawarichTrailShown)
+
   const [fitKey, setFitKey] = useState<number>(0)
   const initialFitTripId = useRef<number | null>(null)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState<'left' | 'right' | null>(null)
@@ -2177,6 +2195,7 @@ export function useTripPlanner() {
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
     roadtripMode, toggleRoadtripMode, roadtripActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
     overviewShown, toggleOverview, overviewActive, tripOverview,
+    dawarichTrailShown, toggleDawarichTrail, dawarichTrail, dawarichEnabled: !!enabledAddons.dawarich,
     followTrack, roadtripViaCounts,
     allowedFileTypes, tripMembers, setTripMembers, refreshMembers, loadAccommodations,
     TRANSPORT_TYPES, TRIP_TABS, activeTab, setActiveTab, handleTabChange,

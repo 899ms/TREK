@@ -154,6 +154,13 @@ function baseState(): HookState {
     askRefuel: vi.fn(),
     acceptRefuel: vi.fn(),
     followTrack: { dayId: null, open: vi.fn(), close: vi.fn(), tracks: [], busy: false, round: 0, error: null, outcome: null, apply: vi.fn(), clear: vi.fn(), viaCount: 0, available: false },
+    // The recorded-route overlay (#2279). Off and empty: the page reads
+    // `dawarichTrail.track` unconditionally, so the fixture has to carry the
+    // shape the hook returns even when the addon is not in play.
+    dawarichEnabled: false,
+    dawarichTrailShown: false,
+    toggleDawarichTrail: vi.fn(),
+    dawarichTrail: { track: null, status: 'idle', reload: vi.fn() },
     roadtripViaCounts: {},
     stopDraft: null,
     setStopDraft: vi.fn(),

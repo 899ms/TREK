@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronLeft, MapPin, Grid3x3, Upload, MoreHorizontal, Play, Image, Camera, EyeOff, Settings2 } from 'lucide-react'
+import { useSearchParams } from 'react-router'
+import { ChevronLeft, MapPin, Grid3x3, MoreHorizontal, Play, Image, Camera, EyeOff, Settings2 } from 'lucide-react'
 import JourneyMap from '../../../components/Journey/JourneyMapAuto'
 import type { JourneyMapAutoHandle } from '../../../components/Journey/JourneyMapAuto'
 import PhotoLightbox from '../../../components/Journey/PhotoLightbox'
@@ -9,6 +10,10 @@ import { ProviderPicker } from '../../../components/Journey/JourneyDetailPagePro
 import { photoUrl } from '../../../pages/journeyDetail/JourneyDetailPage.helpers'
 import { useJourneyDetail } from '../../../pages/journeyDetail/useJourneyDetail'
 import { useJourneyStore } from '../../../store/journeyStore'
+import { useAddonStore } from '../../../store/addonStore'
+import DawarichIcon from '../../../components/shared/DawarichIcon'
+import DawarichSuggestionsPanel from '../../../components/Dawarich/DawarichSuggestionsPanel'
+import { FormSheetHeader } from '../trip/sheets/PlSheetChrome'
 import type { JourneyEntry, GalleryPhoto } from '../../../store/journeyStore'
 import { useAuthStore } from '../../../store/authStore'
 import { journeyApi, addonsApi, memoriesApi } from '../../../api/client'
@@ -42,6 +47,15 @@ export default function MJourneyDetail() {
     sidebarMapItems, tracks,
     loadJourney, updateEntry, deleteEntry, uploadPhotos,
   } = useJourneyDetail()
+
+  // The dock's FAB is a sibling of this screen: on the Gallery it becomes the
+  // upload button, so it has to know which tab is open — and it stops knowing
+  // when this screen goes away.
+  const setMobileGalleryOpen = useJourneyStore(state => state.setMobileGalleryOpen)
+  useEffect(() => {
+    setMobileGalleryOpen(view === 'gallery')
+    return () => setMobileGalleryOpen(false)
+  }, [view, setMobileGalleryOpen])
 
   const mapRef = useRef<JourneyMapAutoHandle>(null)
   const carouselRef = useRef<HTMLDivElement>(null)
@@ -129,10 +143,44 @@ export default function MJourneyDetail() {
   // Gallery upload — device files plus the connected photo providers (Immich/Synology).
   const galleryFileRef = useRef<HTMLInputElement>(null)
   const [availableProviders, setAvailableProviders] = useState<{ id: string; name: string }[]>([])
+  // Whether the probe below has finished — not whether it found anything.
+  const [providersReady, setProvidersReady] = useState(false)
   const [showUploadMenu, setShowUploadMenu] = useState(false)
   const [showActionMenu, setShowActionMenu] = useState(false)
   const [pickerProvider, setPickerProvider] = useState<string | null>(null)
+  const dawarichEnabled = useAddonStore(state => state.isEnabled)('dawarich')
+  const [dawarichOpen, setDawarichOpen] = useState(false)
   const [uploading, setUploading] = useState(false)
+
+  const openUpload = useCallback(() => {
+    if (availableProviders.length > 0) setShowUploadMenu(true)
+    else galleryFileRef.current?.click()
+  }, [availableProviders.length])
+
+  // The dock's FAB asks through the URL, the way every other "+" in the shell
+  // does. The parameter is cleared straight away so going back does not reopen
+  // the picker; the intent is held in state until the provider probe has
+  // answered, because "device or Immich?" cannot be asked before we know
+  // whether there is an Immich.
+  const [params, setParams] = useSearchParams()
+  const [pendingUpload, setPendingUpload] = useState(false)
+  useEffect(() => {
+    if (params.get('create') !== 'photo') return
+    setParams(prev => {
+      const next = new URLSearchParams(prev)
+      next.delete('create')
+      return next
+    }, { replace: true })
+    if (!canEditEntries) return
+    setView('gallery')
+    setPendingUpload(true)
+  }, [params, setParams, canEditEntries, setView])
+
+  useEffect(() => {
+    if (!pendingUpload || !providersReady) return
+    setPendingUpload(false)
+    openUpload()
+  }, [pendingUpload, providersReady, openUpload])
 
   useEffect(() => {
     let active = true
@@ -155,6 +203,7 @@ export default function MJourneyDetail() {
         }
         if (active) setAvailableProviders(connected)
       } catch { /* no providers */ }
+      finally { if (active) setProvidersReady(true) }
     })()
     return () => { active = false }
   }, [])
@@ -314,20 +363,18 @@ export default function MJourneyDetail() {
           </button>
         </div>
         <span className="ml-auto flex flex-none items-center gap-2">
-          {view === 'gallery' && canEditEntries && (
-            <button
-              type="button"
-              onClick={() => (availableProviders.length > 0 ? setShowUploadMenu(true) : galleryFileRef.current?.click())}
-              disabled={uploading}
+          {/* Uploading lives on the dock's FAB while the Gallery is open — the
+              one big action on the screen. A second button up here would be the
+              same thing twice, so it only appears while an upload is running,
+              as its progress. */}
+          {view === 'gallery' && canEditEntries && uploading && (
+            <span
+              role="status"
               aria-label={t('common.upload')}
-              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-m-act text-m-actfg shadow-[0_5px_14px_-6px_rgba(0,0,0,.3)] disabled:opacity-60"
+              className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-m-act text-m-actfg shadow-[0_5px_14px_-6px_rgba(0,0,0,.3)]"
             >
-              {uploading ? (
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-              ) : (
-                <Upload size={16} strokeWidth={2.2} />
-              )}
-            </button>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+            </span>
           )}
           <button
             type="button"
@@ -339,6 +386,47 @@ export default function MJourneyDetail() {
           </button>
         </span>
       </div>
+
+      {/* The stays Dawarich recorded for these dates, as candidate entries. Over
+          the map rather than in the header: it belongs to what is on the map,
+          and the header is already three controls wide on a phone. Sits above
+          the card rail so it never covers the card somebody is reading. */}
+      {dawarichEnabled && canEditEntries && view === 'timeline' && (
+        <button
+          type="button"
+          onClick={() => setDawarichOpen(true)}
+          aria-label={t('dawarich.suggestions.title')}
+          className="absolute right-4 z-[9] flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-sheet)] shadow-[0_6px_18px_-8px_rgba(0,0,0,.35)] bottom-[calc(var(--bottom-nav-h,84px)+16px+128px)]"
+        >
+          <DawarichIcon size={46} />
+        </button>
+      )}
+
+      {dawarichOpen && current && (
+        <MSheet open onClose={() => setDawarichOpen(false)} variant="bottom" material="glass" ariaLabel={t('dawarich.suggestions.title')}>
+          <div className="flex max-h-[82dvh] min-h-0 flex-col">
+            <FormSheetHeader
+              leading={
+                <span className="flex h-10 w-10 flex-none overflow-hidden rounded-[13px]">
+                  <DawarichIcon size={40} />
+                </span>
+              }
+              title={t('dawarich.suggestions.title')}
+              onClose={() => setDawarichOpen(false)}
+              closeLabel={t('common.close')}
+            />
+            <div className="min-h-0 flex-1 overflow-y-auto px-[14px] pb-4">
+              {/* Journal entries and nothing else: a journey is for writing, and
+                  the trip planner already offers the same stay as a place. */}
+              <DawarichSuggestionsPanel
+                bare
+                journals={[{ id: current.id, label: current.title }]}
+                onAccepted={() => { void loadJourney(current.id) }}
+              />
+            </div>
+          </div>
+        </MSheet>
+      )}
 
       {/* Horizontal card timeline */}
       {view === 'timeline' && entries.length > 0 && (

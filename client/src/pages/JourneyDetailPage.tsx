@@ -13,6 +13,7 @@ import {
   Plus, ChevronUp, ChevronDown, Eye, EyeOff, BookOpen, Image,
 } from 'lucide-react'
 import MobileMapTimeline from '../components/Journey/MobileMapTimeline'
+import DawarichSuggestionsPanel from '../components/Dawarich/DawarichSuggestionsPanel'
 import MobileEntryView from '../components/Journey/MobileEntryView'
 import { useJourneyStore } from '../store/journeyStore'
 import { computeJourneyLifecycle } from '../utils/journeyLifecycle'
@@ -379,6 +380,19 @@ function JourneyDetailPageDesktop() {
               {/* Timeline (desktop only — mobile uses fullscreen combined view above) */}
               {!isMobile && (
                 <div className={`flex flex-col gap-6 pb-24 md:pb-6${view === 'timeline' ? '' : ' hidden'}`}>
+                  {/* Stays Dawarich recorded over this journal's dates, waiting to
+                      be turned into entries (#2279). Above the timeline because
+                      that is what they become; renders nothing when there is
+                      nothing pending. */}
+                  {canEditEntries && (
+                    <DawarichSuggestionsPanel
+                      journals={[{ id: current.id, label: current.title }]}
+                      // The entry the acceptance created belongs on the timeline
+                      // immediately; re-reading the journey is how it gets there.
+                      onAccepted={() => { void loadJourney(current.id) }}
+                    />
+                  )}
+
                   {sortedDates.length === 0 && (
                     <EmptyState scene="journey" title={t('journey.detail.noEntries')} />
                   )}

@@ -20,6 +20,9 @@ import { useTranslation } from '../../i18n/TranslationContext'
 export function MapViewAuto(props: any) {
   const { t } = useTranslation()
   const hazards = useRoadtripHazards(props.tripId, !!props.clusterLoosely)
+  // `dawarichTrack` arrives as a prop rather than being fetched here: the pill
+  // that switches it on lives at page level and needs the load status, so the
+  // fetch sits in useTripPlanner and both shells read the same one.
   const mapProps = { ...props, hazards: hazards.feed?.hazards }
   const provider = useSettingsStore(s => s.settings.map_provider)
   const token = useSettingsStore(s => s.settings.mapbox_access_token)

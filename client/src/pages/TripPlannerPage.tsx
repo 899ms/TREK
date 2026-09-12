@@ -7,6 +7,7 @@ import { useSettingsStore } from '../store/settingsStore'
 import { MapViewAuto as MapView } from '../components/Map/MapViewAuto'
 import { MapCompassPill, type CompassMap } from '../components/Map/MapCompassPill'
 import { TripRouteOverviewPill, TripRouteOverviewPanel } from '../components/Map/TripRouteOverview'
+import { DawarichTrailPill } from '../components/Map/DawarichTrailPill'
 import { getCached, fetchPhoto } from '../services/photoService'
 import DayPlanSidebar from '../components/Planner/DayPlanSidebar'
 import RoadtripModeSwitch from '../components/Roadtrip/RoadtripModeSwitch'
@@ -255,6 +256,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
     roadtripMode, toggleRoadtripMode, roadtripActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
     overviewActive, tripOverview, toggleOverview, overviewShown,
+    dawarichEnabled, dawarichTrailShown, toggleDawarichTrail, dawarichTrail,
     followTrack, roadtripViaCounts,
     allowedFileTypes, tripMembers, setTripMembers, refreshMembers, loadAccommodations,
     TRANSPORT_TYPES, TRIP_TABS, activeTab, setActiveTab, handleTabChange,
@@ -406,6 +408,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
           <div style={{ position: 'absolute', inset: 0 }}>
             <MapView
               tripId={tripId}
+              dawarichTrack={dawarichTrail.track}
               places={roadtripActive ? roadtripMapPlaces : mapPlaces}
               dayPlaces={dayPlaces}
               route={roadtripActive ? roadtripMapLines : overviewActive ? tripOverview.lines : route}
@@ -484,12 +487,12 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                 bottom-left corner, where Leaflet's base-layer switcher sits at
                 z-index 1000 and would cover this. The right corner is free on both
                 renderers — the locate button that lives there is phone-only. */}
-            {!roadtripActive && (
+            {(!roadtripActive || dawarichEnabled) && (
               <div className="hidden md:flex" style={{
                 position: 'absolute', bottom: 18, right: mapInsetRight + 14, zIndex: 26,
                 pointerEvents: 'none', flexDirection: 'column', alignItems: 'flex-end', gap: 8,
               }}>
-                {overviewActive && (
+                {!roadtripActive && overviewActive && (
                   <TripRouteOverviewPanel
                     overview={tripOverview}
                     unit={distanceUnit}
@@ -497,7 +500,20 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                     onSelectDay={handleSelectDay}
                   />
                 )}
-                <TripRouteOverviewPill active={overviewShown} onToggle={toggleOverview} />
+                {!roadtripActive && (
+                  <TripRouteOverviewPill active={overviewShown} onToggle={toggleOverview} />
+                )}
+                {/* Stays in road-trip mode, unlike the overview: the route that was
+                    actually driven is the thing you most want beside the planned
+                    one. It is drawn, never applied — correcting the plan from the
+                    recording is a different feature and deliberately not this one. */}
+                {dawarichEnabled && (
+                  <DawarichTrailPill
+                    active={dawarichTrailShown}
+                    status={dawarichTrail.status}
+                    onToggle={toggleDawarichTrail}
+                  />
+                )}
               </div>
             )}
 

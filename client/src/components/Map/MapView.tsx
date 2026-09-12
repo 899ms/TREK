@@ -53,6 +53,7 @@ import { NightPauseDrag } from './NightPauseDrag'
 import type { DayBoundaryControls } from './dayBoundaryDrag'
 import { POI_CATEGORY_BY_KEY, type Poi } from './poiCategories'
 import { resolveTrackColor, hasManualTrackColor } from './trackColors'
+import DawarichTrailLayer from './DawarichTrailLayer'
 import { OFM_POSITRON, DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, MAP_MAX_ZOOM, SATELLITE_TILE_URL, SATELLITE_TILE_MAXZOOM, AMAP_SATELLITE, attributionForTile } from '../../constants/mapDefaults'
 import { crsForBasemap } from './gcj02Crs'
 import { isGcj02Basemap, resolveBasemap } from '../../utils/tileUrl'
@@ -669,6 +670,8 @@ export const MapView = memo(function MapView({
   routeVias = [],
   dayBoundaryControls,
   hazards,
+  dawarichTrack = null,
+  dawarichSelectedDate = null,
   accessLines = [],
   onPoiDropOnRoute,
   onRouteClick,
@@ -1179,6 +1182,15 @@ export const MapView = memo(function MapView({
       />
 
       {hazards?.length > 0 && <HazardLayers hazards={hazards} />}
+
+      {/* The route as it was actually recorded (#2279). Drawn in the casing
+          pane's sibling order so it sits under the planned route rather than
+          over it — the plan is what the user is editing. */}
+      <DawarichTrailLayer
+        track={dawarichTrack}
+        selectedDate={dawarichSelectedDate}
+        casingPane={hasCasingPane ? TRACK_CASING_PANE : undefined}
+      />
       <ClusteredPois pois={pois} enabled={clusterLoosely} onPoiClick={onPoiClick}>{poiMarkers}</ClusteredPois>
       {/* Charging stops / rest areas a plugin route places on the drawn day route.
           Host-vetted data (server-normalized), rendered as plain tone dots. */}

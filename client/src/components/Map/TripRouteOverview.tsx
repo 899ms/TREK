@@ -1,5 +1,6 @@
 import { Route } from 'lucide-react'
 import { useTranslation } from '../../i18n'
+import { Tooltip } from '../shared/Tooltip'
 import { profileIcon } from '../Planner/DayPlanSidebarRouteConnector'
 import { formatDistance } from '../../utils/units'
 import { MAP_CONTROL_SHADOW } from './mapControlShadow'
@@ -21,25 +22,30 @@ export function TripRouteOverviewPill({ active, onToggle }: { active: boolean; o
       WebkitBackdropFilter: 'blur(20px) saturate(180%)',
       boxShadow: MAP_CONTROL_SHADOW,
     }}>
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-label={label}
-        title={label}
-        aria-pressed={active}
-        data-testid="trip-overview-pill"
-        className={active ? 'text-accent' : 'text-content-muted'}
-        style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 34, height: 34, borderRadius: 999, border: 'none', cursor: 'pointer',
-          background: 'transparent', padding: 0,
-          transition: 'background 0.14s, color 0.14s',
-        }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
-      >
-        <Route size={17} strokeWidth={2} />
-      </button>
+      {/* TREK's own tooltip, not the browser's — the native one ignores the
+          colour scheme, waits a second and a half, and cannot be read on a touch
+          device at all. `left`, because these controls hug the right edge of the
+          map and a tooltip to the right would hang off it. */}
+      <Tooltip label={label} placement="left">
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={label}
+          aria-pressed={active}
+          data-testid="trip-overview-pill"
+          className={active ? 'text-accent' : 'text-content-muted'}
+          style={{
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+            width: 34, height: 34, borderRadius: 999, border: 'none', cursor: 'pointer',
+            background: 'transparent', padding: 0,
+            transition: 'background 0.14s, color 0.14s',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'var(--bg-hover)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+        >
+          <Route size={17} strokeWidth={2} />
+        </button>
+      </Tooltip>
     </div>
   )
 }

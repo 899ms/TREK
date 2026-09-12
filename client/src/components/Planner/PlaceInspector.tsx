@@ -22,6 +22,8 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAddonStore } from '../../store/addonStore'
 import { useSaveToCollectionStore } from '../../store/saveToCollectionStore'
 import { getCategoryIcon } from '../shared/categoryIcons'
+import DawarichIcon from '../shared/DawarichIcon'
+import { Tooltip } from '../shared/Tooltip'
 import { useToast } from '../shared/Toast'
 import { useTranslation, translateApiError } from '../../i18n'
 import { usePluginStore } from '../../store/pluginStore'
@@ -795,6 +797,17 @@ function PlaceInspectorHeader({ openNow, place, category, t, editingName, nameIn
                   className="text-content"
                   style={{ fontWeight: 600, fontSize: 'calc(15px * var(--fs-scale-subtitle, 1))', lineHeight: '1.3', cursor: onUpdatePlace ? 'text' : 'default' }}
                 >{place.name}</span>
+              )}
+              {/* Where the place came from, when it did not come from somebody
+                  typing it: a stay accepted out of their own recordings. The
+                  mark alone — the name beside it is already the place's name,
+                  and a word here would only repeat the tooltip. */}
+              {place.source === 'dawarich' && (
+                <Tooltip label={t('dawarich.place.fromDawarich')} placement="top">
+                  <span style={{ display: 'inline-flex', flexShrink: 0, overflow: 'hidden', borderRadius: 5 }}>
+                    <DawarichIcon size={16} />
+                  </span>
+                </Tooltip>
               )}
               {category && (() => {
                 const CatIcon = getCategoryIcon(category.icon)

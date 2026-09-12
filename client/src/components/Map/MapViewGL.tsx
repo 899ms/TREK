@@ -1,6 +1,6 @@
 import { useEffect, useRef, useMemo, useState, createElement, useCallback } from 'react'
 import { makeMarkerDraggable, makePoiDraggable, draggedPoiId } from './markerDrag'
-import type { RoadtripVia } from '@trek/shared'
+import type { DawarichTrack, RoadtripVia } from '@trek/shared'
 import { useStableVias } from './viaMarkerState'
 import { ALT_CASING, ALT_LABEL_TEXT } from '../Roadtrip/alternativeColors'
 import type { AlternativeOverlay } from '../Roadtrip/alternativeOverlays'
@@ -30,6 +30,7 @@ import { nightPauseMarker, NIGHT_PAUSE_MIN_ZOOM } from './nightPauseMarker'
 import { clusterPois, poiClusterMarkup, poiClusterList, POI_CLUSTER_DETAIL_ZOOM } from './poiClusters'
 import type { RoadtripHazard } from '@trek/shared'
 import { useHazardLayerGL } from './useHazardLayerGL'
+import { useDawarichTrailGL } from './useDawarichTrailGL'
 import { bindDayBoundaryDrag, type DayBoundaryControls } from './dayBoundaryDrag'
 import NightPauseTooltip from './NightPauseTooltip'
 import { POI_CATEGORY_BY_KEY, type Poi } from './poiCategories'
@@ -190,6 +191,10 @@ interface Props {
    */
   clusterLoosely?: boolean
   hazards?: RoadtripHazard[]
+  /** The route recorded in Dawarich, already fetched by MapViewAuto (#2279). */
+  dawarichTrack?: DawarichTrack | null
+  /** Draw only this local day of the recording. */
+  dawarichSelectedDate?: string | null
   /** Via points to draw as draggable handles, keyed by day (#1797). */
   roadtripVias?: Record<number, RoadtripVia[]>
   onMoveVia?: (dayId: number, id: number, lat: number, lng: number) => void
@@ -635,6 +640,8 @@ export function MapViewGL({
   focusPoints,
   clusterLoosely = false,
   hazards,
+  dawarichTrack = null,
+  dawarichSelectedDate = null,
   dayOrderMap = NO_DAY_ORDER,
   leftWidth = 0,
   rightWidth = 0,
@@ -712,6 +719,8 @@ export function MapViewGL({
   const mapRef = useRef<any | null>(null)
   const hazardPopupFactory = useCallback(() => new gl.Popup({ className: 'map-tooltip trek-hazard-popup', maxWidth: '320px' }), [gl])
   useHazardLayerGL(mapRef.current, mapReady, hazards, hazardPopupFactory)
+  // Beneath the planned route's casing, the GL twin of the Leaflet pane order.
+  useDawarichTrailGL(mapRef.current, mapReady, dawarichTrack, dawarichSelectedDate, 'trip-route-casing')
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<Map<number, PlacePin>>(new Map())
   // Own layer for the hand-positioned place pins (MapLibre path, see makePlacePin).
