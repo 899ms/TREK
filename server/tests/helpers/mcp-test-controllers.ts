@@ -168,7 +168,10 @@ export function createMcpTestRegistry(): McpRegistry {
     generalStorage,
   );
   const reservationsService = new ReservationsService(dbService, permissionsService, budgetService, realtimeService, notificationsStub(), new ReservationsReadRepository(dbService));
-  const accommodationsService = new AccommodationsService(dbService, permissionsService, realtimeService);
+  // One instance, four consumers: AssignmentsMcp, ReservationsMcp, PlacesMcp and
+  // AccommodationsService, which writes the day stop a booked night implies.
+  const assignmentsService = new AssignmentsService(dbService, permissionsService, realtimeService, queryHelpersService, journeyDomain);
+  const accommodationsService = new AccommodationsService(dbService, permissionsService, realtimeService, assignmentsService);
   const membersService = new TripMembersService(dbService, budgetService, new UserCleanupService(dbService, budgetService), permissionsService, realtimeService, notificationsStub());
   const tripsService = new TripsService(
     dbService,
@@ -192,8 +195,6 @@ export function createMcpTestRegistry(): McpRegistry {
   // one — against the same test DB, which is what makes the `when:` gates
   // answer truthfully here instead of against the process-wide singleton.
   const addonsService = new AddonsService(dbService);
-  // One instance, three consumers: AssignmentsMcp, ReservationsMcp and PlacesMcp.
-  const assignmentsService = new AssignmentsService(dbService, permissionsService, realtimeService, queryHelpersService, journeyDomain);
   // The two photo providers, shared by MemoriesMcp (which browses them) and by
   // the capture backfill JourneyMcp schedules after a provider photo is attached
   // (which asks them when and where it was taken). Built for real rather than

@@ -74,6 +74,7 @@ import { UserCleanupService } from '../../../src/nest/auth/user-cleanup.service'
 import { TripMembersService } from '../../../src/nest/trip-members/trip-members.service';
 import { TripReadModelService } from '../../../src/nest/trip-read-model/trip-read-model.service';
 import { AccommodationsService } from '../../../src/nest/accommodations/accommodations.service';
+import { makeAccommodationsService } from '../../helpers/accommodations-service';
 import { MapsService } from '../../../src/nest/maps/maps.service';
 import { UnsplashService } from '../../../src/nest/unsplash/unsplash.service';
 import { PlacePhotoCacheService } from '../../../src/nest/place-photos/place-photo-cache.service';
@@ -112,7 +113,7 @@ const placesSvc = new PlacesService(
   new JourneyDomainService(dbs(), new RealtimeService(), new TrekPhotosRepository(dbs())),
   makeStorageFixture('').storage,
 );
-const accommodationsSvc = new AccommodationsService(dbs(), new PermissionsService(dbs()), new RealtimeService());
+const accommodationsSvc = makeAccommodationsService(testDb);
 const createAccommodation = accommodationsSvc.createAccommodation.bind(accommodationsSvc);
 
 const svc = new TripsService(
@@ -449,9 +450,9 @@ describe('resyncAccommodationDays (#1288)', () => {
 
   const insertAccommodation = (tripId: number, startDayId: number, endDayId: number) => {
     const place = createPlace(testDb, tripId, { name: 'Grand Hotel' });
-    const acc = createAccommodation(tripId, {
+    const { accommodation: acc } = createAccommodation(tripId, {
       place_id: place.id, start_day_id: startDayId, end_day_id: endDayId,
-    }) as { id: number };
+    }) as { accommodation: { id: number } };
     const linkedRes = testDb.prepare(
       'SELECT id FROM reservations WHERE accommodation_id = ?',
     ).get(acc.id) as { id: number };
@@ -477,6 +478,22 @@ describe('resyncAccommodationDays (#1288)', () => {
     const res = getRes(linkedResId);
     expect(res.day_id).toBe(acc.start_day_id);
     expect(res.reservation_time?.slice(0, 10)).toBe('2025-06-11');
+  });
+
+  it('TRIP-SVC-059: the day stop a booking wrote follows it when the trip is re-dated', () => {
+    // Booking a night also puts its place on the check-in day. Re-dating the trip moves
+    // the stay to whichever day row now carries its date, and the stop has to go with
+    // it, or the route runs through a day the traveller is no longer staying on.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2025-06-10', end_date: '2025-06-14' });
+    const { accId } = insertAccommodation(trip.id, dayFor(trip.id, '2025-06-11'), dayFor(trip.id, '2025-06-13'));
+    const stopOf = () => testDb.prepare('SELECT day_id FROM day_assignments WHERE accommodation_id = ?').get(accId) as { day_id: number };
+    expect(stopOf().day_id).toBe(dayFor(trip.id, '2025-06-11'));
+
+    svc.updateTrip(trip.id, user.id, { start_date: '2025-06-09', end_date: '2025-06-14' }, 'user');
+
+    expect(stopOf().day_id).toBe(getAcc(accId).start_day_id);
+    expect(stopOf().day_id).toBe(dayFor(trip.id, '2025-06-11'));
   });
 
   it('TRIP-SVC-036: moving the whole trip out of the old range keeps the accommodation glued to its days', () => {

@@ -37,6 +37,11 @@ type AccommodationBody = {
  * found) bodies, create 201 / rest 200, and the cascade broadcasts (a created
  * accommodation also emits reservation:created; a delete emits the linked
  * reservation/budget deletions) with the forwarded X-Socket-Id.
+ *
+ * A booking also writes the day stop that puts it on the route, so the answers
+ * carry that stop alongside the existing fields: the broadcast skips the socket
+ * that sent the request, and the client that booked the night has to be able to
+ * draw it without waiting for a reload.
  */
 @Controller('api/trips/:tripId/accommodations')
 // TripAccessGuard resolves :tripId and 404s a trip the user cannot reach; mutations
@@ -70,10 +75,14 @@ export class AccommodationsController {
     if (errors.length > 0) {
       throw new HttpException({ error: errors[0].message }, 404);
     }
-    const accommodation = this.accommodations.create(tripId, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } as never);
+    const { accommodation, mirror } = this.accommodations.create(tripId, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } as never);
     this.accommodations.broadcast(tripId, 'accommodation:created', { accommodation }, socketId);
     this.accommodations.broadcast(tripId, 'reservation:created', {}, socketId);
-    return { accommodation };
+    this.accommodations.announceMirror(tripId, mirror, (event, payload) => this.accommodations.broadcast(tripId, event, payload, socketId), socketId);
+    // The stop rides in the answer as well: the broadcast above deliberately skips
+    // the socket that sent the request, so without it the very session that booked
+    // the night would be the one that cannot see it until a reload.
+    return { accommodation, assignment: mirror.created };
   }
 
   @RequirePermission('day_edit')
@@ -95,9 +104,10 @@ export class AccommodationsController {
     if (errors.length > 0) {
       throw new HttpException({ error: errors[0].message }, 404);
     }
-    const accommodation = this.accommodations.update(id, existing as never, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } as never);
+    const { accommodation, mirror } = this.accommodations.update(id, existing as never, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } as never);
     this.accommodations.broadcast(tripId, 'accommodation:updated', { accommodation }, socketId);
-    return { accommodation };
+    this.accommodations.announceMirror(tripId, mirror, (event, payload) => this.accommodations.broadcast(tripId, event, payload, socketId), socketId);
+    return { accommodation, assignment: mirror.created, removedAssignments: mirror.removed };
   }
 
   @RequirePermission('day_edit')
@@ -111,7 +121,8 @@ export class AccommodationsController {
     if (!this.accommodations.get(id, tripId)) {
       throw new HttpException({ error: 'Accommodation not found' }, 404);
     }
-    const { linkedReservationIds, deletedBudgetItemIds } = this.accommodations.remove(id);
+    const { linkedReservationIds, deletedBudgetItemIds, mirror } = this.accommodations.remove(id);
+    this.accommodations.announceMirror(tripId, mirror, (event, payload) => this.accommodations.broadcast(tripId, event, payload, socketId), socketId);
     for (const reservationId of linkedReservationIds) {
       this.accommodations.broadcast(tripId, 'reservation:deleted', { reservationId }, socketId);
     }
@@ -119,6 +130,6 @@ export class AccommodationsController {
       this.accommodations.broadcast(tripId, 'budget:deleted', { itemId }, socketId);
     }
     this.accommodations.broadcast(tripId, 'accommodation:deleted', { accommodationId: Number(id) }, socketId);
-    return { success: true };
+    return { success: true, removedAssignments: mirror.removed };
   }
 }

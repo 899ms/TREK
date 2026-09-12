@@ -66,6 +66,7 @@ import { UserCleanupService } from '../../../src/nest/auth/user-cleanup.service'
 import { TripMembersService } from '../../../src/nest/trip-members/trip-members.service';
 import { TripReadModelService } from '../../../src/nest/trip-read-model/trip-read-model.service';
 import { AccommodationsService } from '../../../src/nest/accommodations/accommodations.service';
+import { makeAccommodationsService } from '../../helpers/accommodations-service';
 import { MapsService } from '../../../src/nest/maps/maps.service';
 import { QueryHelpersService } from '../../../src/nest/query-helpers/query-helpers.service';
 import { notificationsStub } from '../../helpers/notifications';
@@ -93,7 +94,7 @@ const placesSvc = new PlacesService(
   new JourneyDomainService(dbs(), new RealtimeService(), new TrekPhotosRepository(dbs())),
   makeStorageFixture('').storage,
 );
-const accommodationsSvc = new AccommodationsService(dbs(), new PermissionsService(dbs()), new RealtimeService());
+const accommodationsSvc = makeAccommodationsService(testDb);
 const membersSvc = new TripMembersService(dbs(), budgetSvc, new UserCleanupService(dbs(), budgetSvc), new PermissionsService(dbs()), new RealtimeService(), notificationsStub());
 
 const buildReadModel = (database: DatabaseService, roster: TripMembersService = membersSvc) =>

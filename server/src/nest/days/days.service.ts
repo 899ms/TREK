@@ -365,6 +365,16 @@ export class DaysService {
         ELSE :date || SUBSTR(reservation_time, 11) END
     WHERE accommodation_id = :accId AND type = 'hotel'
   `);
+    // The day stop a booking wrote moves with it, the way its linked booking does.
+    // Left behind it would sit on a day the traveller no longer sleeps there, with
+    // nothing on screen to say why. Re-indexed to the end of the target day, because
+    // its old position belonged to a day it is leaving.
+    const moveStayStop = this.db.prepare(`
+    UPDATE day_assignments
+    SET day_id = :dayId,
+        order_index = COALESCE((SELECT MAX(order_index) FROM day_assignments WHERE day_id = :dayId), -1) + 1
+    WHERE accommodation_id = :accId
+  `);
 
     for (const stay of stays) {
       const oldStartDate = prevDateByDayId.get(stay.start_day_id);
@@ -375,6 +385,7 @@ export class DaysService {
         if (newStart && newEnd && newStart.day_number <= newEnd.day_number
           && (newStart.id !== stay.start_day_id || newEnd.id !== stay.end_day_id)) {
           updateStay.run(newStart.id, newEnd.id, stay.id);
+          moveStayStop.run({ dayId: newStart.id, accId: stay.id });
           stay.start_day_id = newStart.id;
         }
       }

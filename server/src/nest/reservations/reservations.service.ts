@@ -562,7 +562,14 @@ export class ReservationsService {
 
     let accommodationCreated = false;
 
-    // Auto-create accommodation for hotel reservations
+    // Auto-create accommodation for hotel reservations.
+    //
+    // Deliberately NOT through AccommodationsService, which would also put the
+    // place on its check-in day: this surface is gated on 'reservation_edit' and
+    // that stop is 'day_edit' work, and the two are configured separately. A
+    // booking clerk must not rewrite the day plan as a side effect. A hotel
+    // booked here therefore still reaches the route once somebody opens the stay
+    // and saves it.
     let resolvedAccommodationId: number | null = accommodation_id || null;
     if (type === 'hotel' && !resolvedAccommodationId && create_accommodation) {
       const { place_id: accPlaceId, start_day_id, end_day_id, check_in, check_out, confirmation: accConf } = create_accommodation;

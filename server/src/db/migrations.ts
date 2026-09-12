@@ -4731,6 +4731,17 @@ function runMigrations(db: Database.Database): void {
       const hasSource = db.prepare("SELECT 1 FROM pragma_table_info('places') WHERE name = 'source'").get();
       if (!hasSource) db.exec('ALTER TABLE places ADD COLUMN source TEXT');
     },
+
+    // Provenance for a day stop that a lodging booking put there rather than the
+    // traveller: it carries the stay's id, so moving or deleting the booking can
+    // move or delete exactly that stop and never one somebody placed by hand.
+    // Deliberately left NULL for every row that already exists: everything planned
+    // before this shipped was planned by hand, and a booking must not start
+    // claiming ownership of it.
+    () => {
+      const hasColumn = db.prepare("SELECT 1 FROM pragma_table_info('day_assignments') WHERE name = 'accommodation_id'").get();
+      if (!hasColumn) db.exec('ALTER TABLE day_assignments ADD COLUMN accommodation_id INTEGER');
+    },
   ];
 
   if (currentVersion < migrations.length) {

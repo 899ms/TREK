@@ -33,6 +33,31 @@ For each day between the **From** day and **To** day (inclusive), the accommodat
 
 ![Day planner side bar with accomodation](assets/Hotel-ReservationDaySidebar.png)
 
+## On the route
+
+Booking a night from the Day Detail panel also puts its place on the check-in day, as a
+stop of its own. That stop is what the map draws a line to and what the Road Trip view
+builds its route from, so the hotel now shows up there without having to be entered a
+second time as an ordinary place. A night booked in the Road Trip view has always worked
+this way; this makes the two directions match.
+
+A few details worth knowing:
+
+- Only the check-in day gets a stop, however many nights the stay runs. That is the day
+  you travel there; the later nights keep showing as badges in the day header.
+- The place is marked as a **hotel** stop, which is why it carries no number in the Road
+  Trip rail and does not count towards the day's stop total. If you had already given the
+  place a stop type of your own, that one is kept.
+- If the place was already planned for that day, nothing is added. You keep the stop you
+  placed, and the booking simply rides along with it.
+- Moving the booking to a different check-in day moves its stop with it. Deleting the
+  booking removes the stop it created, and leaves a stop you placed yourself standing.
+- Service stops, hotels among them, can be hidden from the day lists with **Show in Days
+  too** under **Service stops** in the Road Trip settings.
+
+Stays booked before this existed keep their day plans untouched. Open such a booking and
+save it once and it picks up its stop.
+
 ## In the day plan sidebar
 
 Accommodations appear as small colour-coded badges in the day header row of the day plan sidebar:

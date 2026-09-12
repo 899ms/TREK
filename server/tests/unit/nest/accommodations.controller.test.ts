@@ -7,12 +7,15 @@ import type { User } from '../../../src/types';
 const user = { id: 1, role: 'user', email: 'u@example.test' } as User;
 const trip = { user_id: 1 };
 const refs = { place_id: 2, start_day_id: 10, end_day_id: 11 };
+/** A write that left the day plan alone, which is what most of these cases are about. */
+const noMirror = { created: null, removed: [], stamped: null };
 
 function makeService(overrides: Partial<AccommodationsService> = {}): AccommodationsService {
   return {
     verifyTripAccess: vi.fn().mockReturnValue(trip),
     canEdit: vi.fn().mockReturnValue(true),
     broadcast: vi.fn(),
+    announceMirror: vi.fn(),
     validateRefs: vi.fn().mockReturnValue([]),
     ...overrides,
   } as unknown as AccommodationsService;
@@ -48,12 +51,23 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
     });
 
     it('creates and emits accommodation:created + reservation:created', () => {
-      const create = vi.fn().mockReturnValue({ id: 9 });
+      const create = vi.fn().mockReturnValue({ accommodation: { id: 9 }, mirror: noMirror });
       const broadcast = vi.fn();
       const svc = makeService({ create, broadcast } as Partial<AccommodationsService>);
-      expect(new AccommodationsController(svc).create(user, '5', refs, 'sock')).toEqual({ accommodation: { id: 9 } });
+      expect(new AccommodationsController(svc).create(user, '5', refs, 'sock')).toEqual({ accommodation: { id: 9 }, assignment: null });
       expect(broadcast).toHaveBeenCalledWith('5', 'accommodation:created', { accommodation: { id: 9 } }, 'sock');
       expect(broadcast).toHaveBeenCalledWith('5', 'reservation:created', {}, 'sock');
+    });
+
+    it('ACC-CTL-001 hands the day stop back in the answer and announces it', () => {
+      // The broadcast skips the socket that sent the request, so the answer is the
+      // only way the session that booked the night learns about its own stop.
+      const stop = { id: 77, day_id: 10 };
+      const create = vi.fn().mockReturnValue({ accommodation: { id: 9 }, mirror: { created: stop, removed: [], stamped: null } });
+      const announceMirror = vi.fn();
+      const svc = makeService({ create, announceMirror } as Partial<AccommodationsService>);
+      expect(new AccommodationsController(svc).create(user, '5', refs, 'sock')).toEqual({ accommodation: { id: 9 }, assignment: stop });
+      expect(announceMirror).toHaveBeenCalledWith('5', { created: stop, removed: [], stamped: null }, expect.any(Function), 'sock');
     });
   });
 
@@ -65,11 +79,22 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
 
     it('updates and broadcasts', () => {
       const get = vi.fn().mockReturnValue({ id: 9 });
-      const update = vi.fn().mockReturnValue({ id: 9, notes: 'x' });
+      const update = vi.fn().mockReturnValue({ accommodation: { id: 9, notes: 'x' }, mirror: noMirror });
       const broadcast = vi.fn();
       const svc = makeService({ get, update, broadcast } as Partial<AccommodationsService>);
-      expect(new AccommodationsController(svc).update(user, '5', '9', refs, 'sock')).toEqual({ accommodation: { id: 9, notes: 'x' } });
+      expect(new AccommodationsController(svc).update(user, '5', '9', refs, 'sock')).toEqual({ accommodation: { id: 9, notes: 'x' }, assignment: null, removedAssignments: [] });
       expect(broadcast).toHaveBeenCalledWith('5', 'accommodation:updated', { accommodation: { id: 9, notes: 'x' } }, 'sock');
+    });
+
+    it('ACC-CTL-002 a booking moved to another day reports the stop it took with it', () => {
+      const get = vi.fn().mockReturnValue({ id: 9 });
+      const mirror = { created: { id: 78, day_id: 11 }, removed: [{ id: 77, dayId: 10 }], stamped: null };
+      const update = vi.fn().mockReturnValue({ accommodation: { id: 9 }, mirror });
+      const announceMirror = vi.fn();
+      const svc = makeService({ get, update, announceMirror } as Partial<AccommodationsService>);
+      expect(new AccommodationsController(svc).update(user, '5', '9', refs, 'sock'))
+        .toEqual({ accommodation: { id: 9 }, assignment: mirror.created, removedAssignments: mirror.removed });
+      expect(announceMirror).toHaveBeenCalledWith('5', mirror, expect.any(Function), 'sock');
     });
   });
 
@@ -83,11 +108,11 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
       const get = vi.fn().mockReturnValue({ id: 9 });
       const remove = vi.fn().mockReturnValue({
         linkedReservationId: 4, deletedBudgetItemId: 7,
-        linkedReservationIds: [4], deletedBudgetItemIds: [7],
+        linkedReservationIds: [4], deletedBudgetItemIds: [7], mirror: noMirror,
       });
       const broadcast = vi.fn();
       const svc = makeService({ get, remove, broadcast } as Partial<AccommodationsService>);
-      expect(new AccommodationsController(svc).remove(user, '5', '9', 'sock')).toEqual({ success: true });
+      expect(new AccommodationsController(svc).remove(user, '5', '9', 'sock')).toEqual({ success: true, removedAssignments: [] });
       expect(broadcast).toHaveBeenCalledWith('5', 'reservation:deleted', { reservationId: 4 }, 'sock');
       expect(broadcast).toHaveBeenCalledWith('5', 'budget:deleted', { itemId: 7 }, 'sock');
       expect(broadcast).toHaveBeenCalledWith('5', 'accommodation:deleted', { accommodationId: 9 }, 'sock');
@@ -97,7 +122,7 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
       const get = vi.fn().mockReturnValue({ id: 9 });
       const remove = vi.fn().mockReturnValue({
         linkedReservationId: 4, deletedBudgetItemId: null,
-        linkedReservationIds: [4, 5], deletedBudgetItemIds: [],
+        linkedReservationIds: [4, 5], deletedBudgetItemIds: [], mirror: noMirror,
       });
       const broadcast = vi.fn();
       const svc = makeService({ get, remove, broadcast } as Partial<AccommodationsService>);

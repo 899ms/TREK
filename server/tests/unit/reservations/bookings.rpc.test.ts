@@ -45,19 +45,25 @@ function build(opts: { canEdit?: boolean; cascade?: boolean; seenActions?: strin
     syncBudgetOnUpdate: vi.fn(),
     notifyBookingChange: vi.fn(),
   } as unknown as ReservationsService & Record<string, ReturnType<typeof vi.fn>>;
+  /** A stay write that left the day plan alone. */
+  const noMirror = () => ({ created: null, removed: [], stamped: null });
   // The lodging blocks live in AccommodationsService; AccommodationsRpc still calls its
   // injected copy `days`, which is why the fixture keeps that name.
   const days = {
     validateAccommodationRefs: vi.fn((_t: number, placeId?: number) => (placeId === 404 ? [{ message: 'place 404 is not on this trip' }] : [])),
-    createAccommodation: vi.fn(() => ({ id: 60 })),
+    createAccommodation: vi.fn(() => ({ accommodation: { id: 60 }, mirror: noMirror() })),
     getAccommodation: vi.fn((id: number) => (id === 11 ? { id: 11 } : undefined)),
-    updateAccommodation: vi.fn(() => ({ id: 11 })),
+    updateAccommodation: vi.fn(() => ({ accommodation: { id: 11 }, mirror: noMirror() })),
     deleteAccommodation: vi.fn(() => ({
       linkedReservationId: opts.cascade ? 40 : null,
       deletedBudgetItemId: opts.cascade ? 7 : null,
       linkedReservationIds: opts.cascade ? [40] : [],
       deletedBudgetItemIds: opts.cascade ? [7] : [],
+      mirror: noMirror(),
     })),
+    // The real one broadcasts the day stop a booking writes; these cases are about
+    // the booking events, so the fixture keeps it inert and BOOK-RPC-016 covers it.
+    announceMirror: vi.fn(),
   } as unknown as AccommodationsService & Record<string, ReturnType<typeof vi.fn>>;
   const guards = new PluginGuards(
     {
@@ -241,6 +247,14 @@ describe('AccommodationsRpc', () => {
     const res = (await f.host().dispatch(req('accommodations.update', { tripId: 1, accommodationId: 11, input: { place_id: 404 } }), 42)) as RpcError;
     expect(res.error.message).toBe('place 404 is not on this trip');
     expect(f.days.updateAccommodation).not.toHaveBeenCalled();
+  });
+
+  it('BOOK-RPC-017 the day stop a booking writes is announced through the plugin surface too', async () => {
+    const f = build();
+    await f.host().dispatch(req('accommodations.create', { tripId: 1, input: { place_id: 7, start_day_id: 3, end_day_id: 4 } }), 42);
+    // Same call the REST route makes, so a plugin booking a night cannot leave the
+    // other sessions without the stop that puts it on the route.
+    expect(f.days.announceMirror).toHaveBeenCalledWith(1, { created: null, removed: [], stamped: null }, expect.any(Function));
   });
 
   it('BOOK-RPC-015d deleting a block without a partner cascades only its own event', async () => {

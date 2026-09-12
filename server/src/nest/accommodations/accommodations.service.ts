@@ -1,11 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import type { TrekWsPayload, TrekWsTripEventName } from '@trek/shared';
 import { RealtimeService } from '../realtime/realtime.service';
-import { DatabaseService, type TripAccess } from '../database/database.service';
+import { DatabaseService, type PlaceWithTags, type TripAccess } from '../database/database.service';
 import { PermissionsService } from '../permissions/permissions.service';
+import { AssignmentsService } from '../assignments/assignments.service';
 import type { User } from '../../types';
 
 type Trip = TripAccess;
+
+type MirroredAssignment = ReturnType<AssignmentsService['createAssignment']>;
+
+/** How a surface sends the mirror's events; see announceMirror. */
+export type MirrorSender = <E extends TrekWsTripEventName>(event: E, payload: TrekWsPayload<E>) => void;
+
+/** What a stay write did to the day plan, on top of writing the stay itself. */
+export interface AccommodationMirror {
+  /** The day stop the booking added, or null when that day already held the place. */
+  created: MirroredAssignment | null;
+  /** Day stops the booking took back, because it moved days or was deleted. */
+  removed: { id: number; dayId: number }[];
+  /** The place, when this write was the one that typed it as lodging. */
+  stamped: PlaceWithTags | null;
+}
+
+const noMirror = (): AccommodationMirror => ({ created: null, removed: [], stamped: null });
 
 export interface DayAccommodation {
   id: number;
@@ -43,6 +61,16 @@ export interface CreateAccommodationData {
  * not the thing doing the carrying.
  *
  * Still gated by 'day_edit', the same permission as days.
+ *
+ * It also owns the day stop a booking implies. A road-trip stop IS a day
+ * assignment: the rail, the server-side plan and the map all build their stops
+ * from day_assignments and only look the stay up afterwards, to hang check-in
+ * and check-out on one. A stay written without an assignment is therefore
+ * invisible to every routing surface, which is what made people enter their
+ * hotel a second time as an ordinary place. The road-trip side has always
+ * written both halves in one go (the place, its day, and the stay); this is the
+ * day planner catching up, in the domain that writes the stay, so the next
+ * surface to book a night does not have to remember it.
  */
 @Injectable()
 export class AccommodationsService {
@@ -50,6 +78,7 @@ export class AccommodationsService {
     private readonly dbs: DatabaseService,
     private readonly permissions: PermissionsService,
     private readonly realtime: RealtimeService,
+    private readonly assignments: AssignmentsService,
   ) {}
 
   private get db() {
@@ -98,6 +127,21 @@ export class AccommodationsService {
     return this.deleteAccommodation(id);
   }
 
+  /**
+   * Send what a stay write did to the day plan, and let the journey skeletons
+   * catch up the way an assignment route does.
+   *
+   * Takes the sender rather than broadcasting itself: REST and the plugin RPC
+   * hand their socket id in, the MCP tools tag their events, and the fan-out is
+   * the one part that must not exist in three copies.
+   */
+  announceMirror(tripId: string | number, mirror: AccommodationMirror, send: MirrorSender, socketId?: string): void {
+    for (const stop of mirror.removed) send('assignment:deleted', { assignmentId: stop.id, dayId: stop.dayId });
+    if (mirror.created) send('assignment:created', { assignment: mirror.created });
+    if (mirror.stamped) send('place:updated', { place: mirror.stamped });
+    if (mirror.created || mirror.removed.length > 0) this.assignments.reconcile(tripId, socketId);
+  }
+
   // -------------------------------------------------------------------------
   // Accommodation CRUD
   // -------------------------------------------------------------------------
@@ -141,12 +185,88 @@ export class AccommodationsService {
     return errors;
   }
 
+  /**
+   * Put the booking's check-in day on the map.
+   *
+   * Only the check-in day gets a stop, even for a fortnight's stay: that is the
+   * day you drive there, and it is exactly what the road-trip side writes for a
+   * night it books itself. The later nights ride on the stay row, which is where
+   * the rail reads check-out from.
+   *
+   * Runs inside the caller's transaction.
+   */
+  private mirrorStay(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+    const mirror = noMirror();
+    // A stay can outlive its place (place_id is ON DELETE SET NULL) and the booking
+    // form writes stays that never had one. Nothing to put on the map then.
+    if (!placeId) return mirror;
+
+    // 'hotel' is a service stop: it takes no number, stays out of the day's stop
+    // count and falls under the existing "show service stops in Days" switch. Without
+    // the stamp a booked night made here would look nothing like one booked in the
+    // road trip. Only ever filled in when it is empty: a type the traveller picked
+    // (a campsite, say) is theirs.
+    const place = this.db.get<{ stop_type: string | null }>('SELECT stop_type FROM places WHERE id = ?', placeId);
+    if (place && !place.stop_type) {
+      this.db.run("UPDATE places SET stop_type = 'hotel' WHERE id = ?", placeId);
+      mirror.stamped = this.db.getPlaceWithTags(placeId);
+    }
+
+    // The road-trip flow assigns the place to the day and only then books the night.
+    // Claiming that row would make cancelling the booking delete a stop the traveller
+    // placed, so the booking rides along with it and marks nothing as its own. Same
+    // answer for a place already planned for that day by hand.
+    if (this.db.get('SELECT id FROM day_assignments WHERE day_id = ? AND place_id = ?', dayId, placeId)) return mirror;
+
+    // Through AssignmentsService, so the stop lands at the end of the day with the
+    // order_index every other new assignment gets. Evening is where you arrive at a
+    // hotel, and the day planner has no drive to position it against anyway.
+    const created = this.assignments.createAssignment(dayId, placeId);
+    if (created) {
+      this.db.run('UPDATE day_assignments SET accommodation_id = ? WHERE id = ?', accommodationId, created.id);
+      mirror.created = created;
+    }
+    return mirror;
+  }
+
+  /** The day stops this booking, and only this booking, put on the plan. */
+  private ownStops(accommodationId: number) {
+    return this.db.all<{ id: number; day_id: number; place_id: number }>(
+      'SELECT id, day_id, place_id FROM day_assignments WHERE accommodation_id = ?', accommodationId
+    );
+  }
+
+  /**
+   * Carry the mirrored stop over to wherever the booking now is.
+   *
+   * A booking that owns no stop gets one, which is how a stay made before any of
+   * this existed picks one up: re-save it once and it appears. The cost is that a
+   * mirrored stop somebody deleted by hand comes back the next time they touch the
+   * booking, which is the lesser of the two surprises.
+   *
+   * Runs inside the caller's transaction.
+   */
+  private remirrorStay(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+    const own = this.ownStops(accommodationId);
+    if (own.length === 1 && own[0].day_id === dayId && own[0].place_id === placeId) return noMirror();
+
+    const mirror = noMirror();
+    for (const stop of own) {
+      this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
+      mirror.removed.push({ id: stop.id, dayId: stop.day_id });
+    }
+    const fresh = this.mirrorStay(accommodationId, placeId, dayId);
+    mirror.created = fresh.created;
+    mirror.stamped = fresh.stamped;
+    return mirror;
+  }
+
   createAccommodation(tripId: string | number, data: CreateAccommodationData) {
     const { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } = data;
 
-    // The stay and its partner hotel reservation are one logical write —
-    // atomic, so a failed reservation insert can't leave an orphan stay.
-    const accommodationId = this.db.transaction(() => {
+    // The stay, its partner hotel reservation and the day stop it implies are one
+    // logical write, and an atomic one, so a failed insert halfway can't leave an orphan.
+    const written = this.db.transaction(() => {
       const result = this.db.run(
         'INSERT INTO day_accommodations (trip_id, place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
         tripId, place_id, start_day_id, end_day_id, check_in || null, check_in_end || null, check_out || null, confirmation || null, notes || null
@@ -170,10 +290,10 @@ export class AccommodationsService {
         Object.keys(meta).length > 0 ? JSON.stringify(meta) : null
       );
 
-      return newId;
+      return { accommodationId: newId, mirror: this.mirrorStay(Number(newId), place_id ?? null, start_day_id) };
     });
 
-    return this.getAccommodationWithPlace(accommodationId);
+    return { accommodation: this.getAccommodationWithPlace(written.accommodationId), mirror: written.mirror };
   }
 
   getAccommodation(id: string | number, tripId: string | number) {
@@ -193,10 +313,15 @@ export class AccommodationsService {
     const newConfirmation = fields.confirmation !== undefined ? fields.confirmation : existing.confirmation;
     const newNotes = fields.notes !== undefined ? fields.notes : existing.notes;
 
-    this.db.run(
-      'UPDATE day_accommodations SET place_id = ?, start_day_id = ?, end_day_id = ?, check_in = ?, check_in_end = ?, check_out = ?, confirmation = ?, notes = ? WHERE id = ?',
-      newPlaceId, newStartDayId, newEndDayId, newCheckIn, newCheckInEnd, newCheckOut, newConfirmation, newNotes, id
-    );
+    // The stay row and the day stop that mirrors it describe the same booking, so a
+    // move that wrote only one of the two must not survive.
+    const mirror = this.db.transaction(() => {
+      this.db.run(
+        'UPDATE day_accommodations SET place_id = ?, start_day_id = ?, end_day_id = ?, check_in = ?, check_in_end = ?, check_out = ?, confirmation = ?, notes = ? WHERE id = ?',
+        newPlaceId, newStartDayId, newEndDayId, newCheckIn, newCheckInEnd, newCheckOut, newConfirmation, newNotes, id
+      );
+      return this.remirrorStay(Number(id), newPlaceId, newStartDayId);
+    });
 
     // Sync check-in/out/confirmation to every linked reservation. The booking form
     // lets more than one hotel booking point at the same block and there is no
@@ -212,7 +337,7 @@ export class AccommodationsService {
         JSON.stringify(meta), newConfirmation || null, res.id);
     }
 
-    return this.getAccommodationWithPlace(Number(id));
+    return { accommodation: this.getAccommodationWithPlace(Number(id)), mirror };
   }
 
   /**
@@ -230,6 +355,7 @@ export class AccommodationsService {
     deletedBudgetItemId: number | null;
     linkedReservationIds: number[];
     deletedBudgetItemIds: number[];
+    mirror: AccommodationMirror;
   } {
     return this.db.transaction(() => {
       const linkedRes = this.db.all<{ id: number }>('SELECT id FROM reservations WHERE accommodation_id = ?', Number(id));
@@ -243,6 +369,15 @@ export class AccommodationsService {
         this.db.run('DELETE FROM reservations WHERE id = ?', res.id);
       }
 
+      // Only the stops this booking put there itself. A stop the traveller placed
+      // and then booked a night at keeps standing, which is how cancelling a night
+      // in the road trip has always behaved.
+      const mirror = noMirror();
+      for (const stop of this.ownStops(Number(id))) {
+        this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
+        mirror.removed.push({ id: stop.id, dayId: stop.day_id });
+      }
+
       this.db.run('DELETE FROM day_accommodations WHERE id = ?', id);
       const linkedReservationIds = linkedRes.map(r => r.id);
       return {
@@ -250,6 +385,7 @@ export class AccommodationsService {
         deletedBudgetItemId: deletedBudgetItemIds[0] ?? null,
         linkedReservationIds,
         deletedBudgetItemIds,
+        mirror,
       };
     });
   }

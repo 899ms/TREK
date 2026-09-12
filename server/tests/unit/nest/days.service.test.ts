@@ -62,11 +62,11 @@ const bridgeGetDay = (id: string | number, tripId: string | number) => svc.getDa
 const bridgeListDays = (tripId: string | number) => svc.list(tripId);
 import { RealtimeService } from '../../../src/nest/realtime/realtime.service';
 import { QueryHelpersService } from '../../../src/nest/query-helpers/query-helpers.service';
-import { AccommodationsService } from '../../../src/nest/accommodations/accommodations.service';
+import { makeAccommodationsService } from '../../helpers/accommodations-service';
 import type { Day } from '../../../src/types';
 
 const svc = new DaysService(new DatabaseService(testDb), new PermissionsService(new DatabaseService(testDb)), new RealtimeService(), new QueryHelpersService(new DatabaseService(testDb)));
-const accommodations = new AccommodationsService(new DatabaseService(testDb), new PermissionsService(new DatabaseService(testDb)), new RealtimeService());
+const accommodations = makeAccommodationsService(testDb);
 
 beforeAll(() => {
   createTables(testDb);
