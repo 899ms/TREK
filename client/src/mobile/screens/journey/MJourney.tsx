@@ -137,7 +137,7 @@ function HeroCard({ journey, onOpen }: { journey: JourneyListItem; onOpen: () =>
 /** One fact about the journey, set like the spotlight trip's pills on the dashboard. */
 function HeroPill({ icon, label }: { icon: React.ReactElement; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-white/[.28] px-[9px] py-[3px] font-geist text-[0.5625rem] font-bold tracking-[.07em] uppercase backdrop-blur-[6px]">
+    <span className="inline-flex items-center gap-1 rounded-full bg-white/[.28] px-[9px] py-[3px] font-geist text-[0.5625rem] font-bold tracking-[.07em] uppercase">
       {icon}
       {label}
     </span>
