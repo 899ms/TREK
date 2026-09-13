@@ -349,7 +349,7 @@ export class PlacesService {
       currency = COALESCE(?, currency),
       place_time = ?,
       end_time = ?,
-      duration_minutes = COALESCE(?, duration_minutes),
+      duration_minutes = ?,
       notes = ?,
       image_url = ?,
       google_place_id = ?,
@@ -375,9 +375,11 @@ export class PlacesService {
       currency || null,
       place_time !== undefined ? place_time : existingPlace.place_time,
       end_time !== undefined ? end_time : existingPlace.end_time,
-      // `?? null` rather than `|| null`: with COALESCE(?, duration_minutes) a
-      // falsy-coerced 0 read as "absent" and silently kept the old duration.
-      duration_minutes ?? null,
+      // Not COALESCE, like its neighbours: the contract says an explicit null
+      // clears the planned stay length, and COALESCE made null and absent the
+      // same thing, so the field advertised a reset it never performed. 0 keeps
+      // working, which a `|| null` bind would have swallowed.
+      duration_minutes !== undefined ? duration_minutes : existingPlace.duration_minutes,
       notes !== undefined ? notes : existingPlace.notes,
       image_url !== undefined ? image_url : existingPlace.image_url,
       google_place_id !== undefined ? google_place_id : existingPlace.google_place_id,

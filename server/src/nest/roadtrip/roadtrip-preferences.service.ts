@@ -35,7 +35,7 @@ export class RoadtripPreferencesService {
     return roadtripPreferencesSchema.parse(preferences);
   }
 
-  update(tripId: number, patch: RoadtripPreferences): RoadtripPreferences {
+  update(tripId: number, patch: RoadtripPreferences, socketId?: string): RoadtripPreferences {
     const validated = roadtripPreferencesUpdateSchema.parse(patch);
     const saved = this.db.transaction(() => {
       const next = { ...this.read(tripId), ...validated };
@@ -52,7 +52,11 @@ export class RoadtripPreferencesService {
       }
       return this.read(tripId);
     });
-    this.realtime.broadcast(String(tripId), 'roadtripPreferences:changed', { preferences: saved });
+    // The saving tab is left out, like every other trip mutation: it already has
+    // the answer, and its own echo costs it a second store commit and the route
+    // recompute that follows. The MCP tool passes none, which is right — nobody
+    // there is holding the result already.
+    this.realtime.broadcast(String(tripId), 'roadtripPreferences:changed', { preferences: saved }, socketId);
     return saved;
   }
 }

@@ -4,7 +4,7 @@ import { RequireAddon } from '../addons/require-addon.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RequirePermission, TripAccessGuard } from '../permissions/trip-access.guard';
 import { RoadtripPreferencesService } from './roadtrip-preferences.service';
-import { Body, Controller, Get, Param, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Headers, Param, Put, UseGuards } from '@nestjs/common';
 import { roadtripPreferencesUpdateSchema } from '@trek/shared';
 
 import { createZodDto } from 'nestjs-zod';
@@ -24,7 +24,7 @@ export class RoadtripPreferencesController {
 
   @Put()
   @RequirePermission('day_edit')
-  update(@Param('tripId') tripId: string, @Body() patch: PreferencesDto) {
-    return { tripId: Number(tripId), preferences: this.preferences.update(Number(tripId), patch) };
+  update(@Param('tripId') tripId: string, @Body() patch: PreferencesDto, @Headers('x-socket-id') socketId?: string) {
+    return { tripId: Number(tripId), preferences: this.preferences.update(Number(tripId), patch, socketId) };
   }
 }

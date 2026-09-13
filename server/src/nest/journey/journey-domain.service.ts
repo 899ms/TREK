@@ -608,7 +608,7 @@ export class JourneyDomainService {
         // update everything on skeletons
         this.db.prepare(
           `
-          UPDATE journey_entries SET title = ?, entry_date = ?, entry_time = ?, location_name = ?, location_lat = ?, location_lng = ?, updated_at = ?
+          UPDATE journey_entries SET title = ?, entry_date = ?, entry_time = ?, location_name = ?, location_lat = ?, location_lng = ?, country_code = ?, updated_at = ?
           WHERE id = ?
         `,
         ).run(
@@ -618,6 +618,9 @@ export class JourneyDomainService {
           place.address || place.name,
           place.lat || null,
           place.lng || null,
+          // The pin moved, so the flag has to follow it — the same rule updateEntry
+          // states, and the one every sync write here used to skip.
+          this.countryFor(place.lat ?? null, place.lng ?? null),
           now,
           entry.id,
         );
@@ -625,10 +628,13 @@ export class JourneyDomainService {
         // for filled entries, only update location silently
         this.db.prepare(
           `
-          UPDATE journey_entries SET location_name = ?, location_lat = ?, location_lng = ?, updated_at = ?
+          UPDATE journey_entries SET location_name = ?, location_lat = ?, location_lng = ?, country_code = ?, updated_at = ?
           WHERE id = ?
         `,
-        ).run(place.address || place.name, place.lat || null, place.lng || null, now, entry.id);
+        ).run(
+          place.address || place.name, place.lat || null, place.lng || null,
+          this.countryFor(place.lat ?? null, place.lng ?? null), now, entry.id,
+        );
       }
     }
   }
@@ -815,8 +821,8 @@ export class JourneyDomainService {
             found.location_lng !== lng;
           if (stale) {
             this.db.prepare(
-              `UPDATE journey_entries SET title = ?, entry_date = ?, entry_time = ?, location_name = ?, location_lat = ?, location_lng = ?, updated_at = ? WHERE id = ?`,
-            ).run(place.name, entryDate, entryTime, locationName, lat, lng, now, found.id);
+              `UPDATE journey_entries SET title = ?, entry_date = ?, entry_time = ?, location_name = ?, location_lat = ?, location_lng = ?, country_code = ?, updated_at = ? WHERE id = ?`,
+            ).run(place.name, entryDate, entryTime, locationName, lat, lng, this.countryFor(lat, lng), now, found.id);
             changed = true;
           }
         } else {
@@ -825,8 +831,8 @@ export class JourneyDomainService {
             found.location_name !== locationName || found.location_lat !== lat || found.location_lng !== lng;
           if (stale) {
             this.db.prepare(
-              `UPDATE journey_entries SET location_name = ?, location_lat = ?, location_lng = ?, updated_at = ? WHERE id = ?`,
-            ).run(locationName, lat, lng, now, found.id);
+              `UPDATE journey_entries SET location_name = ?, location_lat = ?, location_lng = ?, country_code = ?, updated_at = ? WHERE id = ?`,
+            ).run(locationName, lat, lng, this.countryFor(lat, lng), now, found.id);
             changed = true;
           }
         }

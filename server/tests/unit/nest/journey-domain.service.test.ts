@@ -2471,6 +2471,52 @@ describe('country_code', () => {
     expect(cleared.country_code).toBeNull();
   });
 
+  it('JOURNEY-SVC-114: a place that moves across a border moves its skeleton entry country too', () => {
+    // The pin can also move without anybody editing the entry: the place it came
+    // from is dragged, and the trip sync writes the new coordinates onto the
+    // skeleton. The flag has to follow that write like it follows a manual one.
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const trip = createTrip(testDb, user.id, { title: 'Border', start_date: '2026-08-01', end_date: '2026-08-03' });
+    const place = createPlace(testDb, trip.id, { name: 'Grenzstein', lat: 48.8584, lng: 2.2945 });
+    const day = testDb.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY date ASC LIMIT 1').get(trip.id) as { id: number };
+    createDayAssignment(testDb, day.id, place.id);
+    svc.addTripToJourney(journey.id, trip.id, user.id);
+
+    const before = testDb.prepare(
+      "SELECT country_code FROM journey_entries WHERE journey_id = ? AND source_place_id = ? AND type = 'skeleton'"
+    ).get(journey.id, place.id) as { country_code: string | null };
+    expect(before.country_code).toBe('FR');
+
+    testDb.prepare('UPDATE places SET lat = ?, lng = ? WHERE id = ?').run(52.52, 13.405, place.id);
+    svc.onPlaceUpdated(place.id);
+
+    const after = testDb.prepare(
+      "SELECT country_code FROM journey_entries WHERE journey_id = ? AND source_place_id = ? AND type = 'skeleton'"
+    ).get(journey.id, place.id) as { country_code: string | null };
+    expect(after.country_code).toBe('DE');
+  });
+
+  it('JOURNEY-SVC-115: and so does a filled entry, whose location follows the place silently', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const trip = createTrip(testDb, user.id, { title: 'Border 2', start_date: '2026-08-01', end_date: '2026-08-03' });
+    const place = createPlace(testDb, trip.id, { name: 'Grenzstein', lat: 48.8584, lng: 2.2945 });
+    const day = testDb.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY date ASC LIMIT 1').get(trip.id) as { id: number };
+    createDayAssignment(testDb, day.id, place.id);
+    svc.addTripToJourney(journey.id, trip.id, user.id);
+    // Writing a story turns the skeleton into a filled entry.
+    testDb.prepare("UPDATE journey_entries SET type = 'entry' WHERE source_place_id = ?").run(place.id);
+
+    testDb.prepare('UPDATE places SET lat = ?, lng = ? WHERE id = ?').run(52.52, 13.405, place.id);
+    svc.onPlaceUpdated(place.id);
+
+    const after = testDb.prepare(
+      'SELECT country_code, location_lat FROM journey_entries WHERE source_place_id = ?'
+    ).get(place.id) as { country_code: string | null; location_lat: number };
+    expect(after).toMatchObject({ country_code: 'DE', location_lat: 52.52 });
+  });
+
   it('JOURNEY-SVC-113: an edit that does not touch the pin leaves the country alone', () => {
     const { user } = createUser(testDb);
     const journey = createJourney(testDb, user.id);

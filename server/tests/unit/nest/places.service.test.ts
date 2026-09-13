@@ -1418,9 +1418,22 @@ describe('zero-valued numeric fields', () => {
     const zeroed = await svc.update(String(trip.id), String(place.id), { duration_minutes: 0 }) as any;
     expect(zeroed.duration_minutes).toBe(0);
 
-    // An omitted duration still leaves the stored value alone (COALESCE).
+    // An omitted duration still leaves the stored value alone.
     const untouched = await svc.update(String(trip.id), String(place.id), { name: 'Stop 2' }) as any;
     expect(untouched.duration_minutes).toBe(0);
+  });
+
+  it('PLACE-SVC-067b — an explicit null clears the planned stay length', async () => {
+    // What the write contract and the MCP tool both advertise. Behind COALESCE,
+    // null and absent were the same thing, so the field promised a reset it never
+    // performed and the day plan kept budgeting the old ninety minutes.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const place = createPlace(testDb, trip.id, { name: 'Stop' }) as any;
+    testDb.prepare('UPDATE places SET duration_minutes = 90 WHERE id = ?').run(place.id);
+
+    const cleared = await svc.update(String(trip.id), String(place.id), { duration_minutes: null }) as any;
+    expect(cleared.duration_minutes).toBeNull();
   });
 });
 
