@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'Místo bylo smazáno',
   'trip.toast.selectDay': 'Prosím nejdříve vyberte den',
   'trip.toast.assignedToDay': 'Místo bylo přiřazeno ke dni',
+  'trip.toast.loadError': 'Cestu se nepodařilo načíst',
   'trip.toast.reorderError': 'Nepodařilo se změnit pořadí',
   'trip.toast.reservationUpdated': 'Rezervace aktualizována',
   'trip.toast.reservationAdded': 'Rezervace přidána',

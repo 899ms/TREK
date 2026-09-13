@@ -20,6 +20,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'Hely törölve',
   'trip.toast.selectDay': 'Kérjük, először válassz egy napot',
   'trip.toast.assignedToDay': 'Hely hozzárendelve a naphoz',
+  'trip.toast.loadError': 'Az utazást nem sikerült betölteni',
   'trip.toast.reorderError': 'Nem sikerült átrendezni',
   'trip.toast.reservationUpdated': 'Foglalás frissítve',
   'trip.toast.reservationAdded': 'Foglalás hozzáadva',

@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': '地点已删除',
   'trip.toast.selectDay': '请先选择一天',
   'trip.toast.assignedToDay': '地点已分配到当天',
+  'trip.toast.loadError': '无法加载行程',
   'trip.toast.reorderError': '排序失败',
   'trip.toast.reservationUpdated': '预订已更新',
   'trip.toast.reservationAdded': '预订已添加',

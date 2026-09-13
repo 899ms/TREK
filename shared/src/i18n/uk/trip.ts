@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'Місце видалено',
   'trip.toast.selectDay': 'Спочатку виберіть день',
   'trip.toast.assignedToDay': 'Місце призначено на день',
+  'trip.toast.loadError': 'Не вдалося завантажити подорож',
   'trip.toast.reorderError': 'Помилка зміни порядку',
   'trip.toast.reservationUpdated': 'Бронювання оновлено',
   'trip.toast.reservationAdded': 'Бронювання додано',

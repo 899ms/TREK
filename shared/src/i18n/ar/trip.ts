@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'تم حذف المكان',
   'trip.toast.selectDay': 'يرجى اختيار يوم أولًا',
   'trip.toast.assignedToDay': 'تم إسناد المكان إلى اليوم',
+  'trip.toast.loadError': 'تعذر تحميل الرحلة',
   'trip.toast.reorderError': 'فشل إعادة الترتيب',
   'trip.toast.reservationUpdated': 'تم تحديث الحجز',
   'trip.toast.reservationAdded': 'تمت إضافة الحجز',

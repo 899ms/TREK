@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'Plats raderad',
   'trip.toast.selectDay': 'Vänligen välj en dag först',
   'trip.toast.assignedToDay': 'Plats tilldelad till dag',
+  'trip.toast.loadError': 'Det gick inte att ladda resan',
   'trip.toast.reorderError': 'Misslyckades att ordna om',
   'trip.toast.reservationUpdated': 'Reservation uppdaterad',
   'trip.toast.reservationAdded': 'Reservation tillagd',

@@ -128,7 +128,23 @@ export function useTripPlanner() {
   // drive-first reading of the same trip. Per trip and per session, like the tab choice:
   // someone planning a road trip stays in it across reloads without it leaking into
   // their next, non-driving trip.
-  const [roadtripMode, setRoadtripMode] = useState<boolean>(() => sessionStorage.getItem(`trip-roadtrip-${tripId}`) === '1')
+  const [storedRoadtripMode, setRoadtripMode] = useState<boolean>(() => sessionStorage.getItem(`trip-roadtrip-${tripId}`) === '1')
+  // Declared here rather than with the other layout state further down, because
+  // road-trip mode is decided on it and the assignment and place lists below are
+  // decided on that. One subscriber for the whole hook.
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)')
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+  // The phone shell has no road-trip surface at all: no rail, no drive lines, and
+  // no switch to turn the mode back off. Narrowing a desktop window past the
+  // phone breakpoint used to carry the flag across anyway, which took the trip
+  // overview pill away with nothing in its place and listed every booked night
+  // twice. The flag is kept, so widening the window again returns to the drive.
+  const roadtripMode = storedRoadtripMode && !isMobile
   // Two reasons a stop can be road-trip-only, and they are not the same reason.
   //
   // The switch is the traveller's: it hides the petrol stations and rest areas
@@ -488,13 +504,6 @@ export function useTripPlanner() {
   }, [alwaysShowRoutesDefault])
   const [mapTransportDetail, setMapTransportDetail] = useState<Reservation | null>(null)
 
-  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)')
-    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [])
   // Layout is width-driven (isMobile); the drag bridge is pointer-driven (isTouch).
   // Conflating them is what left a tablet's places list undraggable-but-unscrollable (#1432).
   const isTouch = useIsTouch()
@@ -618,7 +627,14 @@ export function useTripPlanner() {
       for (const boundary of dayBoundaries.boundaries) await dayBoundaries.save(boundary.day_number, null)
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : t('common.unknownError')) }
   } : undefined
-  const roadtripVias = useRoadtripVias(tripId, roadtripActive)
+  // Fed whenever the addon is on, not only while the mode is being looked at.
+  // The three handlers that re-anchor a day's vias — assign, remove, reorder —
+  // are reachable from the place inspector in both modes, and with an empty list
+  // they computed an empty correction and wrote nothing while the server kept
+  // every via pointing at a position that had moved. Deleting a stop with the
+  // switch off then left the detour on the wrong leg, for the traveller and for
+  // a collaborator who never turned the mode on at all.
+  const roadtripVias = useRoadtripVias(tripId, !!enabledAddons.roadtrip)
   const refuel = useRefuelSearch()
   const roadtripRoutes = useRoadtripRoutes(
     tripId,
@@ -1382,8 +1398,21 @@ export function useTripPlanner() {
     const day = roadtripRoutes.days.find(d => d.dayId === open.dayId)
     const stop = day?.stops[open.index]
     if (!day || !stop) return
+    const ownerDayId = stop.ownerDayId ?? day.dayId
+    const legIndex = stop.ownerIndex ?? open.index
     try {
-      await roadtripVias.add(stop.ownerDayId ?? day.dayId, stop.ownerIndex ?? open.index, alt.divergence.lat, alt.divergence.lng)
+      // Replaces the leg rather than appending to it. The alternatives under the
+      // button were computed for the two bare endpoints — the road already being
+      // driven is offered separately as `current` — so a leg that already carries
+      // a via cannot produce the line the preview drew. Appending put the new
+      // point behind the old one and routed A, south to the old via, north to the
+      // new one, then B: a zigzag matching neither the preview nor the distance
+      // printed on it. Same write the direct branch above already uses.
+      await roadtripVias.addMany(
+        ownerDayId,
+        [{ after_order_index: legIndex, lat: alt.divergence.lat, lng: alt.divergence.lng }],
+        [legIndex],
+      )
       routeAlternatives.close()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'))

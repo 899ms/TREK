@@ -24,6 +24,7 @@ const trip: TranslationStrings = {
   'trip.toast.placeDeleted': 'Tempat dihapus',
   'trip.toast.selectDay': 'Pilih hari terlebih dahulu',
   'trip.toast.assignedToDay': 'Tempat ditambahkan ke hari',
+  'trip.toast.loadError': 'Tidak dapat memuat perjalanan',
   'trip.toast.reorderError': 'Gagal mengurutkan ulang',
   'trip.toast.reservationUpdated': 'Reservasi diperbarui',
   'trip.toast.reservationAdded': 'Reservasi ditambahkan',

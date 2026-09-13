@@ -332,6 +332,20 @@ export function useRoadtripRoutes(
                   if (s) daySnaps[stopKey(stop)] = s
                 })
               }
+              // What was asked for against what the road turned out to be. Only
+              // the second engine reports it, and only when it answered: an OSRM
+              // fallback leaves `avoidance` absent, which is the honest reading
+              // of "the weighting never happened". Collected here because the
+              // rail plans in the browser and never sees the server's own copy
+              // of this field — without it the "not honoured" badge could not
+              // appear at all, and a motorway-free drive that is not one read as
+              // if the setting had held.
+              if (r.avoidance) {
+                const missed = r.avoidance.asked.filter(cls => !r.avoidance!.achieved.includes(cls))
+                if (missed.length) {
+                  collectedMisses[day.dayId] = [...new Set([...(collectedMisses[day.dayId] ?? []), ...missed])]
+                }
+              }
               Object.assign(dayLegs, foldRouteRun(run, stopAt, r, mode))
               return
             } catch (err) {
@@ -443,6 +457,8 @@ export function useRoadtripRoutes(
     return out
   }, [chains, plan, quietDays, window, legsByDay, seamLegs, viasByDay, connectDays])
   const seamKey = seams.map(s => `${legKey(s.from, s.to)}#${seamShape(s.from, viasByDay)}`).join(';')
+  /** When the last seam request went out, across every run of the effect below. */
+  const lastSeamRequestAt = useRef(0)
 
   useEffect(() => {
     if (!seams.length) return
@@ -450,6 +466,20 @@ export function useRoadtripRoutes(
     void (async () => {
       for (const seam of seams) {
         if (controller.signal.aborted) return
+        // Paced before the request, against a clock that outlives this effect.
+        //
+        // Waiting AFTER one instead spaced nothing: storing a seam changes
+        // seamLegs, which is a dependency of the seams memo, which shortens
+        // seamKey, which is this effect's first dependency — so React tore the
+        // effect down mid-wait, the cleanup aborted the sleep, and the next run
+        // fired straight away. Thirteen seams went out at round-trip speed, the
+        // shared routing hosts answered the tail with 429, and a refused seam
+        // writes no state, so nothing changed to make the effect try again: the
+        // map drew the trip in pieces and the totals came back short.
+        const since = performance.now() - lastSeamRequestAt.current
+        if (since < REQUEST_SPACING_MS) await sleep(REQUEST_SPACING_MS - since, controller.signal)
+        if (controller.signal.aborted) return
+        lastSeamRequestAt.current = performance.now()
         const mode = resolveLegMode(
           { isPlace: true, leg_transport_mode: seam.from.legMode },
           { isPlace: true, incoming_leg_transport_mode: seam.to.incomingLegMode },
@@ -496,7 +526,6 @@ export function useRoadtripRoutes(
           // invented. Retried on the next run of this effect.
           if (controller.signal.aborted) return
         }
-        await sleep(REQUEST_SPACING_MS, controller.signal)
       }
     })()
     return () => controller.abort()

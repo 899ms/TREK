@@ -963,7 +963,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     expect(rt.alt.close).not.toHaveBeenCalled()
   })
 
-  it('FE-TP-ROAD-040: another road is stored as a via where it differs most, not as a polyline', async () => {
+  it('FE-TP-ROAD-040: another road replaces the leg it reshapes, as a via rather than a polyline', async () => {
     routedDay()
     rt.alt.open = {
       dayId: 5, index: 0, loading: false, error: false,
@@ -973,7 +973,11 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
     await act(async () => { await result.current.chooseRouteAlternative(0) })
 
-    expect(rt.vias.add).toHaveBeenCalledWith(5, 0, 53.1, 11.9)
+    // Replacing, not appending: the alternatives were computed for the two bare
+    // endpoints, so a leg that still carries its old via routes somewhere the
+    // preview never drew.
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 0, lat: 53.1, lng: 11.9 }], [0])
+    expect(rt.vias.add).not.toHaveBeenCalled()
     expect(rt.alt.close).toHaveBeenCalled()
   })
 
@@ -983,7 +987,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
       dayId: 5, index: 0, loading: false, error: false,
       routes: [{ divergence: { lat: 53.1, lng: 11.9 } }],
     }
-    rt.vias.add.mockRejectedValue(new Error('rejected'))
+    rt.vias.addMany.mockRejectedValue(new Error('rejected'))
     const { result } = await renderRoadtrip()
     rt.alt.close.mockClear()
 
