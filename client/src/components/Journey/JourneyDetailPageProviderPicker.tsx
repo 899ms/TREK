@@ -221,10 +221,12 @@ export function ProviderPicker({
           </div>
         )}
 
-        {/* Filter bar */}
-        <div className="flex-shrink-0 border-b border-zinc-200 px-6 py-3 dark:border-zinc-700">
+        {/* Filter bar. Embedded in the entry editor this sits in a panel a few hundred
+            pixels tall, so its padding is the difference between three rows of
+            thumbnails and two. */}
+        <div className={`flex-shrink-0 border-b border-zinc-200 dark:border-zinc-700 ${embedded ? 'px-3 py-2' : 'px-6 py-3'}`}>
           {/* Tabs */}
-          <div className="mb-3 flex gap-1.5">
+          <div className={`flex gap-1.5 ${embedded && filter === 'day' ? '' : 'mb-3'}`}>
             {[
               ...(initialDate ? [{ id: 'day' as const, label: t('journey.picker.day') || 'This day' }] : []),
               { id: 'trip' as const, label: t('journey.picker.tripPeriod') },
@@ -552,14 +554,11 @@ export function ProviderPicker({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex flex-shrink-0 items-center justify-between border-t border-zinc-200 bg-zinc-50 px-6 py-4 dark:border-zinc-700 dark:bg-zinc-800/50">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-200/60 px-2.5 py-1 text-[11px] leading-none text-zinc-500 dark:bg-zinc-700/60 dark:text-zinc-400">
-            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-zinc-900 px-1 text-[10px] leading-none font-bold text-white dark:bg-white dark:text-zinc-900">
-              {selected.size}
-            </span>
-            <span className="leading-[18px]">{t('journey.picker.selected')}</span>
-          </span>
+        {/* Footer. The count used to sit here as its own pill as well as on the Add
+            button; one of the two was always saying it twice, and inside the entry
+            editor the row it took cost the grid a row of thumbnails (discussion
+            #2299). Embedded, the whole bar is tighter for the same reason. */}
+        <div className={`flex flex-shrink-0 items-center justify-end border-t border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800/50 ${embedded ? 'px-3 py-2' : 'px-6 py-4'}`}>
           <div className="flex items-center gap-2">
             <button
               type="button"

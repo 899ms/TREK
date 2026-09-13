@@ -4821,6 +4821,53 @@ function runMigrations(db: Database.Database): void {
       }
       if (stays.length > 0) console.log(`[DB] Caught up ${stays.length} booked night(s) missed during the upgrade`);
     },
+    /**
+     * A suggestion the traveller has waved away.
+     *
+     * Skeletons are real rows, and the trip sync decides what to create by asking
+     * which source places already have one. Deleting a dismissed suggestion would
+     * therefore bring it straight back on the next sync. So it stays, marked, and
+     * drops out of every read instead — which also leaves a way back.
+     *
+     * Appended LAST: the array is index-addressed against schema_version.
+     */
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('journey_entries')").all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === 'dismissed')) {
+        db.exec('ALTER TABLE journey_entries ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0');
+      }
+    },
+    /**
+     * The country an entry happened in, resolved once from its coordinates.
+     *
+     * For the flag on the timeline card. Resolved on write rather than on read
+     * because the answer never changes and the polygon test should not run on
+     * every render of every entry.
+     */
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('journey_entries')").all() as Array<{ name: string }>;
+      if (!cols.some((c) => c.name === 'country_code')) {
+        db.exec('ALTER TABLE journey_entries ADD COLUMN country_code TEXT');
+      }
+    },
+    /**
+     * Which of the optional entry fields a journey uses.
+     *
+     * Mood, weather and the pros/cons list are the three things that make the
+     * editor feel like a form. Not everybody journals that way, and a journey
+     * kept by one person for their family should be able to put them away
+     * without the fields being taken from everybody else (discussion #2299).
+     *
+     * DEFAULT 1: every existing journey keeps all three, which is what it had.
+     */
+    () => {
+      const cols = db.prepare("SELECT name FROM pragma_table_info('journeys')").all() as Array<{ name: string }>;
+      for (const col of ['show_verdict', 'show_mood', 'show_weather']) {
+        if (!cols.some((c) => c.name === col)) {
+          db.exec(`ALTER TABLE journeys ADD COLUMN ${col} INTEGER NOT NULL DEFAULT 1`);
+        }
+      }
+    },
   ];
 
   if (currentVersion < migrations.length) {

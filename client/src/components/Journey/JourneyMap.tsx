@@ -98,6 +98,16 @@ interface Props {
   activeMarkerId?: string | null
   onMarkerClick?: (id: string, type?: string) => void
   fullScreen?: boolean
+  /**
+   * Leave the marker labels off.
+   *
+   * On the phone the map sits above a carousel whose active card already carries
+   * the entry's name, and a tooltip on touch is a tap-to-open box rather than a
+   * hover hint — so it says the same thing twice and covers the map to do it
+   * (discussion #2299). On desktop the label is the only name a marker has, so
+   * this stays off there.
+   */
+  hideMarkerTooltip?: boolean
   paddingBottom?: number
   /** CARTO key from the share payload: the public journey has no settings store to read. */
   cartoApiKey?: string
@@ -149,8 +159,12 @@ const EMPTY_TRACKS: JourneyTrack[] = []
 const TRACK_FALLBACK_COLOR = '#4f46e5'
 
 function JourneyMap(
-  { entries, photos, onPhotoClick, trail, tracks, height = 220, dark, activeMarkerId, onMarkerClick, fullScreen, paddingBottom, cartoApiKey, ref }: Props,
+  { entries, photos, onPhotoClick, trail, tracks, height = 220, dark, activeMarkerId, onMarkerClick, fullScreen, paddingBottom, cartoApiKey, hideMarkerTooltip, ref }: Props,
 ) {
+  // Read through a ref: the flag is fixed per surface, and putting it in the
+  // marker effect's deps would rebuild every marker for nothing.
+  const hideMarkerTooltipRef = useRef(hideMarkerTooltip)
+  hideMarkerTooltipRef.current = hideMarkerTooltip
   const stableTrail = trail || EMPTY_TRAIL
   const stableTracks = tracks || EMPTY_TRACKS
   const mapTileUrl = useSettingsStore(s => s.settings.map_tile_url)
@@ -219,12 +233,22 @@ function JourneyMap(
     }
   }, [])
 
+  /**
+   * Bring an entry's marker under the reader without changing how far out they are.
+   *
+   * This fires on every step through the timeline, and it used to force zoom 12.
+   * Reading a journey from a country view therefore yanked the map to street level
+   * on the first scroll and kept it there: every marker filled the screen, and the
+   * one thing a map is for — where is this, relative to everything else — was gone
+   * (discussion #2299). Panning keeps the frame the reader chose; the initial
+   * fitBounds is what decides how close the journey starts out.
+   */
   const focusMarker = useCallback((id: string) => {
     highlightMarker(id)
     const marker = markersRef.current.get(id)
     if (marker && mapRef.current) {
       try {
-        mapRef.current.flyTo(marker.getLatLng(), Math.max(mapRef.current.getZoom(), 12), { duration: 0.5 })
+        mapRef.current.panTo(marker.getLatLng(), { animate: true, duration: 0.5 })
       } catch { /* map not yet initialized */ }
     }
   }, [])
@@ -348,11 +372,13 @@ function JourneyMap(
       const marker = L.marker(pos, { icon }).addTo(map)
       // Escaped for the same reason as the track tooltip above: the label is an
       // entry title, and this map is what the public journey page renders.
-      marker.bindTooltip(escapeHtml(item.label), {
-        direction: 'top',
-        offset: [0, -MARKER_H],
-        className: 'map-tooltip',
-      })
+      if (!hideMarkerTooltipRef.current) {
+        marker.bindTooltip(escapeHtml(item.label), {
+          direction: 'top',
+          offset: [0, -MARKER_H],
+          className: 'map-tooltip',
+        })
+      }
 
       marker.on('click', () => {
         onMarkerClickRef.current?.(item.id)
@@ -462,11 +488,11 @@ function JourneyMap(
       highlightMarker(activeMarkerId)
       const marker = markersRef.current.get(activeMarkerId)
       if (!marker || !mapRef.current) return
-      // fitBounds may still be pending when this fires — getZoom() throws
-      // "Set map center and zoom first" until the map has a view. Guard it.
+      // Pan, don't zoom — see focusMarker. fitBounds may still be pending when this
+      // fires, and panTo on a map with no view throws "Set map center and zoom
+      // first", so the catch is where the map gets its first one.
       try {
-        const currentZoom = mapRef.current.getZoom()
-        mapRef.current.flyTo(marker.getLatLng(), Math.max(currentZoom, 12), { duration: 0.5 })
+        mapRef.current.panTo(marker.getLatLng(), { animate: true, duration: 0.5 })
       } catch {
         mapRef.current.setView(marker.getLatLng(), 12)
       }

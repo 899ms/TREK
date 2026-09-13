@@ -44,6 +44,7 @@ export class JourneyService {
   getSuggestions(userId: number) { return this.journey.getSuggestions(userId); }
   listUserTrips(userId: number) { return this.journey.listUserTrips(userId); }
   updateJourneyPreferences(id: number, userId: number, data: Parameters<typeof this.journey.updateJourneyPreferences>[2]) { return this.journey.updateJourneyPreferences(id, userId, data); }
+  restoreDismissedSuggestions(id: number, userId: number) { return this.journey.restoreDismissedSuggestions(id, userId); }
 
   // Trips
   addTripToJourney(id: number, tripId: number, userId: number) { return this.journey.addTripToJourney(id, tripId, userId); }

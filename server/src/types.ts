@@ -406,6 +406,13 @@ export interface JourneyEntry {
   pros_cons?: string | null;
   visibility: 'private' | 'shared' | 'public';
   sort_order: number;
+  /** ISO 3166-1 alpha-2, resolved from the coordinates when the entry was written. */
+  country_code?: string | null;
+  /**
+   * 0/1 as the row holds it. A suggestion the traveller waved away: the row stays,
+   * so the trip sync does not create it again, and every read leaves it out.
+   */
+  dismissed: number;
   /**
    * 0/1 as the row holds it. Switched on, the entry stays in the journal but
    * is left out of the route and the figures Studio prints (discussion #2064).

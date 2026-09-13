@@ -694,6 +694,17 @@ export class JourneyController {
     return { success: true };
   }
 
+  // ── Suggestions ─────────────────────────────────────────────────────────
+  @Post(':id/suggestions/restore')
+  @HttpCode(200)
+  restoreSuggestions(@CurrentUser() user: User, @Param('id') id: string) {
+    const result = this.journey.restoreDismissedSuggestions(Number(id), user.id);
+    if (!result) {
+      throw new HttpException({ error: 'Not allowed' }, 403);
+    }
+    return result;
+  }
+
   // ── User Preferences ────────────────────────────────────────────────────
   @Patch(':id/preferences')
   preferences(@CurrentUser() user: User, @Param('id') id: string, @Body() body: JourneyPreferencesDto) {

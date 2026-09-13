@@ -127,7 +127,10 @@ describe('MJourneyEntrySheet quick capture', () => {
     });
     setup();
 
-    expect(screen.queryByPlaceholderText('Give this moment a name...')).not.toBeInTheDocument();
+    // Quick capture asks for a name now: without one every entry caught on the
+    // move arrived nameless and the day read as a column of placeholders
+    // (discussion #2299). The story field is what Add details still unlocks.
+    expect(screen.getByPlaceholderText('Give this moment a name...')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Add details' }));
     expect(screen.getByPlaceholderText('Give this moment a name...')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Write your story...')).toBeInTheDocument();

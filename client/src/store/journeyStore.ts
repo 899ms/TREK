@@ -21,6 +21,16 @@ export interface Journey {
    * boolean would make `=== true` compile and never hold.
    */
   show_trip_tracks?: number
+  /**
+   * Which of the optional entry fields this journey uses (discussion #2299).
+   *
+   * Same wire shape and same reason as `show_trip_tracks` above: INTEGER columns
+   * read with SELECT *, so 0 or 1 arrives, and `undefined` on a cached journey
+   * from before the migration — which reads as on, matching the column default.
+   */
+  show_verdict?: number
+  show_mood?: number
+  show_weather?: number
   created_at: number
   updated_at: number
 }
@@ -40,6 +50,8 @@ export interface JourneyEntry {
   location_name?: string | null
   location_lat?: number | null
   location_lng?: number | null
+  /** ISO 3166-1 alpha-2, resolved server-side from the coordinates. Drives the card's flag. */
+  country_code?: string | null
   mood?: string | null
   weather?: string | null
   tags?: string[]
@@ -49,6 +61,8 @@ export interface JourneyEntry {
   // Switched off by hand: the stop stays in the journal but is left out of the
   // route, the distance and the countries that Studio prints.
   stats_excluded?: boolean
+  /** A trip-derived suggestion the traveller waved away. Never sent by the server; the read paths drop it. */
+  dismissed?: boolean
   photos: JourneyPhoto[]
   created_at: number
   updated_at: number
@@ -123,6 +137,8 @@ export interface JourneyDetail extends Journey {
   contributors: JourneyContributor[]
   stats: { entries: number; photos: number; places: number }
   hide_skeletons?: boolean
+  /** How many suggestions were waved away one at a time, so the settings sheet can offer them back. */
+  dismissed_count?: number
   my_role?: 'owner' | 'editor' | 'viewer'
 }
 

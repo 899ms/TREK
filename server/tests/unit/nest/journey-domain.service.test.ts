@@ -2334,3 +2334,186 @@ describe('addTripToJourney guards', () => {
     expect(testDb.prepare('SELECT 1 FROM journey_photos WHERE journey_id = ?').all(journey.id)).toHaveLength(0);
   });
 });
+
+
+// -- Dismissing a suggestion (discussion #2299) --------------------------------
+
+describe('dismissed suggestions', () => {
+  it('JOURNEY-SVC-103: a dismissed suggestion leaves every read but keeps its row', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const keep = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton', title: 'Museum' });
+    const drop = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton', title: 'Aquarium' });
+
+    svc.updateEntry(drop.id, user.id, { dismissed: true });
+
+    const full = svc.getJourneyFull(journey.id, user.id)!;
+    expect(full.entries.map((e: { id: number }) => e.id)).toEqual([keep.id]);
+    expect(svc.listEntries(journey.id, user.id)!.map((e) => e.id)).toEqual([keep.id]);
+    // The row has to survive, or syncTripPlaces offers the same place again.
+    expect(testDb.prepare('SELECT dismissed FROM journey_entries WHERE id = ?').get(drop.id)).toEqual({
+      dismissed: 1,
+    });
+  });
+
+  it('JOURNEY-SVC-104: the journey reports how many were dismissed', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const a = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton' });
+    const b = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton' });
+    createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton' });
+
+    svc.updateEntry(a.id, user.id, { dismissed: true });
+    svc.updateEntry(b.id, user.id, { dismissed: true });
+
+    expect(svc.getJourneyFull(journey.id, user.id)!.dismissed_count).toBe(2);
+  });
+
+  it('JOURNEY-SVC-105: a dismissed place is not offered again by the trip sync', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id, { day_number: 1, date: '2026-01-15' });
+    const place = createPlace(testDb, trip.id, { name: 'Aquarium' });
+    createDayAssignment(testDb, day.id, place.id);
+
+    svc.addTripToJourney(journey.id, trip.id, user.id);
+    const skeleton = svc.listEntries(journey.id, user.id)!.find((e) => e.type === 'skeleton')!;
+    svc.updateEntry(skeleton.id, user.id, { dismissed: true });
+
+    svc.syncTripPlaces(journey.id, trip.id, user.id);
+
+    expect(svc.listEntries(journey.id, user.id)!.filter((e) => e.type === 'skeleton')).toHaveLength(0);
+  });
+
+  it('JOURNEY-SVC-106: restoring brings them all back and says how many', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const a = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton' });
+    const b = createJourneyEntry(testDb, journey.id, user.id, { type: 'skeleton' });
+    svc.updateEntry(a.id, user.id, { dismissed: true });
+    svc.updateEntry(b.id, user.id, { dismissed: true });
+
+    expect(svc.restoreDismissedSuggestions(journey.id, user.id)).toEqual({ restored: 2 });
+    expect(svc.listEntries(journey.id, user.id)).toHaveLength(2);
+  });
+
+  it('JOURNEY-SVC-107: restoring nothing is not an error', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+
+    expect(svc.restoreDismissedSuggestions(journey.id, user.id)).toEqual({ restored: 0 });
+  });
+
+  it('JOURNEY-SVC-108: a viewer may not restore', () => {
+    const { user: owner } = createUser(testDb);
+    const { user: viewer } = createUser(testDb);
+    const journey = createJourney(testDb, owner.id);
+    addJourneyContributor(testDb, journey.id, viewer.id, 'viewer');
+
+    expect(svc.restoreDismissedSuggestions(journey.id, viewer.id)).toBeNull();
+  });
+});
+
+// -- The country behind an entry's coordinates ---------------------------------
+
+describe('country_code', () => {
+  it('JOURNEY-SVC-109: a created entry resolves its country from its coordinates', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+
+    const entry = svc.createEntry(journey.id, user.id, {
+      entry_date: '2026-01-15',
+      location_lat: 52.52,
+      location_lng: 13.405,
+    })!;
+
+    expect(entry.country_code).toBe('DE');
+  });
+
+  it('JOURNEY-SVC-110: an entry with no coordinates has no country', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+
+    const entry = svc.createEntry(journey.id, user.id, { entry_date: '2026-01-15' })!;
+
+    expect(entry.country_code).toBeNull();
+  });
+
+  it('JOURNEY-SVC-111: moving the pin moves the country with it', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const entry = svc.createEntry(journey.id, user.id, {
+      entry_date: '2026-01-15',
+      location_lat: 52.52,
+      location_lng: 13.405,
+    })!;
+
+    const moved = svc.updateEntry(entry.id, user.id, { location_lat: 48.8584, location_lng: 2.2945 })!;
+
+    expect(moved.country_code).toBe('FR');
+  });
+
+  it('JOURNEY-SVC-112: taking the pin off clears the country', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const entry = svc.createEntry(journey.id, user.id, {
+      entry_date: '2026-01-15',
+      location_lat: 52.52,
+      location_lng: 13.405,
+    })!;
+
+    const cleared = svc.updateEntry(entry.id, user.id, {
+      location_lat: null as unknown as number,
+      location_lng: null as unknown as number,
+    })!;
+
+    expect(cleared.country_code).toBeNull();
+  });
+
+  it('JOURNEY-SVC-113: an edit that does not touch the pin leaves the country alone', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+    const entry = svc.createEntry(journey.id, user.id, {
+      entry_date: '2026-01-15',
+      location_lat: 52.52,
+      location_lng: 13.405,
+    })!;
+
+    const renamed = svc.updateEntry(entry.id, user.id, { title: 'Berlin' })!;
+
+    expect(renamed.country_code).toBe('DE');
+  });
+});
+
+// -- Which optional fields a journey keeps -------------------------------------
+
+describe('entry field switches', () => {
+  it('JOURNEY-SVC-114: a fresh journey keeps all three', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+
+    const row = svc.getJourneyFull(journey.id, user.id)! as unknown as Record<string, number>;
+
+    expect([row.show_verdict, row.show_mood, row.show_weather]).toEqual([1, 1, 1]);
+  });
+
+  it('JOURNEY-SVC-115: the owner can put one away, and booleans reach the INTEGER column', () => {
+    const { user } = createUser(testDb);
+    const journey = createJourney(testDb, user.id);
+
+    svc.updateJourney(journey.id, user.id, { show_mood: false, show_weather: false });
+
+    const row = svc.getJourneyFull(journey.id, user.id)! as unknown as Record<string, number>;
+    expect([row.show_verdict, row.show_mood, row.show_weather]).toEqual([1, 0, 0]);
+  });
+
+  it('JOURNEY-SVC-116: an editor may not reshape the journey', () => {
+    const { user: owner } = createUser(testDb);
+    const { user: editor } = createUser(testDb);
+    const journey = createJourney(testDb, owner.id);
+    addJourneyContributor(testDb, journey.id, editor.id, 'editor');
+
+    expect(svc.updateJourney(journey.id, editor.id, { show_mood: false })).toBeNull();
+  });
+});

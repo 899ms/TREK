@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { localIsoDate } from '../../../utils/localDate'
-import { Camera, Plus, Image, Images, X, MapPin, Locate, Trash2, CheckCircle2, MinusCircle } from 'lucide-react'
+import { Camera, Plus, Image, Images, X, MapPin, Locate, Trash2, CheckCircle2, MinusCircle, ChevronUp, ChevronDown, EyeOff } from 'lucide-react'
 import MSheet from '../../components/MSheet'
 import MIconBtn from '../../components/MIconBtn'
 import MToggle from '../../components/MToggle'
@@ -39,6 +39,22 @@ interface MJourneyEntrySheetProps {
   readOnly?: boolean
   userId?: number
   trips?: JourneyTrip[]
+  /** The optional fields this journey still keeps (discussion #2299). Values are never cleared. */
+  showVerdict?: boolean
+  showMood?: boolean
+  showWeather?: boolean
+  /**
+   * Move this entry within its day.
+   *
+   * The desktop feed has arrows beside every card; the phone had no way to
+   * reorder at all, so a day's stops stayed in whatever order they were written
+   * (discussion #2299). Absent when the entry is alone on its day, is a
+   * suggestion, or the reader cannot edit.
+   */
+  onMoveEarlier?: () => void
+  onMoveLater?: () => void
+  /** Wave a trip-derived suggestion away. Only ever passed for a skeleton. */
+  onDismiss?: () => void
   onClose: () => void
   onSave: (data: Record<string, unknown>, existingEntryId?: number) => Promise<number>
   onUploadPhotos: (entryId: number, files: File[], cbs?: { onProgress?: (p: UploadProgress) => void }) => Promise<ResilientResult<JourneyPhoto>>
@@ -54,10 +70,13 @@ interface MJourneyEntrySheetProps {
  */
 export default function MJourneyEntrySheet({
   entry, galleryPhotos, quickCapture = false, readOnly = false, userId = 0, trips = [],
+  showVerdict = true, showMood = true, showWeather = true, onMoveEarlier, onMoveLater, onDismiss,
   onClose, onSave, onUploadPhotos, onAddProviderPhotos, onDelete, onDone,
 }: MJourneyEntrySheetProps) {
   const { t, language } = useTranslation()
   const toast = useToast()
+  // Which verdict row to hand the caret after the next render — see addVerdictRow.
+  const verdictFocusRef = useRef<string | null>(null)
 
   const [title, setTitle] = useState(entry.title || '')
   const [story, setStory] = useState(entry.story || '')
@@ -198,6 +217,29 @@ export default function MJourneyEntrySheet({
     pendingFiles.length > 0 ||
     pendingLinkIds.length > 0 ||
     pendingProviderGroups.length > 0
+
+  /**
+   * Enter opens the next pro or con, directly below the one you are in.
+   *
+   * Same behaviour and same reason as the desktop editor: a list of short things
+   * should not need a button press between every item (discussion #2299). On a
+   * phone keyboard the return key is right there, which is more of a gain than
+   * it is with a mouse.
+   */
+  const addVerdictRow = (list: 'pros' | 'cons', index: number) => {
+    const [values, setValues] = list === 'pros' ? [pros, setPros] as const : [cons, setCons] as const
+    const next = [...values]
+    next.splice(index + 1, 0, '')
+    setValues(next)
+    verdictFocusRef.current = `${list}-${index + 1}`
+  }
+
+  const verdictRowRef = (key: string) => (el: HTMLInputElement | null) => {
+    if (el && verdictFocusRef.current === key) {
+      verdictFocusRef.current = null
+      el.focus()
+    }
+  }
 
   const handleClose = () => {
     if (!captureOnly && !readOnly && isDirty && !window.confirm(t('journey.editor.discardChangesConfirm'))) return
@@ -353,13 +395,28 @@ export default function MJourneyEntrySheet({
         <span className="flex-1 text-[1.0625rem] font-bold">
           {entry.id === 0 ? t('journey.detail.newEntry') : t('journey.detail.editEntry')}
         </span>
+        {(onMoveEarlier || onMoveLater) && (
+          <span className="mr-1 flex items-center gap-1">
+            <MIconBtn variant="neutral" size={34} onClick={() => onMoveEarlier?.()} disabled={!onMoveEarlier} ariaLabel={t('dayplan.moveUp')}>
+              <ChevronUp size={15} strokeWidth={2.4} />
+            </MIconBtn>
+            <MIconBtn variant="neutral" size={34} onClick={() => onMoveLater?.()} disabled={!onMoveLater} ariaLabel={t('dayplan.moveDown')}>
+              <ChevronDown size={15} strokeWidth={2.4} />
+            </MIconBtn>
+          </span>
+        )}
         <MIconBtn variant="neutral" size={34} onClick={handleClose} ariaLabel={t('common.cancel')}>
           <X size={15} strokeWidth={2.2} />
         </MIconBtn>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-[18px] py-3">
-        {!captureOnly && (readOnly ? (
+        {/* Quick capture had no title field at all: it asked for a note and nothing
+            else, so every entry caught on the move arrived nameless and the day's
+            list read as a column of identical placeholders (discussion #2299). The
+            name is the one thing that makes an entry findable later, and it is one
+            line to type, so it comes first here too. */}
+        {readOnly ? (
           <div className="pb-[10px] pt-1 text-[1.25rem] font-extrabold">{title || t('journey.editor.titlePlaceholder')}</div>
         ) : (
           <input
@@ -368,7 +425,7 @@ export default function MJourneyEntrySheet({
             placeholder={t('journey.editor.titlePlaceholder')}
             className="w-full bg-transparent pb-[10px] pt-1 text-[1.25rem] font-extrabold text-m-ink outline-none placeholder:text-m-faint"
           />
-        ))}
+        )}
 
         {!readOnly && (
           <>
@@ -646,8 +703,8 @@ export default function MJourneyEntrySheet({
             />
           )}
 
-          {/* Pros & Cons */}
-          {(!readOnly || pros.length > 0 || cons.length > 0) && (
+          {/* Pros & Cons — gone when the journey has put the verdict away (#2299) */}
+          {showVerdict && (!readOnly || pros.length > 0 || cons.length > 0) && (
           <div className="mt-3 rounded-2xl border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] p-[13px]">
             <div className={`${eyebrow} mb-2`}>{t('journey.editor.prosCons')}</div>
             <div className="flex gap-[10px]">
@@ -660,9 +717,11 @@ export default function MJourneyEntrySheet({
                   <div key={i} className="mb-[6px] flex items-center gap-[6px] rounded-[10px] border border-[color:var(--m-rowbr)] bg-m-sheetop px-2 py-[6px]">
                     <span className="h-[5px] w-[5px] flex-none rounded-full" style={{ background: PRO_COLOR }} />
                     <input
+                      ref={verdictRowRef(`pros-${i}`)}
                       value={p}
                       readOnly={readOnly}
                       onChange={e => { const next = [...pros]; next[i] = e.target.value; setPros(next) }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVerdictRow('pros', i) } }}
                       placeholder={t('journey.editor.proPlaceholder')}
                       className="min-w-0 flex-1 bg-transparent font-geist text-[0.6875rem] font-semibold text-m-ink outline-none placeholder:text-m-faint"
                     />
@@ -676,7 +735,7 @@ export default function MJourneyEntrySheet({
                 {!readOnly && (
                   <button
                     type="button"
-                    onClick={() => setPros([...pros, ''])}
+                    onClick={() => addVerdictRow('pros', pros.length - 1)}
                     className="block w-full rounded-[10px] border border-dashed py-[9px] text-center font-geist text-[0.6875rem] font-semibold"
                     style={{ borderColor: 'rgba(47,163,122,.35)', color: PRO_COLOR }}
                   >
@@ -693,9 +752,11 @@ export default function MJourneyEntrySheet({
                   <div key={i} className="mb-[6px] flex items-center gap-[6px] rounded-[10px] border border-[color:var(--m-rowbr)] bg-m-sheetop px-2 py-[6px]">
                     <span className="h-[5px] w-[5px] flex-none rounded-full" style={{ background: CON_COLOR }} />
                     <input
+                      ref={verdictRowRef(`cons-${i}`)}
                       value={c}
                       readOnly={readOnly}
                       onChange={e => { const next = [...cons]; next[i] = e.target.value; setCons(next) }}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVerdictRow('cons', i) } }}
                       placeholder={t('journey.editor.conPlaceholder')}
                       className="min-w-0 flex-1 bg-transparent font-geist text-[0.6875rem] font-semibold text-m-ink outline-none placeholder:text-m-faint"
                     />
@@ -709,7 +770,7 @@ export default function MJourneyEntrySheet({
                 {!readOnly && (
                   <button
                     type="button"
-                    onClick={() => setCons([...cons, ''])}
+                    onClick={() => addVerdictRow('cons', cons.length - 1)}
                     className="block w-full rounded-[10px] border border-dashed py-[9px] text-center font-geist text-[0.6875rem] font-semibold"
                     style={{ borderColor: 'rgba(214,39,59,.35)', color: CON_COLOR }}
                   >
@@ -811,7 +872,7 @@ export default function MJourneyEntrySheet({
         )}
 
         {/* Mood */}
-        {!captureOnly && <>
+        {showMood && !captureOnly && <>
           <div className={`${eyebrow} mb-[6px] mt-3`}>{t('journey.editor.mood')}</div>
           <div className="flex flex-wrap gap-[6px]">
             {MOBILE_MOODS.map(m => {
@@ -836,6 +897,7 @@ export default function MJourneyEntrySheet({
         </>}
 
         {/* Weather */}
+        {showWeather && <>
         <div className={`${eyebrow} mb-[6px] mt-3`}>{t('journey.editor.weather')}</div>
         <div className="flex flex-wrap gap-[6px]">
           {MOBILE_WEATHERS.map(w => {
@@ -858,6 +920,7 @@ export default function MJourneyEntrySheet({
             )
           })}
         </div>
+        </>}
 
         {/* Tags */}
         {!captureOnly && (!readOnly || tags.length > 0) && (
@@ -903,6 +966,18 @@ export default function MJourneyEntrySheet({
           >
             <Trash2 size={13} strokeWidth={2} />
             {t('common.delete')}
+          </button>
+        )}
+        {/* A suggestion is not deleted, it is put down: the row survives so the trip
+            sync does not offer the same place again (discussion #2299). */}
+        {!readOnly && onDismiss && (
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex items-center gap-[5px] text-[0.75rem] font-bold text-m-muted"
+          >
+            <EyeOff size={13} strokeWidth={2} />
+            {t('journey.suggestions.dismiss')}
           </button>
         )}
         {!readOnly && captureOnly && (

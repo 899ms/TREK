@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { MapPin, Clock, MoreHorizontal, Pencil, Trash2, Plus, RouteOff } from 'lucide-react'
+import { MapPin, Clock, MoreHorizontal, Pencil, Trash2, Plus, RouteOff, X } from 'lucide-react'
 import { formatLocationName } from '../../utils/formatters'
 import { useTranslation } from '../../i18n'
 import { pluginsApi } from '../../api/client'
@@ -152,13 +152,16 @@ export function EntryCard({ entry, readOnly, onEdit, onDelete, onPhotoClick }: {
         {!photos.length && entry.location_name && !entry.title && (
           <div className="mb-2" />
         )}
-        {entry.story && (
-          <ExpandableStory story={entry.story} />
-        )}
-
-        {/* Pros & Cons — "Pros & Cons" style */}
-        {hasProscons && (
-          <VerdictSection pros={prosArr} cons={consArr} />
+        {/* The verdict rides behind the story's fold: it belongs to one entry, and a
+            feed of open pro/con tables is a spreadsheet rather than a journal. An
+            entry with no story keeps it in the open, since there is no fold to
+            put it behind. */}
+        {entry.story ? (
+          <ExpandableStory story={entry.story}>
+            {hasProscons && <VerdictSection pros={prosArr} cons={consArr} />}
+          </ExpandableStory>
+        ) : (
+          hasProscons && <VerdictSection pros={prosArr} cons={consArr} />
         )}
 
         {(mood || weather || (entry.tags && entry.tags.length > 0)) && (
@@ -193,7 +196,16 @@ export function EntryCard({ entry, readOnly, onEdit, onDelete, onPhotoClick }: {
   )
 }
 
-export function SkeletonCard({ entry, onClick }: { entry: JourneyEntry; onClick?: () => void }) {
+/**
+ * A place the linked trip planned, offered as an entry waiting to be written.
+ *
+ * `onDismiss` is the way out of one that will never be written: plans change, and
+ * a journey used to have no answer to a suggestion for a museum the traveller
+ * skipped except hiding every suggestion at once (discussion #2299). The row is
+ * kept server-side so the trip sync does not offer it again, and the journey
+ * settings sheet brings them all back.
+ */
+export function SkeletonCard({ entry, onClick, onDismiss }: { entry: JourneyEntry; onClick?: () => void; onDismiss?: () => void }) {
   const { t } = useTranslation()
   return (
     <div
@@ -219,6 +231,18 @@ export function SkeletonCard({ entry, onClick }: { entry: JourneyEntry; onClick?
         <span className="inline-flex items-center gap-1 flex-shrink-0 rounded-full px-3 py-1.5 text-[11px] font-semibold" style={{ background: 'var(--vg-ink)', color: 'var(--vg-bg)' }}>
           <Plus size={12} strokeWidth={2.6} /> {t('journey.detail.addEntry')}
         </span>
+      )}
+      {onDismiss && (
+        <button
+          type="button"
+          onClick={e => { e.stopPropagation(); onDismiss() }}
+          aria-label={t('journey.suggestions.dismiss')}
+          title={t('journey.suggestions.dismiss')}
+          className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center opacity-45 hover:opacity-100 transition-opacity"
+          style={{ color: 'var(--vg-ink3)' }}
+        >
+          <X size={14} strokeWidth={2.4} />
+        </button>
       )}
     </div>
   )

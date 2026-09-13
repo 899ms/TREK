@@ -164,7 +164,7 @@ export class JourneyShareService {
     // Entries with photos
     const entries = this.db.prepare(`
       SELECT je.* FROM journey_entries je
-      WHERE je.journey_id = ? AND je.type != 'skeleton'
+      WHERE je.journey_id = ? AND je.type != 'skeleton' AND je.dismissed = 0
       ORDER BY je.entry_date, je.sort_order
     `).all(row.journey_id) as any[];
 

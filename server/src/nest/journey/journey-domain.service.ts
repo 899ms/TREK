@@ -230,7 +230,7 @@ export class JourneyDomainService {
     if (!journey) return null;
 
     const entries = this.db
-      .prepare('SELECT * FROM journey_entries WHERE journey_id = ? ORDER BY entry_date ASC, sort_order ASC, id ASC')
+      .prepare('SELECT * FROM journey_entries WHERE journey_id = ? AND dismissed = 0 ORDER BY entry_date ASC, sort_order ASC, id ASC')
       .all(journeyId) as JourneyEntry[];
 
     const photos = this.db
@@ -317,6 +317,13 @@ export class JourneyDomainService {
       contributors,
       stats: { entries: entryCount, photos: photoCount, places: places.length },
       hide_skeletons: !!userPrefs?.hide_skeletons,
+      // What the eye toggle cannot say: how much was waved away one at a time, and
+      // so whether a way back is worth any room at all.
+      dismissed_count: (
+        this.db
+          .prepare('SELECT COUNT(*) AS n FROM journey_entries WHERE journey_id = ? AND dismissed = 1')
+          .get(journeyId) as { n: number }
+      ).n,
       my_role: myRole,
     };
   }
@@ -338,10 +345,20 @@ export class JourneyDomainService {
     if (!this.isOwner(journeyId, userId)) return null;
 
     const ALLOWED_STATUSES = ['draft', 'active', 'completed', 'archived'];
-    const allowed = ['title', 'subtitle', 'cover_gradient', 'cover_image', 'status', 'show_trip_tracks'];
+    const allowed = [
+      'title',
+      'subtitle',
+      'cover_gradient',
+      'cover_image',
+      'status',
+      'show_trip_tracks',
+      'show_verdict',
+      'show_mood',
+      'show_weather',
+    ];
     // Stored as INTEGER, and better-sqlite3 refuses to bind a JS boolean, so the
-    // one flag on this table is coerced rather than passed through.
-    const BOOLEAN_FIELDS = new Set(['show_trip_tracks']);
+    // flags on this table are coerced rather than passed through.
+    const BOOLEAN_FIELDS = new Set(['show_trip_tracks', 'show_verdict', 'show_mood', 'show_weather']);
     const fields: string[] = [];
     const values: unknown[] = [];
     for (const [key, val] of Object.entries(data)) {
@@ -373,6 +390,23 @@ export class JourneyDomainService {
       .prepare('SELECT hide_skeletons FROM journey_contributors WHERE journey_id = ? AND user_id = ?')
       .get(journeyId, userId) as { hide_skeletons: number };
     return { hide_skeletons: !!row.hide_skeletons };
+  }
+
+  /**
+   * Bring every waved-away suggestion back.
+   *
+   * All of them at once rather than one at a time: dismissing is a per-card
+   * gesture, undoing it is a change of mind about the plan, and a list of
+   * things you have already said you did not want is not a screen worth
+   * building. The count comes back so the caller can say what happened.
+   */
+  restoreDismissedSuggestions(journeyId: number, userId: number): { restored: number } | null {
+    if (!this.canEdit(journeyId, userId)) return null;
+    const res = this.db
+      .prepare('UPDATE journey_entries SET dismissed = 0 WHERE journey_id = ? AND dismissed = 1')
+      .run(journeyId);
+    if (res.changes > 0) this.broadcastJourneyEvent(journeyId, 'journey:entry:updated', { restored: res.changes });
+    return { restored: res.changes };
   }
 
   deleteJourney(journeyId: number, userId: number): boolean {
@@ -619,6 +653,22 @@ export class JourneyDomainService {
   }
 
   // Shared skeleton INSERT, reused by syncTripPlaces / onPlaceCreated / reconcileTripSkeletons.
+  /**
+   * The country a pair of coordinates falls in, or null when there is no pair.
+   *
+   * Bundled polygons, no network: the timeline card wants a flag, and a flag is
+   * not worth a geocoding request per entry. Wrapped because the boundary data is
+   * an optional asset — an install without it should lose the flag, not the save.
+   */
+  private countryFor(lat: number | null | undefined, lng: number | null | undefined): string | null {
+    if (typeof lat !== 'number' || typeof lng !== 'number') return null;
+    try {
+      return getCountryFromCoords(lat, lng);
+    } catch {
+      return null;
+    }
+  }
+
   private insertSkeletonEntry(p: {
     journeyId: number;
     tripId: number;
@@ -635,8 +685,8 @@ export class JourneyDomainService {
   }) {
     this.db.prepare(
       `
-      INSERT INTO journey_entries (journey_id, source_trip_id, source_place_id, author_id, type, title, entry_date, entry_time, location_name, location_lat, location_lng, sort_order, created_at, updated_at)
-      VALUES (?, ?, ?, ?, 'skeleton', ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO journey_entries (journey_id, source_trip_id, source_place_id, author_id, type, title, entry_date, entry_time, location_name, location_lat, location_lng, country_code, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, 'skeleton', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
     ).run(
       p.journeyId,
@@ -649,6 +699,7 @@ export class JourneyDomainService {
       p.locationName,
       p.lat,
       p.lng,
+      this.countryFor(p.lat, p.lng),
       p.sortOrder,
       p.now,
       p.now,
@@ -903,7 +954,7 @@ export class JourneyDomainService {
       SELECT id, title, location_name, location_lat, location_lng, entry_date, source_trip_id,
              source_place_id, stats_excluded
         FROM journey_entries
-       WHERE journey_id = ?
+       WHERE journey_id = ? AND dismissed = 0
        ORDER BY entry_date ASC, sort_order ASC, id ASC
     `).all(journeyId) as {
       id: number; title: string | null; location_name: string | null;
@@ -1120,7 +1171,7 @@ export class JourneyDomainService {
     if (!this.canAccessJourney(journeyId, userId)) return null;
 
     const entries = this.db
-      .prepare('SELECT * FROM journey_entries WHERE journey_id = ? ORDER BY entry_date ASC, sort_order ASC, id ASC')
+      .prepare('SELECT * FROM journey_entries WHERE journey_id = ? AND dismissed = 0 ORDER BY entry_date ASC, sort_order ASC, id ASC')
       .all(journeyId) as JourneyEntry[];
 
     const photos = this.db
@@ -1180,8 +1231,8 @@ export class JourneyDomainService {
     const res = this.db
       .prepare(
         `
-      INSERT INTO journey_entries (journey_id, author_id, type, title, story, entry_date, entry_time, location_name, location_lat, location_lng, mood, weather, tags, pros_cons, visibility, sort_order, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO journey_entries (journey_id, author_id, type, title, story, entry_date, entry_time, location_name, location_lat, location_lng, country_code, mood, weather, tags, pros_cons, visibility, sort_order, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       )
       .run(
@@ -1195,6 +1246,7 @@ export class JourneyDomainService {
         data.location_name || null,
         data.location_lat ?? null,
         data.location_lng ?? null,
+        this.countryFor(data.location_lat, data.location_lng),
         data.mood || null,
         data.weather || null,
         data.tags?.length ? JSON.stringify(data.tags) : null,
@@ -1233,6 +1285,7 @@ export class JourneyDomainService {
       visibility: string;
       sort_order: number;
       stats_excluded: boolean;
+      dismissed: boolean;
     }>,
     sid?: string,
   ): JourneyEntryWire | null {
@@ -1262,6 +1315,7 @@ export class JourneyDomainService {
       'visibility',
       'sort_order',
       'stats_excluded',
+      'dismissed',
     ]);
 
     for (const [key, val] of Object.entries(data)) {
@@ -1273,14 +1327,25 @@ export class JourneyDomainService {
       } else if (key === 'pros_cons') {
         fields.push('pros_cons = ?');
         values.push(val && typeof val === 'object' ? JSON.stringify(val) : val);
-      } else if (key === 'stats_excluded') {
-        // INTEGER column, and better-sqlite3 refuses to bind a boolean.
-        fields.push('stats_excluded = ?');
+      } else if (key === 'stats_excluded' || key === 'dismissed') {
+        // INTEGER columns, and better-sqlite3 refuses to bind a boolean.
+        fields.push(`${key} = ?`);
         values.push(val ? 1 : 0);
       } else {
         fields.push(`${key} = ?`);
         values.push(val);
       }
+    }
+
+    // The pin moved, so the flag has to follow it. Either half of the pair may be
+    // the one being changed, so the other is read off the stored row — and the
+    // test is `!== undefined`, not `??`: a null here means "take this entry off the
+    // map", which has to clear the country rather than fall back to the old one.
+    if (data.location_lat !== undefined || data.location_lng !== undefined) {
+      const lat = data.location_lat !== undefined ? data.location_lat : entry.location_lat;
+      const lng = data.location_lng !== undefined ? data.location_lng : entry.location_lng;
+      fields.push('country_code = ?');
+      values.push(this.countryFor(lat, lng));
     }
 
     // if adding story to a skeleton, promote to entry

@@ -26,6 +26,7 @@ vi.mock('leaflet', () => {
     fitBounds: vi.fn(),
     setView: vi.fn(),
     flyTo: vi.fn(),
+    panTo: vi.fn(),
     getZoom: vi.fn(() => 10),
     // Leaflet throws "Set map center and zoom first." out of these until the map
     // has a view; the loaded map is the default here, FE-COMP-JOURNEYMAP-050
@@ -316,20 +317,22 @@ describe('JourneyMap', () => {
     expect(vi.mocked(L.divIcon).mock.calls.length).toBe(iconsBefore);
   });
 
-  it('FE-COMP-JOURNEYMAP-017: focusMarker flies to the pin, never below zoom 12', () => {
+  it('FE-COMP-JOURNEYMAP-017: focusMarker pans to the pin and leaves the zoom where the reader put it', () => {
     const ref = React.createRef<JourneyMapHandle>();
     render(<JourneyMap ref={ref} checkins={[]} entries={entriesWithCoords} />);
 
     act(() => { ref.current!.focusMarker('e2'); });
 
-    // getZoom() is stubbed at 10, so the floor of 12 wins
-    expect(mockedMap().flyTo).toHaveBeenCalledWith({ lat: 0, lng: 0 }, 12, { duration: 0.5 });
+    // It used to force a floor of zoom 12, which yanked a country view to street
+    // level on the first scroll through the timeline (discussion #2299).
+    expect(mockedMap().panTo).toHaveBeenCalledWith({ lat: 0, lng: 0 }, { animate: true, duration: 0.5 });
+    expect(mockedMap().flyTo).not.toHaveBeenCalled();
   });
 
   it('FE-COMP-JOURNEYMAP-018: focusMarker swallows leaflet errors when the map has no view yet', () => {
     const ref = React.createRef<JourneyMapHandle>();
     render(<JourneyMap ref={ref} checkins={[]} entries={entriesWithCoords} />);
-    vi.mocked(mockedMap().getZoom).mockImplementationOnce(() => { throw new Error('Set map center and zoom first'); });
+    vi.mocked(mockedMap().panTo).mockImplementationOnce(() => { throw new Error('Set map center and zoom first'); });
 
     expect(() => act(() => { ref.current!.focusMarker('e1'); })).not.toThrow();
     expect(mockedMap().flyTo).not.toHaveBeenCalled();
@@ -462,13 +465,13 @@ describe('JourneyMap', () => {
     expect(layer.getMaplibreMap().setStyle).not.toHaveBeenCalledWith(expect.stringContaining('tiles.test'));
   });
 
-  it('FE-COMP-JOURNEYMAP-028: the activeMarkerId prop flies to that marker after the settle delay', () => {
+  it('FE-COMP-JOURNEYMAP-028: the activeMarkerId prop pans to that marker after the settle delay', () => {
     vi.useFakeTimers();
     try {
       render(<JourneyMap checkins={[]} entries={entriesWithCoords} activeMarkerId="e2" />);
-      expect(mockedMap().flyTo).not.toHaveBeenCalled();
+      expect(mockedMap().panTo).not.toHaveBeenCalled();
       act(() => { vi.advanceTimersByTime(60); });
-      expect(mockedMap().flyTo).toHaveBeenCalledWith({ lat: 0, lng: 0 }, 12, { duration: 0.5 });
+      expect(mockedMap().panTo).toHaveBeenCalledWith({ lat: 0, lng: 0 }, { animate: true, duration: 0.5 });
     } finally {
       vi.useRealTimers();
     }
@@ -478,8 +481,9 @@ describe('JourneyMap', () => {
     vi.useFakeTimers();
     try {
       render(<JourneyMap checkins={[]} entries={entriesWithCoords} activeMarkerId="e1" />);
-      vi.mocked(mockedMap().getZoom).mockImplementationOnce(() => { throw new Error('Set map center and zoom first'); });
+      vi.mocked(mockedMap().panTo).mockImplementationOnce(() => { throw new Error('Set map center and zoom first'); });
       act(() => { vi.advanceTimersByTime(60); });
+      // The catch is where a map with no view at all gets its first one.
       expect(mockedMap().setView).toHaveBeenCalledWith({ lat: 0, lng: 0 }, 12);
       expect(mockedMap().flyTo).not.toHaveBeenCalled();
     } finally {

@@ -35,6 +35,8 @@ interface Props {
   activeMarkerId?: string | null
   onMarkerClick?: (id: string, type?: string) => void
   fullScreen?: boolean
+  /** See the Leaflet twin: no marker labels where a carousel already names the entry. */
+  hideMarkerTooltip?: boolean
   paddingBottom?: number
   glProvider?: GlMapProvider
   /**
@@ -217,8 +219,10 @@ const EMPTY_TRACKS: JourneyTrack[] = []
 const TRACK_FALLBACK_COLOR = '#4f46e5'
 
 function JourneyMapGL(
-  { entries, trail, tracks, height = 220, dark, activeMarkerId, onMarkerClick, fullScreen, paddingBottom, glProvider = 'mapbox-gl', gl, ref }: Props,
+  { entries, trail, tracks, height = 220, dark, activeMarkerId, onMarkerClick, fullScreen, paddingBottom, glProvider = 'mapbox-gl', gl, hideMarkerTooltip, ref }: Props,
 ) {
+  const hideMarkerTooltipRef = useRef(hideMarkerTooltip)
+  hideMarkerTooltipRef.current = hideMarkerTooltip
   const stableTrail = trail || EMPTY_TRAIL
   const stableTracks = tracks || EMPTY_TRACKS
   const rawMapboxStyle = useSettingsStore(s => s.settings.mapbox_style || MAPBOX_DEFAULT_STYLE)
@@ -247,6 +251,9 @@ function JourneyMapGL(
   mapLangRef.current = mapLang
 
   const showPopup = useCallback((id: string) => {
+    // See `hideMarkerTooltip` on the Leaflet twin: below the carousel the card
+    // already says this, and the popup only covers the map to repeat it.
+    if (hideMarkerTooltipRef.current) return
     const item = itemsRef.current.find(i => i.id === id)
     if (!item || !mapRef.current) return
     ensureJourneyPopupStyle()
@@ -330,14 +337,14 @@ function JourneyMapGL(
     }
   }, [setMarkerStyle, showPopup, hidePopup])
 
+  /** Pan to the marker and leave the zoom alone — see the Leaflet twin for why. */
   const focusMarker = useCallback((id: string) => {
     highlightMarker(id)
     const marker = markersRef.current.get(id)
     if (!marker || !mapRef.current) return
     try {
-      mapRef.current.flyTo({
+      mapRef.current.easeTo({
         center: marker.getLngLat(),
-        zoom: Math.max(mapRef.current.getZoom(), 14),
         pitch: enableMapbox3d ? 45 : 0,
         duration: 600,
       })
@@ -516,9 +523,8 @@ function JourneyMapGL(
       const marker = markersRef.current.get(activeMarkerId)
       if (!marker || !mapRef.current) return
       try {
-        mapRef.current.flyTo({
+        mapRef.current.easeTo({
           center: marker.getLngLat(),
-          zoom: Math.max(mapRef.current.getZoom(), 12),
           pitch: enableMapbox3d && fullScreen ? 45 : 0,
           duration: 500,
         })

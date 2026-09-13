@@ -1022,6 +1022,9 @@ export const journeyApi = {
 
   // Preferences
   updatePreferences: (id: number, data: { hide_skeletons?: boolean }) => apiClient.patch(`/journeys/${id}/preferences`, data).then(r => r.data),
+  /** Bring every waved-away trip suggestion back. Answers with how many returned. */
+  restoreSuggestions: (id: number): Promise<{ restored: number }> =>
+    apiClient.post(`/journeys/${id}/suggestions/restore`).then(r => r.data),
 
   // Share
   getShareLink: (id: number) => apiClient.get(`/journeys/${id}/share-link`).then(r => r.data),

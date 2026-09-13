@@ -29,8 +29,18 @@ export function groupByDate(entries: JourneyEntry[]): Map<string, JourneyEntry[]
   return groups;
 }
 
-export function createDraftJourneyEntry(journeyId: number, now = new Date()): JourneyEntry {
-  const entryDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+/**
+ * A blank entry for the editor to open on.
+ *
+ * `onDate` is what the plus button in a day header hands in. Without it every new
+ * entry landed on today no matter where in the journal you started it, so
+ * writing up the third day of a trip you got back from last week meant correcting
+ * the date by hand every time (discussion #2299). The clock still comes from now:
+ * a day has one date but no one obvious hour, and the picker is right there.
+ */
+export function createDraftJourneyEntry(journeyId: number, now = new Date(), onDate?: string): JourneyEntry {
+  const entryDate = onDate
+    || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const entryTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
   return {
     id: 0,
@@ -166,4 +176,34 @@ export function sortProviderPhotos<T extends ProviderPhotoAsset>(photos: T[], lo
       return a.distance - b.distance || a.index - b.index;
     })
     .map((item) => item.photo);
+}
+
+/**
+ * The entries a search box's text still lets through.
+ *
+ * A journey kept over months is a long scroll with no way in but the wheel: the
+ * only handle on "where was that meal in Lisbon" was remembering roughly which
+ * week it was (discussion #2299). Matching runs over the words the reader would
+ * actually remember — the title, the story, the place and the tags — and is
+ * accent- and case-blind, so `cafe` finds `Café`.
+ *
+ * An empty query is not a filter: it returns the list untouched, same reference.
+ */
+export function matchJourneyEntries<T extends {
+  title?: string | null;
+  story?: string | null;
+  location_name?: string | null;
+  tags?: string[];
+}>(entries: T[], query: string): T[] {
+  const needle = query ? foldForSearch(query) : '';
+  if (!needle) return entries;
+  return entries.filter((entry) => {
+    const haystack = [entry.title, entry.story, entry.location_name, ...(entry.tags ?? [])];
+    return haystack.some((part) => part && foldForSearch(part).includes(needle));
+  });
+}
+
+/** Lowercase and strip diacritics, so a query typed without accents still matches. */
+function foldForSearch(value: string): string {
+  return value.trim().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu, '');
 }

@@ -24,7 +24,9 @@ import MSheet from '../../components/MSheet'
 import MDancingTrek from '../../components/MDancingTrek'
 import MListRow from '../../components/MListRow'
 import MToggle from '../../components/MToggle'
-import MJourneyEntryCard from './MJourneyEntryCard'
+import JourneyEntryCover from '../../../components/Journey/JourneyEntryCover'
+import JourneyDayScrubber from '../../../components/Journey/JourneyDayScrubber'
+import { dayColorOf, journeyDays } from '../../../components/Journey/journeyCard'
 import MJourneyEntrySheet from './MJourneyEntrySheet'
 import MJourneySettingsSheet from './MJourneySettingsSheet'
 
@@ -45,7 +47,8 @@ export default function MJourneyDetail() {
     showSettings, setShowSettings,
     hideSkeletons, setHideSkeletons,
     sidebarMapItems, tracks,
-    loadJourney, updateEntry, deleteEntry, uploadPhotos,
+    dismissSuggestion, restoreSuggestions, openAtEntryId,
+    loadJourney, updateEntry, deleteEntry, reorderEntries, uploadPhotos,
   } = useJourneyDetail()
 
   // The dock's FAB is a sibling of this screen: on the Gallery it becomes the
@@ -112,17 +115,68 @@ export default function MJourneyDetail() {
     }
   }, [entries.length, pickNearestCard])
 
-  // Initial focus — give Leaflet time to initialise and fit bounds first.
+  // Initial focus — give Leaflet time to initialise and fit bounds first. Opens on
+  // today when today is part of the journey (see openAtEntryId), rather than always
+  // at the first entry (discussion #2299).
   useEffect(() => {
     if (entries.length === 0) return
-    const timer = window.setTimeout(() => syncMapToCard(0), 500)
+    const target = openAtEntryId ? entries.findIndex(e => String(e.id) === openAtEntryId) : -1
+    const index = target === -1 ? 0 : target
+    const timer = window.setTimeout(() => {
+      setActiveIndex(index)
+      syncMapToCard(index)
+      if (index > 0) cardRefs.current.get(index)?.scrollIntoView({ inline: 'center', block: 'nearest' })
+    }, 500)
     return () => window.clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries.length])
+  }, [entries.length, openAtEntryId])
 
   const scrollCardIntoCenter = useCallback((idx: number) => {
     cardRefs.current.get(idx)?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' })
   }, [])
+
+  const scrubberDays = useMemo(() => journeyDays(entries), [entries])
+
+  /**
+   * Move an entry within its day, from the entry sheet's header.
+   *
+   * Same rules as the desktop arrows: suggestions do not take part, because they
+   * are the trip's order rather than the traveller's, and a day with one entry
+   * has nothing to reorder. The whole day goes back to the server, which is what
+   * the reorder endpoint expects.
+   */
+  const moveWithinDay = useCallback(async (entry: JourneyEntry, direction: -1 | 1) => {
+    if (!current) return
+    const sameDay = entries.filter(e => e.entry_date === entry.entry_date && e.type !== 'skeleton')
+    const index = sameDay.findIndex(e => e.id === entry.id)
+    const target = index + direction
+    if (index === -1 || target < 0 || target >= sameDay.length) return
+    const reordered = [...sameDay]
+    const [moved] = reordered.splice(index, 1)
+    reordered.splice(target, 0, moved)
+    try {
+      await reorderEntries(current.id, reordered.map(e => e.id))
+      await loadJourney(current.id)
+    } catch {
+      toast.error(t('common.errorOccurred'))
+    }
+  }, [current, entries, reorderEntries, loadJourney, toast, t])
+
+  /** Where in the day's run an entry sits, so the sheet knows which arrows to offer. */
+  const dayNeighbours = useCallback((entry: JourneyEntry) => {
+    const sameDay = entries.filter(e => e.entry_date === entry.entry_date && e.type !== 'skeleton')
+    const index = sameDay.findIndex(e => e.id === entry.id)
+    return { canMoveUp: index > 0, canMoveDown: index >= 0 && index < sameDay.length - 1 }
+  }, [entries])
+
+  /** The day bar lands on the first entry of that day. */
+  const jumpToDay = useCallback((date: string) => {
+    const idx = entries.findIndex(e => e.entry_date === date)
+    if (idx === -1) return
+    setActiveIndex(idx)
+    syncMapToCard(idx)
+    scrollCardIntoCenter(idx)
+  }, [entries, scrollCardIntoCenter, syncMapToCard])
 
   const handleMarkerClick = useCallback((markerId: string) => {
     const idx = entries.findIndex(e => String(e.id) === markerId)
@@ -290,7 +344,8 @@ export default function MJourneyDetail() {
           activeMarkerId={entries[activeIndex] ? String(entries[activeIndex].id) : null}
           onMarkerClick={handleMarkerClick}
           fullScreen
-          paddingBottom={200}
+          paddingBottom={250}
+          hideMarkerTooltip
         />
       </div>
 
@@ -428,11 +483,17 @@ export default function MJourneyDetail() {
         </MSheet>
       )}
 
-      {/* Horizontal card timeline */}
+      {/* Day bar + horizontal card timeline */}
       {view === 'timeline' && entries.length > 0 && (
+        <div className="absolute left-0 right-0 z-[8] bottom-[calc(var(--bottom-nav-h,84px)+16px)]">
+        <JourneyDayScrubber
+          days={scrubberDays}
+          activeDate={entries[activeIndex]?.entry_date ?? null}
+          onPick={jumpToDay}
+        />
         <div
           ref={carouselRef}
-          className="absolute left-0 right-0 z-[8] flex gap-[10px] overflow-x-auto px-4 pb-1 bottom-[calc(var(--bottom-nav-h,84px)+16px)] [-webkit-overflow-scrolling:touch] [scrollbar-width:none]"
+          className="flex items-end gap-[10px] overflow-x-auto px-4 pb-1 [-webkit-overflow-scrolling:touch] [scrollbar-width:none]"
           style={{ scrollSnapType: 'x mandatory' }}
         >
           {entries.map((entry, i) => (
@@ -441,9 +502,18 @@ export default function MJourneyDetail() {
               ref={node => { if (node) cardRefs.current.set(i, node); else cardRefs.current.delete(i) }}
               style={{ scrollSnapAlign: 'center' }}
             >
-              <MJourneyEntryCard entry={entry} number={i + 1} onClick={() => handleCardTap(entry, i)} />
+              <JourneyEntryCover
+                entry={entry}
+                dayColor={dayColorOf(scrubberDays, entry.entry_date)}
+                isActive={i === activeIndex}
+                onClick={() => handleCardTap(entry, i)}
+                showMood={current.show_mood !== 0}
+                showWeather={current.show_weather !== 0}
+                tone="mobile"
+              />
             </div>
           ))}
+        </div>
         </div>
       )}
 
@@ -493,8 +563,26 @@ export default function MJourneyDetail() {
           galleryPhotos={gallery}
           quickCapture={editingEntry.id === 0}
           readOnly={!canEditEntries}
+          showVerdict={current.show_verdict !== 0}
+          showMood={current.show_mood !== 0}
+          showWeather={current.show_weather !== 0}
           userId={useAuthStore.getState().user?.id || 0}
           trips={current.trips}
+          onMoveEarlier={
+            canEditEntries && editingEntry.id !== 0 && editingEntry.type !== 'skeleton' && dayNeighbours(editingEntry).canMoveUp
+              ? () => { void moveWithinDay(editingEntry, -1) }
+              : undefined
+          }
+          onMoveLater={
+            canEditEntries && editingEntry.id !== 0 && editingEntry.type !== 'skeleton' && dayNeighbours(editingEntry).canMoveDown
+              ? () => { void moveWithinDay(editingEntry, 1) }
+              : undefined
+          }
+          onDismiss={
+            canEditEntries && editingEntry.type === 'skeleton' && editingEntry.id !== 0
+              ? () => { setEditingEntry(null); void dismissSuggestion(editingEntry) }
+              : undefined
+          }
           onClose={() => setEditingEntry(null)}
           onSave={async (data, existingEntryId) => {
             // existingEntryId is what the sheet already persisted in an earlier
@@ -531,6 +619,7 @@ export default function MJourneyDetail() {
           onSaved={() => { setShowSettings(false); loadJourney(Number(id)) }}
           onOpenInvite={() => setShowInvite(true)}
           onRefresh={() => loadJourney(Number(id))}
+          onRestoreSuggestions={canEditEntries ? restoreSuggestions : undefined}
         />
       )}
 

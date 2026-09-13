@@ -4,7 +4,7 @@ import { X, Plus, Image, Minus, Check, MapPin, Locate, Camera } from 'lucide-rea
 import { normalizeImageFiles } from '../../utils/convertHeic'
 import { type ResilientResult, type UploadProgress } from '../../utils/uploadQueue'
 import { useTranslation } from '../../i18n'
-import { journeyApi, mapsApi, addonsApi, memoriesApi } from '../../api/client'
+import { journeyApi, mapsApi, addonsApi, memoriesApi, weatherApi } from '../../api/client'
 import { useToast } from '../shared/Toast'
 import { getCurrentPositionOnce } from '../../hooks/useGeolocation'
 import { getApiErrorMessage } from '../../types'
@@ -16,16 +16,27 @@ import { DatePicker } from './JourneyDetailPageDatePicker'
 import CustomTimePicker from '../shared/CustomTimePicker'
 import ToggleSwitch from '../Settings/ToggleSwitch'
 import { ProviderPicker, type ProviderPhotoGroup } from './JourneyDetailPageProviderPicker'
+import { journeyWeatherCategory } from '../../mobile/screens/journey/mobileJourneyMeta'
 
 type PendingProviderGroup = ProviderPhotoGroup & { provider: string }
 
-export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips, userId = 0, onClose, onSave, onUploadPhotos, onAddProviderPhotos, onDone }: {
+export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips, userId = 0, showVerdict = true, showMood = true, showWeather = true, onClose, onSave, onUploadPhotos, onAddProviderPhotos, onDone }: {
   entry: JourneyEntry
   journeyId: number
   tripDates: Set<string>
   galleryPhotos: GalleryPhoto[]
   trips: JourneyTrip[]
   userId?: number
+  /**
+   * The optional fields this journey still keeps (discussion #2299).
+   *
+   * A field switched off disappears from the form but keeps whatever an entry
+   * already holds: the value is not cleared, and switching it back on brings it
+   * into view again. Nobody loses a verdict they wrote by tidying a form.
+   */
+  showVerdict?: boolean
+  showMood?: boolean
+  showWeather?: boolean
   onClose: () => void
   onSave: (data: Record<string, unknown>, existingEntryId?: number) => Promise<number>
   onUploadPhotos: (entryId: number, files: File[], cbs?: { onProgress?: (p: UploadProgress) => void }) => Promise<ResilientResult<JourneyPhoto>>
@@ -73,6 +84,9 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
   // camera, so tablets and laptops get the same route the phone sheet already has.
   const cameraRef = useRef<HTMLInputElement>(null)
   const storyRef = useRef<HTMLTextAreaElement>(null)
+  // Which verdict row to put the caret in after the next render. Enter adds a row
+  // and the caret has to follow it, or the key does half a job.
+  const verdictFocusRef = useRef<string | null>(null)
   const persistedEntryIdRef = useRef<number | null>(entry.id > 0 ? entry.id : null)
 
   // Track which fields differ from the entry we started editing so we can
@@ -131,6 +145,66 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
     pendingProviderGroups.forEach(group => {
       if (group.provider === activeExternalProvider) group.assetIds.forEach(assetId => providerExistingAssetIds.add(assetId))
     })
+  }
+
+  /**
+   * Fill the weather in from the forecast once the entry knows where and when.
+   *
+   * The phone's quick capture has done this since it was built; typing an entry
+   * up at a desk was the one place you still picked the icon by hand (discussion
+   * #2299). The date decides the source on the server: today comes from the
+   * forecast, a backdated day from the ERA5 archive, so writing up last Tuesday
+   * gets last Tuesday's weather rather than this afternoon's.
+   *
+   * Only ever fills an empty field, and each place-and-day is tried once, so a
+   * cleared icon stays cleared and a chosen one is never overwritten.
+   */
+  const weatherTriedRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!showWeather) return
+    if (typeof locationLat !== 'number' || typeof locationLng !== 'number') return
+    if (weather) return
+    const key = `${locationLat.toFixed(3)},${locationLng.toFixed(3)},${entryDate}`
+    if (weatherTriedRef.current === key) return
+    weatherTriedRef.current = key
+
+    let active = true
+    weatherApi.get(locationLat, locationLng, entryDate, language)
+      .then(result => {
+        // An error-shaped answer carries no `main`, and the dev-only schema check
+        // does not stop it reaching here in production.
+        if (!active || !result || result.error || typeof result.main !== 'string') return
+        const category = journeyWeatherCategory(result.main, result.description ?? '')
+        // Re-checked rather than trusted from the closure: the request is a
+        // round trip and the traveller may have picked an icon while it was out.
+        setWeather(current => current || category)
+      })
+      .catch(() => { /* no weather is a fine outcome for a journal entry */ })
+    return () => { active = false }
+  }, [showWeather, locationLat, locationLng, entryDate, weather, language])
+
+  /**
+   * Enter in a pro or con opens the next one, the way every list of short things
+   * behaves. Reaching for the plus button between every item was the complaint
+   * (discussion #2299); the button stays for the mouse.
+   *
+   * The new row goes directly below the one you are in rather than at the end, so
+   * a thought inserted in the middle lands where you meant it.
+   */
+  const addVerdictRow = (list: 'pros' | 'cons', index: number) => {
+    const [values, setValues] = list === 'pros' ? [pros, setPros] as const : [cons, setCons] as const
+    const next = [...values]
+    next.splice(index + 1, 0, '')
+    setValues(next)
+    verdictFocusRef.current = `${list}-${index + 1}`
+  }
+
+  /** Give the caret to the row `addVerdictRow` just made, once React has drawn it. */
+  const verdictRowRef = (key: string) => (el: HTMLInputElement | null) => {
+    if (el && verdictFocusRef.current === key) {
+      verdictFocusRef.current = null
+      el.focus()
+    }
   }
 
   const handleClose = () => {
@@ -307,12 +381,16 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                   <Image size={13} /> {t('journey.editor.fromGallery')}
                 </button>
               )}
+              {/* Only where a camera is plausibly attached to the thing you are typing
+                  on. On a desktop it was a second button to the same file dialog with a
+                  different icon (discussion #2299) — the phone shell has its own sheet,
+                  and this modal is what a tablet gets. */}
               <button type="button"
                 onClick={() => { setPhotoTab('upload'); setShowGalleryPick(false); cameraRef.current?.click() }}
                 disabled={saving}
                 aria-label={t('journey.photo.add')}
                 title={t('journey.photo.add')}
-                className="border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl px-4 text-[12px] text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center disabled:opacity-50"
+                className="md:hidden border border-dashed border-zinc-200 dark:border-zinc-700 rounded-xl px-4 text-[12px] text-zinc-500 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800 flex items-center justify-center disabled:opacity-50"
               >
                 <Camera size={14} />
               </button>
@@ -530,7 +608,8 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
           </div>
 
           <div className="flex flex-col gap-4 min-w-0">
-          {/* Pros & Cons */}
+          {/* Pros & Cons — gone entirely when the journey does not keep a verdict */}
+          {showVerdict && (
           <div className="bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl p-5">
             <div className="mb-4">
               <span className="text-[11px] font-semibold tracking-[0.12em] uppercase text-zinc-500">{t('journey.editor.prosCons')}</span>
@@ -549,8 +628,10 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                     <div key={i} className="flex items-center gap-2 h-9 px-3 border rounded-[10px] border-zinc-200 dark:border-zinc-700">
                       <span className="w-[5px] h-[5px] rounded-full bg-green-500 flex-shrink-0" />
                       <input
+                        ref={verdictRowRef(`pros-${i}`)}
                         value={p}
                         onChange={e => { const next = [...pros]; next[i] = e.target.value; setPros(next) }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVerdictRow('pros', i) } }}
                         placeholder={t('journey.editor.proPlaceholder')}
                         className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-green-400 dark:placeholder:text-green-600"
                       />
@@ -562,7 +643,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                     </div>
                   ))}
                   <button type="button"
-                    onClick={() => setPros([...pros, ''])}
+                    onClick={() => addVerdictRow('pros', pros.length - 1)}
                     className="flex items-center justify-center gap-1.5 h-9 w-full border border-dashed border-green-200 dark:border-green-800/40 rounded-[10px] text-[12px] font-medium text-green-700 dark:text-green-400 hover:border-green-300 dark:hover:border-green-700 transition-colors"
                   >
                     <Plus size={13} strokeWidth={2.5} /> {t('journey.editor.addAnother')}
@@ -583,8 +664,10 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                     <div key={i} className="flex items-center gap-2 h-9 px-3 border rounded-[10px] border-zinc-200 dark:border-zinc-700">
                       <span className="w-[5px] h-[5px] rounded-full bg-red-500 flex-shrink-0" />
                       <input
+                        ref={verdictRowRef(`cons-${i}`)}
                         value={c}
                         onChange={e => { const next = [...cons]; next[i] = e.target.value; setCons(next) }}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVerdictRow('cons', i) } }}
                         placeholder={t('journey.editor.conPlaceholder')}
                         className="flex-1 min-w-0 bg-transparent border-none outline-none text-[13px] text-zinc-900 dark:text-zinc-100 placeholder:text-red-400 dark:placeholder:text-red-600"
                       />
@@ -596,7 +679,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                     </div>
                   ))}
                   <button type="button"
-                    onClick={() => setCons([...cons, ''])}
+                    onClick={() => addVerdictRow('cons', cons.length - 1)}
                     className="flex items-center justify-center gap-1.5 h-9 w-full border border-dashed border-red-200 dark:border-red-800/40 rounded-[10px] text-[12px] font-medium text-red-700 dark:text-red-400 hover:border-red-300 dark:hover:border-red-700 transition-colors"
                   >
                     <Plus size={13} strokeWidth={2.5} /> {t('journey.editor.addAnother')}
@@ -605,6 +688,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
               </div>
             </div>
           </div>
+          )}
 
           {/* The date needs the room, not the clock: a long localized date
               ("12. Sept. 2026") wrapped onto a second line while the time field
@@ -720,6 +804,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
             </div>
           )}
 
+          {showMood && (
           <div>
             <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-500 block mb-2">{t('journey.editor.mood')}</label>
             <div className="flex flex-wrap gap-2">
@@ -739,7 +824,9 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
               })}
             </div>
           </div>
+          )}
 
+          {showWeather && (
           <div>
             <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-500 block mb-2">{t('journey.editor.weather')}</label>
             <div className="flex flex-wrap gap-2">
@@ -758,6 +845,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
               })}
             </div>
           </div>
+          )}
           </div>
           </div>
         </div>

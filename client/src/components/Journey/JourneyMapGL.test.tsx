@@ -35,6 +35,7 @@ const gl = vi.hoisted(() => {
     remove: vi.fn(),
     resize: vi.fn(),
     flyTo: vi.fn(),
+    easeTo: vi.fn(),
     fitBounds: vi.fn(),
     getZoom: vi.fn(() => 10),
     addSource: vi.fn(),
@@ -460,19 +461,21 @@ describe('JourneyMapGL', () => {
     expect(document.querySelectorAll('#trek-journey-popup-style')).toHaveLength(1)
   })
 
-  it('FE-COMP-JMAPGL-023: focusMarker flies in with the 3D pitch and a zoom floor of 14', () => {
+  it('FE-COMP-JMAPGL-023: focusMarker eases over with the 3D pitch and no zoom of its own', () => {
     withToken()
     const ref = React.createRef<JourneyMapGLHandle>()
     render(<JourneyMapGL ref={ref} checkins={[]} entries={entries} />)
 
     act(() => { ref.current!.focusMarker('e2') })
 
-    expect(gl.map.flyTo).toHaveBeenCalledWith({
+    // No zoom in the call at all: stepping through the timeline keeps the frame the
+    // reader chose (discussion #2299), same as the Leaflet twin.
+    expect(gl.map.easeTo).toHaveBeenCalledWith({
       center: [13.405, 52.52],
-      zoom: 14,
       pitch: 45,
       duration: 600,
     })
+    expect(gl.map.flyTo).not.toHaveBeenCalled()
   })
 
   it('FE-COMP-JMAPGL-024: with 3D disabled the camera stays flat', () => {
@@ -482,7 +485,7 @@ describe('JourneyMapGL', () => {
 
     act(() => { ref.current!.focusMarker('e1') })
 
-    expect(gl.map.flyTo).toHaveBeenCalledWith(expect.objectContaining({ pitch: 0 }))
+    expect(gl.map.easeTo).toHaveBeenCalledWith(expect.objectContaining({ pitch: 0 }))
     expect(addCustom3dBuildings).not.toHaveBeenCalled()
   })
 
@@ -490,7 +493,7 @@ describe('JourneyMapGL', () => {
     withToken()
     const ref = React.createRef<JourneyMapGLHandle>()
     render(<JourneyMapGL ref={ref} checkins={[]} entries={entries} />)
-    gl.map.getZoom.mockImplementationOnce(() => { throw new Error('not ready') })
+    gl.map.easeTo.mockImplementationOnce(() => { throw new Error('not ready') })
 
     expect(() => act(() => { ref.current!.focusMarker('e1') })).not.toThrow()
     expect(gl.map.flyTo).not.toHaveBeenCalled()
@@ -512,19 +515,18 @@ describe('JourneyMapGL', () => {
     expect(gl.map.resize).toHaveBeenCalled()
   })
 
-  it('FE-COMP-JMAPGL-028: the activeMarkerId prop highlights and flies after the settle delay', () => {
+  it('FE-COMP-JMAPGL-028: the activeMarkerId prop highlights and eases over after the settle delay', () => {
     vi.useFakeTimers()
     try {
       withToken()
       render(<JourneyMapGL checkins={[]} entries={entries} activeMarkerId="e2" />)
-      expect(gl.map.flyTo).not.toHaveBeenCalled()
+      expect(gl.map.easeTo).not.toHaveBeenCalled()
 
       act(() => { vi.advanceTimersByTime(60) })
 
       expect(gl.popups).toHaveLength(1)
-      expect(gl.map.flyTo).toHaveBeenCalledWith(expect.objectContaining({
+      expect(gl.map.easeTo).toHaveBeenCalledWith(expect.objectContaining({
         center: [13.405, 52.52],
-        zoom: 12,
         duration: 500,
       }))
     } finally {
