@@ -70,6 +70,7 @@ import { makeAccommodationsService } from '../../helpers/accommodations-service'
 import { MapsService } from '../../../src/nest/maps/maps.service';
 import { QueryHelpersService } from '../../../src/nest/query-helpers/query-helpers.service';
 import { notificationsStub } from '../../helpers/notifications';
+import { accommodationsOver } from '../../helpers/accommodations-service';
 import { EphemeralTokenService } from '../../../src/nest/auth/ephemeral-token.service';
 import { UnsplashService } from '../../../src/nest/unsplash/unsplash.service';
 import { PlacePhotoCacheService } from '../../../src/nest/place-photos/place-photo-cache.service';
@@ -101,7 +102,7 @@ const buildReadModel = (database: DatabaseService, roster: TripMembersService = 
   new TripReadModelService(
     database, roster, daysSvc, accommodationsSvc, budgetSvc,
     new PackingService(dbs(), new PermissionsService(dbs()), new RealtimeService(), notificationsStub()),
-    new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs())),
+    new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs()), accommodationsOver(dbs())),
     new CollabService(dbs(), new PermissionsService(dbs()), new RealtimeService(), notificationsStub(), makeStorageFixture('').storage, new RateLimitService()),
     placesSvc,
     new TodoService(dbs(), new PermissionsService(dbs()), new RealtimeService()),

@@ -167,11 +167,12 @@ export function createMcpTestRegistry(): McpRegistry {
     journeyDomain,
     generalStorage,
   );
-  const reservationsService = new ReservationsService(dbService, permissionsService, budgetService, realtimeService, notificationsStub(), new ReservationsReadRepository(dbService));
   // One instance, four consumers: AssignmentsMcp, ReservationsMcp, PlacesMcp and
   // AccommodationsService, which writes the day stop a booked night implies.
   const assignmentsService = new AssignmentsService(dbService, permissionsService, realtimeService, queryHelpersService, journeyDomain);
   const accommodationsService = new AccommodationsService(dbService, permissionsService, realtimeService, assignmentsService);
+  // Built after it: a hotel booking writes the stay's day stop through this one.
+  const reservationsService = new ReservationsService(dbService, permissionsService, budgetService, realtimeService, notificationsStub(), new ReservationsReadRepository(dbService), accommodationsService);
   const membersService = new TripMembersService(dbService, budgetService, new UserCleanupService(dbService, budgetService), permissionsService, realtimeService, notificationsStub());
   const tripsService = new TripsService(
     dbService,

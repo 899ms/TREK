@@ -17,7 +17,17 @@ import { TrekPhotosRepository } from '../../src/nest/photos/trek-photos.reposito
  * why this is a helper and not five copies across the suites.
  */
 export function makeAccommodationsService(conn: Database): AccommodationsService {
-  const dbs = new DatabaseService(conn);
+  return accommodationsOver(new DatabaseService(conn));
+}
+
+/**
+ * The same, for a suite that already holds the DatabaseService.
+ *
+ * ReservationsService takes one now, because a hotel booking owes the day plan
+ * the same stop a night entered under Days does, and every suite that builds
+ * that service by hand needs one to hand it.
+ */
+export function accommodationsOver(dbs: DatabaseService): AccommodationsService {
   const permissions = new PermissionsService(dbs);
   const realtime = new RealtimeService();
   const assignments = new AssignmentsService(

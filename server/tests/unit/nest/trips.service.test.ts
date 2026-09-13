@@ -118,7 +118,7 @@ const createAccommodation = accommodationsSvc.createAccommodation.bind(accommoda
 
 const svc = new TripsService(
   dbs(),
-  new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs())),
+  new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs()), accommodationsSvc),
   daysSvc,
   new PermissionsService(dbs()),
   budgetSvc,
@@ -131,7 +131,7 @@ const membersSvc = new TripMembersService(dbs(), budgetSvc, new UserCleanupServi
 const readModelSvc = new TripReadModelService(
   dbs(), membersSvc, daysSvc, accommodationsSvc, budgetSvc,
   new PackingService(dbs(), new PermissionsService(dbs()), new RealtimeService(), notificationsStub()),
-  new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs())),
+  new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs()), accommodationsSvc),
   new CollabService(dbs(), new PermissionsService(dbs()), new RealtimeService(), notificationsStub(), coversFx.storage, new RateLimitService()),
   placesSvc,
   new TodoService(dbs(), new PermissionsService(dbs()), new RealtimeService()),
@@ -1098,7 +1098,7 @@ describe('quirk fixes', () => {
     const fdbs = failingConnection(match);
     return new TripsService(
       fdbs,
-      new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs())),
+      new ReservationsService(dbs(), new PermissionsService(dbs()), budgetSvc, new RealtimeService(), notificationsStub(), new ReservationsReadRepository(dbs()), accommodationsSvc),
       daysSvc,
       new PermissionsService(dbs()),
       budgetSvc,

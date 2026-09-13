@@ -23,7 +23,10 @@ export interface AccommodationMirror {
   stamped: PlaceWithTags | null;
 }
 
-const noMirror = (): AccommodationMirror => ({ created: null, removed: [], stamped: null });
+/** A write that left the day plan alone. Exported for the surfaces that write a
+ *  stay row themselves and have to answer with a mirror either way. */
+export const noStayMirror = (): AccommodationMirror => ({ created: null, removed: [], stamped: null });
+const noMirror = noStayMirror;
 
 export interface DayAccommodation {
   id: number;
@@ -125,6 +128,37 @@ export class AccommodationsService {
 
   remove(id: string | number, opts: { keepStop?: boolean } = {}) {
     return this.deleteAccommodation(id, opts);
+  }
+
+  // -------------------------------------------------------------------------
+  // For a surface that writes the stay row itself
+  //
+  // The booking form does: it fills day_accommodations straight from a hotel
+  // reservation, with its own COALESCE semantics and its own field set, and
+  // folding that into createAccommodation would mean bending one of the two out
+  // of shape. What must not be duplicated is the stop, so these three open the
+  // mirror to it and keep the SQL here.
+  //
+  // A night entered on the booking form is a night entered in Days: it shows in
+  // the day header exactly like one added there. Road trip mode draws the same
+  // booking as a service stop instead, so the stop is not a second edit to the
+  // day plan, it is the same one in the other view. That is why writing it does
+  // not ask for more than the booking already did.
+  // -------------------------------------------------------------------------
+
+  /** Put a freshly written stay on the map. */
+  attachStayStop(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+    return this.mirrorStay(accommodationId, placeId, dayId);
+  }
+
+  /** Carry a stay's own stop over to where the stay now is. */
+  moveStayStop(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+    return this.remirrorStay(accommodationId, placeId, dayId);
+  }
+
+  /** Take back the stops of a stay that is being deleted elsewhere. */
+  dropStayStops(accommodationId: number): AccommodationMirror {
+    return this.releaseStops(accommodationId, {});
   }
 
   /**
@@ -234,6 +268,33 @@ export class AccommodationsService {
     return this.db.all<{ id: number; day_id: number; place_id: number }>(
       'SELECT id, day_id, place_id FROM day_assignments WHERE accommodation_id = ?', accommodationId
     );
+  }
+
+  /**
+   * Let go of the stops a booking owns, because the booking is going away.
+   *
+   * Only the ones it put there itself. A stop the traveller placed and then
+   * booked a night at keeps standing, which is how cancelling a night in the road
+   * trip has always behaved.
+   *
+   * keepStop hands it to the traveller instead of taking it away. That is the road
+   * trip popup turning a night back into a pause: they asked to drop the booking,
+   * not the place, and the stop is mid-drive where re-adding it would land it at
+   * the end of the day.
+   *
+   * Runs inside the caller's transaction.
+   */
+  private releaseStops(accommodationId: number, opts: { keepStop?: boolean }): AccommodationMirror {
+    const mirror = noMirror();
+    for (const stop of this.ownStops(accommodationId)) {
+      if (opts.keepStop) {
+        this.db.run('UPDATE day_assignments SET accommodation_id = NULL WHERE id = ?', stop.id);
+        continue;
+      }
+      this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
+      mirror.removed.push({ id: stop.id, dayId: stop.day_id });
+    }
+    return mirror;
   }
 
   /**
@@ -372,23 +433,7 @@ export class AccommodationsService {
         this.db.run('DELETE FROM reservations WHERE id = ?', res.id);
       }
 
-      // Only the stops this booking put there itself. A stop the traveller placed
-      // and then booked a night at keeps standing, which is how cancelling a night
-      // in the road trip has always behaved.
-      //
-      // keepStop hands it to the traveller instead of taking it away. That is the
-      // road trip popup turning a night back into a pause: they asked to drop the
-      // booking, not the place, and the stop is mid-drive where re-adding it would
-      // land it at the end of the day.
-      const mirror = noMirror();
-      for (const stop of this.ownStops(Number(id))) {
-        if (opts.keepStop) {
-          this.db.run('UPDATE day_assignments SET accommodation_id = NULL WHERE id = ?', stop.id);
-          continue;
-        }
-        this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
-        mirror.removed.push({ id: stop.id, dayId: stop.day_id });
-      }
+      const mirror = this.releaseStops(Number(id), opts);
 
       this.db.run('DELETE FROM day_accommodations WHERE id = ?', id);
       const linkedReservationIds = linkedRes.map(r => r.id);

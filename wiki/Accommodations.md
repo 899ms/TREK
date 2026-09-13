@@ -35,11 +35,18 @@ For each day between the **From** day and **To** day (inclusive), the accommodat
 
 ## On the route
 
-Booking a night from the Day Detail panel also puts its place on the check-in day, as a
-stop of its own. That stop is what the map draws a line to and what the Road Trip view
-builds its route from, so the hotel now shows up there without having to be entered a
-second time as an ordinary place. A night booked in the Road Trip view has always worked
-this way; this makes the two directions match.
+Booking a night also puts its place on the check-in day, as a stop of its own. That stop
+is what the map draws a line to and what the Road Trip view builds its route from, so the
+hotel shows up on the drive without having to be entered a second time as an ordinary
+place. It works the same way whichever way you book the night: the Day Detail panel, the
+booking form under Bookings, the phone, the Road Trip view, an MCP client or a plugin.
+
+The two views show the same night differently, and both are the whole picture:
+
+- **Days** keeps it in the day header, as the badge it has always been. The stop itself is
+  hidden there, because the row would be that same hotel a second time.
+- **Road Trip** draws it as a service stop in the driving chain, which is the view that
+  needs to know where the day ends.
 
 A few details worth knowing:
 
@@ -52,11 +59,11 @@ A few details worth knowing:
   placed, and the booking simply rides along with it.
 - Moving the booking to a different check-in day moves its stop with it. Deleting the
   booking removes the stop it created, and leaves a stop you placed yourself standing.
-- Service stops, hotels among them, can be hidden from the day lists with **Show in Days
-  too** under **Service stops** in the Road Trip settings.
+- Hotels are service stops, so **Show in Days too** under **Service stops** in the Road
+  Trip settings also decides whether they appear in the places list.
 
-Stays booked before this existed keep their day plans untouched. Open such a booking and
-save it once and it picks up its stop.
+Nights booked before this existed are given their stop when the server upgrades, so trips
+you already have show their hotels on the drive without anyone re-saving anything.
 
 ## In the day plan sidebar
 
