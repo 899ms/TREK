@@ -32,6 +32,7 @@ import { createHash } from 'node:crypto';
 import { fromAmapLocation, gcj02ToWgs84, toAmapLocation } from '@trek/shared';
 import { readEnv } from '../../../app-config';
 import { safeFetchFollow } from '../../../utils/ssrfGuard';
+import { discardBody, exceedsDeclaredLength, readCappedJson } from '../../../utils/cappedFetch';
 import { UA, parseOpeningHours } from '../maps.helpers';
 import type {
   PlacesProvider,
@@ -44,6 +45,13 @@ import type {
 
 /** The upstream every Web Service call is written against. */
 const AMAP_UPSTREAM = 'https://restapi.amap.com';
+/** A search answer is a few dozen POIs; anything past this is not the endpoint we think it is. */
+const AMAP_MAX_RESPONSE_BYTES = 1_000_000;
+
+/** An Amap list field, or nothing. The envelope is checked; its arrays never were. */
+function asArray<T>(value: T[] | undefined | null): T[] {
+  return Array.isArray(value) ? value : [];
+}
 
 /**
  * The prefix that makes an Amap POI id recognisable anywhere in TREK.
@@ -226,7 +234,18 @@ export class AmapPlacesProvider implements PlacesProvider {
       this.fail(label, response.status, `Amap ${label} failed with HTTP ${response.status}`);
     }
 
-    const data = (await response.json()) as T;
+    // Capped, like the places index client next door: the base URL is
+    // configurable (AMAP_API_BASE points at an operator's own gateway), and an
+    // answer of arbitrary size was buffered into the heap in full before
+    // anything looked at it.
+    if (exceedsDeclaredLength(response, AMAP_MAX_RESPONSE_BYTES)) {
+      discardBody(response);
+      this.fail(label, 502, `Amap ${label} answered with more than ${AMAP_MAX_RESPONSE_BYTES} bytes`);
+    }
+    const data = await readCappedJson<T>(response, AMAP_MAX_RESPONSE_BYTES);
+    if (!data || typeof data !== 'object') {
+      this.fail(label, 502, `Amap ${label} answered with something that is not a JSON object`);
+    }
     if (data.status !== '1') {
       const infocode = data.infocode ?? '';
       const hint = AMAP_INFOCODE_HINTS[infocode] || data.info || 'Amap API error';
@@ -320,7 +339,11 @@ export class AmapPlacesProvider implements PlacesProvider {
         )
       : await this.call<AmapEnvelope & { pois?: AmapPoi[] }>('/v3/place/text', common, 'place/text');
 
-    return (data.pois ?? []).map((poi) => this.toPlace(poi));
+    // The envelope is validated, its arrays are not: `as T` only ever said what
+    // the answer was meant to look like. A `pois` object rather than an array
+    // threw a TypeError nobody caught between here and the controller, so the
+    // user got a 500 instead of the OpenStreetMap answer.
+    return asArray(data.pois).map((poi) => this.toPlace(poi));
   }
 
   // Amap does not bill per keystroke and has no session concept, so the token
@@ -377,7 +400,7 @@ export class AmapPlacesProvider implements PlacesProvider {
       `place/detail(${poiId})`,
     );
 
-    const poi = data.pois?.[0];
+    const poi = asArray(data.pois)[0];
     return poi ? { ...this.toPlace(poi), cached_at: Date.now() } : null;
   }
 

@@ -11,7 +11,7 @@ import type {
 import { Jimp } from 'jimp';
 import { readEnv, getAppUrl } from '../../app-config';
 import { safeFetchFollow, SsrfBlockedError } from '../../utils/ssrfGuard';
-import { discardBody, exceedsDeclaredLength, readCappedText } from '../../utils/cappedFetch';
+import { discardBody, exceedsDeclaredLength, readCapped, readCappedText } from '../../utils/cappedFetch';
 import { resolveApiKey, type ApiKeySource } from '../settings/instance-api-keys';
 import { isPlacesProviderChoice, type PlacesProviderChoice } from './providers/places-provider';
 import {
@@ -410,6 +410,8 @@ const BRAND_LOGO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const BRAND_LOGO_CACHE_MAX = 300;
 /** Well past any logo; a Commons original can be a multi-megabyte SVG or print-res PNG. */
 const BRAND_LOGO_MAX_BYTES = 512 * 1024;
+/** A place photo is a full-size image rather than a 128px mark, so its own ceiling. */
+const WIKIMEDIA_PHOTO_MAX_BYTES = 8 * 1024 * 1024;
 const BRAND_LOGO_WIDTH = 128;
 /** The square the logo is centred in, and the breathing room around it. */
 const BRAND_LOGO_CANVAS = 96;
@@ -825,14 +827,20 @@ export class MapsService {
       // Special:FilePath renders a thumbnail at the width asked for and redirects to
       // the CDN, so each hop is re-checked by the guard rather than trusted.
       const url = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(file)}?width=${BRAND_LOGO_WIDTH}`;
-      const imgRes = await safeFetchFollow(url, undefined, { bypassInternalIpAllowed: true });
+      // The same six seconds the Wikidata hop above allows. Without a deadline
+      // this waited on undici's five-minute default, holding a request context
+      // and a socket per stalled logo while the pin sat on its fallback icon.
+      const imgRes = await safeFetchFollow(url, { signal: AbortSignal.timeout(WIKI_TIMEOUT_MS) }, { bypassInternalIpAllowed: true });
       if (!imgRes.ok) return remember(null);
 
-      const declared = Number(imgRes.headers.get('content-length') ?? '0');
-      if (declared > BRAND_LOGO_MAX_BYTES) return remember(null);
-      const bytes = Buffer.from(await imgRes.arrayBuffer());
-      // Checked again after reading: a chunked response has no length to check first.
-      if (bytes.byteLength === 0 || bytes.byteLength > BRAND_LOGO_MAX_BYTES) return remember(null);
+      if (exceedsDeclaredLength(imgRes, BRAND_LOGO_MAX_BYTES)) {
+        discardBody(imgRes);
+        return remember(null);
+      }
+      // Streamed rather than buffered whole: a chunked answer declares no length,
+      // so the post-check only ever ran after the bytes were already in memory.
+      const { bytes, truncated } = await readCapped(imgRes, BRAND_LOGO_MAX_BYTES);
+      if (truncated || bytes.byteLength === 0) return remember(null);
 
       const contentType = imgRes.headers.get('content-type') ?? '';
       if (!contentType.startsWith('image/')) return remember(null);
@@ -872,6 +880,23 @@ export class MapsService {
     // by Overpass, and a mixed answer would silently drop it.
     const indexKnowsAll = wanted.length > 0 && wanted.every(key => POI_CATEGORY_TO_TREK[key]?.length);
     const terms = [...categoryOfTerm.keys()];
+    // The index matches a term as a SUBSTRING of `category` and `category_path`
+    // (see POI_CATEGORY_TO_TREK), so an exact lookup misses every leaf that is
+    // not literally a term: `italian_restaurant` is a hit for `restaurant` and
+    // finds nothing here. Falling through to wanted[0] then labelled it with
+    // whichever pill the user happened to tap first, and the corridor panel
+    // groups and colours on exactly that field, so a trattoria came back as a
+    // petrol station. Longest match wins, because `fast_food` must not lose to
+    // `food` when both are terms of different categories.
+    const labelFor = (leaf: string | null, path: string | null): string | undefined => {
+      const haystack = `${leaf ?? ''} ${path ?? ''}`;
+      let best: string | undefined;
+      for (const [term, key] of categoryOfTerm) {
+        if (!haystack.includes(term)) continue;
+        if (best === undefined || term.length > best.length) best = term;
+      }
+      return best === undefined ? undefined : categoryOfTerm.get(best);
+    };
     if (this.trekPlacesEnabled() && indexKnowsAll) {
       try {
         const lat = (bbox.south + bbox.north) / 2;
@@ -916,7 +941,7 @@ export class MapsService {
               // The category that produced the hit, not the list that was
               // asked for: a mixed search must not label a petrol station as
               // "fuel,charging,restaurant".
-              category: categoryOfTerm.get(p.category ?? '') ?? wanted[0],
+              category: labelFor(p.category ?? null, p.categoryPath ?? null) ?? wanted[0],
               poi_type: p.category ?? wanted[0],
               address: p.address?.freeform ?? null,
               website: p.contact?.website ?? null,
@@ -2702,12 +2727,23 @@ export class MapsService {
             if (!wiki) return null;
             // Follow redirects manually so each hop (the image URL can 3xx to a CDN
             // host) is re-validated against the SSRF guard, not just the first URL.
-            const imgRes = await safeFetchFollow(wiki.photoUrl, undefined, { bypassInternalIpAllowed: true });
+            const imgRes = await safeFetchFollow(
+              wiki.photoUrl, { signal: AbortSignal.timeout(WIKI_TIMEOUT_MS) }, { bypassInternalIpAllowed: true },
+            );
             if (!imgRes.ok) {
               providerFailed = true;
               return null;
             }
-            const bytes = Buffer.from(await imgRes.arrayBuffer());
+            if (exceedsDeclaredLength(imgRes, WIKIMEDIA_PHOTO_MAX_BYTES)) {
+              discardBody(imgRes);
+              providerFailed = true;
+              return null;
+            }
+            const { bytes, truncated } = await readCapped(imgRes, WIKIMEDIA_PHOTO_MAX_BYTES);
+            if (truncated || bytes.byteLength === 0) {
+              providerFailed = true;
+              return null;
+            }
             const cached = await this.photoCache.put(placeId, bytes, wiki.attribution);
             return { attribution: cached.attribution };
           } catch {

@@ -283,6 +283,39 @@ describe('MapsService.pois answered from the index', () => {
     expect(out.pois.map(p => p.category)).toEqual(['fuel', 'charging']);
   });
 
+  it('MAPS-POIS-013b: a leaf category that is only a substring of a term is still labelled by it', async () => {
+    // The index matches a term inside `category` and `category_path`, so most
+    // real leaves are not literally a term. Looked up exactly, they missed and
+    // took the first category of the request instead — whichever pill the user
+    // tapped first — and the corridor panel groups and colours on that field.
+    mockNearby.mockResolvedValue([
+      { ...FULL, gers: 'r-1', name: 'Trattoria', category: 'italian_restaurant', categoryPath: 'eat_and_drink>restaurant>italian_restaurant' },
+      { ...FULL, gers: 'f-1', name: 'Aral', category: 'gas_station', categoryPath: 'automotive>gas_station' },
+    ]);
+    const svc = make();
+    stubOverpass(svc);
+
+    const out = await svc.pois('fuel,restaurant', BOX);
+
+    // Fuel was tapped first, so the old fallback made the trattoria a petrol
+    // station: orange pin, listed under Fuel.
+    expect(out.pois.map(p => [p.name, p.category])).toEqual([['Trattoria', 'restaurant'], ['Aral', 'fuel']]);
+    // The true leaf is still reported, unchanged.
+    expect(out.pois[0].poi_type).toBe('italian_restaurant');
+  });
+
+  it('MAPS-POIS-013c: the longest matching term wins, so fast_food does not answer as a cafe', async () => {
+    mockNearby.mockResolvedValue([
+      { ...FULL, gers: 'q-1', name: 'Imbiss', category: 'fast_food_restaurant', categoryPath: 'eat_and_drink>fast_food>fast_food_restaurant' },
+    ]);
+    const svc = make();
+    stubOverpass(svc);
+
+    const out = await svc.pois('cafe,restaurant', BOX);
+
+    expect(out.pois[0].category).toBe('restaurant');
+  });
+
   it('MAPS-POIS-014: a category the index has no terms for sends the whole query to Overpass', async () => {
     // All or nothing. Answering the half it knows would silently drop the rest,
     // and the caller counts a finished search either way.

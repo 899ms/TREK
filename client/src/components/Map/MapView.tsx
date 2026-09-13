@@ -1006,6 +1006,15 @@ export const MapView = memo(function MapView({
     <>
     <div className="w-full h-full relative">
     <MapContainer
+      // The datum is in the element's identity, because react-leaflet builds the
+      // map once and Leaflet cannot change a CRS afterwards. Settings can arrive
+      // late — a first GET that fails leaves the store on defaults until
+      // ensureSettingsLoaded heals it — and without this the raster layer would
+      // switch to Amap's GCJ-02 tiles under a map still projecting WGS-84, which
+      // puts every marker and route a few hundred metres off the street beneath
+      // it. Only the datum: keying on the whole tile URL would throw the view and
+      // the cluster group away on every template or API-key edit.
+      key={isGcjBasemap ? 'gcj02' : 'wgs84'}
       id="trek-map"
       center={initialView.center}
       zoom={initialView.zoom}

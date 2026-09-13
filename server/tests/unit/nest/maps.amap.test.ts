@@ -256,6 +256,29 @@ describe('AmapPlacesProvider.searchText', () => {
     expect(calledUrl()).toContain('/v3/place/text');
   });
 
+  it('AMAP-015b: a pois field that is not a list answers empty instead of throwing a 500', async () => {
+    // `as T` only ever described what the answer was meant to look like. The
+    // base URL is configurable, and an object here used to reach `.map` and
+    // throw a TypeError nobody caught between the provider and the controller.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: { id: 'B3' } })));
+    await expect(provider().searchText('外滩')).resolves.toEqual([]);
+  });
+
+  it('AMAP-015c: a body larger than the cap is refused before it is read', async () => {
+    const cancel = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: (n: string) => (n === 'content-length' ? String(50 * 1024 * 1024) : null) },
+      body: { getReader: () => ({ read: async () => ({ done: true }), cancel }), cancel },
+      json: async () => ({ status: '1', pois: [] }),
+    }));
+
+    await expect(provider().searchText('外滩')).rejects.toThrow(/more than/);
+    // The socket goes back rather than staying pinned on a body nobody reads.
+    expect(cancel).toHaveBeenCalled();
+  });
+
   it('AMAP-016: keeps a POI that has no geometry rather than dropping it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [{ id: 'B3', name: '无坐标', location: [] }] })));
     const [place] = await provider().searchText('无坐标');
