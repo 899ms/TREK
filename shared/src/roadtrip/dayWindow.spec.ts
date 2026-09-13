@@ -308,14 +308,38 @@ describe('daily travel window', () => {
     expect(planned.issue).toBe('conflict');
   });
 
-  it('pauses a long visit at its location and carries the remaining stay into tomorrow', () => {
+  it('pauses a long visit at its location and resumes the next morning', () => {
+    // Eleven hours from eight in the morning is over at seven in the evening, an hour
+    // after the window shuts. The stay does not pause overnight and pick up its last
+    // hour tomorrow — night time is time — so the morning starts free.
     const first = stop(1, { dwellMinutes: 660 });
     const planned = calculate([first, stop(2)], [60]);
     expect(planned.chains[0]!.stops[1]!).toMatchObject({ lat: first.lat, lng: first.lng });
     expect(planned.chains[0]!.schedule.entries[0]!.departure).toBe('18:00');
-    expect(planned.chains[1]!.schedule.entries[0]!.departure).toBe('09:00');
-    expect(planned.chains[1]!.schedule.entries[1]!.arrival).toBe('10:00');
+    expect(planned.chains[1]!.schedule.entries[0]!.departure).toBe('08:00');
+    expect(planned.chains[1]!.schedule.entries[1]!.arrival).toBe('09:00');
     expect(first.dwellMinutes).toBe(660);
+  });
+
+  it('a night booked as a full day is over the next morning, not two days later', () => {
+    // Twenty-four hours from just after eight is over just after eight tomorrow. Counted
+    // against the driving window alone it took two of them to run down, so a single
+    // night pushed everything after it onto the day after next.
+    const hotel = stop(1, { time: '08:04', dwellMinutes: 24 * 60 });
+    const planned = planDayWindow(
+      [day(1, [hotel, stop(2)]), day(2), day(3)],
+      { start: 480, end: 1200 },
+      (a, b) => leg(10, a, b),
+      'metric',
+      labels,
+    );
+
+    expect(planned.issue).toBeNull();
+    // One night inserted, not two: the stay ends inside the next day's window.
+    const dayTwo = planned.chains.find(c => c.dayNumber === 2)!;
+    expect(dayTwo.schedule.entries.find(e => e.departure === '08:04')).toBeTruthy();
+    // And the stop after it is reached that same morning.
+    expect(dayTwo.stops.some(s => s.assignmentId === 2)).toBe(true);
   });
 
   it('does not place a night pause halfway through a ferry crossing', () => {
@@ -337,7 +361,8 @@ describe('daily travel window', () => {
 
   it('bounds extreme driving and stay durations', () => {
     expect(calculate([stop(1), stop(2)], [600 * 367]).issue).toBe('tooLong');
-    expect(calculate([stop(1, { dwellMinutes: 600 * 367 }), stop(2)], [1]).issue).toBe('tooLong');
+    // Counted against the clock, so a year of standing still is 1440 minutes a day.
+    expect(calculate([stop(1, { dwellMinutes: 1440 * 400 }), stop(2)], [1]).issue).toBe('tooLong');
   });
 
   it('maps insertions on generated days back to real stored stops', () => {

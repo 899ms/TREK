@@ -277,6 +277,11 @@ export function planDayWindow(
     append(stop, clock);
     previous = stop;
 
+    // How long the traveller is here, spent against the clock rather than against the
+    // driving hours. The night between two of them is not a pause in the stay: standing
+    // somewhere for twenty-four hours takes twenty-four hours, and counting only the
+    // hours the window is open stretched a single night over three days.
+    const overnight = Math.max(0, 1440 - window.end + window.start);
     let dwell = Math.max(0, stop.dwellMinutes ?? 0);
     while (dwell > 0) {
       const remaining = targets.has(number) ? dwell : Math.max(0, window.end - clock);
@@ -288,6 +293,12 @@ export function planDayWindow(
       if (dwell > 0) {
         previous = night(previous);
         if (issue) return failed(issue);
+        // The hours the window was shut passed too.
+        dwell = Math.max(0, dwell - overnight);
+        if (dwell === 0) {
+          const resumed = chainAt(number).schedule.entries;
+          resumed[resumed.length - 1]!.departure = formatClock(Math.round(clock));
+        }
       }
     }
     if (target === position || (!targets.has(number) && stop.endDay && i < stops.length - 1)) {
