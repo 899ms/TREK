@@ -158,7 +158,14 @@ export function useDawarichConnection(): DawarichConnectionState {
         toast.success(t('dawarich.test.success', { count: result.visitCount ?? 0 }))
       } else {
         const message = translateError(result.error ?? null) ?? t('dawarich.test.failed')
-        setProbeMessage(message)
+        // The reason underneath, where the server managed to name one. The codes
+        // above are deliberately vague so an English sentence from Dawarich does
+        // not land on a German install, but "TREK could not reach that address"
+        // alone leaves a self-hoster with nothing to act on: it reads the same
+        // whether the host is down, the certificate was rejected, or TREK refused
+        // a private address on purpose and would need ALLOW_INTERNAL_NETWORK to
+        // permit it. The panel gets both; the toast stays one line.
+        setProbeMessage(result.errorDetail ? `${message} (${result.errorDetail})` : message)
         toast.error(message)
       }
     } catch (err) {
