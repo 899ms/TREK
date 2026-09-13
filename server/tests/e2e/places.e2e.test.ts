@@ -44,6 +44,11 @@ const { db } = vi.hoisted(() => {
   tmp.exec(`CREATE TABLE day_assignments (id INTEGER PRIMARY KEY AUTOINCREMENT, day_id INTEGER NOT NULL,
     place_id INTEGER NOT NULL, order_index INTEGER DEFAULT 0);`);
   // reclaimPlaceImage ref-counts an uploaded thumbnail across both tables.
+  // Deleting a place cancels the nights booked at it (#2354), so the delete path
+  // reads this table even in a file that never books one.
+  tmp.exec(`CREATE TABLE day_accommodations (id INTEGER PRIMARY KEY AUTOINCREMENT, trip_id INTEGER,
+    place_id INTEGER, start_day_id INTEGER, end_day_id INTEGER, check_in TEXT, check_in_end TEXT,
+    check_out TEXT, confirmation TEXT, notes TEXT, created_at TEXT DEFAULT (datetime('now')));`);
   tmp.exec(`CREATE TABLE collection_places (id INTEGER PRIMARY KEY AUTOINCREMENT, image_url TEXT);`);
   // reclaimPhotoCache's removeIfUnreferenced sweeps the Google photo cache.
   tmp.exec(`CREATE TABLE google_place_photo_meta (place_id TEXT PRIMARY KEY, attribution TEXT, error_at DATETIME);`);
