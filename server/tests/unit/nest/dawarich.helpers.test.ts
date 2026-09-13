@@ -323,9 +323,14 @@ describe('normalizeVisit', () => {
     expect(normalizeVisit(visit({ status: null }))?.status).toBe('suggested');
   });
 
-  it('DAWARICH-VISIT-007: a positive duration is read as seconds', () => {
+  it('DAWARICH-VISIT-007: the span between the timestamps is the length, whatever duration says', () => {
+    // 18:30 to 20:00. The reported figure is ignored while there are two usable
+    // timestamps, because that is the pair shown beside it in the panel. It used
+    // to win and to be read as seconds, which divided Dawarich's minutes by sixty
+    // a second time and turned an eighteen-minute stop into "0 min".
     expect(normalizeVisit(visit({ duration: 5400 }))?.durationMinutes).toBe(90);
-    expect(normalizeVisit(visit({ duration: '120' }))?.durationMinutes).toBe(2);
+    expect(normalizeVisit(visit({ duration: '120' }))?.durationMinutes).toBe(90);
+    expect(normalizeVisit(visit({ duration: 18 }))?.durationMinutes).toBe(90);
   });
 
   it('DAWARICH-VISIT-008: a missing or zero duration is recomputed from the two timestamps', () => {
@@ -385,7 +390,9 @@ describe('normalizeVisit', () => {
   it('DAWARICH-VISIT-016: an unreadable end falls back to the reported duration', () => {
     // With a duration to go on, the end is the arrival plus that span — which is
     // what the stay actually was, and what the two timestamps then agree on.
-    const result = normalizeVisit(visit({ duration: 1800, ended_at: 'sometime' }));
+    // Minutes: Dawarich writes `duration_minutes = ((ended_at - started_at) / 60)`
+    // into this column (app/services/visits/create.rb).
+    const result = normalizeVisit(visit({ duration: 30, ended_at: 'sometime' }));
     expect(Date.parse(result!.endedAt) - Date.parse(result!.startedAt)).toBe(1_800_000);
     expect(result?.durationMinutes).toBe(30);
   });
