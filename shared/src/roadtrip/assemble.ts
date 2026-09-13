@@ -90,7 +90,6 @@ export function assembleRoadtrip({
               d.stops.map((s) => ({
                 anchor: s.time ?? s.checkInTime ?? null,
                 dwellMinutes: s.dwellMinutes,
-                departureAt: s.checkoutAt === undefined ? undefined : s.checkoutAt - d.dayNumber * 1440,
               })),
               d.stops.slice(0, -1).map((s, i) => storedLegFor(s, d.stops[i + 1]!)?.seg.duration),
             ),
@@ -160,15 +159,7 @@ export function assembleRoadtrip({
       const snap = s.automaticNight ? undefined : allSnaps[stopKey(s)];
       const line = spurFor(snap);
       if (line) accessLines.push({ line, meters: snap!.meters, stopKey: stopKey(s) });
-      const entry = schedule.entries[index];
-      const arrival = parseClock(entry?.arrival);
-      const dwellMinutes =
-        s.checkoutAt !== undefined && arrival !== null
-          ? Math.max(0, s.checkoutAt - ((chain.dayNumber + (entry?.dayOffset ?? 0)) * 1440 + arrival))
-          : s.checkoutAt !== undefined
-            ? null
-            : s.dwellMinutes;
-      return { ...s, dwellMinutes, offRoadMeters: line ? snap!.meters : null };
+      return { ...s, offRoadMeters: line ? snap!.meters : null };
     });
 
     const drive = {

@@ -147,8 +147,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Sebuah tujuan',
   'roadtrip.stay.mode.pause': 'Istirahat',
   'roadtrip.stay.mode.night': 'Menginap',
-  'roadtrip.stay.checkOutDay': 'Check out',
-  'roadtrip.stay.dayNumber': 'Hari {number}',
   'roadtrip.stay.nightAdded': 'Ditambahkan sebagai menginap',
   'roadtrip.stay.nightAction': 'Tambahkan sebagai menginap',
   'roadtrip.stop.makeService': 'Jadikan perhentian di jalan',

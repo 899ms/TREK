@@ -149,8 +149,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Προορισμός',
   'roadtrip.stay.mode.pause': 'Στάση',
   'roadtrip.stay.mode.night': 'Διανυκτέρευση',
-  'roadtrip.stay.checkOutDay': 'Αναχώρηση',
-  'roadtrip.stay.dayNumber': 'Ημέρα {number}',
   'roadtrip.stay.nightAdded': 'Προστέθηκε ως διανυκτέρευση',
   'roadtrip.stay.nightAction': 'Προσθήκη ως διανυκτέρευση',
   'roadtrip.stop.makeService': 'Μετατροπή σε στάση στον δρόμο',

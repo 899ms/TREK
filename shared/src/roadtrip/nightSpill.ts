@@ -69,17 +69,40 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
   const landing = new Map<number, Placed[]>();
   for (const d of all) landing.set(d.dayNumber, []);
 
+  /**
+   * How far into a day the one before it still reaches.
+   *
+   * A stop stood at for twenty-four hours is not over when the date changes: the day
+   * after it begins where it ends, not at nothing. Only ever a floor, and only when a
+   * stay genuinely runs past midnight — an ordinary day that finishes at six in the
+   * evening hands on nothing, because the night between them is not a wait, it is a
+   * night.
+   */
+  let carriedInto: { dayNumber: number; minute: number } | null = null;
+
   for (const d of all) {
+    const notBefore = carriedInto?.dayNumber === d.dayNumber ? carriedInto.minute : null;
     const routed = d.stops.slice(0, -1).map((s, i) => legFor(s, d.stops[i + 1]!));
     const legs = routed.map((l) => l?.seg);
     const schedule = computeSchedule(
       d.stops.map((s) => ({
         anchor: s.time ?? s.checkInTime ?? null,
         dwellMinutes: s.dwellMinutes,
-        departureAt: s.checkoutAt === undefined ? undefined : s.checkoutAt - d.dayNumber * 1440,
       })),
       legs.map((l) => l?.duration),
+      { notBefore },
     );
+    // Where this day's last clock lands, carried to whichever day that turns out to be.
+    const ends = schedule.endsAt ?? null;
+    if (ends !== null && ends > 1440) {
+      carriedInto = { dayNumber: d.dayNumber + Math.floor(ends / 1440), minute: ends % 1440 };
+    } else if (carriedInto && carriedInto.dayNumber <= d.dayNumber) {
+      // Spent: this is the day it was pointing at.
+      carriedInto = null;
+    }
+    // Otherwise it is left alone. A stay of several days passes over the days in the
+    // middle without them having anything to say, and clearing it there would lose the
+    // morning it was aimed at.
 
     let day = 0;
     let previous: number | null = null;
@@ -90,7 +113,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
         if (previous !== null && clock < previous) day += 1;
         previous = clock;
       }
-      const offset = d.stops.some((s) => s.checkoutAt !== undefined) ? (entry?.dayOffset ?? day) : day;
+      const offset = day;
       const marks = schedule.warnings.filter((w) => w.index === i);
 
       const reachable = offset > 0 && numbers.has(d.dayNumber + offset);

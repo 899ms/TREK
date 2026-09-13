@@ -145,8 +145,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Ett resmål',
   'roadtrip.stay.mode.pause': 'Paus',
   'roadtrip.stay.mode.night': 'Övernattning',
-  'roadtrip.stay.checkOutDay': 'Utcheckning',
-  'roadtrip.stay.dayNumber': 'Dag {number}',
   'roadtrip.stay.nightAdded': 'Tillagd som övernattning',
   'roadtrip.stay.nightAction': 'Lägg till som övernattning',
   'roadtrip.stop.makeService': 'Gör det till ett stopp på vägen',

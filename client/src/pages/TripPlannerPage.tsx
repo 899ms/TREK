@@ -96,10 +96,15 @@ const TransportModal = lazyWithRetry(() =>
  * No label: ErrorBoundary lets label win over the panel level and would title a
  * broken packing list "This plugin could not be shown".
  */
-function LazyPanel({ id, children }: { id: string; children: React.ReactNode }): React.ReactElement {
+function LazyPanel({ id, children, overlay }: { id: string; children: React.ReactNode; overlay?: boolean }): React.ReactElement {
   return (
     <ErrorBoundary boundaryId={`planner-panel:${id}`}>
-      <Suspense fallback={<div className="h-full w-full min-h-[180px] rounded-xl bg-surface-secondary animate-pulse" />}>
+      {/* A panel holds its place with a skeleton while its chunk arrives; a dialog has no
+          place to hold. Drawn in the page flow, that skeleton was a pale block flashing
+          under the planner the first time each dialog was ever opened, and never again
+          once the chunk was cached. Nothing is the right placeholder for something that
+          is about to cover the screen anyway. */}
+      <Suspense fallback={overlay ? null : <div className="h-full w-full min-h-[180px] rounded-xl bg-surface-secondary animate-pulse" />}>
         {children}
       </Suspense>
     </ErrorBoundary>
@@ -1025,7 +1030,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
       {/* Which track a day drives along. Mounted only while it is open, so the chunk and
           the parsing of every imported line stay out of an ordinary planner session. */}
       {followTrack.dayId !== null && (
-        <LazyPanel id="roadtrip-track">
+        <LazyPanel id="roadtrip-track" overlay>
           <RoadtripTrackModal
             follow={followTrack}
             dayNumber={roadtripRoutes.days.find(d => d.dayId === followTrack.dayId)?.dayNumber ?? 0}
@@ -1033,12 +1038,12 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
         </LazyPanel>
       )}
       {stayDraft && (
-        <LazyPanel id="roadtrip-stay">
+        <LazyPanel id="roadtrip-stay" overlay>
           <RoadtripStayModal stop={stayDraft} onClose={() => setStayDraft(null)} onSave={setRoadtripStay} />
         </LazyPanel>
       )}
       {stopDraft && (
-        <LazyPanel id="roadtrip-stop">
+        <LazyPanel id="roadtrip-stop" overlay>
           <RoadtripStopPopup
             draft={stopDraft}
             duplicateName={stopDraftDuplicate}

@@ -3,7 +3,7 @@ import { assembleRoadtrip, foldRouteRun, type RoadtripStop, type RoadtripRoutes,
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { calculateRouteWithLegs, RoutingRefusedError } from '../Map/RouteCalculator'
 import { resolveLegMode } from '../Planner/legMode'
-import { splitIntoRuns, parseClock, parseAvoid, type DriveLimits } from './roadtripModel'
+import { splitIntoRuns, parseAvoid, type DriveLimits } from './roadtripModel'
 import { spillChains } from './nightSpill'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useVehicleRange } from './useVehicleRange'
@@ -71,14 +71,14 @@ const legKey = (from: RoadtripStop, to: RoadtripStop): string => `${stopKey(from
 
 const EMPTY_ACCOMMODATIONS: Accommodation[] = []
 
-const asStop = (a: Assignment, ownerDayId: number, ownerIndex: number, accommodations: Accommodation[], days: Day[]): RoadtripStop | null => {
+const asStop = (a: Assignment, ownerDayId: number, ownerIndex: number, accommodations: Accommodation[]): RoadtripStop | null => {
   const p = a.place
   if (!p || typeof p.lat !== 'number' || typeof p.lng !== 'number') return null
+  // Check-in only. A check-out is the LATEST the room has to be handed back, not the
+  // earliest anybody may leave, so it says nothing about when the drive sets off and
+  // has no business in the chain. It stays a booking detail, shown under Days.
   const stay = accommodations.find(stay => stay.place_id === a.place_id && stay.start_day_id === ownerDayId)
-  const checkoutDay = days.find(day => day.id === stay?.end_day_id)?.day_number
-  const checkoutTime = parseClock(stay?.check_out)
   return {
-    ...(checkoutDay != null && checkoutTime !== null ? { checkoutAt: checkoutDay * 1440 + checkoutTime } : {}),
     assignmentId: a.id,
     ownerDayId,
     ownerIndex,
@@ -205,7 +205,7 @@ export function useRoadtripRoutes(
         const stops = (assignments[String(d.id)] ?? [])
           .slice()
           .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-          .map(a => asStop(a, d.id, 0, accommodations, days))
+          .map(a => asStop(a, d.id, 0, accommodations))
           .filter((s): s is RoadtripStop => s !== null)
           // The index is filled in after the drop, because it is the index into THIS
           // list: an assignment whose place has no coordinates never becomes a stop, and
@@ -233,7 +233,7 @@ export function useRoadtripRoutes(
         stops: (assignments[String(d.id)] ?? [])
           .slice()
           .sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0))
-          .map(a => asStop(a, d.id, 0, accommodations, days))
+          .map(a => asStop(a, d.id, 0, accommodations))
           .filter((s): s is RoadtripStop => s !== null)
           .map((s, i) => ({ ...s, ownerIndex: i })),
       }))

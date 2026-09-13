@@ -133,6 +133,15 @@ export interface ScheduleEntry {
 export interface Schedule {
   entries: ScheduleEntry[];
   warnings: ScheduleWarning[];
+  /**
+   * Minute the last stop is left at, counted from the start of this day, so a stay
+   * running past midnight comes back as more than 1440.
+   *
+   * The one number the next day needs. A stop stood at for twenty-four hours is not
+   * over when the date changes, and the day after it cannot begin before it ends.
+   * Null or absent when nothing on this day has a time at all.
+   */
+  endsAt?: number | null;
 }
 
 const DAY_MINUTES = 24 * 60;
@@ -154,13 +163,24 @@ function resolveArrival(
   };
 }
 
-export function computeSchedule(stops: ScheduleStop[], legSeconds: (number | undefined)[]): Schedule {
+/**
+ * @param opts.notBefore Minute of this day the first stop cannot be reached before,
+ * because the day before is still running into it: a stop stood at past midnight ends
+ * where it ends, and nothing can happen ahead of that. Behaves like the arrival of an
+ * imaginary stop just before the first, so a stop pinned earlier keeps its clock and
+ * picks up the same late finding any leg it cannot make in time would give it.
+ */
+export function computeSchedule(
+  stops: ScheduleStop[],
+  legSeconds: (number | undefined)[],
+  opts: { notBefore?: number | null } = {},
+): Schedule {
   const warnings: ScheduleWarning[] = [];
 
   const arrivals: (number | null)[] = new Array(stops.length).fill(null);
   const anchored: boolean[] = new Array(stops.length).fill(false);
 
-  let cursor: number | null = null;
+  let cursor: number | null = opts.notBefore ?? null;
   let dayOffset = 0;
 
   for (let i = 0; i < stops.length; i++) {
@@ -231,7 +251,22 @@ export function computeSchedule(stops: ScheduleStop[], legSeconds: (number | und
     });
   }
 
-  return { entries, warnings };
+  // Read off the last stop that actually has a clock: a trailing stop with no time of
+  // its own carries nothing forward, and a day whose times peter out halfway should
+  // hand on what it does know rather than nothing.
+  let endsAt: number | null = null;
+  for (let i = stops.length - 1; i >= 0; i--) {
+    const raw = arrivals[i];
+    if (raw === null || raw === undefined) continue;
+    const arrival = raw + shift;
+    endsAt =
+      stops[i]!.departureAt === undefined
+        ? arrival + (stops[i]!.dwellMinutes ?? 0)
+        : Math.max(arrival, stops[i]!.departureAt! + shift);
+    break;
+  }
+
+  return { entries, warnings, endsAt };
 }
 
 export function splitIntoRuns<T>(stops: T[], modeOfLeg: (from: T, to: T) => string): { stops: T[]; mode: string }[] {

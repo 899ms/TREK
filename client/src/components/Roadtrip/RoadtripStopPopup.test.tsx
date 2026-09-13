@@ -191,7 +191,11 @@ describe('RoadtripStopPopup', () => {
     wrap(<RoadtripStopPopup draft={nightDraft('hotel')} {...noop} onSaveNight={vi.fn()} />)
 
     expect(screen.getByRole('button', { name: 'Overnight' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('Check out on')).toBeInTheDocument()
+    // Check-in and nothing else. A check-out says when the room has to be back, never
+    // when anybody drives on, so the drive has no use for it and does not ask.
+    expect(screen.getByRole('textbox', { name: 'Check-in' })).toBeInTheDocument()
+    expect(screen.queryByText('Check out on')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Check-out' })).not.toBeInTheDocument()
     // The two questions a pause asks are gone: a hotel has no kind and no dwell.
     expect(screen.queryByText('Kind of stop')).not.toBeInTheDocument()
   })
@@ -285,7 +289,10 @@ describe('editing a roadtrip stop', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledWith({ stopType: 'fuel', dwellMinutes: 45 }))
   })
-  it('loads and preserves an existing overnight booking', async () => {
+  it('loads an existing overnight booking and keeps its check-in', async () => {
+    // The stored check-out is left where it is rather than resaved: this surface no
+    // longer asks for one, and writing back a blank would quietly drop what somebody
+    // entered under Days.
     const onSaveNight = vi.fn()
     wrap(<RoadtripStopPopup draft={draft({ poi: poi({ category: 'hotel' }), overnight: { days: [{ id: 4, number: 1, date: null }, { id: 5, number: 2, date: null }], defaultEndDayId: 5 }, editing: { placeId: 7, stopType: 'hotel', dwellMinutes: 30, accommodationId: 8, checkIn: '16:00', checkOut: '10:00' } })} {...noop} onSaveNight={onSaveNight} />)
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))

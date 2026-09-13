@@ -145,8 +145,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Úti cél',
   'roadtrip.stay.mode.pause': 'Szünet',
   'roadtrip.stay.mode.night': 'Éjszakázás',
-  'roadtrip.stay.checkOutDay': 'Kijelentkezés',
-  'roadtrip.stay.dayNumber': '{number}. nap',
   'roadtrip.stay.nightAdded': 'Hozzáadva éjszakázásként',
   'roadtrip.stay.nightAction': 'Hozzáadás éjszakázásként',
   'roadtrip.stop.makeService': 'Legyen útközbeni megálló',

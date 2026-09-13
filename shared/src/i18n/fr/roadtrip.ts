@@ -148,8 +148,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Une destination',
   'roadtrip.stay.mode.pause': 'Pause',
   'roadtrip.stay.mode.night': 'Nuitée',
-  'roadtrip.stay.checkOutDay': 'Départ le',
-  'roadtrip.stay.dayNumber': 'Jour {number}',
   'roadtrip.stay.nightAdded': 'Ajouté comme nuitée',
   'roadtrip.stay.nightAction': 'Ajouter comme nuitée',
   'roadtrip.stop.makeService': 'En faire un arrêt en chemin',

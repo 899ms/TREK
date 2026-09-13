@@ -1,12 +1,10 @@
 import React, { useState } from 'react'
 import { ParkingSquare, Hourglass, AlertTriangle, BedDouble } from 'lucide-react'
 import Modal from '../shared/Modal'
-import CustomSelect from '../shared/CustomSelect'
 import CustomTimePicker from '../shared/CustomTimePicker'
 import StayPortals from './StayPortals'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { safeExternalHref } from '../../utils/safeUrl'
-import { formatDate } from '../../utils/formatters'
 import { formatDurationShort } from './roadtripModel'
 import { STOP_KINDS, STOP_KIND_BY_KEY } from './stopKinds'
 import type { CorridorPoi } from './useCorridorPois'
@@ -76,7 +74,7 @@ interface RoadtripStopPopupProps {
 export default function RoadtripStopPopup({
   draft, duplicateName, onClose, onSave, onSaveNight, onMoreDetails,
 }: RoadtripStopPopupProps): React.ReactElement | null {
-  const { t, language } = useTranslation()
+  const { t } = useTranslation()
   // Through the same guard every other external link in the app goes through.
   // This value is an unvalidated OpenStreetMap tag, and OSM `website` tags are
   // routinely written without a scheme — `www.hotel.de` as a raw href is a
@@ -91,9 +89,7 @@ export default function RoadtripStopPopup({
   // means everywhere else — but both offer the other, because a campsite is somewhere
   // people sleep and a hotel is somewhere people stop for lunch.
   const [night, setNight] = useState<boolean>(draft?.editing ? !!draft.editing.accommodationId : draft?.poi.category === 'hotel')
-  const [endDayId, setEndDayId] = useState<number | null>(draft?.overnight?.defaultEndDayId ?? null)
   const [checkIn, setCheckIn] = useState(draft?.editing?.checkIn || draft?.arrivalTime || '')
-  const [checkOut, setCheckOut] = useState(draft?.editing?.checkOut ?? '')
   const [saving, setSaving] = useState(false)
 
   if (!draft) return null
@@ -107,9 +103,13 @@ export default function RoadtripStopPopup({
     try {
       if (asNight) {
         await onSaveNight?.({
-          endDayId: endDayId ?? overnight!.defaultEndDayId,
+          // The night runs to the day the rail suggests. Choosing another one is a
+          // booking decision, and the booking lives under Days.
+          endDayId: overnight!.defaultEndDayId,
           checkIn,
-          checkOut,
+          // Passed back exactly as it was loaded. This surface no longer asks for a
+          // check-out, and sending a blank would quietly erase one entered under Days.
+          checkOut: draft.editing?.checkOut ?? '',
         })
       } else {
         await onSave({ stopType, dwellMinutes: dwell })
@@ -178,44 +178,17 @@ export default function RoadtripStopPopup({
 
         {asNight ? (
           <div className="flex flex-col gap-3">
-            <div>
+            {/* Check-in only, and optional at that: it is the hour the drive can stop
+                for the night, which is the one thing about a booking the chain uses.
+                A check-out says when the room has to be back, never when anybody sets
+                off, so it is a booking detail and lives under Days with the rest of
+                them. A hotel found on a map has no idea when its reception opens. */}
+            <label className="min-w-0 flex-1">
               <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
-                {t('roadtrip.stay.checkOutDay')}
+                {t('day.checkIn')}
               </span>
-              <div className="mt-1.5">
-                <CustomSelect
-                  value={String(endDayId ?? overnight!.defaultEndDayId)}
-                  onChange={value => setEndDayId(Number(value))}
-                  options={overnight!.days.map(d => ({
-                    value: String(d.id),
-                    // Through the shared helper, like every other day date in
-                    // this feature. Interpolating the column gave this one
-                    // dropdown a bare ISO date while the rail beside it showed
-                    // the same day in the reader's own order.
-                    label: d.date
-                      ? `${t('roadtrip.stay.dayNumber', { number: d.number })} · ${formatDate(d.date, language)}`
-                      : t('roadtrip.stay.dayNumber', { number: d.number }),
-                  }))}
-                  size="sm"
-                />
-              </div>
-            </div>
-            {/* Both optional: leaving them empty is normal, and the server stores null.
-                A hotel found on a map has no idea when its reception opens. */}
-            <div className="flex gap-3">
-              <label className="min-w-0 flex-1">
-                <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
-                  {t('day.checkIn')}
-                </span>
-                <CustomTimePicker value={checkIn} onChange={setCheckIn} aria-label={t('day.checkIn')} placeholder="" style={{ marginTop: 6, width: '100%' }} />
-              </label>
-              <label className="min-w-0 flex-1">
-                <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
-                  {t('day.checkOut')}
-                </span>
-                <CustomTimePicker value={checkOut} onChange={setCheckOut} aria-label={t('day.checkOut')} placeholder="" style={{ marginTop: 6, width: '100%' }} />
-              </label>
-            </div>
+              <CustomTimePicker value={checkIn} onChange={setCheckIn} aria-label={t('day.checkIn')} placeholder="" style={{ marginTop: 6, width: '100%' }} />
+            </label>
             {websiteHref || draft.poi.phone ? (
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-caption">
                 {websiteHref ? (
@@ -299,7 +272,7 @@ export default function RoadtripStopPopup({
         </div>
         {overnight ? <StayPortals lat={draft.poi.lat} lng={draft.poi.lng} name={draft.poi.name} camping={draft.poi.category === 'campsite'}
           arrival={overnight.days.find(day => day.id === draft.dayId)?.date}
-          departure={overnight.days.find(day => day.id === (endDayId ?? overnight.defaultEndDayId))?.date} /> : null}
+          departure={overnight.days.find(day => day.id === overnight.defaultEndDayId)?.date} /> : null}
         </div>
 
         <div className="flex items-center gap-2 border-t border-edge-faint pt-3">

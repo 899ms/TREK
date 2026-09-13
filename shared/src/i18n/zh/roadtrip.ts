@@ -137,8 +137,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': '目的地',
   'roadtrip.stay.mode.pause': '停留',
   'roadtrip.stay.mode.night': '过夜',
-  'roadtrip.stay.checkOutDay': '退房日',
-  'roadtrip.stay.dayNumber': '第 {number} 天',
   'roadtrip.stay.nightAdded': '已添加为过夜住宿',
   'roadtrip.stay.nightAction': '添加为过夜住宿',
   'roadtrip.stop.makeService': '设为途中停靠',

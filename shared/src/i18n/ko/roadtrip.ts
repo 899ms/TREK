@@ -145,8 +145,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': '목적지',
   'roadtrip.stay.mode.pause': '휴식',
   'roadtrip.stay.mode.night': '숙박',
-  'roadtrip.stay.checkOutDay': '체크아웃 날짜',
-  'roadtrip.stay.dayNumber': '{number}일차',
   'roadtrip.stay.nightAdded': '숙박으로 추가했습니다',
   'roadtrip.stay.nightAction': '숙박으로 추가',
   'roadtrip.stop.makeService': '경유 정차로 변경',

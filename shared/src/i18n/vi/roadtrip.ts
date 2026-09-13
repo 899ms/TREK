@@ -146,8 +146,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Một điểm đến',
   'roadtrip.stay.mode.pause': 'Nghỉ',
   'roadtrip.stay.mode.night': 'Qua đêm',
-  'roadtrip.stay.checkOutDay': 'Trả phòng ngày',
-  'roadtrip.stay.dayNumber': 'Ngày {number}',
   'roadtrip.stay.nightAdded': 'Đã thêm làm nơi nghỉ đêm',
   'roadtrip.stay.nightAction': 'Thêm làm nơi nghỉ đêm',
   'roadtrip.stop.makeService': 'Biến thành điểm dừng dọc đường',

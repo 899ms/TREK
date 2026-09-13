@@ -145,8 +145,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Cíl cesty',
   'roadtrip.stay.mode.pause': 'Pauza',
   'roadtrip.stay.mode.night': 'Nocleh',
-  'roadtrip.stay.checkOutDay': 'Odjezd',
-  'roadtrip.stay.dayNumber': 'Den {number}',
   'roadtrip.stay.nightAdded': 'Přidáno jako nocleh',
   'roadtrip.stay.nightAction': 'Přidat jako nocleh',
   'roadtrip.stop.makeService': 'Změnit na zastávku po cestě',

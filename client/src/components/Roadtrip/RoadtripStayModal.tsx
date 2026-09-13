@@ -12,10 +12,17 @@ import { formatClockTime } from '../../utils/formatters'
  * Kept short on purpose: a longer list reads as a form, and anything not on it is what
  * the slider is for.
  */
-const PRESETS = [15, 30, 45, 60, 90, 120]
+const PRESETS = [15, 30, 45, 60, 90, 120, 480, 720]
 
-/** As far as the slider goes, in minutes. Beyond four hours it is a day, not a stop. */
-const MAX = 240
+/**
+ * As far as the slider goes, in minutes.
+ *
+ * A full day. It used to stop at four hours, on the reasoning that anything longer is a
+ * day rather than a stop — which held while a booked night got its length from the
+ * check-out instead. The drive no longer reads a check-out, so this is the only place a
+ * night is given its hours, and four of them is not a night.
+ */
+const MAX = 1440
 /** The step the slider and the two buttons move in. */
 const STEP = 5
 

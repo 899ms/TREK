@@ -366,47 +366,28 @@ describe('daily travel window', () => {
   });
 });
 
-describe('booked checkout', () => {
-  it('waits at the hotel until noon on the checkout day', () => {
-    const hotel = stop(2, { checkoutAt: 2 * 1440 + 720, dwellMinutes: 30 });
-    const stops = [stop(1), hotel, stop(3)];
-    const plan = calculate(stops, [60, 60]);
-    expect(plan.issue).toBeNull();
-    expect(plan.chains[0]!.schedule.entries[1]!.arrival).toBe('09:00');
-    expect(plan.chains[0]!.schedule.entries[1]!.departure).toBe('12:00');
-    expect(plan.chains[1]!.schedule.entries[0]!.arrival).toBe('12:00');
-    expect(plan.chains[1]!.schedule.entries[1]!.arrival).toBe('13:00');
-  });
-  it('honours an early checkout and multiple nights', () => {
-    const stops = [stop(1, { checkoutAt: 3 * 1440 + 420 }), stop(2)];
-    const plan = calculate(stops, [60], [day(2), day(3)]);
-    expect(plan.issue).toBeNull();
-    expect(plan.chains[2]!.schedule.entries[0]!.arrival).toBe('07:00');
-    expect(plan.chains[2]!.schedule.entries[1]!.arrival).toBe('08:00');
-  });
-  it('does not move time backwards when arrival is after checkout', () => {
-    const stops = [stop(1, { time: '13:00', checkoutAt: 1440 + 720 }), stop(2)];
-    const plan = calculate(stops, [60]);
-    expect(plan.chains[0]!.schedule.entries[1]!.arrival).toBe('14:00');
-  });
-});
-
-it('keeps checkout when the drive arrives after suggested check-in', () => {
+it('waits for a check-in the drive overshoots rather than rushing it', () => {
   const stops = [
     stop(1, { time: '07:00', dwellMinutes: 60 }),
-    stop(2, { checkInTime: '09:11', checkoutAt: 2 * 1440 + 600 }),
+    stop(2, { checkInTime: '09:11' }),
     stop(3),
   ];
   const plan = calculate(stops, [72.5, 29]);
   expect(plan.issue).toBeNull();
+  // Arrives two minutes past the hour it may check in from, and is left there rather
+  // than pulled back to the round number.
   expect(plan.chains[0]!.schedule.entries[1]!.arrival).toBe('09:13');
-  expect(plan.chains[1]!.stops.at(-1)!.placeId).toBe(3);
-  expect(plan.chains[1]!.schedule.entries.at(-1)!.arrival).toBe('10:29');
+  const stops0 = plan.chains[0]!.stops;
+  expect(stops0.at(-1)!.placeId).toBe(3);
+  // And carries straight on from there: nothing holds the traveller at the stop.
+  expect(plan.chains[0]!.schedule.entries.at(-1)!.arrival).toBe('09:42');
 });
 
 it('waits for check-in without treating it as a fixed appointment', () => {
-  const plan = calculate([stop(1), stop(2, { checkInTime: '15:00', checkoutAt: 2 * 1440 + 600 }), stop(3)], [60, 29]);
+  const plan = calculate([stop(1), stop(2, { checkInTime: '15:00' }), stop(3)], [60, 29]);
   expect(plan.issue).toBeNull();
+  // The check-in is a door opening, not an appointment: the drive waits for it and then
+  // carries straight on, rather than the day being rebuilt around it.
   expect(plan.chains[0]!.schedule.entries[1]!.arrival).toBe('15:00');
-  expect(plan.chains[1]!.schedule.entries.at(-1)!.arrival).toBe('10:29');
+  expect(plan.chains[0]!.schedule.entries.at(-1)!.arrival).toBe('15:29');
 });

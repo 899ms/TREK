@@ -147,8 +147,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Bir varış noktası',
   'roadtrip.stay.mode.pause': 'Mola',
   'roadtrip.stay.mode.night': 'Konaklama',
-  'roadtrip.stay.checkOutDay': 'Çıkış günü',
-  'roadtrip.stay.dayNumber': '{number}. gün',
   'roadtrip.stay.nightAdded': 'Konaklama olarak eklendi',
   'roadtrip.stay.nightAction': 'Konaklama olarak ekle',
   'roadtrip.stop.makeService': 'Yol üzerinde molaya dönüştür',

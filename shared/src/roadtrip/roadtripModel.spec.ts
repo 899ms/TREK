@@ -252,7 +252,7 @@ describe('computeSchedule', () => {
   });
 
   it('handles an empty chain', () => {
-    expect(computeSchedule([], [])).toEqual({ entries: [], warnings: [] });
+    expect(computeSchedule([], [])).toEqual({ entries: [], warnings: [], endsAt: null });
   });
 
   it('treats a missing dwell as no time spent', () => {

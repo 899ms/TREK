@@ -146,8 +146,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.none': 'Пункт призначення',
   'roadtrip.stay.mode.pause': 'Зупинка',
   'roadtrip.stay.mode.night': 'Ночівля',
-  'roadtrip.stay.checkOutDay': 'Виїзд',
-  'roadtrip.stay.dayNumber': 'День {number}',
   'roadtrip.stay.nightAdded': 'Додано як ночівлю',
   'roadtrip.stay.nightAction': 'Додати як ночівлю',
   'roadtrip.stop.makeService': 'Зробити зупинкою в дорозі',

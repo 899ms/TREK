@@ -1727,13 +1727,17 @@ export function useTripPlanner() {
     setShowPlaceForm(true)
   }, [assignments, roadtripActive, tripAccommodations, days, overnightOptions, roadtripRoutes.days])
 
+  /**
+   * How long the drive stands here, for every stop alike.
+   *
+   * A booked night used to be sent to the booking form instead, because its duration was
+   * read off the check-out and there was nothing here to set. The drive no longer reads
+   * a check-out at all: a night is a stop that takes as long as it takes, and asking how
+   * long is the same question at a hotel as at a viewpoint.
+   */
   const editRoadtripStay = useCallback((draft: NonNullable<typeof stayDraft>) => {
-    const stay = tripAccommodations.find(stay => stay.place_id === draft.placeId && stay.check_out)
-    const place = places.find(place => place.id === draft.placeId)
-    const visit = stay && assignments[String(stay.start_day_id)]?.find(visit => visit.place_id === draft.placeId)
-    if (stay && place && visit) openPlaceEditor(place, visit.id)
-    else setStayDraft(draft)
-  }, [tripAccommodations, places, assignments, openPlaceEditor])
+    setStayDraft(draft)
+  }, [])
 
   const handleDeletePlace = useCallback((placeId) => {
     setDeletePlaceId(placeId)
