@@ -2367,15 +2367,15 @@ describe('JourneyDetailPage', () => {
 
   // ── FE-PAGE-JOURNEYDETAIL-105 ──────────────────────────────────────────
   describe('FE-PAGE-JOURNEYDETAIL-105: EntryEditor has hidden file input', () => {
-    it('has a hidden file input with accept="image/*" and multiple attribute', async () => {
+    it('takes pictures and clips, several at a time', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       await renderAndWait();
       await openEntryEditor(user);
 
-      // The editor has a hidden file input
-      const fileInputs = document.querySelectorAll('input[type="file"][accept="image/*"]');
+      // The picker takes video as well as stills (#2341). The camera input beside
+      // it stays image-only: `capture` is for taking a photo, not filming one.
+      const fileInputs = document.querySelectorAll('input[type="file"][accept="image/*,video/*"]');
       expect(fileInputs.length).toBeGreaterThanOrEqual(1);
-      // Should have the multiple attribute
       const editorFileInput = Array.from(fileInputs).find(input => {
         return input.closest('[class*="fixed"]') !== null;
       });
