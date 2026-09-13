@@ -74,7 +74,16 @@ export function formatClock(minutes: number): string {
 
 export interface ScheduleStop {
   departureAt?: number;
+  /** A time somebody fixed this stop to. The chain restarts from it, and arriving
+   *  after it is being late. */
   anchor: string | null;
+
+  /**
+   * The earliest this stop can be entered, when something says so — a check-in is
+   * the hour a room becomes available, not an appointment. Arriving before it means
+   * waiting for it; arriving after it means arriving, with nothing to report.
+   */
+  earliest?: string | null;
 
   dwellMinutes: number | null;
 }
@@ -186,7 +195,16 @@ export function computeSchedule(
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i]!;
     const anchor = parseClock(stop.anchor);
-    const { arrival, lateBy } = resolveArrival(anchor, cursor, dayOffset);
+    const resolved = resolveArrival(anchor, cursor, dayOffset);
+    // A door that opens at eleven is not an appointment at eleven. Reaching the stop
+    // later than that is simply reaching it; only a time somebody pinned can be missed.
+    const opens = parseClock(stop.earliest ?? null);
+    const waited = anchor === null && opens !== null && resolved.arrival !== null
+      ? opens + Math.round((resolved.arrival - opens) / DAY_MINUTES) * DAY_MINUTES
+      : null;
+    const held = waited !== null && waited > resolved.arrival!;
+    const arrival = held ? waited : resolved.arrival;
+    const lateBy = resolved.lateBy;
     if (lateBy !== null) warnings.push({ index: i, code: 'late', minutes: lateBy });
 
     if (arrival === null) {
@@ -199,7 +217,9 @@ export function computeSchedule(
     if (offset > dayOffset) dayOffset = offset;
 
     arrivals[i]! = arrival;
-    anchored[i]! = anchor !== null;
+    // Ink for a time somebody decided: a pinned one always, a check-in only where the
+    // drive actually had to wait for it.
+    anchored[i]! = anchor !== null || held;
 
     const leg = legSeconds[i];
     cursor =

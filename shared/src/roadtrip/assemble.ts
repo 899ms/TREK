@@ -88,7 +88,8 @@ export function assembleRoadtrip({
             spills: [],
             schedule: computeSchedule(
               d.stops.map((s) => ({
-                anchor: s.time ?? s.checkInTime ?? null,
+                anchor: s.time ?? null,
+                earliest: s.checkInTime ?? null,
                 dwellMinutes: s.dwellMinutes,
               })),
               d.stops.slice(0, -1).map((s, i) => storedLegFor(s, d.stops[i + 1]!)?.seg.duration),
