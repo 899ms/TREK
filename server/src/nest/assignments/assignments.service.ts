@@ -53,7 +53,12 @@ export class AssignmentsService {
     try { this.journey.reconcileTripSkeletons(Number(tripId), socketId); } catch { /* non-fatal */ }
   }
 
-  private getAssignmentWithPlace(assignmentId: number | bigint) {
+  /**
+   * One stop, shaped the way every assignment event and REST answer carries it.
+   * Public because the accommodation mirror moves a stop in place and has to hand
+   * the moved row back in exactly this shape.
+   */
+  getAssignmentWithPlace(assignmentId: number | bigint) {
     const a = this.dbs.get<AssignmentRow>(`
       SELECT da.*, p.id as place_id, p.name as place_name, p.description as place_description,
         p.lat, p.lng, p.address, p.category_id, p.price, p.currency as place_currency,

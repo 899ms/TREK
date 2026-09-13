@@ -321,11 +321,17 @@ export class PlacesController {
     for (const id of scoped) this.places.onDeleted(id);
     // Read the linked expenses before the delete — afterwards the link is gone (#1298).
     const expenseIds = this.places.linkedExpenseIds(tripId, scoped);
-    const deleted = await this.places.removeMany(tripId, ids);
+    const { deleted, cancelled } = await this.places.removeMany(tripId, ids);
     for (const id of deleted) {
       this.places.broadcast(tripId, 'place:deleted', { placeId: id }, socketId);
     }
-    for (const itemId of expenseIds) {
+    // A night booked at this place went with it, and took its partner booking and
+    // that booking's expense along. Neither is covered by place:deleted, and an
+    // expense linked by reservation_id is not one linkedExpenseIds finds.
+    for (const reservationId of cancelled.reservationIds) {
+      this.places.broadcast(tripId, 'reservation:deleted', { reservationId }, socketId);
+    }
+    for (const itemId of [...expenseIds, ...cancelled.budgetItemIds]) {
       this.places.broadcast(tripId, 'budget:deleted', { itemId }, socketId);
     }
     return { deleted, count: deleted.length };
@@ -489,11 +495,18 @@ export class PlacesController {
     }
     this.places.onDeleted(Number(id));
     const expenseIds = this.places.linkedExpenseIds(tripId, [id]);
-    if (!(await this.places.remove(tripId, id))) {
+    const { deleted, cancelled } = await this.places.remove(tripId, id);
+    if (!deleted) {
       throw new HttpException({ error: 'Place not found' }, 404);
     }
     this.places.broadcast(tripId, 'place:deleted', { placeId: Number(id) }, socketId);
-    for (const itemId of expenseIds) {
+    // A night booked at this place went with it, and took its partner booking and
+    // that booking's expense along. Neither is covered by place:deleted, and an
+    // expense linked by reservation_id is not one linkedExpenseIds finds.
+    for (const reservationId of cancelled.reservationIds) {
+      this.places.broadcast(tripId, 'reservation:deleted', { reservationId }, socketId);
+    }
+    for (const itemId of [...expenseIds, ...cancelled.budgetItemIds]) {
       this.places.broadcast(tripId, 'budget:deleted', { itemId }, socketId);
     }
     return { success: true };

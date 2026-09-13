@@ -406,14 +406,14 @@ describe('remove', () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
     const place = createPlace(testDb, trip.id, { name: 'To Delete' }) as any;
-    expect(await svc.remove(String(trip.id), String(place.id))).toBe(true);
+    expect((await svc.remove(String(trip.id), String(place.id))).deleted).toBe(true);
     expect(svc.get(String(trip.id), String(place.id))).toBeNull();
   });
 
   it('PLACE-SVC-018 — returns false for non-existent place', async () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
-    expect(await svc.remove(String(trip.id), '99999')).toBe(false);
+    expect((await svc.remove(String(trip.id), '99999')).deleted).toBe(false);
   });
 
   it('PLACE-SVC-019 — deleting one place does not remove others', async () => {
@@ -474,7 +474,7 @@ describe('remove', () => {
 
     // Read the link before the delete — that is what the controller broadcasts.
     expect(svc.linkedExpenseIds(trip.id, [place.id])).toEqual([linked]);
-    expect(await svc.remove(String(trip.id), String(place.id))).toBe(true);
+    expect((await svc.remove(String(trip.id), String(place.id))).deleted).toBe(true);
 
     const rows = testDb.prepare('SELECT id FROM budget_items ORDER BY id').all() as { id: number }[];
     expect(rows.map(r => r.id)).toEqual([untouched, standalone]);
@@ -532,16 +532,41 @@ describe('removeMany', () => {
     const b = createPlace(testDb, trip.id, { name: 'B' }) as any;
     const foreign = createPlace(testDb, other.id, { name: 'Foreign' }) as any;
 
-    const deleted = await svc.removeMany(String(trip.id), [a.id, b.id, foreign.id, 99999]);
+    const { deleted } = await svc.removeMany(String(trip.id), [a.id, b.id, foreign.id, 99999]);
 
     expect(deleted.sort()).toEqual([a.id, b.id].sort());
     expect(svc.get(String(other.id), String(foreign.id))).not.toBeNull();
   });
 
+  it('PLACE-SVC-057b — a place delete reports the booking and expense its cancelled night took down', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id) as any;
+    const hotel = createPlace(testDb, trip.id, { name: 'Hotel Adlon' }) as any;
+    // Booked through the accommodations domain, so it gets its partner hotel
+    // reservation the way the booking form writes one.
+    const { accommodation } = accommodations.createAccommodation(trip.id, {
+      place_id: hotel.id, start_day_id: day.id, end_day_id: day.id,
+    }) as { accommodation: { id: number } };
+    const reservation = testDb.prepare('SELECT id FROM reservations WHERE accommodation_id = ?').get(accommodation.id) as { id: number };
+    // An expense hung off the reservation rather than the place: linkedExpenseIds
+    // selects on budget_items.place_id and never finds this one.
+    const itemId = Number(testDb.prepare(
+      "INSERT INTO budget_items (trip_id, name, total_price, reservation_id) VALUES (?, 'Hotel stay', 240, ?)"
+    ).run(trip.id, reservation.id).lastInsertRowid);
+
+    const { deleted, cancelled } = await svc.remove(String(trip.id), String(hotel.id));
+
+    expect(deleted).toBe(true);
+    expect(cancelled.reservationIds).toEqual([reservation.id]);
+    expect(cancelled.budgetItemIds).toEqual([itemId]);
+    expect(testDb.prepare('SELECT id FROM budget_items WHERE id = ?').get(itemId)).toBeUndefined();
+  });
+
   it('PLACE-SVC-057 — returns [] for an empty id list', async () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
-    expect(await svc.removeMany(String(trip.id), [])).toEqual([]);
+    expect((await svc.removeMany(String(trip.id), [])).deleted).toEqual([]);
   });
 });
 

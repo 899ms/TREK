@@ -552,15 +552,15 @@ export class TripsService {
         INSERT INTO places (trip_id, name, description, lat, lng, address, category_id, price, currency,
           reservation_status, reservation_notes, reservation_datetime, place_time, end_time,
           duration_minutes, notes, image_url, google_place_id, google_ftid, website, phone, transport_mode, osm_id,
-          amap_poi_id, route_geometry, route_color, stop_type)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          amap_poi_id, route_geometry, route_color, stop_type, fill_percent)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const p of oldPlaces) {
         const r = insertPlace.run(newTripId, p.name, p.description, p.lat, p.lng, p.address, p.category_id,
           p.price, p.currency, p.reservation_status, p.reservation_notes, p.reservation_datetime,
           p.place_time, p.end_time, p.duration_minutes, p.notes, p.image_url, p.google_place_id,
           p.google_ftid, p.website, p.phone, p.transport_mode, p.osm_id, p.amap_poi_id, p.route_geometry,
-          p.route_color, p.stop_type);
+          p.route_color, p.stop_type, p.fill_percent);
         placeMap.set(p.id, r.lastInsertRowid);
       }
 
@@ -650,17 +650,29 @@ export class TripsService {
       const oldAccom = this.db.prepare('SELECT * FROM day_accommodations WHERE trip_id = ?').all(sourceTripId) as any[];
       const accomMap = new Map<number, number | bigint>();
       const insertAccom = this.db.prepare(`
-        INSERT INTO day_accommodations (trip_id, place_id, start_day_id, end_day_id, check_in, check_out, confirmation, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO day_accommodations (trip_id, place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
       for (const a of oldAccom) {
         const newPlaceId = placeMap.get(a.place_id);
         const newStartDay = dayMap.get(a.start_day_id);
         const newEndDay = dayMap.get(a.end_day_id);
         if (newPlaceId && newStartDay && newEndDay) {
-          const r = insertAccom.run(newTripId, newPlaceId, newStartDay, newEndDay, a.check_in, a.check_out, a.confirmation, a.notes);
+          const r = insertAccom.run(newTripId, newPlaceId, newStartDay, newEndDay, a.check_in, a.check_in_end, a.check_out, a.confirmation, a.notes);
           accomMap.set(a.id, r.lastInsertRowid);
         }
+      }
+
+      // A booked night's stop carries the booking that put it there. Left blank, the
+      // copy draws the hotel twice: once as the stop and once as the overnight block,
+      // which is the duplicate the mirror exists to remove. Stamped afterwards rather
+      // than at insert time, because the bookings are copied after the stops.
+      const stampCopiedStop = this.db.prepare('UPDATE day_assignments SET accommodation_id = ? WHERE id = ?');
+      for (const a of oldAssignments) {
+        if (!a.accommodation_id) continue;
+        const newAssignmentId = assignmentMap.get(a.id);
+        const newAccomId = accomMap.get(a.accommodation_id);
+        if (newAssignmentId && newAccomId) stampCopiedStop.run(newAccomId, newAssignmentId);
       }
 
       const oldReservations = this.db.prepare('SELECT * FROM reservations WHERE trip_id = ?').all(sourceTripId) as any[];

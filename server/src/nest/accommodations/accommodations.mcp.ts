@@ -173,7 +173,9 @@ export class AccommodationsMcp {
     const { accommodation, mirror } = this.accommodations.updateAccommodation(accommodationId, existing, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes });
     this.guards.safeBroadcast(tripId, 'accommodation:updated', { accommodation });
     this.accommodations.announceMirror(tripId, mirror, this.mirrorSender(tripId));
-    return ok({ accommodation, assignment: mirror.created });
+    // movedAssignment rather than a delete/create pair: an edit carries the booking's
+    // own stop across instead of rebuilding it, so the caller sees the same row.
+    return ok({ accommodation, assignment: mirror.created, movedAssignment: mirror.moved, removedAssignments: mirror.removed });
   }
 
   @Tool({

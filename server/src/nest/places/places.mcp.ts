@@ -258,10 +258,14 @@ export class PlacesMcp {
     try { this.journey.onPlaceDeleted(placeId); } catch { /* non-fatal */ } // sync journeys before the row is gone
     // The link is gone once the place is, so read it first (#1298).
     const expenseIds = this.places.linkedExpenseIds(tripId, [placeId]);
-    const deleted = await this.places.remove(String(tripId), String(placeId));
+    const { deleted, cancelled } = await this.places.remove(String(tripId), String(placeId));
     if (!deleted) return { content: [{ type: 'text' as const, text: 'Place not found.' }], isError: true };
     this.guards.safeBroadcast(tripId, 'place:deleted', { placeId });
-    for (const itemId of expenseIds) this.guards.safeBroadcast(tripId, 'budget:deleted', { itemId });
+    // A night booked at this place went with it, and took its partner booking and
+    // that booking's expense along. Neither is covered by place:deleted, and an
+    // expense linked by reservation_id is not one linkedExpenseIds finds.
+    for (const reservationId of cancelled.reservationIds) this.guards.safeBroadcast(tripId, 'reservation:deleted', { reservationId });
+    for (const itemId of [...expenseIds, ...cancelled.budgetItemIds]) this.guards.safeBroadcast(tripId, 'budget:deleted', { itemId });
     return ok({ success: true });
   }
 
@@ -431,9 +435,13 @@ export class PlacesMcp {
     }
     // The link is gone once the places are, so read it first (#1298).
     const expenseIds = this.places.linkedExpenseIds(tripId, scoped);
-    const deleted = await this.places.removeMany(String(tripId), placeIds);
+    const { deleted, cancelled } = await this.places.removeMany(String(tripId), placeIds);
     for (const id of deleted) this.guards.safeBroadcast(tripId, 'place:deleted', { placeId: id });
-    for (const itemId of expenseIds) this.guards.safeBroadcast(tripId, 'budget:deleted', { itemId });
+    // A night booked at this place went with it, and took its partner booking and
+    // that booking's expense along. Neither is covered by place:deleted, and an
+    // expense linked by reservation_id is not one linkedExpenseIds finds.
+    for (const reservationId of cancelled.reservationIds) this.guards.safeBroadcast(tripId, 'reservation:deleted', { reservationId });
+    for (const itemId of [...expenseIds, ...cancelled.budgetItemIds]) this.guards.safeBroadcast(tripId, 'budget:deleted', { itemId });
     return ok({ deleted, count: deleted.length });
   }
 

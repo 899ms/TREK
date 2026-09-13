@@ -108,7 +108,7 @@ export class AccommodationsController {
     const { accommodation, mirror } = this.accommodations.update(id, existing as never, { place_id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes } as never);
     this.accommodations.broadcast(tripId, 'accommodation:updated', { accommodation }, socketId);
     this.accommodations.announceMirror(tripId, mirror, (event, payload) => this.accommodations.broadcast(tripId, event, payload, socketId), socketId);
-    return { accommodation, assignment: mirror.created, removedAssignments: mirror.removed };
+    return { accommodation, assignment: mirror.created, movedAssignment: mirror.moved, removedAssignments: mirror.removed };
   }
 
   @RequirePermission('day_edit')
@@ -135,6 +135,6 @@ export class AccommodationsController {
       this.accommodations.broadcast(tripId, 'budget:deleted', { itemId }, socketId);
     }
     this.accommodations.broadcast(tripId, 'accommodation:deleted', { accommodationId: Number(id) }, socketId);
-    return { success: true, removedAssignments: mirror.removed };
+    return { success: true, removedAssignments: mirror.removed, updatedAssignments: mirror.updated };
   }
 }

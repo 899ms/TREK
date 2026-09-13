@@ -17,6 +17,10 @@ export type MirrorSender = <E extends TrekWsTripEventName>(event: E, payload: Tr
 export interface AccommodationMirror {
   /** The day stop the booking added, or null when that day already held the place. */
   created: MirroredAssignment | null;
+  /** The booking's own stop, carried to where the booking now is. */
+  moved: { assignment: MirroredAssignment; oldDayId: number } | null;
+  /** Stops the booking still stands on but no longer owns (a night dropped, the place kept). */
+  updated: MirroredAssignment[];
   /** Day stops the booking took back, because it moved days or was deleted. */
   removed: { id: number; dayId: number }[];
   /** The place, when this write was the one that typed it as lodging. */
@@ -25,7 +29,7 @@ export interface AccommodationMirror {
 
 /** A write that left the day plan alone. Exported for the surfaces that write a
  *  stay row themselves and have to answer with a mirror either way. */
-export const noStayMirror = (): AccommodationMirror => ({ created: null, removed: [], stamped: null });
+export const noStayMirror = (): AccommodationMirror => ({ created: null, moved: null, updated: [], removed: [], stamped: null });
 const noMirror = noStayMirror;
 
 export interface DayAccommodation {
@@ -172,8 +176,35 @@ export class AccommodationsService {
   announceMirror(tripId: string | number, mirror: AccommodationMirror, send: MirrorSender, socketId?: string): void {
     for (const stop of mirror.removed) send('assignment:deleted', { assignmentId: stop.id, dayId: stop.dayId });
     if (mirror.created) send('assignment:created', { assignment: mirror.created });
+    if (mirror.moved) {
+      send('assignment:moved', {
+        assignment: mirror.moved.assignment,
+        oldDayId: mirror.moved.oldDayId,
+        newDayId: mirror.moved.assignment.day_id,
+      });
+    }
+    for (const stop of mirror.updated) send('assignment:updated', { assignment: stop });
     if (mirror.stamped) send('place:updated', { place: mirror.stamped });
-    if (mirror.created || mirror.removed.length > 0) this.assignments.reconcile(tripId, socketId);
+
+    // A night is seated by its check-in, which renumbers the stops around it. The
+    // created/moved event alone puts the row at the end of the day on every other
+    // screen, so the day that changed sends its order along.
+    for (const dayId of this.touchedDays(mirror)) {
+      const orderedIds = this.db.all<{ id: number }>(
+        'SELECT id FROM day_assignments WHERE day_id = ? ORDER BY order_index', dayId).map(row => row.id);
+      send('assignment:reordered', { dayId, orderedIds });
+    }
+
+    if (mirror.created || mirror.moved || mirror.removed.length > 0) this.assignments.reconcile(tripId, socketId);
+  }
+
+  /** Days whose stop order this write can have changed, each named once. */
+  private touchedDays(mirror: AccommodationMirror): number[] {
+    const days = new Set<number>();
+    if (mirror.created) days.add(mirror.created.day_id);
+    if (mirror.moved) { days.add(mirror.moved.assignment.day_id); days.add(mirror.moved.oldDayId); }
+    for (const stop of mirror.removed) days.add(stop.dayId);
+    return [...days];
   }
 
   // -------------------------------------------------------------------------
@@ -241,13 +272,15 @@ export class AccommodationsService {
    * its position from the chain, not from the hour, so pushing past it would move a
    * stop the traveller placed deliberately.
    */
-  private positionForCheckIn(dayId: number, checkIn: string | null | undefined): number | undefined {
+  private positionForCheckIn(dayId: number, checkIn: string | null | undefined, excludeId?: number): number | undefined {
     if (!checkIn) return undefined;
+    // excludeId leaves the row being re-seated out of the chain it is measured
+    // against. Without it a night parked at the end of the day can find itself.
     const rows = this.db.all<{ order_index: number; at: string | null }>(`
       SELECT da.order_index, COALESCE(da.assignment_time, p.place_time) AS at
       FROM day_assignments da JOIN places p ON p.id = da.place_id
-      WHERE da.day_id = ? ORDER BY da.order_index
-    `, dayId);
+      WHERE da.day_id = ? AND da.id != ? ORDER BY da.order_index
+    `, dayId, excludeId ?? -1);
     const later = rows.find(row => row.at !== null && row.at > checkIn);
     return later?.order_index;
   }
@@ -275,22 +308,80 @@ export class AccommodationsService {
     return !laterAhead && !earlierBehind;
   }
 
+  /**
+   * Type the place as lodging, unless the traveller already typed it themselves.
+   *
+   * 'hotel' is a service stop: it takes no number, stays out of the day's stop
+   * count and falls under the existing "show service stops in Days" switch. Without
+   * the stamp a booked night made here would look nothing like one booked in the
+   * road trip. Only ever filled in when it is empty: a type the traveller picked
+   * (a campsite, say) is theirs.
+   */
+  private stampLodging(placeId: number): PlaceWithTags | null {
+    const place = this.db.get<{ stop_type: string | null }>('SELECT stop_type FROM places WHERE id = ?', placeId);
+    if (!place || place.stop_type) return null;
+    this.db.run("UPDATE places SET stop_type = 'hotel' WHERE id = ?", placeId);
+    return this.db.getPlaceWithTags(placeId);
+  }
+
+  /**
+   * Carry the booking's own stop to where the booking now is, in place.
+   *
+   * A day stop is more than a (day, place) pair. Its participants and any road-trip
+   * day boundary hang off its id by ON DELETE CASCADE, and its note, its hour and its
+   * end-of-day flag live in its own columns. Deleting the row and inserting a fresh
+   * one loses every bit of that, and correcting a booking's date is not a request to
+   * strip the stop the traveller built on it.
+   *
+   * Null when the row cannot simply move, because the target day already holds that
+   * place under a stop of its own: then ours has to go rather than stand beside it.
+   *
+   * Runs inside the caller's transaction.
+   */
+  private relocateOwnStop(
+    stop: { id: number; day_id: number; order_index: number },
+    placeId: number,
+    dayId: number,
+    checkIn?: string | null,
+  ): MirroredAssignment | null {
+    if (this.db.get('SELECT id FROM day_assignments WHERE day_id = ? AND place_id = ? AND id != ?', dayId, placeId, stop.id)) {
+      return null;
+    }
+
+    // Close the gap the row leaves behind. A no-op when it is not changing days,
+    // because it is put back into that same numbering two statements down.
+    this.db.run(
+      'UPDATE day_assignments SET order_index = order_index - 1 WHERE day_id = ? AND order_index > ?',
+      stop.day_id, stop.order_index,
+    );
+
+    // Park it at the end of the target day first, then seat it by the check-in the
+    // same way a fresh insert would. Two steps, because the index it should get is
+    // read off the chain it is not part of yet.
+    const max = this.db.get<{ max: number | null }>(
+      'SELECT MAX(order_index) AS max FROM day_assignments WHERE day_id = ? AND id != ?', dayId, stop.id)!;
+    const end = (max.max !== null ? max.max : -1) + 1;
+    this.db.run('UPDATE day_assignments SET day_id = ?, place_id = ?, order_index = ? WHERE id = ?', dayId, placeId, end, stop.id);
+
+    const seat = this.positionForCheckIn(dayId, checkIn, stop.id);
+    if (seat !== undefined && seat < end) {
+      this.db.run(
+        'UPDATE day_assignments SET order_index = order_index + 1 WHERE day_id = ? AND order_index >= ? AND id != ?',
+        dayId, seat, stop.id,
+      );
+      this.db.run('UPDATE day_assignments SET order_index = ? WHERE id = ?', seat, stop.id);
+    }
+
+    return this.assignments.getAssignmentWithPlace(stop.id);
+  }
+
   private mirrorStay(accommodationId: number, placeId: number | null, dayId: number, checkIn?: string | null): AccommodationMirror {
     const mirror = noMirror();
     // A stay can outlive its place (place_id is ON DELETE SET NULL) and the booking
     // form writes stays that never had one. Nothing to put on the map then.
     if (!placeId) return mirror;
 
-    // 'hotel' is a service stop: it takes no number, stays out of the day's stop
-    // count and falls under the existing "show service stops in Days" switch. Without
-    // the stamp a booked night made here would look nothing like one booked in the
-    // road trip. Only ever filled in when it is empty: a type the traveller picked
-    // (a campsite, say) is theirs.
-    const place = this.db.get<{ stop_type: string | null }>('SELECT stop_type FROM places WHERE id = ?', placeId);
-    if (place && !place.stop_type) {
-      this.db.run("UPDATE places SET stop_type = 'hotel' WHERE id = ?", placeId);
-      mirror.stamped = this.db.getPlaceWithTags(placeId);
-    }
+    mirror.stamped = this.stampLodging(placeId);
 
     // The road-trip flow assigns the place to the day and only then books the night.
     // Claiming that row would make cancelling the booking delete a stop the traveller
@@ -340,6 +431,11 @@ export class AccommodationsService {
     for (const stop of this.ownStops(accommodationId)) {
       if (opts.keepStop) {
         this.db.run('UPDATE day_assignments SET accommodation_id = NULL WHERE id = ?', stop.id);
+        // The stop stays, but it is the traveller's now. Days hides a stop whose
+        // accommodation_id is set, so a client left holding the old row keeps the
+        // place invisible on a day it is standing on.
+        const released = this.assignments.getAssignmentWithPlace(stop.id);
+        if (released) mirror.updated.push(released);
         continue;
       }
       this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
@@ -371,6 +467,20 @@ export class AccommodationsService {
     }
 
     const mirror = noMirror();
+
+    // One stop is the ordinary case, and it can be carried across rather than
+    // rebuilt. Everything hanging off the row survives that: its participants, its
+    // note, its hour, its end-of-day flag and the road-trip day boundary anchored
+    // on its id, all of which a DELETE takes with it.
+    if (own.length === 1 && placeId) {
+      const moved = this.relocateOwnStop(own[0], placeId, dayId, checkIn);
+      if (moved) {
+        mirror.moved = { assignment: moved, oldDayId: own[0].day_id };
+        mirror.stamped = this.stampLodging(placeId);
+        return mirror;
+      }
+    }
+
     for (const stop of own) {
       this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
       mirror.removed.push({ id: stop.id, dayId: stop.day_id });

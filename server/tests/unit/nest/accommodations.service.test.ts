@@ -342,7 +342,7 @@ describe('deleteAccommodation', () => {
       deletedBudgetItemId: budgetItemId,
       linkedReservationIds: [reservation.id],
       deletedBudgetItemIds: [budgetItemId],
-      mirror: { created: null, removed: [{ id: expect.any(Number), dayId: day.id }], stamped: null },
+      mirror: { created: null, moved: null, updated: [], removed: [{ id: expect.any(Number), dayId: day.id }], stamped: null },
     });
     expect(testDb.prepare('SELECT id FROM budget_items WHERE id = ?').get(budgetItemId)).toBeUndefined();
   });
@@ -503,7 +503,7 @@ describe('route-facing delegators', () => {
       deletedBudgetItemId: null,
       linkedReservationIds: [reservation.id],
       deletedBudgetItemIds: [],
-      mirror: { created: null, removed: [{ id: expect.any(Number), dayId: day.id }], stamped: null },
+      mirror: { created: null, moved: null, updated: [], removed: [{ id: expect.any(Number), dayId: day.id }], stamped: null },
     });
     expect(svc.get(accom.id, trip.id)).toBeUndefined();
   });
@@ -762,7 +762,7 @@ describe('the day stop a booking implies', () => {
 
     const { mirror } = book(trip.id, null, day.id, day.id);
 
-    expect(mirror).toEqual({ created: null, removed: [], stamped: null });
+    expect(mirror).toEqual({ created: null, moved: null, updated: [], removed: [], stamped: null });
     expect(stopsOn(day.id)).toHaveLength(0);
   });
 
@@ -779,9 +779,84 @@ describe('the day stop a booking implies', () => {
     const { mirror } = svc.updateAccommodation(accommodation.id, existing, { start_day_id: day2.id, end_day_id: day2.id }) as any;
 
     expect(stopsOn(day1.id)).toHaveLength(0);
-    expect(stopsOn(day2.id)).toEqual([expect.objectContaining({ place_id: place.id, accommodation_id: accommodation.id })]);
-    expect(mirror.removed).toEqual([{ id: before.id, dayId: day1.id }]);
-    expect(mirror.created).toMatchObject({ day_id: day2.id });
+    // The same row, carried over. Not a delete and a fresh insert: everything the
+    // traveller hung on this stop is keyed by its id.
+    expect(stopsOn(day2.id)).toEqual([expect.objectContaining({ id: before.id, place_id: place.id, accommodation_id: accommodation.id })]);
+    expect(mirror.removed).toEqual([]);
+    expect(mirror.created).toBeNull();
+    expect(mirror.moved).toMatchObject({ oldDayId: day1.id, assignment: { id: before.id, day_id: day2.id } });
+  });
+
+  it('ACC-028b moving the booking keeps the note, the hour and the end-of-day flag on the stop', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day1 = createDay(testDb, trip.id);
+    const day2 = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day1.id, day1.id);
+    const stop = stopsOn(day1.id)[0];
+    testDb.prepare('UPDATE day_assignments SET notes = ?, assignment_time = ?, end_day = 1 WHERE id = ?')
+      .run('ask for the quiet side', '15:30', stop.id);
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    svc.updateAccommodation(accommodation.id, existing, { start_day_id: day2.id, end_day_id: day2.id });
+
+    const after = testDb.prepare('SELECT * FROM day_assignments WHERE id = ?').get(stop.id) as Record<string, unknown>;
+    expect(after).toMatchObject({ day_id: day2.id, notes: 'ask for the quiet side', assignment_time: '15:30', end_day: 1 });
+  });
+
+  it('ACC-028c moving the booking keeps the people assigned to the stop', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day1 = createDay(testDb, trip.id);
+    const day2 = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day1.id, day1.id);
+    const stop = stopsOn(day1.id)[0];
+    // assignment_participants.assignment_id is ON DELETE CASCADE, so a delete and
+    // re-insert would take these with it without a word.
+    testDb.prepare('INSERT INTO assignment_participants (assignment_id, user_id) VALUES (?, ?)').run(stop.id, user.id);
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    svc.updateAccommodation(accommodation.id, existing, { start_day_id: day2.id, end_day_id: day2.id });
+
+    const kept = testDb.prepare('SELECT user_id FROM assignment_participants WHERE assignment_id = ?').all(stop.id);
+    expect(kept).toEqual([{ user_id: user.id }]);
+  });
+
+  it('ACC-028d a move onto a day that already holds the place by hand drops the booking stop instead of doubling it', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day1 = createDay(testDb, trip.id);
+    const day2 = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day1.id, day1.id);
+    const own = stopsOn(day1.id)[0];
+    const byHand = createDayAssignment(testDb, day2.id, place.id) as { id: number };
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    const { mirror } = svc.updateAccommodation(accommodation.id, existing, { start_day_id: day2.id, end_day_id: day2.id }) as any;
+
+    expect(stopsOn(day1.id)).toHaveLength(0);
+    expect(stopsOn(day2.id).map((row: { id: number }) => row.id)).toEqual([byHand.id]);
+    expect(mirror.removed).toEqual([{ id: own.id, dayId: day1.id }]);
+    expect(mirror.moved).toBeNull();
+  });
+
+  it('ACC-028e the day the stop left closes the gap it made in the order', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day1 = createDay(testDb, trip.id);
+    const day2 = createDay(testDb, trip.id);
+    const hotel = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const museum = createPlace(testDb, trip.id, { name: 'Pergamon' });
+    const { accommodation } = book(trip.id, hotel.id, day1.id, day1.id);
+    createDayAssignment(testDb, day1.id, museum.id);
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    svc.updateAccommodation(accommodation.id, existing, { start_day_id: day2.id, end_day_id: day2.id });
+
+    expect(stopsOn(day1.id).map((row: { order_index: number }) => row.order_index)).toEqual([0]);
   });
 
   it('ACC-029 editing an unrelated field leaves the stop exactly where it is', () => {
@@ -796,7 +871,7 @@ describe('the day stop a booking implies', () => {
     const { mirror } = svc.updateAccommodation(accommodation.id, existing, { check_in: '16:00' }) as any;
 
     expect(stopsOn(day.id)).toEqual(before);
-    expect(mirror).toEqual({ created: null, removed: [], stamped: null });
+    expect(mirror).toEqual({ created: null, moved: null, updated: [], removed: [], stamped: null });
   });
 
   it('ACC-030 a stay whose stop belongs to the traveller does not get a second one', () => {
@@ -887,10 +962,47 @@ describe('the day stop a booking implies', () => {
     const sent: string[] = [];
     svc.announceMirror(5, {
       created: { id: 78, day_id: 11 } as never,
+      moved: null,
+      updated: [],
       removed: [{ id: 77, dayId: 10 }],
       stamped: { id: 3 } as never,
     }, event => { sent.push(event); });
-    expect(sent).toEqual(['assignment:deleted', 'assignment:created', 'place:updated']);
+    // The two days whose order changed follow, arrival first (see touchedDays).
+    expect(sent).toEqual([
+      'assignment:deleted', 'assignment:created', 'place:updated',
+      'assignment:reordered', 'assignment:reordered',
+    ]);
+  });
+
+  it('ACC-033b announceMirror reports a move as one event, not a delete and a create', () => {
+    const sent: Array<{ event: string; payload: unknown }> = [];
+    svc.announceMirror(5, {
+      created: null,
+      moved: { assignment: { id: 78, day_id: 11 } as never, oldDayId: 10 },
+      updated: [],
+      removed: [],
+      stamped: null,
+    }, (event, payload) => { sent.push({ event, payload }); });
+    expect(sent.map(e => e.event)).toEqual(['assignment:moved', 'assignment:reordered', 'assignment:reordered']);
+    expect(sent[0].payload).toMatchObject({ oldDayId: 10, newDayId: 11 });
+  });
+
+  it('ACC-033c a kept stop is announced as updated, so the day list stops hiding it', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day.id, day.id);
+    const stop = stopsOn(day.id)[0];
+
+    const { mirror } = svc.remove(accommodation.id, { keepStop: true }) as any;
+
+    // Days hides a stop that carries an accommodation_id, so a client still holding
+    // the old row keeps the place invisible on a day it is standing on.
+    expect(mirror.updated).toEqual([expect.objectContaining({ id: stop.id, accommodation_id: null })]);
+    const sent: string[] = [];
+    svc.announceMirror(trip.id, mirror, event => { sent.push(event); });
+    expect(sent).toContain('assignment:updated');
   });
 });
 

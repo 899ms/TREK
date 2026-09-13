@@ -29,6 +29,14 @@ import { reclaimPlaceImage } from './place-image';
 import { JourneyDomainService } from '../journey/journey-domain.service';
 import { StorageService } from '../storage/storage.service';
 import { AccommodationsService } from '../accommodations/accommodations.service';
+
+/** Rows a place delete took down with the nights booked there, for the caller to announce. */
+export interface CancelledStays {
+  reservationIds: number[];
+  budgetItemIds: number[];
+}
+
+const noCancelledStays = (): CancelledStays => ({ reservationIds: [], budgetItemIds: [] });
 import {
   ENRICH_CONCURRENCY,
   ADDRESS_BACKFILL_MAX_PLACES,
@@ -439,33 +447,43 @@ export class PlacesService {
    *
    * Runs inside the caller's transaction.
    */
-  private cancelStaysAt(tripId: string | number, placeId: string | number): void {
+  private cancelStaysAt(tripId: string | number, placeId: string | number, into: CancelledStays): void {
     const stays = this.dbs.all<{ id: number }>(
       'SELECT id FROM day_accommodations WHERE trip_id = ? AND place_id = ?', tripId, placeId,
     );
-    for (const stay of stays) this.accommodations.deleteAccommodation(stay.id);
+    for (const stay of stays) {
+      const gone = this.accommodations.deleteAccommodation(stay.id);
+      // What went down with the night is what the caller has to announce. The
+      // partner booking and its expense are rows the Bookings list and the Costs
+      // total are still holding; place:deleted says nothing about either, and a
+      // budget item linked by reservation_id is not found by linkedExpenseIds.
+      into.reservationIds.push(...gone.linkedReservationIds);
+      into.budgetItemIds.push(...gone.deletedBudgetItemIds);
+    }
   }
 
-  async remove(tripId: string, placeId: string): Promise<boolean> {
+  async remove(tripId: string, placeId: string): Promise<{ deleted: boolean; cancelled: CancelledStays }> {
     const place = this.dbs.get<{ google_place_id: string | null; image_url: string | null }>(
       'SELECT google_place_id, image_url FROM places WHERE id = ? AND trip_id = ?', placeId, tripId,
     );
-    if (!place) return false;
+    const cancelled = noCancelledStays();
+    if (!place) return { deleted: false, cancelled };
     // The linked expense goes with the place, the same way a booking takes its
     // expense with it (#1298). One transaction, so a place can never survive
     // half-detached from its money.
     this.dbs.transaction(() => {
-      this.cancelStaysAt(tripId, placeId);
+      this.cancelStaysAt(tripId, placeId, cancelled);
       this.dbs.run('DELETE FROM budget_items WHERE trip_id = ? AND place_id = ?', tripId, placeId);
       this.dbs.run('DELETE FROM places WHERE id = ?', placeId);
     });
     await reclaimPhotoCache(this.photoCache, place.google_place_id, place.image_url);
     await reclaimPlaceImage(this.storage, place.image_url);
-    return true;
+    return { deleted: true, cancelled };
   }
 
-  async removeMany(tripId: string, ids: number[]): Promise<number[]> {
-    if (ids.length === 0) return [];
+  async removeMany(tripId: string, ids: number[]): Promise<{ deleted: number[]; cancelled: CancelledStays }> {
+    const cancelled = noCancelledStays();
+    if (ids.length === 0) return { deleted: [], cancelled };
     const selectStmt = this.dbs.prepare('SELECT google_place_id, image_url FROM places WHERE id = ? AND trip_id = ?');
     const deleteStmt = this.dbs.prepare('DELETE FROM places WHERE id = ?');
     const deleteExpenseStmt = this.dbs.prepare('DELETE FROM budget_items WHERE trip_id = ? AND place_id = ?');
@@ -475,7 +493,7 @@ export class PlacesService {
       for (const id of ids) {
         const row = selectStmt.get(id, tripId) as { google_place_id: string | null; image_url: string | null } | undefined;
         if (!row) continue;
-        this.cancelStaysAt(tripId, id);
+        this.cancelStaysAt(tripId, id, cancelled);
         deleteExpenseStmt.run(tripId, id);
         deleteStmt.run(id);
         deleted.push(id);
@@ -487,7 +505,7 @@ export class PlacesService {
       await reclaimPhotoCache(this.photoCache, row.google_place_id, row.image_url);
       await reclaimPlaceImage(this.storage, row.image_url);
     }
-    return deleted;
+    return { deleted, cancelled };
   }
 
   /**
