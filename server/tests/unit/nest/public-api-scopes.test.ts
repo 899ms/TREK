@@ -273,7 +273,7 @@ describe('PublicApiController — what a narrowed key reaches', () => {
     expect(ctl.listTrips(req(ALL))).toEqual({ trips: [TRIP] });
     expect(ctl.listBucketList(req(ALL))).toEqual({ items: [] });
     expect(ctl.getTrip(req(ALL), '12', undefined)).toEqual(TRIP);
-    expect(getTrip).toHaveBeenCalledWith(12, 7, [...PUBLIC_API_INCLUDES]);
+    expect(getTrip).toHaveBeenCalledWith(12, 7, [...PUBLIC_API_INCLUDES], [...PUBLIC_API_SCOPES]);
   });
 
   it('PUBAPI-SCOPE-U021: a trips-only key reads the trip list', () => {
@@ -305,20 +305,21 @@ describe('PublicApiController — what a narrowed key reaches', () => {
     const getTrip = vi.fn().mockReturnValue(TRIP);
     apiController({ getTrip }).getTrip(req(limited('trips', 'days', 'notes')), '12', undefined);
     // `include` absent means "everything"; refusing a key for wanting sections it
-    // never named would make a narrow key unable to read a trip at all.
-    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days', 'notes']);
+    // never named would make a narrow key unable to read a trip at all. The grant
+    // rides along so the service can tell an implied day block from a granted one.
+    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days', 'notes'], ['trips', 'days', 'notes']);
   });
 
   it('PUBAPI-SCOPE-U025: a trips-only key gets the summary and nothing that hangs off it', () => {
     const getTrip = vi.fn().mockReturnValue(TRIP);
     apiController({ getTrip }).getTrip(req(limited('trips')), '12', undefined);
-    expect(getTrip).toHaveBeenCalledWith(12, 7, []);
+    expect(getTrip).toHaveBeenCalledWith(12, 7, [], ['trips']);
   });
 
   it('PUBAPI-SCOPE-U026: an empty include is treated like an absent one, and narrowed too', () => {
     const getTrip = vi.fn().mockReturnValue(TRIP);
     apiController({ getTrip }).getTrip(req(limited('trips', 'days')), '12', '   ');
-    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days']);
+    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days'], ['trips', 'days']);
   });
 
   it('PUBAPI-SCOPE-U027: a section named explicitly and not granted is a 403, not a silent drop', () => {
@@ -340,7 +341,7 @@ describe('PublicApiController — what a narrowed key reaches', () => {
   it('PUBAPI-SCOPE-U028: an include the key covers is passed through untouched', () => {
     const getTrip = vi.fn().mockReturnValue(TRIP);
     apiController({ getTrip }).getTrip(req(limited('trips', 'days', 'notes')), '12', 'days, notes');
-    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days', 'notes']);
+    expect(getTrip).toHaveBeenCalledWith(12, 7, ['days', 'notes'], ['trips', 'days', 'notes']);
   });
 
   it('PUBAPI-SCOPE-U029: a bad id is still a 400 — the scope check does not swallow it', () => {

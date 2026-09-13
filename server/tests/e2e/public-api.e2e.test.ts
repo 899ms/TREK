@@ -126,6 +126,8 @@ const MCP_TOKEN = 'trek_' + 'c'.repeat(48);
 /** Narrowed keys, all Ada's, so only the grant differs between them. */
 const TRIPS_ONLY_TOKEN = 'trek_' + 'd'.repeat(48);
 const TRIPS_DAYS_TOKEN = 'trek_' + 'e'.repeat(48);
+/** Places without days: the grant that used to get the day spine anyway. */
+const TRIPS_PLACES_TOKEN = 'trek_' + '1'.repeat(48);
 /** api_scopes that cannot be parsed — the fall-back-to-everything case. */
 const BROKEN_SCOPES_TOKEN = 'trek_' + 'f'.repeat(48);
 
@@ -178,6 +180,7 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
     // it, so if narrowing ever leaks into the default those tests fail first.
     seedLimitedToken(1, TRIPS_ONLY_TOKEN, JSON.stringify(['trips']));
     seedLimitedToken(1, TRIPS_DAYS_TOKEN, JSON.stringify(['trips', 'days', 'notes']));
+    seedLimitedToken(1, TRIPS_PLACES_TOKEN, JSON.stringify(['trips', 'places']));
     seedLimitedToken(1, BROKEN_SCOPES_TOKEN, '{"not":"a list"');
 
     // Ada owns trip 1; Bob owns trip 2; trip 3 is Bob's but Ada is a member.
@@ -188,7 +191,7 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
     db.prepare("INSERT INTO trips (id, user_id, title, start_date) VALUES (3, 2, 'Shared', '2026-08-01')").run();
     db.prepare('INSERT INTO trip_members (trip_id, user_id) VALUES (3, 1)').run();
 
-    db.prepare("INSERT INTO days (id, trip_id, day_number, date, title) VALUES (1, 1, 1, '2026-06-14', 'Ankunft')").run();
+    db.prepare("INSERT INTO days (id, trip_id, day_number, date, title, notes) VALUES (1, 1, 1, '2026-06-14', 'Ankunft', 'Schlüssel beim Nachbarn abholen')").run();
     db.prepare("INSERT INTO days (id, trip_id, day_number, date) VALUES (2, 1, 2, '2026-06-15')").run();
     db.prepare("INSERT INTO categories (id, name) VALUES (1, 'Museum')").run();
     db.prepare(
@@ -551,6 +554,35 @@ describe('Public API v1 e2e (real guard + real SQL)', () => {
       expect(res.body.days[0].places).toEqual([]);
       expect(res.body.accommodations).toBeUndefined();
       expect(JSON.stringify(res.body)).not.toContain('Uffizien');
+    });
+
+    it('PUBAPI-SCOPE-008b: a grant without `days` gets the day shell, not the day', async () => {
+      // Places hang off days, so the day container is implied and has to be. It is
+      // the join key, though, not a way back to the section the key was narrowed to
+      // exclude: the day's title and its own free-text notes stay behind.
+      const res = await get('/api/v1/trips/1?include=places', TRIPS_PLACES_TOKEN);
+      expect(res.status).toBe(200);
+      expect(res.body.days).toHaveLength(2);
+      expect(res.body.days[0]).toMatchObject({ date: '2026-06-14', title: null, notes: null });
+      expect(res.body.days[0].places.map((pl: { name: string }) => pl.name)).toEqual(['Uffizien', 'Ponte Vecchio']);
+      const serialised = JSON.stringify(res.body);
+      expect(serialised).not.toContain('Ankunft');
+      expect(serialised).not.toContain('Nachbarn');
+    });
+
+    it('PUBAPI-SCOPE-008c: the same key with no include at all is narrowed the same way', async () => {
+      // The route that made it a bypass rather than an oddity: `include` absent
+      // means every section, and narrowToGrant reduces it to ['places'], which
+      // implies days all over again.
+      const res = await get('/api/v1/trips/1', TRIPS_PLACES_TOKEN);
+      expect(res.status).toBe(200);
+      expect(res.body.days[0]).toMatchObject({ title: null, notes: null });
+      expect(JSON.stringify(res.body)).not.toContain('Nachbarn');
+    });
+
+    it('PUBAPI-SCOPE-008d: a key that was granted days still reads both fields', async () => {
+      const res = await get('/api/v1/trips/1', TRIPS_DAYS_TOKEN);
+      expect(res.body.days[0]).toMatchObject({ title: 'Ankunft', notes: 'Schlüssel beim Nachbarn abholen' });
     });
 
     it('PUBAPI-SCOPE-009: an include the key does cover still answers', async () => {

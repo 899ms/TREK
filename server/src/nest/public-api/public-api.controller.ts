@@ -12,6 +12,7 @@ import { ApiTokenGuard } from './api-token.guard';
 import { PublicApiService } from './public-api.service';
 import {
   enforcePublicApiRateLimit,
+  grantedScopes,
   narrowToGrant,
   requireScope,
   requireUserId,
@@ -98,7 +99,10 @@ export class PublicApiController {
     }
     const allowed = narrowToGrant(asked, req);
 
-    const trip = this.api.getTrip(tripId, requireUserId(req), allowed);
+    // The grant goes in as well as the narrowed include: days are implied by any
+    // section that hangs off them, and the implied block must still be measured
+    // against what the key may read.
+    const trip = this.api.getTrip(tripId, requireUserId(req), allowed, grantedScopes(req));
     if (!trip) {
       throw new HttpException({ error: 'Trip not found' }, 404);
     }
