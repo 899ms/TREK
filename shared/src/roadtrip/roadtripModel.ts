@@ -154,13 +154,25 @@ function resolveArrival(
   };
 }
 
-export function computeSchedule(stops: ScheduleStop[], legSeconds: (number | undefined)[]): Schedule {
+/**
+ * @param opts.notBefore Minute of this day before which the first stop cannot be
+ * reached, because a booking still holds the traveller somewhere else: the night
+ * before ran into this morning and its check-out is when the room is given back.
+ * Behaves like the arrival of an imaginary stop just before the first, so a stop
+ * pinned earlier keeps its clock and picks up the same late warning it would from
+ * any other leg it cannot make in time.
+ */
+export function computeSchedule(
+  stops: ScheduleStop[],
+  legSeconds: (number | undefined)[],
+  opts: { notBefore?: number | null } = {},
+): Schedule {
   const warnings: ScheduleWarning[] = [];
 
   const arrivals: (number | null)[] = new Array(stops.length).fill(null);
   const anchored: boolean[] = new Array(stops.length).fill(false);
 
-  let cursor: number | null = null;
+  let cursor: number | null = opts.notBefore ?? null;
   let dayOffset = 0;
 
   for (let i = 0; i < stops.length; i++) {

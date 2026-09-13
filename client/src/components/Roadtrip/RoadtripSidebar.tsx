@@ -3,7 +3,7 @@ import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
 import React, { useState } from 'react'
 import {
   CarFront, Footprints, Bike, Zap, AlertTriangle,
-  ParkingSquare, Shuffle, Fuel, Clock, Spline, Ban, Plus, RotateCcw, X, BatteryCharging, Moon, Milestone,
+  ParkingSquare, Shuffle, Fuel, Clock, Spline, Ban, Plus, RotateCcw, X, BatteryCharging, Moon, Milestone, LogOut,
   type LucideIcon,
 } from 'lucide-react'
 import MDancingTrek from '../../mobile/components/MDancingTrek'
@@ -965,7 +965,10 @@ function CheckoutDeparture({ stop, entry }: { stop: RoadtripStop; entry?: Schedu
   if (stop.checkoutAt === undefined || !entry?.departure) return null
   return <Tooltip label={t('roadtrip.spill.departs', { time: formatClockTime(entry.departure, is12h) })}>
     <span dir="ltr" tabIndex={0} className="inline-flex shrink-0 items-center gap-1 rounded bg-surface-secondary px-1 py-0.5 align-middle whitespace-nowrap font-medium text-[length:calc(10px*var(--fs-scale-caption,1))] leading-none tabular-nums text-content-muted">
-      <Clock size={10} aria-hidden />{formatClockTime(entry.departure, is12h)}
+      {/* Leaving, not just a time of day: this chip is the one clock in the rail that
+          says when you give the room back, and beside an arrival it read as a second
+          arrival. The door-out mark is what a hotel desk calls check-out. */}
+      <LogOut size={10} aria-hidden />{formatClockTime(entry.departure, is12h)}
     </span>
   </Tooltip>
 }

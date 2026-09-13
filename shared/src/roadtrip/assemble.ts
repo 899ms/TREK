@@ -2,7 +2,7 @@ import { spurFor } from './accessSpur';
 import { pointAtMeters } from './corridor';
 import type { RoadtripDayBoundary } from './day-boundary.schema';
 import { planDayWindow, type DayWindow } from './dayWindow';
-import { spillChains } from './nightSpill';
+import { earliestFreeMinute, spillChains } from './nightSpill';
 import type {
   PlanDay,
   QuietDay,
@@ -77,6 +77,9 @@ export function assembleRoadtrip({
       )
     : null;
   const automaticSchedule = !!timed && timed.issue === null;
+  // Same floor the spill chains use: a night booked into the next morning holds the
+  // traveller until check-out, so the day it lands in cannot start before that.
+  const heldUntil = earliestFreeMinute([...plan, ...quietDays]);
   const displayChains = automaticSchedule
     ? timed.chains
     : timed?.issue
@@ -93,6 +96,7 @@ export function assembleRoadtrip({
                 departureAt: s.checkoutAt === undefined ? undefined : s.checkoutAt - d.dayNumber * 1440,
               })),
               d.stops.slice(0, -1).map((s, i) => storedLegFor(s, d.stops[i + 1]!)?.seg.duration),
+              { notBefore: heldUntil.get(d.dayNumber) ?? null },
             ),
           }))
       : splitScheduledDays(chains, [...plan, ...quietDays], storedLegFor);

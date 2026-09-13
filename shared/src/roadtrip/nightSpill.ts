@@ -54,6 +54,35 @@ interface Placed {
   from: RoadtripStop | undefined;
 }
 
+/**
+ * The minute each day is free to start on, for the days a booking still holds.
+ *
+ * A night booked into the next morning does not end at midnight: the room is given
+ * back at check-out, and until then the traveller is at the hotel and not at the
+ * first stop of the new day. Without this each day was scheduled from nothing, so a
+ * stop pinned before check-out read as perfectly fine.
+ *
+ * Only the day the check-out falls in. A stay running Monday to Thursday leaves
+ * Tuesday and Wednesday alone, which is the point: you sleep there, you do not sit
+ * there. And the bound is a floor, never a move. A stop with a clock of its own
+ * keeps it and collects the late warning any leg it cannot make would give it.
+ */
+export function earliestFreeMinute(days: PlanDay[]): Map<number, number> {
+  const held = new Map<number, number>();
+  for (const day of days) {
+    for (const stop of day.stops) {
+      if (stop.checkoutAt === undefined) continue;
+      const checkoutDay = Math.floor(stop.checkoutAt / 1440);
+      // A check-out on the stop's own day binds nothing: that is a day trip, and the
+      // stops after it already follow through the leg chain.
+      if (checkoutDay <= day.dayNumber) continue;
+      const minute = stop.checkoutAt - checkoutDay * 1440;
+      held.set(checkoutDay, Math.max(held.get(checkoutDay) ?? 0, minute));
+    }
+  }
+  return held;
+}
+
 export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegLookup): SpillChain[] {
   const all: PlanDay[] = [
     ...plan,
@@ -66,6 +95,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
     })),
   ].sort((a, b) => a.dayNumber - b.dayNumber);
   const numbers = new Set(all.map((d) => d.dayNumber));
+  const heldUntil = earliestFreeMinute(all);
   const landing = new Map<number, Placed[]>();
   for (const d of all) landing.set(d.dayNumber, []);
 
@@ -79,6 +109,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
         departureAt: s.checkoutAt === undefined ? undefined : s.checkoutAt - d.dayNumber * 1440,
       })),
       legs.map((l) => l?.duration),
+      { notBefore: heldUntil.get(d.dayNumber) ?? null },
     );
 
     let day = 0;
