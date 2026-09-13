@@ -56,19 +56,19 @@ function assemble(stops: RoadtripStop[], legs: number[]) {
   const day: PlanDay = { dayId: 1, dayNumber: 1, date: '2026-06-01', title: null, stops };
   const allLegs: Record<string, RoutedLeg> = {};
   legs.forEach((km, i) => {
-    allLegs[legKey(stops[i], stops[i + 1])] = leg(km);
+    allLegs[legKey(stops[i]!, stops[i + 1]!)] = leg(km);
   });
   return assembleRoadtrip({
     plan: [day],
     quietDays: [],
     window: null,
-    distanceUnit: 'km',
+    distanceUnit: 'metric',
     allLegs,
     snapByDay: {},
     missedByDay: {},
     loading: false,
     // 600 km on a full battery, and no daily driving ceiling to muddy the warnings.
-    limits: { rangeKm: 600 },
+    limits: { rangeKm: 600, legMinutes: null, dayMinutes: null },
     vehicleKind: 'electric',
     connectDays: false,
     boundaries: [],
@@ -77,7 +77,7 @@ function assemble(stops: RoadtripStop[], legs: number[]) {
 }
 
 const rangeWarnings = (routes: ReturnType<typeof assemble>) =>
-  routes.days[0].driveWarnings.filter((w) => w.code === 'range');
+  routes.days[0]!.driveWarnings.filter((w) => w.code === 'range');
 
 describe('assembleRoadtrip drive warnings', () => {
   it('ROADTRIP-ASSEMBLE-001: a charger at the end of an out-of-range leg answers for it', () => {
