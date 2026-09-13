@@ -1,6 +1,6 @@
 import type { QuietDay, RoadtripDay, RoadtripStop } from './planning-types';
 import type { RouteSegment } from './planning-types';
-import { computeSchedule, parseClock, type Schedule } from './roadtripModel';
+import { computeSchedule, parseClock, type Schedule, hasChosenArrival } from './roadtripModel';
 
 export interface SpillMark {
   automatic?: boolean;
@@ -147,7 +147,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
         entries: placed.map((p) => ({
           arrival: p.arrival,
           departure: p.departure,
-          anchored: p.stop.time !== null && p.stop.time !== undefined,
+          anchored: hasChosenArrival(p.stop),
           dayOffset: p.dayOffset,
         })),
         warnings: placed.flatMap((p, i) =>

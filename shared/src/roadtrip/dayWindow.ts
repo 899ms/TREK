@@ -3,7 +3,7 @@ import type { RoadtripDayBoundary } from './day-boundary.schema';
 import type { SpillChain } from './nightSpill';
 import type { RoadtripDay, RoadtripStop, RoutedLeg } from './planning-types';
 import type { DistanceUnit } from './planning-types';
-import { formatClock, parseClock } from './roadtripModel';
+import { formatClock, hasChosenArrival, parseClock } from './roadtripModel';
 import { formatDurationShort } from './roadtripModel';
 import { formatDistance } from './units';
 
@@ -168,7 +168,7 @@ export function planDayWindow(
     chain.schedule.entries.push({
       arrival: formatClock(Math.round(arrival)),
       departure: formatClock(Math.round(departure)),
-      anchored: !stop.automaticNight && stop.time !== null,
+      anchored: hasChosenArrival(stop),
       dayOffset: Math.floor(arrival / 1440),
     });
   };

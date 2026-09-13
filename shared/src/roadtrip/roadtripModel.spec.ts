@@ -1,6 +1,7 @@
 import {
   computeSchedule,
   formatClock,
+  hasChosenArrival,
   formatDurationShort,
   insertIndexForAlong,
   deriveDriveWarnings,
@@ -821,4 +822,28 @@ it('uses checkout as departure even without an arrival or daily start', () => {
   expect(schedule.entries[1]!.departure).toBe('08:00');
   expect(schedule.entries[2]!.arrival).toBe('10:00');
   expect(schedule.entries[2]!.dayOffset).toBe(1);
+});
+
+
+describe('hasChosenArrival', () => {
+  // The rail prints a chosen hour in ink and a computed one in grey. Every scheduler
+  // anchors on `time ?? checkInTime`, so a booked night's check-in is as chosen as a
+  // pinned stop; two of the three used to ask only about `time` and printed it grey.
+  it('counts a pinned time', () => {
+    expect(hasChosenArrival({ time: '09:00' })).toBe(true);
+  });
+
+  it('counts a check-in, which is the hour a booked night starts its day on', () => {
+    expect(hasChosenArrival({ time: null, checkInTime: '08:00' })).toBe(true);
+  });
+
+  it('leaves a stop the chain worked out alone', () => {
+    expect(hasChosenArrival({ time: null, checkInTime: null })).toBe(false);
+    expect(hasChosenArrival({})).toBe(false);
+  });
+
+  it('never counts a night the planner inserted itself', () => {
+    // Its clock comes from the driving limits, not from anybody's decision.
+    expect(hasChosenArrival({ time: '22:00', automaticNight: { phase: 'end' } })).toBe(false);
+  });
 });

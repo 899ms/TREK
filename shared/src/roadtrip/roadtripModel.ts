@@ -38,6 +38,22 @@ export function formatDurationShort(seconds: number): string {
   return `${m} min`;
 }
 
+/**
+ * Whether this stop's arrival is a time somebody chose, rather than one the chain
+ * worked out from the stop before it.
+ *
+ * A check-in counts. Every schedule already anchors on `time ?? checkInTime`, so a
+ * booked night starts its day exactly like a pinned stop does; asking only about
+ * `time` here made the rail print that chosen hour in the grey it reserves for
+ * computed ones. One function because the answer was spelled out separately in each
+ * of the three schedulers, and two of them spelled it differently from the anchor
+ * they had just used.
+ */
+export function hasChosenArrival(stop: { time?: string | null; checkInTime?: string | null; automaticNight?: unknown }): boolean {
+  if (stop.automaticNight) return false;
+  return (stop.time ?? null) !== null || (stop.checkInTime ?? null) !== null;
+}
+
 export function parseClock(value: string | null | undefined): number | null {
   if (!value) return null;
   const m = /^(\d{1,2}):(\d{2})/.exec(value.trim());
