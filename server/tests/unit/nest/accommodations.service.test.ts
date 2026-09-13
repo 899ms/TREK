@@ -840,9 +840,12 @@ describe('AccommodationsService wiring', () => {
     expectRegisteredProvider(AccommodationsDomainModule, AccommodationsService);
     const imports = Reflect.getMetadata('imports', AccommodationsModule) as unknown[];
     expect(imports).toEqual(expect.arrayContaining([AccommodationsDomainModule]));
+    // The MODULE is re-exported, not the provider: Nest refuses to export a provider
+    // belonging to an imported module, and a boot that fails on that only shows up when
+    // the container is actually built.
     const exports = Reflect.getMetadata('exports', AccommodationsModule) as unknown[];
     expect(Array.isArray(exports)).toBe(true);
-    expect(exports).toEqual(expect.arrayContaining([AccommodationsService]));
+    expect(exports).toEqual(expect.arrayContaining([AccommodationsDomainModule]));
   });
 
   it('ACC-001b: the domain module reaches neither places nor the surfaces', () => {

@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { AccommodationsController } from './accommodations.controller';
-import { AccommodationsService } from './accommodations.service';
 import { AccommodationsRpc } from './accommodations.rpc';
 import { AccommodationsMcp } from './accommodations.mcp';
 import { PlacesModule } from '../places/places.module';
@@ -32,6 +31,9 @@ import { McpSharedModule } from '../mcp-shared/mcp-shared.module';
   imports: [McpSharedModule, PermissionsModule, RealtimeModule, PluginGuardsModule, DatabaseModule, PlacesModule, AccommodationsDomainModule, AuthModule],
   controllers: [AccommodationsController],
   providers: [AccommodationsRpc, AccommodationsMcp],
-  exports: [AccommodationsService],
+  // The MODULE, not the provider: Nest refuses to export a provider that belongs to
+  // an imported module, and the service lives in the domain module now. Re-exporting
+  // the module gives every existing importer the same service it always got.
+  exports: [AccommodationsDomainModule],
 })
 export class AccommodationsModule {}
