@@ -242,7 +242,7 @@ describe('PlacesController (parity with the legacy /api/trips/:tripId/places rou
       expect(removeMany).not.toHaveBeenCalled();
     });
     it('deletes, fires hooks + broadcasts per deleted id', async () => {
-      const removeMany = vi.fn().mockReturnValue([1, 2]); const onDeleted = vi.fn(); const broadcast = vi.fn();
+      const removeMany = vi.fn().mockReturnValue({ deleted: [1, 2], cancelled: { reservationIds: [], budgetItemIds: [] } }); const onDeleted = vi.fn(); const broadcast = vi.fn();
       const scopedIds = vi.fn().mockReturnValue([1, 2]);
       const s = svc({ removeMany, onDeleted, broadcast, scopedIds } as Partial<PlacesService>);
       expect(await new PlacesController(s, new RuntimeEnvService(), storageStub).bulkDelete(user, '5', { ids: [1, 2] }, 'sock')).toEqual({ deleted: [1, 2], count: 2 });
@@ -253,7 +253,7 @@ describe('PlacesController (parity with the legacy /api/trips/:tripId/places rou
     // #1745: the hook keys on the place id alone, so an id from another trip
     // would detach that trip's journey entries even though removeMany skips it.
     it('fires the journey hook only for ids that belong to the trip, ahead of the delete', async () => {
-      const removeMany = vi.fn().mockReturnValue([1]);
+      const removeMany = vi.fn().mockReturnValue({ deleted: [1], cancelled: { reservationIds: [], budgetItemIds: [] } });
       const scopedIds = vi.fn().mockReturnValue([1]);
       const onDeleted = vi.fn();
       const s = svc({ removeMany, scopedIds, onDeleted, broadcast: vi.fn() } as Partial<PlacesService>);
@@ -266,7 +266,7 @@ describe('PlacesController (parity with the legacy /api/trips/:tripId/places rou
 
     // #1298: the link is gone once the place is, so the ids have to be read first.
     it('announces the expenses the deleted places took with them', async () => {
-      const removeMany = vi.fn().mockReturnValue([1, 2]);
+      const removeMany = vi.fn().mockReturnValue({ deleted: [1, 2], cancelled: { reservationIds: [], budgetItemIds: [] } });
       const linkedExpenseIds = vi.fn().mockReturnValue([77]);
       const broadcast = vi.fn();
       const s = svc({ removeMany, linkedExpenseIds, broadcast } as Partial<PlacesService>);
@@ -423,12 +423,25 @@ describe('PlacesController (parity with the legacy /api/trips/:tripId/places rou
 
   it('DELETE /:id fires the hook then 404 / success', async () => {
     const onDeleted = vi.fn();
-    const remove = vi.fn().mockReturnValue(false);
+    const remove = vi.fn().mockReturnValue({ deleted: false, cancelled: { reservationIds: [], budgetItemIds: [] } });
     expect(await thrownAsync(() => new PlacesController(svc({ remove, onDeleted } as Partial<PlacesService>), new RuntimeEnvService(), storageStub).remove(user, '5', '9'))).toEqual({ status: 404, body: { error: 'Place not found' } });
     expect(onDeleted).toHaveBeenCalledWith(9);
     expect(onDeleted.mock.invocationCallOrder[0]).toBeLessThan(remove.mock.invocationCallOrder[0]);
-    const s = svc({ remove: vi.fn().mockReturnValue(true), broadcast: vi.fn() } as Partial<PlacesService>);
+    const s = svc({ remove: vi.fn().mockReturnValue({ deleted: true, cancelled: { reservationIds: [], budgetItemIds: [] } }), broadcast: vi.fn() } as Partial<PlacesService>);
     expect(await new PlacesController(s, new RuntimeEnvService(), storageStub).remove(user, '5', '9')).toEqual({ success: true });
+  });
+
+  it('DELETE /:id announces the booking and the expense a cancelled night took down', async () => {
+    // place:deleted says nothing about either, and an expense linked by
+    // reservation_id is not one linkedExpenseIds finds.
+    const broadcast = vi.fn();
+    const remove = vi.fn().mockReturnValue({ deleted: true, cancelled: { reservationIds: [12], budgetItemIds: [77] } });
+    const s = svc({ remove, broadcast, linkedExpenseIds: vi.fn().mockReturnValue([]) } as Partial<PlacesService>);
+
+    await new PlacesController(s, new RuntimeEnvService(), storageStub).remove(user, '5', '9', 'sock');
+
+    expect(broadcast).toHaveBeenCalledWith('5', 'reservation:deleted', { reservationId: 12 }, 'sock');
+    expect(broadcast).toHaveBeenCalledWith('5', 'budget:deleted', { itemId: 77 }, 'sock');
   });
 
   // #1745: a place on another trip must 404 without the hook ever running —
