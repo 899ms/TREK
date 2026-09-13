@@ -604,7 +604,7 @@ export class ReservationsService {
         // night entered under Days. Without it the hotel booked on this form is the
         // one place the drive does not know about, which is the duplicate entry this
         // whole change exists to remove.
-        stayMirror = this.accommodations.attachStayStop(resolvedAccommodationId, accPlaceId || null, start_day_id);
+        stayMirror = this.accommodations.attachStayStop(resolvedAccommodationId, accPlaceId || null, start_day_id, check_in);
       }
     }
 
@@ -748,14 +748,14 @@ export class ReservationsService {
           // The stay just moved. Its stop moves with it, or it is left sitting on a
           // day nobody sleeps there any more, hidden from the day list because it
           // still carries this booking's id and stranded in the middle of the drive.
-          stayMirror = this.accommodations.moveStayStop(resolvedAccId, accPlaceId || null, start_day_id);
+          stayMirror = this.accommodations.moveStayStop(resolvedAccId, accPlaceId || null, start_day_id, check_in);
         } else if (accPlaceId) {
           const accResult = this.db.run(
             'INSERT INTO day_accommodations (trip_id, place_id, start_day_id, end_day_id, check_in, check_out, confirmation) VALUES (?, ?, ?, ?, ?, ?, ?)',
             tripId, accPlaceId, start_day_id, end_day_id, check_in || null, check_out || null, accConf || confirmation_number || null
           );
           resolvedAccId = Number(accResult.lastInsertRowid);
-          stayMirror = this.accommodations.attachStayStop(resolvedAccId, accPlaceId, start_day_id);
+          stayMirror = this.accommodations.attachStayStop(resolvedAccId, accPlaceId, start_day_id, check_in);
         }
         accommodationChanged = true;
       }

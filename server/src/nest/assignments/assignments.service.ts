@@ -131,10 +131,17 @@ export class AssignmentsService {
    * stop that reaches it without its booking id is one the day list cannot tell
    * from a place the traveller added, so it draws the hotel a second time.
    */
-  createAssignment(dayId: string | number, placeId: unknown, notes?: string | null, opts: { accommodationId?: number } = {}) {
+  createAssignment(dayId: string | number, placeId: unknown, notes?: string | null, opts: { accommodationId?: number; orderIndex?: number } = {}) {
     const result = this.dbs.transaction(() => {
       const maxOrder = this.dbs.get<{ max: number | null }>('SELECT MAX(order_index) as max FROM day_assignments WHERE day_id = ?', dayId)!;
-      const orderIndex = (maxOrder.max !== null ? maxOrder.max : -1) + 1;
+      const end = (maxOrder.max !== null ? maxOrder.max : -1) + 1;
+      // Somewhere in the middle when the caller says so, which means everything from
+      // there on moves down. The end is still the default and still what every caller
+      // but one asks for.
+      const orderIndex = opts.orderIndex !== undefined ? Math.max(0, Math.min(opts.orderIndex, end)) : end;
+      if (orderIndex < end) {
+        this.dbs.run('UPDATE day_assignments SET order_index = order_index + 1 WHERE day_id = ? AND order_index >= ?', dayId, orderIndex);
+      }
 
       return this.dbs.run(
         'INSERT INTO day_assignments (day_id, place_id, order_index, notes, accommodation_id) VALUES (?, ?, ?, ?, ?)',

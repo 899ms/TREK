@@ -628,6 +628,70 @@ describe('the day stop a booking implies', () => {
     expect(stopsOn(day.id).map(a => a.place_id)).toEqual([museum.id, hotel.id]);
   });
 
+  it('ACC-022b a check-in puts the night before whatever is pinned to a later hour', () => {
+    // The default is last, because a night usually ends the day. A check-in at eleven
+    // says otherwise, and dropping the stop behind a stop pinned to the afternoon built
+    // a drive that reaches the hotel after the hour it was booked around.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const afternoon = createPlace(testDb, trip.id, { name: 'Mercure' });
+    const hotel = createPlace(testDb, trip.id, { name: 'Billstedt' });
+    const pinned = createDayAssignment(testDb, day.id, afternoon.id);
+    testDb.prepare("UPDATE day_assignments SET assignment_time = '16:00' WHERE id = ?").run(pinned.id);
+
+    svc.createAccommodation(trip.id, { place_id: hotel.id, start_day_id: day.id, end_day_id: day.id, check_in: '11:00' });
+
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([hotel.id, afternoon.id]);
+  });
+
+  it('ACC-022c a check-in after everything pinned stays last, like a night without one', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const morning = createPlace(testDb, trip.id, { name: 'Museum' });
+    const hotel = createPlace(testDb, trip.id, { name: 'Billstedt' });
+    const pinned = createDayAssignment(testDb, day.id, morning.id);
+    testDb.prepare("UPDATE day_assignments SET assignment_time = '09:00' WHERE id = ?").run(pinned.id);
+
+    svc.createAccommodation(trip.id, { place_id: hotel.id, start_day_id: day.id, end_day_id: day.id, check_in: '18:00' });
+
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([morning.id, hotel.id]);
+  });
+
+  it('ACC-022d a stop without an hour of its own is never pushed past', () => {
+    // Its position came from the chain, not from a clock, so the traveller put it there.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const untimed = createPlace(testDb, trip.id, { name: 'Hafen' });
+    const hotel = createPlace(testDb, trip.id, { name: 'Billstedt' });
+    createDayAssignment(testDb, day.id, untimed.id);
+
+    svc.createAccommodation(trip.id, { place_id: hotel.id, start_day_id: day.id, end_day_id: day.id, check_in: '11:00' });
+
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([untimed.id, hotel.id]);
+  });
+
+  it('ACC-022e moving the check-in later re-seats the night', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const afternoon = createPlace(testDb, trip.id, { name: 'Mercure' });
+    const hotel = createPlace(testDb, trip.id, { name: 'Billstedt' });
+    const pinned = createDayAssignment(testDb, day.id, afternoon.id);
+    testDb.prepare("UPDATE day_assignments SET assignment_time = '16:00' WHERE id = ?").run(pinned.id);
+    const { accommodation } = svc.createAccommodation(trip.id, {
+      place_id: hotel.id, start_day_id: day.id, end_day_id: day.id, check_in: '11:00',
+    }) as any;
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([hotel.id, afternoon.id]);
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    svc.updateAccommodation(accommodation.id, existing, { check_in: '20:00' });
+
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([afternoon.id, hotel.id]);
+  });
+
   it('ACC-023 the place is typed as lodging, so the rail draws it as a service stop', () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);

@@ -147,13 +147,13 @@ export class AccommodationsService {
   // -------------------------------------------------------------------------
 
   /** Put a freshly written stay on the map. */
-  attachStayStop(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
-    return this.mirrorStay(accommodationId, placeId, dayId);
+  attachStayStop(accommodationId: number, placeId: number | null, dayId: number, checkIn?: string | null): AccommodationMirror {
+    return this.mirrorStay(accommodationId, placeId, dayId, checkIn);
   }
 
   /** Carry a stay's own stop over to where the stay now is. */
-  moveStayStop(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
-    return this.remirrorStay(accommodationId, placeId, dayId);
+  moveStayStop(accommodationId: number, placeId: number | null, dayId: number, checkIn?: string | null): AccommodationMirror {
+    return this.remirrorStay(accommodationId, placeId, dayId, checkIn);
   }
 
   /** Take back the stops of a stay that is being deleted elsewhere. */
@@ -229,7 +229,53 @@ export class AccommodationsService {
    *
    * Runs inside the caller's transaction.
    */
-  private mirrorStay(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+  /**
+   * Where in the day the booked night belongs.
+   *
+   * Last, unless the booking names an hour. A night usually ends the day, which is why
+   * that is the default — but a check-in at eleven says the traveller is at the desk
+   * before whatever they pinned to the afternoon, and dropping the stop behind it built
+   * a drive that visits the hotel after the sixteen-hundred it was booked around.
+   *
+   * Only stops that carry a clock of their own are compared. One without a time takes
+   * its position from the chain, not from the hour, so pushing past it would move a
+   * stop the traveller placed deliberately.
+   */
+  private positionForCheckIn(dayId: number, checkIn: string | null | undefined): number | undefined {
+    if (!checkIn) return undefined;
+    const rows = this.db.all<{ order_index: number; at: string | null }>(`
+      SELECT da.order_index, COALESCE(da.assignment_time, p.place_time) AS at
+      FROM day_assignments da JOIN places p ON p.id = da.place_id
+      WHERE da.day_id = ? ORDER BY da.order_index
+    `, dayId);
+    const later = rows.find(row => row.at !== null && row.at > checkIn);
+    return later?.order_index;
+  }
+
+  /**
+   * Whether the night already sits where its check-in says it should.
+   *
+   * Read off the chain rather than recomputed, because the index a fresh insert would
+   * get is not the index this row already occupies. Two ways to be wrong: something
+   * with a later hour ahead of it, or something with an earlier one behind it. Stops
+   * without an hour are passed over in both directions — their place in the chain is
+   * the traveller's doing, not a clock's.
+   */
+  private seatedByCheckIn(dayId: number, ownId: number, checkIn: string | null | undefined): boolean {
+    if (!checkIn) return true;
+    const rows = this.db.all<{ id: number; at: string | null }>(`
+      SELECT da.id, COALESCE(da.assignment_time, p.place_time) AS at
+      FROM day_assignments da JOIN places p ON p.id = da.place_id
+      WHERE da.day_id = ? ORDER BY da.order_index
+    `, dayId);
+    const own = rows.findIndex(row => row.id === ownId);
+    if (own < 0) return true;
+    const laterAhead = rows.slice(0, own).some(row => row.at !== null && row.at > checkIn);
+    const earlierBehind = rows.slice(own + 1).some(row => row.at !== null && row.at <= checkIn);
+    return !laterAhead && !earlierBehind;
+  }
+
+  private mirrorStay(accommodationId: number, placeId: number | null, dayId: number, checkIn?: string | null): AccommodationMirror {
     const mirror = noMirror();
     // A stay can outlive its place (place_id is ON DELETE SET NULL) and the booking
     // form writes stays that never had one. Nothing to put on the map then.
@@ -261,14 +307,17 @@ export class AccommodationsService {
     // would leave that copy without it. The day list has nothing else to tell the
     // stop from a place the traveller added, so it would show the hotel a second
     // time until the next reload.
-    mirror.created = this.assignments.createAssignment(dayId, placeId, null, { accommodationId });
+    mirror.created = this.assignments.createAssignment(dayId, placeId, null, {
+      accommodationId,
+      orderIndex: this.positionForCheckIn(dayId, checkIn),
+    });
     return mirror;
   }
 
   /** The day stops this booking, and only this booking, put on the plan. */
   private ownStops(accommodationId: number) {
-    return this.db.all<{ id: number; day_id: number; place_id: number }>(
-      'SELECT id, day_id, place_id FROM day_assignments WHERE accommodation_id = ?', accommodationId
+    return this.db.all<{ id: number; day_id: number; place_id: number; order_index: number }>(
+      'SELECT id, day_id, place_id, order_index FROM day_assignments WHERE accommodation_id = ?', accommodationId
     );
   }
 
@@ -311,17 +360,22 @@ export class AccommodationsService {
    *
    * Runs inside the caller's transaction.
    */
-  private remirrorStay(accommodationId: number, placeId: number | null, dayId: number): AccommodationMirror {
+  private remirrorStay(accommodationId: number, placeId: number | null, dayId: number, checkIn?: string | null): AccommodationMirror {
     const own = this.ownStops(accommodationId);
     if (own.length === 0) return noMirror();
-    if (own.length === 1 && own[0].day_id === dayId && own[0].place_id === placeId) return noMirror();
+    if (own.length === 1 && own[0].day_id === dayId && own[0].place_id === placeId) {
+      // Same place, same day — but a check-in moved to a different hour can still put
+      // the night somewhere else in the chain, and a stop sitting after the afternoon
+      // it was booked around is the plan reading back wrong.
+      if (this.seatedByCheckIn(dayId, own[0].id, checkIn)) return noMirror();
+    }
 
     const mirror = noMirror();
     for (const stop of own) {
       this.db.run('DELETE FROM day_assignments WHERE id = ?', stop.id);
       mirror.removed.push({ id: stop.id, dayId: stop.day_id });
     }
-    const fresh = this.mirrorStay(accommodationId, placeId, dayId);
+    const fresh = this.mirrorStay(accommodationId, placeId, dayId, checkIn);
     mirror.created = fresh.created;
     mirror.stamped = fresh.stamped;
     return mirror;
@@ -356,7 +410,7 @@ export class AccommodationsService {
         Object.keys(meta).length > 0 ? JSON.stringify(meta) : null
       );
 
-      return { accommodationId: newId, mirror: this.mirrorStay(Number(newId), place_id ?? null, start_day_id) };
+      return { accommodationId: newId, mirror: this.mirrorStay(Number(newId), place_id ?? null, start_day_id, check_in) };
     });
 
     return { accommodation: this.getAccommodationWithPlace(written.accommodationId), mirror: written.mirror };
@@ -386,7 +440,7 @@ export class AccommodationsService {
         'UPDATE day_accommodations SET place_id = ?, start_day_id = ?, end_day_id = ?, check_in = ?, check_in_end = ?, check_out = ?, confirmation = ?, notes = ? WHERE id = ?',
         newPlaceId, newStartDayId, newEndDayId, newCheckIn, newCheckInEnd, newCheckOut, newConfirmation, newNotes, id
       );
-      return this.remirrorStay(Number(id), newPlaceId, newStartDayId);
+      return this.remirrorStay(Number(id), newPlaceId, newStartDayId, newCheckIn);
     });
 
     // Sync check-in/out/confirmation to every linked reservation. The booking form
