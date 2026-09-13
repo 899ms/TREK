@@ -1609,6 +1609,11 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onReorderStop, on
       {/* Folded to the header, and with it off the map: what is not listed here is not
           drawn there either, which is the whole point of putting a day away. */}
       <ol className="px-3.5 pb-3 pt-3" hidden={collapsed}>
+        {/* The drive in from yesterday, above the first stop, because that is where it
+            happens. Without it a morning that starts at 08:11 after a stay that ended at
+            08:00 looks like eleven minutes went missing. A day whose first stop crossed
+            over instead gets that road under its own block, so this is left out there. */}
+        {day.arrivingLeg ? <DriveBand leg={day.arrivingLeg} /> : null}
         {runs.map(run => (
           run.spill ? (
             <SpillBlock key={`spill-${run.from}`} spill={run.spill}>

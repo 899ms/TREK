@@ -100,6 +100,17 @@ export interface RoadtripDay {
 
   legs: (RouteSegment | undefined)[];
 
+  /**
+   * The drive from where the day before ended to where this one starts.
+   *
+   * Only when the days are connected, and only when no stop actually crossed over —
+   * a crossing is already drawn as a spill, with this same road under it. Separate
+   * from `legs`, which are the roads BETWEEN this day's own stops: this one arrives
+   * before the first of them, and without it a morning that begins at 08:11 looks
+   * like it began out of nowhere.
+   */
+  arrivingLeg?: RouteSegment;
+
   schedule: Schedule;
 
   legVias: RouteVia[][];

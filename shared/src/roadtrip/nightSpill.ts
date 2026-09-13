@@ -78,10 +78,18 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
    * evening hands on nothing, because the night between them is not a wait, it is a
    * night.
    */
-  let carriedInto: { dayNumber: number; minute: number } | null = null;
+  let carriedInto: { dayNumber: number; minute: number; from: RoadtripStop } | null = null;
 
   for (const d of all) {
-    const notBefore = carriedInto?.dayNumber === d.dayNumber ? carriedInto.minute : null;
+    // Plus the drive from where the stay ends to where this day starts. The carried
+    // minute is a DEPARTURE, and arriving at the same instant would mean the road
+    // between them takes no time at all.
+    const arriving = carriedInto?.dayNumber === d.dayNumber && d.stops[0]
+      ? legFor(carriedInto.from, d.stops[0])?.seg.duration
+      : undefined;
+    const notBefore = carriedInto?.dayNumber === d.dayNumber
+      ? carriedInto.minute + Math.round((arriving ?? 0) / 60)
+      : null;
     const routed = d.stops.slice(0, -1).map((s, i) => legFor(s, d.stops[i + 1]!));
     const legs = routed.map((l) => l?.seg);
     const schedule = computeSchedule(
@@ -95,7 +103,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
     // Where this day's last clock lands, carried to whichever day that turns out to be.
     const ends = schedule.endsAt ?? null;
     if (ends !== null && ends > 1440) {
-      carriedInto = { dayNumber: d.dayNumber + Math.floor(ends / 1440), minute: ends % 1440 };
+      carriedInto = { dayNumber: d.dayNumber + Math.floor(ends / 1440), minute: ends % 1440, from: d.stops[d.stops.length - 1]! };
     } else if (carriedInto && carriedInto.dayNumber <= d.dayNumber) {
       // Spent: this is the day it was pointing at.
       carriedInto = null;
@@ -106,6 +114,7 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
 
     let day = 0;
     let previous: number | null = null;
+    const baseOffset = schedule.entries.find((e) => e.arrival !== null)?.dayOffset ?? 0;
     d.stops.forEach((stop, i) => {
       const entry = schedule.entries[i]!;
       const clock = parseClock(entry?.arrival);
@@ -113,7 +122,16 @@ export function spillChains(plan: PlanDay[], quietDays: QuietDay[], legFor: LegL
         if (previous !== null && clock < previous) day += 1;
         previous = clock;
       }
-      const offset = day;
+      // How many days on from where this one's clock STARTS, not the schedule's absolute
+      // count: a day whose first arrivals came out negative is lifted whole, and the
+      // lift shows up in every offset, so reading them raw moved an early stop to
+      // tomorrow and left the late one behind. Differences survive the lift.
+      //
+      // The backwards-clock fallback covers stops with no time at all, and stays as the
+      // floor for the rest. On its own it cannot see a stop reached after a stay that
+      // ran through the night: twenty-four hours on puts you in tomorrow at the same
+      // reading on the clock, never an earlier one.
+      const offset = entry?.arrival != null ? Math.max(entry.dayOffset - baseOffset, day) : day;
       const marks = schedule.warnings.filter((w) => w.index === i);
 
       const reachable = offset > 0 && numbers.has(d.dayNumber + offset);

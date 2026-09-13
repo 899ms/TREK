@@ -293,8 +293,10 @@ describe('spillChains', () => {
       const chains = spillChains(plan, [], everyLeg(11));
       const dayTwo = chains.find((c) => c.dayNumber === 2)!;
 
-      expect(dayTwo.schedule.entries[0]!.arrival).toBe('08:00');
-      expect(dayTwo.schedule.entries[1]!.arrival).toBe('08:11');
+      // 08:00 is when the stay ENDS; getting to the first stop still takes the eleven
+      // minutes the road takes.
+      expect(dayTwo.schedule.entries[0]!.arrival).toBe('08:11');
+      expect(dayTwo.schedule.entries[1]!.arrival).toBe('08:22');
     });
 
     it('FE-NIGHTSPILL-014: an ordinary evening hands on nothing', () => {
@@ -321,7 +323,31 @@ describe('spillChains', () => {
 
       // Never moved: the hour is the traveller's.
       expect(dayTwo.schedule.entries[0]!.arrival).toBe('07:00');
-      expect(dayTwo.schedule.warnings).toContainEqual({ index: 0, code: 'late', minutes: 60 });
+      // 71 minutes short, not 60: the stay ends at eight and the road takes eleven.
+      expect(dayTwo.schedule.warnings).toContainEqual({ index: 0, code: 'late', minutes: 71 });
+    });
+
+    it('FE-NIGHTSPILL-017: the stop after the stay moves to the day it is reached on', () => {
+      // Both stops sit on day one, but the second is reached a full day after the first.
+      // The clock reads later, not earlier, so the backwards-jump rule never sees it; the
+      // schedule's own day count does.
+      const plan = [
+        day(1, 1, [
+          stop({ assignmentId: 1, name: 'Hamburg', time: '07:56' }),
+          stop({ assignmentId: 2, name: 'Mercure', time: '08:00', dwellMinutes: 24 * 60 }),
+          stop({ assignmentId: 3, name: 'Panorama' }),
+        ]),
+        day(2, 2, []),
+      ];
+
+      const chains = spillChains(plan, [], everyLeg(10));
+
+      expect(chains.find((c) => c.dayNumber === 1)!.stops.map((s) => s.name)).toEqual(['Hamburg', 'Mercure']);
+      const dayTwo = chains.find((c) => c.dayNumber === 2)!;
+      expect(dayTwo.stops.map((s) => s.name)).toEqual(['Panorama']);
+      expect(dayTwo.schedule.entries[0]!.arrival).toBe('08:10');
+      // Marked as having set off yesterday, so the card can say where it came from.
+      expect(dayTwo.spills[0]).toMatchObject({ at: 0, count: 1, fromDayNumber: 1 });
     });
 
     it('FE-NIGHTSPILL-016: a stay of two whole days walks the clock forward day by day', () => {
@@ -335,7 +361,7 @@ describe('spillChains', () => {
 
       // Day two is still inside the stay, so it cannot begin at all.
       expect(chains.find((c) => c.dayNumber === 2)!.schedule.entries[0]!.arrival).toBeNull();
-      expect(chains.find((c) => c.dayNumber === 3)!.schedule.entries[0]!.arrival).toBe('08:00');
+      expect(chains.find((c) => c.dayNumber === 3)!.schedule.entries[0]!.arrival).toBe('08:11');
     });
   });
 });

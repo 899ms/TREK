@@ -112,14 +112,17 @@ export function assembleRoadtrip({
     const routed = chain.stops.slice(0, -1).map((s, i) => legFor(s, chain.stops[i + 1]!));
 
     const inboundAt = new Map<number, { seg: RouteSegment | undefined; line: [number, number][]; drawnAs: number }>();
+    let arrivingLeg: RouteSegment | undefined;
     if (connectDays && !automaticSchedule) {
       for (const spill of chain.spills) {
         inboundAt.set(spill.at, { seg: spill.leg, line: spill.line, drawnAs: spill.fromDayNumber });
       }
 
       const joined = inboundAt.has(0) ? undefined : previousStop && legFor(previousStop, chain.stops[0]!);
-      if (joined)
+      if (joined) {
         inboundAt.set(0, { seg: joined.seg, line: joined.line, drawnAs: previousDayNumber ?? chain.dayNumber });
+        arrivingLeg = joined.seg;
+      }
     }
     previousStop = chain.stops[chain.stops.length - 1]! ?? previousStop;
     previousDayNumber = chain.stops.length ? chain.dayNumber : previousDayNumber;
@@ -228,6 +231,9 @@ export function assembleRoadtrip({
       title: chain.title,
       avoidMissed: missedByDay[chain.dayId],
       spills: chain.spills,
+      // Only where no stop actually crossed over: a crossing already draws its own band,
+      // with this same road under it, and a second one would be the drive twice.
+      arrivingLeg: chain.spills.length ? undefined : arrivingLeg,
       stops,
       legs,
       legVias,
