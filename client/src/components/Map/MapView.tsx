@@ -1224,7 +1224,11 @@ export const MapView = memo(function MapView({
     {/* 20px off the sidebar, not 12: the pill is round and frosted, so at the
         smaller gap its shadow ran into the sidebar edge and the two read as one
         surface. */}
-    <div style={{ position: 'absolute', left: leftWidth + 20, top: hasInspector ? 80 : undefined, bottom: hasInspector ? undefined : switcherBottom, zIndex: 1000, pointerEvents: 'none' }}>
+    {/* Bottom left, whatever else is on screen. Opening a place used to send it to the
+        top of the map, which read as the control moving house rather than as room being
+        made: the inspector is a centred card at most 800 wide, so the corner it would
+        have been clearing is one the card never reaches. */}
+    <div style={{ position: 'absolute', left: leftWidth + 20, bottom: switcherBottom, zIndex: 1000, pointerEvents: 'none' }}>
       <MapLayerSwitcher active={baseLayer} onToggle={toggleBaseLayer} />
     </div>
     </div>

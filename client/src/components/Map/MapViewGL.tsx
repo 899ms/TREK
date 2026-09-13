@@ -2305,11 +2305,12 @@ export function MapViewGL({
       {/* Same pill, same corner, same offsets as the Leaflet map: the switch should not
           move when an instance changes renderer. The day panel is a centred card on the
           desktop map and never reaches the pill, but on a phone it is full width and
-          does, which is why the lift is only there. */}
+          does, which is why the lift is only there. An open place inspector is a centred
+          card too, and used to send the pill to the top of the map for a corner it never
+          covers. */}
       <div style={{
         position: 'absolute', left: leftWidth + 20, zIndex: 1000, pointerEvents: 'none',
-        top: hasInspector ? 80 : undefined,
-        bottom: hasInspector ? undefined : isMobile && hasDayDetail
+        bottom: isMobile && hasDayDetail
           ? 'calc(var(--bottom-nav-h, 0px) + 20px + var(--day-panel-h, 0px) + 12px)'
           : 'calc(var(--bottom-nav-h, 0px) + 12px)',
       }}>
