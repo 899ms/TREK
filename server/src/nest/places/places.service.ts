@@ -28,6 +28,7 @@ import { type UpdateConflict, isUpdateConflict } from '../common/conflictResult'
 import { reclaimPlaceImage } from './place-image';
 import { JourneyDomainService } from '../journey/journey-domain.service';
 import { StorageService } from '../storage/storage.service';
+import { AccommodationsService } from '../accommodations/accommodations.service';
 import {
   ENRICH_CONCURRENCY,
   ADDRESS_BACKFILL_MAX_PLACES,
@@ -123,6 +124,7 @@ export class PlacesService {
     private readonly photoCache: PlacePhotoCacheService,
     private readonly journey: JourneyDomainService,
     private readonly storage: StorageService,
+    private readonly accommodations: AccommodationsService,
   ) {}
 
   verifyTripAccess(tripId: string, userId: number) {
@@ -425,6 +427,25 @@ export class PlacesService {
     return rows.map(r => r.id);
   }
 
+
+  /**
+   * The nights booked at a place, cancelled because the place is going.
+   *
+   * A stay whose place is deleted used to be left behind with place_id NULL: still
+   * drawn in the day header, still naming a hotel through its partner booking, and
+   * pointing nowhere. Through the accommodations domain rather than a DELETE here,
+   * because a stay takes its partner booking, that booking's expense and the day stop
+   * it wrote with it, and none of that is places' business to know.
+   *
+   * Runs inside the caller's transaction.
+   */
+  private cancelStaysAt(tripId: string | number, placeId: string | number): void {
+    const stays = this.dbs.all<{ id: number }>(
+      'SELECT id FROM day_accommodations WHERE trip_id = ? AND place_id = ?', tripId, placeId,
+    );
+    for (const stay of stays) this.accommodations.deleteAccommodation(stay.id);
+  }
+
   async remove(tripId: string, placeId: string): Promise<boolean> {
     const place = this.dbs.get<{ google_place_id: string | null; image_url: string | null }>(
       'SELECT google_place_id, image_url FROM places WHERE id = ? AND trip_id = ?', placeId, tripId,
@@ -434,6 +455,7 @@ export class PlacesService {
     // expense with it (#1298). One transaction, so a place can never survive
     // half-detached from its money.
     this.dbs.transaction(() => {
+      this.cancelStaysAt(tripId, placeId);
       this.dbs.run('DELETE FROM budget_items WHERE trip_id = ? AND place_id = ?', tripId, placeId);
       this.dbs.run('DELETE FROM places WHERE id = ?', placeId);
     });
@@ -453,6 +475,7 @@ export class PlacesService {
       for (const id of ids) {
         const row = selectStmt.get(id, tripId) as { google_place_id: string | null; image_url: string | null } | undefined;
         if (!row) continue;
+        this.cancelStaysAt(tripId, id);
         deleteExpenseStmt.run(tripId, id);
         deleteStmt.run(id);
         deleted.push(id);

@@ -160,17 +160,19 @@ export function createMcpTestRegistry(): McpRegistry {
   // the journey skeleton hooks landed on the place write paths. tsconfig.tests.json
   // covers `tests` now and CI runs it (npm run typecheck:tests), so a missed
   // dependency fails the build — pass them for real regardless of the gate.
+  // One instance, four consumers: AssignmentsMcp, ReservationsMcp, PlacesMcp and
+  // AccommodationsService, which writes the day stop a booked night implies.
+  const assignmentsService = new AssignmentsService(dbService, permissionsService, realtimeService, queryHelpersService, journeyDomain);
+  const accommodationsService = new AccommodationsService(dbService, permissionsService, realtimeService, assignmentsService);
+  // Built after it: deleting a place cancels the nights booked at it through this one.
   const placesService = new PlacesService(
     dbService, permissionsService, realtimeService, mapsService, queryHelpersService,
     new UnsplashService(dbService, new RuntimeEnvService(), generalStorage),
     placePhotoCache,
     journeyDomain,
     generalStorage,
+    accommodationsService,
   );
-  // One instance, four consumers: AssignmentsMcp, ReservationsMcp, PlacesMcp and
-  // AccommodationsService, which writes the day stop a booked night implies.
-  const assignmentsService = new AssignmentsService(dbService, permissionsService, realtimeService, queryHelpersService, journeyDomain);
-  const accommodationsService = new AccommodationsService(dbService, permissionsService, realtimeService, assignmentsService);
   // Built after it: a hotel booking writes the stay's day stop through this one.
   const reservationsService = new ReservationsService(dbService, permissionsService, budgetService, realtimeService, notificationsStub(), new ReservationsReadRepository(dbService), accommodationsService);
   const membersService = new TripMembersService(dbService, budgetService, new UserCleanupService(dbService, budgetService), permissionsService, realtimeService, notificationsStub());

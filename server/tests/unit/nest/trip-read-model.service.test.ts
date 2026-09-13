@@ -94,6 +94,7 @@ const placesSvc = new PlacesService(
   new UnsplashService(dbs(), new RuntimeEnvService(), makeStorageFixture('').storage), photoCache,
   new JourneyDomainService(dbs(), new RealtimeService(), new TrekPhotosRepository(dbs())),
   makeStorageFixture('').storage,
+  accommodationsOver(dbs()),
 );
 const accommodationsSvc = makeAccommodationsService(testDb);
 const membersSvc = new TripMembersService(dbs(), budgetSvc, new UserCleanupService(dbs(), budgetSvc), new PermissionsService(dbs()), new RealtimeService(), notificationsStub());

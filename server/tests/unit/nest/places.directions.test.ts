@@ -41,6 +41,7 @@ vi.mock('../../../src/utils/ssrfGuard', () => ({
 import { createTables } from '../../../src/db/schema';
 import { runMigrations } from '../../../src/db/migrations';
 import { createUser, createTrip, createPlace } from '../../helpers/factories';
+import { accommodationsOver } from '../../helpers/accommodations-service';
 import { DatabaseService } from '../../../src/nest/database/database.service';
 import { PermissionsService } from '../../../src/nest/permissions/permissions.service';
 import { RealtimeService } from '../../../src/nest/realtime/realtime.service';
@@ -89,6 +90,7 @@ function svc(searchNominatim: MapsService['searchNominatim']): PlacesService {
     photoCacheStub,
     new JourneyDomainService(dbs, new RealtimeService(), new TrekPhotosRepository(dbs)),
     storageFx.storage,
+    accommodationsOver(dbs),
   );
 }
 

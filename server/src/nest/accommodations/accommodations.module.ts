@@ -4,7 +4,7 @@ import { AccommodationsService } from './accommodations.service';
 import { AccommodationsRpc } from './accommodations.rpc';
 import { AccommodationsMcp } from './accommodations.mcp';
 import { PlacesModule } from '../places/places.module';
-import { AssignmentsDomainModule } from '../assignments/assignments-domain.module';
+import { AccommodationsDomainModule } from './accommodations-domain.module';
 import { AuthModule } from '../auth/auth.module';
 import { DatabaseModule } from '../database/database.module';
 import { PermissionsModule } from '../permissions/permissions.module';
@@ -29,9 +29,9 @@ import { McpSharedModule } from '../mcp-shared/mcp-shared.module';
  * which comes near accommodations.
  */
 @Module({
-  imports: [McpSharedModule, PermissionsModule, RealtimeModule, PluginGuardsModule, DatabaseModule, PlacesModule, AssignmentsDomainModule, AuthModule],
+  imports: [McpSharedModule, PermissionsModule, RealtimeModule, PluginGuardsModule, DatabaseModule, PlacesModule, AccommodationsDomainModule, AuthModule],
   controllers: [AccommodationsController],
-  providers: [AccommodationsService, AccommodationsRpc, AccommodationsMcp],
+  providers: [AccommodationsRpc, AccommodationsMcp],
   exports: [AccommodationsService],
 })
 export class AccommodationsModule {}

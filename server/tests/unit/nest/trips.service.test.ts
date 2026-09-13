@@ -74,7 +74,7 @@ import { UserCleanupService } from '../../../src/nest/auth/user-cleanup.service'
 import { TripMembersService } from '../../../src/nest/trip-members/trip-members.service';
 import { TripReadModelService } from '../../../src/nest/trip-read-model/trip-read-model.service';
 import { AccommodationsService } from '../../../src/nest/accommodations/accommodations.service';
-import { makeAccommodationsService } from '../../helpers/accommodations-service';
+import { accommodationsOver, makeAccommodationsService } from '../../helpers/accommodations-service';
 import { MapsService } from '../../../src/nest/maps/maps.service';
 import { UnsplashService } from '../../../src/nest/unsplash/unsplash.service';
 import { PlacePhotoCacheService } from '../../../src/nest/place-photos/place-photo-cache.service';
@@ -112,6 +112,7 @@ const placesSvc = new PlacesService(
   photoCache,
   new JourneyDomainService(dbs(), new RealtimeService(), new TrekPhotosRepository(dbs())),
   makeStorageFixture('').storage,
+  accommodationsOver(dbs()),
 );
 const accommodationsSvc = makeAccommodationsService(testDb);
 const createAccommodation = accommodationsSvc.createAccommodation.bind(accommodationsSvc);

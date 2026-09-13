@@ -46,6 +46,7 @@ import { RealtimeService } from '../../../src/nest/realtime/realtime.service';
 import { AccommodationsService } from '../../../src/nest/accommodations/accommodations.service';
 import { makeAccommodationsService } from '../../helpers/accommodations-service';
 import { AccommodationsModule } from '../../../src/nest/accommodations/accommodations.module';
+import { AccommodationsDomainModule } from '../../../src/nest/accommodations/accommodations-domain.module';
 import { AccommodationsController } from '../../../src/nest/accommodations/accommodations.controller';
 import { expectRegisteredProvider, expectRegisteredController } from '../../helpers/module-providers';
 
@@ -830,12 +831,25 @@ describe('the day stop a booking implies', () => {
 });
 
 describe('AccommodationsService wiring', () => {
-  it('ACC-001: the module carries the controller, the service and the RPC surface', () => {
+  it('ACC-001: the module carries the controller and the RPC surface, and re-exports the service', () => {
     expectRegisteredController(AccommodationsModule, AccommodationsController);
-    expectRegisteredProvider(AccommodationsModule, AccommodationsService);
+    // The service itself lives in the domain module now, so places can delete the
+    // nights booked at a place without the surfaces coming along and closing a loop
+    // back through PlacesModule. Still exported from here: everything that imported
+    // AccommodationsModule for the service keeps working.
+    expectRegisteredProvider(AccommodationsDomainModule, AccommodationsService);
+    const imports = Reflect.getMetadata('imports', AccommodationsModule) as unknown[];
+    expect(imports).toEqual(expect.arrayContaining([AccommodationsDomainModule]));
     const exports = Reflect.getMetadata('exports', AccommodationsModule) as unknown[];
     expect(Array.isArray(exports)).toBe(true);
     expect(exports).toEqual(expect.arrayContaining([AccommodationsService]));
+  });
+
+  it('ACC-001b: the domain module reaches neither places nor the surfaces', () => {
+    // The whole point of the split: PlacesModule imports this one, so a path back to
+    // places from here would be the loop it exists to avoid.
+    const imports = (Reflect.getMetadata('imports', AccommodationsDomainModule) as { name?: string }[]) ?? [];
+    expect(imports.map(m => m?.name)).not.toContain('PlacesModule');
   });
 
   it('ACC-002: it does not import the days or reservations modules', () => {
