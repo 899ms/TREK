@@ -874,6 +874,30 @@ describe('the day stop a booking implies', () => {
     expect(mirror).toEqual({ created: null, moved: null, updated: [], removed: [], stamped: null });
   });
 
+  it('ACC-029b a night sitting behind a later afternoon is re-seated, keeping its row', () => {
+    // The state the migration backfill leaves: every pre-existing stay's stop was
+    // appended last, whatever its check-in says. Giving the booking an hour has to
+    // move it ahead of the evening it was booked around.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const dinner = createPlace(testDb, trip.id, { name: 'Osteria' });
+    const hotel = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    testDb.prepare("UPDATE places SET place_time = '19:00' WHERE id = ?").run(dinner.id);
+    createDayAssignment(testDb, day.id, dinner.id);
+    const { accommodation } = book(trip.id, hotel.id, day.id, day.id);
+    const stop = stopsOn(day.id).find((row: { place_id: number }) => row.place_id === hotel.id)!;
+    expect(stop.order_index).toBe(1);
+
+    const existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    const { mirror } = svc.updateAccommodation(accommodation.id, existing, { check_in: '15:00' }) as any;
+
+    expect(stopsOn(day.id).map((row: { place_id: number }) => row.place_id)).toEqual([hotel.id, dinner.id]);
+    // Re-seated, not rebuilt: the same row, one place further forward.
+    expect(mirror.moved).toMatchObject({ oldDayId: day.id, assignment: { id: stop.id } });
+    expect(mirror.removed).toEqual([]);
+  });
+
   it('ACC-030 a stay whose stop belongs to the traveller does not get a second one', () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);

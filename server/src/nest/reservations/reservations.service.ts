@@ -884,18 +884,22 @@ export class ReservationsService {
       let accommodationDeleted = false;
       let stayMirror = noStayMirror();
       if (reservation.accommodation_id) {
-        // trip_id in the WHERE, not just the reservation's own scope: a row
-        // written before referencesOutsideTrip existed can still carry a
-        // foreign accommodation_id, and the cascade must not follow it.
-        const removed = this.db.run(
-          'DELETE FROM day_accommodations WHERE id = ? AND trip_id = ?', reservation.accommodation_id, tripId,
+        // trip_id in the check, not just the reservation's own scope: a row written
+        // before referencesOutsideTrip existed can still carry a foreign
+        // accommodation_id, and the cascade must not follow it. The stops go by
+        // accommodation id alone, which is exactly the reach that guard denies.
+        const ownStay = this.db.get<{ id: number }>(
+          'SELECT id FROM day_accommodations WHERE id = ? AND trip_id = ?', reservation.accommodation_id, tripId,
         );
-        accommodationDeleted = removed.changes > 0;
-        // Only once that DELETE actually took a row on THIS trip. The stops go by
-        // accommodation id alone, which is exactly the reach the trip_id guard above
-        // is there to deny a foreign id. A stop left carrying a dead booking's id is
-        // one the day list hides and nobody can reach to remove.
-        if (accommodationDeleted) stayMirror = this.accommodations.dropStayStops(reservation.accommodation_id);
+        if (ownStay) {
+          // Released before the row goes, not after: the release looks the stops up
+          // by accommodation id, and that pointer is cleared the moment the stay is
+          // deleted. Reversed, the stop stands with nothing left to remove it, and
+          // the day list hides it for carrying a booking id.
+          stayMirror = this.accommodations.dropStayStops(reservation.accommodation_id);
+          this.db.run('DELETE FROM day_accommodations WHERE id = ? AND trip_id = ?', reservation.accommodation_id, tripId);
+          accommodationDeleted = true;
+        }
       }
 
       const linkedBudget = this.db.get<{ id: number }>('SELECT id FROM budget_items WHERE trip_id = ? AND reservation_id = ?', tripId, id);

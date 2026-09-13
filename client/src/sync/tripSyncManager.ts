@@ -33,6 +33,7 @@ import {
 import { prefetchPlacesForTrip } from './placePrefetcher'
 import { prefetchTilesForTrip } from './tilePrefetcher'
 import { isAuthed } from './authGate'
+import { isEffectivelyOffline } from './networkMode'
 import { getOfflinePrefs, isTripOfflineEnabled, isTripPinned } from './offlinePrefs'
 import { useSettingsStore } from '../store/settingsStore'
 import type { Trip, Day, Place, PackingItem, TodoItem, BudgetItem, Reservation, TripFile, Accommodation, TripMember } from '../types'
@@ -115,9 +116,6 @@ function isVideo(file: TripFile): boolean {
 async function syncTrip(tripId: number): Promise<void> {
   const bundle = await tripsApi.bundle(tripId) as TripBundle
 
-  await roadtripPreferencesRepo.read(tripId).catch((error: unknown) => {
-    if ((error as { response?: { status?: number } }).response?.status !== 404) throw error
-  })
   await upsertTrip(bundle.trip)
   await upsertDays(bundle.days)
   await upsertPlaces(bundle.places)
@@ -144,6 +142,14 @@ async function syncTrip(tripId: number): Promise<void> {
     tilesBbox: null,
     filesCachedCount: 0,
   })
+
+  // Last, and never fatal. Driving settings belong to an optional addon: the
+  // route answers 404 when it is off, and the repo's own offline fallback throws
+  // a bare Error when there is no cached row yet, which is exactly the state a
+  // first sync is in. Ahead of the writes and rethrowing anything but a 404, it
+  // threw the whole downloaded bundle away for that trip while the run still
+  // reported it stored, so Settings said "N trips ready" over an empty database.
+  await roadtripPreferencesRepo.read(tripId).catch(() => { /* optional addon, optional cache */ })
 }
 
 /** Cache non-photo file blobs for a trip. Fire-and-forget safe. */
@@ -222,7 +228,11 @@ export type SyncOutcome =
 
 function skipReason(): SyncOutcome | null {
   if (_syncing) return { status: 'skipped', reason: 'busy' }
-  if (!navigator.onLine) return { status: 'skipped', reason: 'offline' }
+  // isEffectivelyOffline, not navigator.onLine: work-offline is a switch the user
+  // holds, and it survives a logout. A run started under it downloads over the
+  // real connection while every repo read answers from a cache that logging out
+  // just deleted, which is a sync that reports trips it did not store.
+  if (isEffectivelyOffline()) return { status: 'skipped', reason: 'offline' }
   if (!isAuthed()) return { status: 'skipped', reason: 'signed-out' }
   return null
 }

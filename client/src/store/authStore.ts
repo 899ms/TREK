@@ -7,6 +7,7 @@ import { getApiErrorMessage } from '../types'
 import { tripSyncManager } from '../sync/tripSyncManager'
 import { reopenForUser, deleteCurrentUserDb } from '../db/offlineDb'
 import { setAuthed } from '../sync/authGate'
+import { setForcedOffline } from '../sync/networkMode'
 import { registerSyncTriggers, unregisterSyncTriggers } from '../sync/syncTriggers'
 import { useSystemNoticeStore } from './systemNoticeStore.js'
 import { clearAppearanceSnapshot } from '../theme/applyAppearance'
@@ -252,6 +253,11 @@ export const useAuthStore = create<AuthState>()(
     // browser language is one TREK ships, so otherwise the next user here stays
     // in the previous account's language, launch after launch.
     forgetServerLanguage()
+    // And work-offline, for the same reason with sharper teeth: the switch lives
+    // in localStorage, step 6 below deletes the offline database it reads from,
+    // and the next account would come up believing it is offline over a working
+    // connection, with nothing cached to answer from.
+    setForcedOffline(false)
     // 4. Tell server to clear the httpOnly cookie (best-effort).
     await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' }).catch(() => {})
     // 5. Clear service worker caches containing sensitive data.
