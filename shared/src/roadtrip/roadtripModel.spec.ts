@@ -865,6 +865,20 @@ describe('a check-in is a door opening, not an appointment', () => {
     expect(schedule.warnings).toEqual([]);
   });
 
+  it('sets the hour when nothing before it does, instead of being worked backwards', () => {
+    // Booked to check in at ten, with a stop pinned to three in the afternoon behind it.
+    // Read only as a floor, the chain worked the hotel backwards out of the afternoon
+    // and put it at 13:46: true enough as arithmetic, and nothing anybody asked for.
+    const schedule = computeSchedule(
+      [{ anchor: null, earliest: '10:00', dwellMinutes: 60 }, { anchor: '15:00', dwellMinutes: 60 }],
+      [14 * 60],
+    );
+    expect(schedule.entries[0]!.arrival).toBe('10:00');
+    expect(schedule.entries[0]!.anchored).toBe(true);
+    expect(schedule.entries[1]!.arrival).toBe('15:00');
+    expect(schedule.warnings).toEqual([]);
+  });
+
   it('is simply arrived at when the drive gets there later', () => {
     const schedule = computeSchedule(
       [{ anchor: '15:00', dwellMinutes: 60 }, { anchor: null, earliest: '11:00', dwellMinutes: 60 }],

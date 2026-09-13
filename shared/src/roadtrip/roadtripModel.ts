@@ -199,10 +199,16 @@ export function computeSchedule(
     // A door that opens at eleven is not an appointment at eleven. Reaching the stop
     // later than that is simply reaching it; only a time somebody pinned can be missed.
     const opens = parseClock(stop.earliest ?? null);
-    const waited = anchor === null && opens !== null && resolved.arrival !== null
-      ? opens + Math.round((resolved.arrival - opens) / DAY_MINUTES) * DAY_MINUTES
+    // With nothing before it deciding the hour, the door IS the hour: a night booked
+    // to check in at ten starts the day at ten rather than being worked backwards out
+    // of whatever comes after it. Reached later, it is only a floor, and a floor below
+    // the arrival changes nothing.
+    const waited = anchor === null && opens !== null
+      ? resolved.arrival === null
+        ? opens + dayOffset * DAY_MINUTES
+        : opens + Math.round((resolved.arrival - opens) / DAY_MINUTES) * DAY_MINUTES
       : null;
-    const held = waited !== null && waited > resolved.arrival!;
+    const held = waited !== null && (resolved.arrival === null || waited > resolved.arrival);
     const arrival = held ? waited : resolved.arrival;
     const lateBy = resolved.lateBy;
     if (lateBy !== null) warnings.push({ index: i, code: 'late', minutes: lateBy });
