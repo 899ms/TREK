@@ -323,7 +323,7 @@
 .trek-dash .col-detail-rating { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--line); }
 /* Matched to the rating beside it, so the row reads as one set rather than a pill next
    to a tag. */
-.trek-dash .col-labelchip.big { padding: 6px 12px; font-size: 12.5px; }
+.trek-dash .col-labelchip.big { padding: 6px 12px; font-size: 12.5px; border-radius: 999px; }
 .trek-dash .col-detail-labels { display: flex; flex-wrap: wrap; gap: 7px; margin: 2px 0 10px; }
 
 /* ----------------- filter bar (status + category dropdowns) ----------------- */
