@@ -212,10 +212,16 @@ export class AssignmentsService {
       if (placeTime) {
         const assignment = this.dbs.get<{ day_id: number }>('SELECT day_id FROM day_assignments WHERE id = ?', id);
         if (assignment) {
+          // A booked night's hour lives on the booking, not on the stop: nobody types a
+          // time into a hotel row, they type a check-in. Left out of this, the night
+          // counted as untimed and stayed wherever it had been dropped, so pinning an
+          // afternoon stop sorted that one and left the hotel sitting in front of or
+          // behind it by accident.
           const dayAssignments = this.dbs.all<{ id: number; effective_time: string | null }>(`
-            SELECT da.id, COALESCE(da.assignment_time, p.place_time) as effective_time
+            SELECT da.id, COALESCE(da.assignment_time, p.place_time, acc.check_in) as effective_time
             FROM day_assignments da
             JOIN places p ON da.place_id = p.id
+            LEFT JOIN day_accommodations acc ON acc.id = da.accommodation_id
             WHERE da.day_id = ?
             ORDER BY da.order_index ASC
           `, assignment.day_id);

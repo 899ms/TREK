@@ -17,7 +17,6 @@ import type {
 } from './planning-types';
 import {
   computeSchedule,
-  parseClock,
   deriveDriveWarnings,
   refuelsRange,
   isServiceStopType,
@@ -159,7 +158,7 @@ export function assembleRoadtrip({
       legs.reduce((sum, l) => sum + (l?.duration ?? 0), 0) + inbound.reduce((sum, l) => sum + (l?.duration ?? 0), 0);
     const schedule = chain.schedule;
     const legVias = routed.map((l) => l?.vias ?? []);
-    const stops = chain.stops.map((s, index) => {
+    const stops = chain.stops.map((s) => {
       const snap = s.automaticNight ? undefined : allSnaps[stopKey(s)];
       const line = spurFor(snap);
       if (line) accessLines.push({ line, meters: snap!.meters, stopKey: stopKey(s) });

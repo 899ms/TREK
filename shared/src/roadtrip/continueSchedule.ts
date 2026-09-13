@@ -5,7 +5,9 @@ export function continueSchedule(
   stops: RoadtripStop[],
   schedule: Schedule,
   legs: (number | undefined)[],
-  dayNumber: number,
+  /** Unused since a check-out stopped shaping the chain; kept so the call sites and
+   *  their specs read the same as every other scheduler entry point. */
+  _dayNumber?: number,
 ): Schedule {
   const entries = schedule.entries.map((entry) => ({ ...entry }));
   const warnings = [...schedule.warnings];
