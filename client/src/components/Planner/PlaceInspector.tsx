@@ -321,6 +321,8 @@ export default function PlaceInspector({
     ? ((selectedAssignmentId ? dayAssignments.find(a => a.id === selectedAssignmentId) : null)
       ?? dayAssignments.find(a => a.place?.id === place.id))
     : null
+  /** This stop belongs to a booked night rather than to the traveller. */
+  const bookedNight = assignmentInDay?.accommodation_id != null
 
   // The weekday lines are display text; the ring is computed from the structured
   // periods next to them, in the place's own timezone. open_now stays the fallback.
@@ -509,8 +511,14 @@ export default function PlaceInspector({
           {mode === 'collection' && collectionStatus && onSetStatus && (
             <StatusBadge status={collectionStatus} onChange={onSetStatus} t={t} />
           )}
-          {/* Trip mode — day assignment */}
-          {mode === 'trip' && !!selectedDayId && (
+          {/* Trip mode — day assignment.
+              A stop a lodging booking put there is not offered either way. Taking it off
+              the day would leave the booking behind with nothing on the drive and no way
+              back short of saving it again, and putting a second one beside it is the
+              duplicate the stop exists to prevent. The booking is removed where it is
+              made: in the day's overnight block, or by turning the night back into a
+              pause in road trip mode. */}
+          {mode === 'trip' && !!selectedDayId && !bookedNight && (
             assignmentInDay ? (
               <ActionButton onClick={() => onRemoveAssignment?.(selectedDayId, assignmentInDay.id)} variant="ghost" icon={<Minus size={13} />}
                 label={<span className="hidden sm:inline">{t('inspector.removeFromDay')}</span>} />

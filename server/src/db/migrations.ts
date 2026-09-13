@@ -4782,6 +4782,45 @@ function runMigrations(db: Database.Database): void {
       }
       if (stays.length > 0) console.log(`[DB] Put ${stays.length} booked night(s) on their check-in day`);
     },
+
+    /*
+     * The same sweep once more, for the nights the first one could not have seen.
+     *
+     * A migration runs while the old container is still answering: a booking written
+     * in those seconds is written by code that knows nothing about the day stop, and
+     * lands behind the sweep that would have given it one. One did, on the test
+     * instance, out of ten. There is nothing to be done about that window, but there
+     * is something to be done about what falls into it, and a booking that never got
+     * its stop is invisible to the drive with no way back short of saving it again.
+     *
+     * Safe to repeat: the same NOT EXISTS decides it, so a stay that already has its
+     * stop is passed over, and one whose place the traveller planned by hand keeps
+     * that row unclaimed. Every future release can carry the same step for the same
+     * reason.
+     */
+    () => {
+      const stays = db.prepare(`
+        SELECT a.id, a.place_id, a.start_day_id
+        FROM day_accommodations a
+        WHERE a.place_id IS NOT NULL
+          AND NOT EXISTS (
+            SELECT 1 FROM day_assignments da
+            WHERE da.day_id = a.start_day_id AND da.place_id = a.place_id
+          )
+        ORDER BY a.id
+      `).all() as Array<{ id: number; place_id: number; start_day_id: number }>;
+
+      const insert = db.prepare(
+        `INSERT INTO day_assignments (day_id, place_id, order_index, accommodation_id)
+         VALUES (?, ?, COALESCE((SELECT MAX(order_index) + 1 FROM day_assignments WHERE day_id = ?), 0), ?)`
+      );
+      const stamp = db.prepare("UPDATE places SET stop_type = 'hotel' WHERE id = ? AND (stop_type IS NULL OR stop_type = '')");
+      for (const stay of stays) {
+        insert.run(stay.start_day_id, stay.place_id, stay.start_day_id, stay.id);
+        stamp.run(stay.place_id);
+      }
+      if (stays.length > 0) console.log(`[DB] Caught up ${stays.length} booked night(s) missed during the upgrade`);
+    },
   ];
 
   if (currentVersion < migrations.length) {
