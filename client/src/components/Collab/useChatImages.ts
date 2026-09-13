@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 /**
  * The images pinned to a chat message before it is sent.
@@ -7,15 +7,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
  * their own copy of the same picking, previewing and clearing, which is two
  * places for the same leak and a duplication bill on every line.
  *
- * Object URLs are held in a ref and revoked when the file they belong to goes,
- * when the list is cleared and on unmount. Rebuilding every preview on each
- * change, which is what both copies did, leaked one URL per image per keystroke
- * of picking, and did it from inside a setState updater, so React ran it twice
- * in development and leaked twice as fast.
+ * A file and the object URL that previews it are one thing, so they are stored
+ * as one thing and the two arrays the callers read are derived from it. Every
+ * mutator computes the next list first and then commits it: nothing is created
+ * or revoked inside a state updater, because React invokes those an extra time
+ * in development and the second run would mint a second URL for the same file.
+ * That is what the strip showed as two thumbnails for one attachment, and
+ * removing one of them left a preview for a picture that was never sent.
+ *
+ * The ref is the list, the state is the render of it. Written together so two
+ * calls in the same tick see each other, which a functional updater would give
+ * for free and a plain array would not.
  */
 export const CHAT_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 export const MAX_CHAT_IMAGES = 4
 export const MAX_CHAT_IMAGE_BYTES = 10 * 1024 * 1024
+
+interface PickedImage {
+  file: File
+  url: string
+}
 
 export interface ChatImages {
   files: File[]
@@ -27,51 +38,46 @@ export interface ChatImages {
 }
 
 export function useChatImages(): ChatImages {
-  const [files, setFiles] = useState<File[]>([])
-  const [previews, setPreviews] = useState<string[]>([])
-  const urls = useRef<string[]>([])
+  const [items, setItems] = useState<PickedImage[]>([])
+  const itemsRef = useRef<PickedImage[]>([])
 
-  const revokeAll = useCallback(() => {
-    urls.current.forEach(URL.revokeObjectURL)
-    urls.current = []
+  const commit = useCallback((next: PickedImage[]) => {
+    itemsRef.current = next
+    setItems(next)
   }, [])
 
-  useEffect(() => revokeAll, [revokeAll])
+  // Unmount with pictures still pinned: the URLs outlive the component otherwise.
+  useEffect(() => () => {
+    itemsRef.current.forEach(item => URL.revokeObjectURL(item.url))
+    itemsRef.current = []
+  }, [])
 
   const add = useCallback((incoming: FileList | File[]) => {
     const all = Array.from(incoming)
     const valid = all.filter(f => CHAT_IMAGE_TYPES.includes(f.type) && f.size <= MAX_CHAT_IMAGE_BYTES)
-    if (valid.length) {
-      setFiles(prev => {
-        const room = MAX_CHAT_IMAGES - prev.length
-        const added = valid.slice(0, Math.max(0, room))
-        // Only the new files get a URL; the ones already in the list keep theirs.
-        const fresh = added.map(URL.createObjectURL)
-        urls.current = [...urls.current, ...fresh]
-        setPreviews(p => [...p, ...fresh])
-        return [...prev, ...added]
-      })
+    const room = MAX_CHAT_IMAGES - itemsRef.current.length
+    const added = valid.slice(0, Math.max(0, room))
+    if (added.length) {
+      // Only the new files get a URL; the ones already in the list keep theirs.
+      commit([...itemsRef.current, ...added.map(file => ({ file, url: URL.createObjectURL(file) }))])
     }
     return valid.length === all.length
-  }, [])
+  }, [commit])
 
   const remove = useCallback((index: number) => {
-    setFiles(prev => prev.filter((_, i) => i !== index))
-    setPreviews(prev => {
-      const gone = prev[index]
-      if (gone) {
-        URL.revokeObjectURL(gone)
-        urls.current = urls.current.filter(u => u !== gone)
-      }
-      return prev.filter((_, i) => i !== index)
-    })
-  }, [])
+    const gone = itemsRef.current[index]
+    if (!gone) return
+    URL.revokeObjectURL(gone.url)
+    commit(itemsRef.current.filter((_, i) => i !== index))
+  }, [commit])
 
   const clear = useCallback(() => {
-    revokeAll()
-    setFiles([])
-    setPreviews([])
-  }, [revokeAll])
+    itemsRef.current.forEach(item => URL.revokeObjectURL(item.url))
+    commit([])
+  }, [commit])
+
+  const files = useMemo(() => items.map(item => item.file), [items])
+  const previews = useMemo(() => items.map(item => item.url), [items])
 
   return { files, previews, add, remove, clear }
 }

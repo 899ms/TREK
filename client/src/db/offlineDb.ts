@@ -178,7 +178,7 @@ class TrekOfflineDb extends Dexie {
   syncMeta!: Table<SyncMeta, number>;
   blobCache!: Table<BlobCacheEntry, string>;
   importFiles!: Table<ImportSourceFile, [string, string]>;
-  areaPlaces!: Table<CachedAreaPlace, string>;
+  areaPlaces!: Table<CachedAreaPlace, [string, number]>;
 
   constructor(name: string = ANON_DB_NAME) {
     super(name);
@@ -226,6 +226,25 @@ class TrekOfflineDb extends Dexie {
     this.version(6).stores({ roadtripPreferences: 'tripId' });
     this.version(5).stores({
       areaPlaces: 'gers, tripId, searchName',
+    });
+
+    // v7/v8: the same place near two trips is two rows now.
+    //
+    // Keyed on the GERS id alone, one row could only ever name one trip, and a
+    // bulkPut for the second trip rewrote the first trip's rows to point at it.
+    // Switching the second trip off then deleted the shared set by tripId, and
+    // the first trip's areaPlacesKey still matched its bbox, so nothing ever
+    // downloaded them again: a trip whose switch read "on" with no offline
+    // search behind it. Dexie cannot change a primary key in place, so the
+    // table is dropped and rebuilt, and every stored fingerprint is cleared so
+    // the next sync refills what the drop took.
+    this.version(7).stores({ areaPlaces: null });
+    this.version(8).stores({
+      areaPlaces: '[gers+tripId], gers, tripId, searchName',
+    }).upgrade(async (tx) => {
+      await tx.table('syncMeta').toCollection().modify((row: { areaPlacesKey?: string }) => {
+        delete row.areaPlacesKey;
+      });
     });
   }
 }

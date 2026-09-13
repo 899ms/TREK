@@ -639,14 +639,25 @@ export class BudgetService {
       if (data.receipt_file_ids !== undefined) {
         // The ids that survive are left linked rather than dropped and re-added,
         // so a receipt the request keeps never loses its row for an instant.
-        const keep = new Set(data.receipt_file_ids.map(Number));
+        // Deduplicated: the same id twice would make the second pass adopt a
+        // second spare row into the pair the first one just wrote.
+        const wanted = [...new Set(data.receipt_file_ids.map(Number))];
+        const keep = new Set(wanted);
         this.unlinkReceipts(id, keep);
-        if (data.receipt_file_ids.length > 0) {
+        if (wanted.length > 0) {
           const insertLink = this.db.prepare('INSERT OR IGNORE INTO file_links (file_id, budget_item_id) VALUES (?, ?)');
           const adopt = this.db.prepare('UPDATE file_links SET budget_item_id = ? WHERE id = ?');
-          for (const fid of data.receipt_file_ids) {
+          for (const fid of wanted) {
             const belongs = this.db.get('SELECT id FROM trip_files WHERE id = ? AND trip_id = ? AND deleted_at IS NULL', fid, tripId);
             if (!belongs) continue;
+            // Already this item's receipt: nothing to do. A file can carry several
+            // link rows (one per place, one per booking), so on a second save of
+            // the same expense the row kept from last time is skipped by
+            // unlinkReceipts and the next spare would be adopted into a duplicate
+            // (file, item) pair, which the unique index refuses. That threw inside
+            // the transaction and rolled the whole expense edit back, every time.
+            const already = this.db.get('SELECT 1 FROM file_links WHERE file_id = ? AND budget_item_id = ?', fid, id);
+            if (already) continue;
             // A file already tied to a place or a booking gets the receipt link
             // written onto that row, because the unique index is per file and
             // item and a second row for the same pair would be refused anyway.

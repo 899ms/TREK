@@ -183,14 +183,30 @@ export async function searchCachedPlaces(query: string, limit = 10): Promise<Cac
 
   // Prefix hits come off the index; the substring pass is the fallback for
   // "osteria" matching "L'Osteria Rostock", which no prefix index can answer.
-  const byPrefix = await offlineDb.areaPlaces.where('searchName').startsWith(needle).limit(limit).toArray()
+  // Deduplicated on the GERS id: a place inside two cached trips' areas is
+  // stored once per trip, and a search that spans every trip would otherwise
+  // hand the same restaurant back twice.
+  const seen = new Set<string>()
+  const take = (rows: CachedAreaPlace[]) => {
+    const out: CachedAreaPlace[] = []
+    for (const row of rows) {
+      if (seen.has(row.gers)) continue
+      seen.add(row.gers)
+      out.push(row)
+      if (seen.size >= limit) break
+    }
+    return out
+  }
+
+  const byPrefix = take(await offlineDb.areaPlaces.where('searchName').startsWith(needle).limit(limit * 2).toArray())
   if (byPrefix.length >= limit) return byPrefix
 
-  const seen = new Set(byPrefix.map((p) => p.gers))
-  const rest = await offlineDb.areaPlaces
-    .filter((p) => !seen.has(p.gers) && p.searchName.includes(needle))
-    .limit(limit - byPrefix.length)
-    .toArray()
+  const rest = take(
+    await offlineDb.areaPlaces
+      .filter((p) => !seen.has(p.gers) && p.searchName.includes(needle))
+      .limit((limit - byPrefix.length) * 2)
+      .toArray(),
+  )
 
   return [...byPrefix, ...rest]
 }
@@ -206,7 +222,10 @@ export async function searchCachedPlaces(query: string, limit = 10): Promise<Cac
  */
 export async function getCachedPlace(placeId: string): Promise<CachedAreaPlace | null> {
   if (!placeId.startsWith('gers:')) return null
-  return (await offlineDb.areaPlaces.get(placeId.slice('gers:'.length))) ?? null
+  // Through the `gers` index rather than the primary key: the key is compound
+  // now, and which trip cached the row is not something the caller knows or
+  // should have to know.
+  return (await offlineDb.areaPlaces.where('gers').equals(placeId.slice('gers:'.length)).first()) ?? null
 }
 
 export function cachedToPlaceRecord(p: CachedAreaPlace): Record<string, unknown> {

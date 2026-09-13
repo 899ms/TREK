@@ -1046,6 +1046,39 @@ describe('an expense whose split leaves a remainder', () => {
     expect(testDb.prepare('SELECT COUNT(*) c FROM file_links WHERE file_id = ?').get(f4)).toEqual({ c: 1 });
   });
 
+  it('re-saving an expense whose receipt is also linked elsewhere twice does not 500', () => {
+    // A file may carry one link row per place and one per booking, and the receipt
+    // link is written onto a spare one of those. On the second save the row kept
+    // from last time is skipped, so the next spare used to be adopted into a
+    // second (file, item) pair — refused by the unique index, thrown inside the
+    // transaction, and the whole expense edit rolled back. Every time, for good.
+    const { user: alice } = createUser(testDb);
+    const trip = createTrip(testDb, alice.id);
+    const file = Number(testDb.prepare('INSERT INTO trip_files (trip_id, filename, original_name) VALUES (?, ?, ?)').run(trip.id, 'r.jpg', 'r.jpg').lastInsertRowid);
+    const place = testDb.prepare('INSERT INTO places (trip_id, name) VALUES (?, ?)').run(trip.id, 'Osteria').lastInsertRowid;
+    const reservation = testDb.prepare("INSERT INTO reservations (trip_id, title, type) VALUES (?, 'Table', 'restaurant')").run(trip.id).lastInsertRowid;
+    testDb.prepare('INSERT INTO file_links (file_id, place_id) VALUES (?, ?)').run(file, place);
+    testDb.prepare('INSERT INTO file_links (file_id, reservation_id) VALUES (?, ?)').run(file, reservation);
+
+    const item = budget.createBudgetItem(trip.id, { name: 'Dinner', total_price: 40, receipt_file_ids: [file] });
+    const again = budget.updateBudgetItem(item.id, trip.id, { total_price: 42, receipt_file_ids: [file] });
+
+    expect(again?.total_price).toBe(42);
+    expect(again?.receipts?.map(r => r.id)).toEqual([file]);
+    expect(testDb.prepare('SELECT COUNT(*) c FROM file_links WHERE file_id = ? AND budget_item_id = ?').get(file, item.id)).toEqual({ c: 1 });
+  });
+
+  it('a receipt named twice in one save is linked once', () => {
+    const { user: alice } = createUser(testDb);
+    const trip = createTrip(testDb, alice.id);
+    const file = Number(testDb.prepare('INSERT INTO trip_files (trip_id, filename, original_name) VALUES (?, ?, ?)').run(trip.id, 'dup.jpg', 'dup.jpg').lastInsertRowid);
+    const item = budget.createBudgetItem(trip.id, { name: 'Taxi' });
+
+    const updated = budget.updateBudgetItem(item.id, trip.id, { receipt_file_ids: [file, file] });
+
+    expect(updated?.receipts?.map(r => r.id)).toEqual([file]);
+  });
+
   it('unlinks receipts on deleteBudgetItem and leaves every file in place', () => {
     const { user: alice } = createUser(testDb);
     const trip = createTrip(testDb, alice.id);

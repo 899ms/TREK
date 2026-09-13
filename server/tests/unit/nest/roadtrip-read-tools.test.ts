@@ -22,12 +22,26 @@ describe('roadtrip read tools', () => {
   });
   it('passes reviewed Google stops and the authenticated user to the importer', async () => {
     const routes = { preview: vi.fn(async () => ({ stops: [] })), import: vi.fn(() => ({ imported: 2 })) };
-    const tool = new GoogleRouteMcp(routes as never, {} as never);
+    const auth = { isDemoUser: vi.fn(() => false) };
+    const tool = new GoogleRouteMcp(routes as never, auth as never, {} as never);
     await tool.preview({ url: 'https://www.google.com/maps/dir/A/B' });
     expect(routes.preview).toHaveBeenCalledWith('https://www.google.com/maps/dir/A/B');
     const input = { tripId: 10, dayId: 1, stops: [{ name: 'A', lat: 1, lng: 2 }] };
     expect(JSON.stringify(tool.import(input, ctx))).toContain('2');
     expect(routes.import).toHaveBeenCalledWith(10, 5, input);
+  });
+
+  it('refuses the Google import for the demo account, like every other write tool', () => {
+    // The one non-admin write tool that had no gate: a demo session could write
+    // thirty places and their assignments onto the shared demo trip.
+    const routes = { preview: vi.fn(), import: vi.fn() };
+    const auth = { isDemoUser: vi.fn(() => true) };
+    const tool = new GoogleRouteMcp(routes as never, auth as never, {} as never);
+
+    const res = tool.import({ tripId: 10, dayId: 1, stops: [{ name: 'A', lat: 1, lng: 2 }] } as never, ctx);
+
+    expect(res.isError).toBe(true);
+    expect(routes.import).not.toHaveBeenCalled();
   });
   it('does not expose manual boundaries to nonmembers', async () => {
     const boundaries = { list: vi.fn(() => [{ day_number: 1 }]) };

@@ -92,6 +92,37 @@ describe('prefetchPlacesForTrip', () => {
     expect(areaMock).toHaveBeenCalledTimes(1)
   })
 
+  it('FE-PLACEPRE-005b: two trips over the same city keep their own copies', async () => {
+    // Keyed on the GERS id alone, the second trip's write rewrote the first
+    // trip's rows to point at itself, and switching the second trip off then
+    // deleted them for both.
+    await offlineDb.syncMeta.put({
+      tripId: 8, lastSyncedAt: null, status: 'idle', tilesBbox: null, filesCachedCount: 0,
+    })
+    await prefetchPlacesForTrip(7, TRIP_PLACES)
+    await prefetchPlacesForTrip(8, TRIP_PLACES)
+
+    const rows = await offlineDb.areaPlaces.toArray()
+    expect(rows).toHaveLength(4)
+    expect(rows.filter((r) => r.tripId === 7)).toHaveLength(2)
+    expect(rows.filter((r) => r.tripId === 8)).toHaveLength(2)
+  });
+
+  it('FE-PLACEPRE-005c: dropping one trip leaves the other trip searchable', async () => {
+    await offlineDb.syncMeta.put({
+      tripId: 8, lastSyncedAt: null, status: 'idle', tilesBbox: null, filesCachedCount: 0,
+    })
+    await prefetchPlacesForTrip(7, TRIP_PLACES)
+    await prefetchPlacesForTrip(8, TRIP_PLACES)
+
+    await offlineDb.areaPlaces.where('tripId').equals(8).delete()
+
+    // Offline search spans every cached trip, and trip 7 never asked to lose
+    // anything. Its fingerprint also still matches, so nothing would refill it.
+    const hits = await searchCachedPlaces('osteria')
+    expect(hits.map((h) => h.name)).toEqual(["L'Osteria"])
+  });
+
   it('FE-PLACEPRE-005: re-downloads when the trip moves', async () => {
     await prefetchPlacesForTrip(7, TRIP_PLACES)
     await prefetchPlacesForTrip(7, [place(41.9, 12.5), place(41.92, 12.52)])
