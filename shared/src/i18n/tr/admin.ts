@@ -181,12 +181,12 @@ const admin: TranslationStrings = {
     'Google’ın erişilemediği ve OpenStreetMap verisinin çok az olduğu Çin anakarasında yer arama için. «Web 服务» (web servisi) türünde bir anahtar gerekir, JS API anahtarı değil. console.amap.com adresinden alınır.',
   'admin.placesProvider.title': 'Yer arama sağlayıcısı',
   'admin.placesProvider.subtitle':
-    'Yer aramasını, otomatik tamamlamayı ve ayrıntıları hangi servisin yanıtlayacağı. Otomatik, Google anahtarı varsa Google’ı, sonra Amap’i, sonra OpenStreetMap’i kullanır.',
+    "TREK'in kendi dizini ve OpenStreetMap her aramayı yanıtlar. Burada, onlar bir şey bulamadığında başka kime sorulacağı seçilir: Otomatik, anahtar varsa Google'ı, sonra Amap'i tercih eder.",
   'admin.placesProvider.auto': 'Otomatik',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Seçilen sağlayıcı için API anahtarı ayarlanmamış, bu yüzden yer arama OpenStreetMap’e geri döner.',
+  'admin.placesProvider.missingKey': 'Seçilen sağlayıcı için API anahtarı tanımlı değil; yer aramasını yalnızca TREK dizini ve OpenStreetMap yanıtlar.',
   'admin.placesProvider.saved': 'Yer arama sağlayıcısı kaydedildi',
   'admin.validateKey': 'Test et',
   'admin.keyValid': 'Bağlı',
@@ -807,5 +807,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Seyahat yok',
   'admin.invite.tripHint': 'Yeni kullanıcı bağlantı üzerinden kaydolduğunda otomatik olarak bu seyahate eklenir.',
   'admin.invite.boundTo': '{trip} seyahatine ekler',
+  'admin.placesUsageTitle': 'Anahtar ne için kullanılır',
+  'admin.mapsKeyHintShort': "Fotoğraf, puan ve çalışma saatleri ekler. Her sorgu bundan sonra Google'a gider.",
+  'admin.amapKeyHintShort': 'Çin anakarasında yer araması için. JS API anahtarı değil, web servis anahtarı gerekir.',
 };
 export default admin;

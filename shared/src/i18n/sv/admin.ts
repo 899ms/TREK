@@ -181,13 +181,13 @@ const admin: TranslationStrings = {
     'För platssökning i Fastlandskina, där Google inte går att nå och OpenStreetMap har tunn täckning. Kräver en "Web 服务"-nyckel (webbtjänst), inte en JS API-nyckel. Skaffa en på console.amap.com.',
   'admin.placesProvider.title': 'Leverantör för platssökning',
   'admin.placesProvider.subtitle':
-    'Vilken tjänst som svarar på platssökning, autokomplettering och detaljer. Automatisk använder Google när en Google-nyckel är konfigurerad, därefter Amap och sedan OpenStreetMap.',
+    'TREK:s egen indexering och OpenStreetMap svarar på varje sökning. Här väljs vem som frågas därutöver när de inte hittar något: Automatiskt föredrar Google om en nyckel finns, sedan Amap.',
   'admin.placesProvider.auto': 'Automatisk',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
   'admin.placesProvider.missingKey':
-    'Den valda leverantören har ingen API-nyckel konfigurerad, så platssökningen faller tillbaka på OpenStreetMap.',
+    'Den valda leverantören saknar API-nyckel, så platssökningen besvaras enbart av TREK:s index och OpenStreetMap.',
   'admin.placesProvider.saved': 'Leverantör för platssökning sparad',
   'admin.validateKey': 'Test',
   'admin.keyValid': 'Ansluten',
@@ -806,5 +806,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'Den nya användaren läggs automatiskt till i den här resan när de registrerar sig via länken.',
   'admin.invite.boundTo': 'läggs till i {trip}',
+  'admin.placesUsageTitle': 'Vad nyckeln används till',
+  'admin.mapsKeyHintShort': 'Lägger till foton, betyg och öppettider. Varje sökning går då till Google.',
+  'admin.amapKeyHintShort': 'För platssökning i Fastlandskina. Kräver en webbtjänstnyckel, inte en JS API-nyckel.',
 };
 export default admin;

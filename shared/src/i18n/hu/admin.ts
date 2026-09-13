@@ -138,12 +138,12 @@ const admin: TranslationStrings = {
     'Helykereséshez Kína szárazföldi részén, ahol a Google nem érhető el, az OpenStreetMap adatai pedig hiányosak. „Web 服务" (webszolgáltatás) típusú kulcs kell hozzá, nem JS API-kulcs. A console.amap.com oldalon kérhető.',
   'admin.placesProvider.title': 'Helykeresési szolgáltató',
   'admin.placesProvider.subtitle':
-    'Melyik szolgáltatás válaszol a helykeresésre, a javaslatokra és a részletekre. Az automatikus a Google-t használja, ha van Google-kulcs, utána az Amapot, végül az OpenStreetMapet.',
+    'A TREK saját indexe és az OpenStreetMap minden keresésre válaszol. Itt választod ki, kit kérdezünk még, ha ők nem találnak semmit: az Automatikus a Google-t részesíti előnyben, ha van kulcs, utána az Amapot.',
   'admin.placesProvider.auto': 'Automatikus',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'A kiválasztott szolgáltatóhoz nincs API-kulcs beállítva, ezért a helykeresés az OpenStreetMapre esik vissza.',
+  'admin.placesProvider.missingKey': 'A kiválasztott szolgáltatóhoz nincs API-kulcs beállítva, ezért a helykeresésre csak a TREK indexe és az OpenStreetMap válaszol.',
   'admin.placesProvider.saved': 'Helykeresési szolgáltató elmentve',
   'admin.validateKey': 'Teszt',
   'admin.keyValid': 'Csatlakozva',
@@ -812,5 +812,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'Az új felhasználó automatikusan hozzáadódik ehhez az utazáshoz, amikor a linken keresztül regisztrál.',
   'admin.invite.boundTo': 'hozzáadja a következőhöz: {trip}',
+  'admin.placesUsageTitle': 'Mire használjuk a kulcsot',
+  'admin.mapsKeyHintShort': 'Fényképeket, értékeléseket és nyitvatartást ad hozzá. Minden lekérdezés a Google-höz megy.',
+  'admin.amapKeyHintShort': 'Helykereséshez a szárazföldi Kínában. Webszolgáltatás-kulcs kell, nem JS API-kulcs.',
 };
 export default admin;

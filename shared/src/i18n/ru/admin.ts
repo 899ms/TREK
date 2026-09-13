@@ -139,12 +139,12 @@ const admin: TranslationStrings = {
     'Для поиска мест в континентальном Китае, где Google недоступен, а данных OpenStreetMap мало. Нужен ключ типа «Web 服务» (веб-сервис), а не ключ JS API. Получить можно на console.amap.com.',
   'admin.placesProvider.title': 'Провайдер поиска мест',
   'admin.placesProvider.subtitle':
-    'Какой сервис отвечает за поиск мест, подсказки и детали. «Автоматически» использует Google, если задан ключ Google, затем Amap, затем OpenStreetMap.',
+    'Собственный индекс TREK и OpenStreetMap отвечают на каждый поиск. Здесь выбирается, кого спросить дополнительно, если они ничего не нашли: «Автоматически» предпочитает Google при наличии ключа, затем Amap.',
   'admin.placesProvider.auto': 'Автоматически',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Для выбранного провайдера не задан API-ключ, поэтому поиск мест переключается на OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Для выбранного поставщика не задан ключ API, поэтому на поиск мест отвечают только индекс TREK и OpenStreetMap.',
   'admin.placesProvider.saved': 'Провайдер поиска мест сохранён',
   'admin.validateKey': 'Проверить',
   'admin.keyValid': 'Подключено',
@@ -805,5 +805,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Без поездки',
   'admin.invite.tripHint': 'Новый пользователь автоматически добавляется в эту поездку при регистрации по ссылке.',
   'admin.invite.boundTo': 'добавляет в {trip}',
+  'admin.placesUsageTitle': 'Для чего используется ключ',
+  'admin.mapsKeyHintShort': 'Добавляет фото, оценки и часы работы. Каждый запрос тогда идёт в Google.',
+  'admin.amapKeyHintShort': 'Для поиска мест в материковом Китае. Нужен ключ веб-сервиса, а не ключ JS API.',
 };
 export default admin;

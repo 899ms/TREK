@@ -137,13 +137,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Pour la recherche de lieux en Chine continentale, où Google est inaccessible et où OpenStreetMap contient très peu de données. Nécessite une clé de type « Web 服务 » (service web), pas une clé d’API JS. À obtenir sur console.amap.com.',
   'admin.placesProvider.title': 'Fournisseur de recherche de lieux',
-  'admin.placesProvider.subtitle':
-    'Quel service répond à la recherche de lieux, à l’autocomplétion et aux détails. Automatique utilise Google si une clé Google est configurée, puis Amap, puis OpenStreetMap.',
+  'admin.placesProvider.subtitle': "L'index propre de TREK et OpenStreetMap répondent à chaque recherche. Ceci choisit qui est interrogé en plus quand ils ne trouvent rien : Automatique préfère Google si une clé existe, puis Amap.",
   'admin.placesProvider.auto': 'Automatique',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Aucune clé API n’est configurée pour le fournisseur sélectionné : la recherche de lieux se replie donc sur OpenStreetMap.',
+  'admin.placesProvider.missingKey': "Le fournisseur sélectionné n'a pas de clé API configurée : la recherche de lieux est donc assurée par le seul index TREK et OpenStreetMap.",
   'admin.placesProvider.saved': 'Fournisseur de recherche de lieux enregistré',
   'admin.validateKey': 'Tester',
   'admin.keyValid': 'Connecté',
@@ -813,5 +812,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     "Le nouvel utilisateur est automatiquement ajouté à ce voyage lorsqu'il s'inscrit via le lien.",
   'admin.invite.boundTo': 'ajoute à {trip}',
+  'admin.placesUsageTitle': 'À quoi sert la clé',
+  'admin.mapsKeyHintShort': 'Ajoute photos, avis et horaires. Chaque recherche passe alors par Google.',
+  'admin.amapKeyHintShort': 'Pour la recherche de lieux en Chine continentale. Nécessite une clé de service web, pas une clé API JS.',
 };
 export default admin;

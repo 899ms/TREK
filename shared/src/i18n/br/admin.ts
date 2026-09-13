@@ -136,13 +136,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Para a busca de lugares na China continental, onde o Google é inacessível e o OpenStreetMap tem poucos dados. Exige uma chave do tipo "Web 服务" (serviço web), não uma chave da API JS. Obtenha em console.amap.com.',
   'admin.placesProvider.title': 'Provedor de busca de lugares',
-  'admin.placesProvider.subtitle':
-    'Qual serviço responde à busca de lugares, ao autocompletar e aos detalhes. Automático usa o Google quando há uma chave do Google configurada, depois o Amap e depois o OpenStreetMap.',
+  'admin.placesProvider.subtitle': 'O índice do próprio TREK e o OpenStreetMap respondem a cada busca. Aqui se escolhe quem mais é consultado quando eles não acham nada: Automático prefere o Google se houver chave, depois Amap.',
   'admin.placesProvider.auto': 'Automático',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'O provedor selecionado não tem nenhuma chave de API configurada, então a busca de lugares volta para o OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'O provedor selecionado não tem chave de API configurada, então a busca de lugares é respondida apenas pelo índice do TREK e pelo OpenStreetMap.',
   'admin.placesProvider.saved': 'Provedor de busca de lugares salvo',
   'admin.validateKey': 'Testar',
   'admin.keyValid': 'Conectado',
@@ -798,5 +797,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Nenhuma viagem',
   'admin.invite.tripHint': 'O novo usuário é adicionado automaticamente a esta viagem ao se registrar pelo link.',
   'admin.invite.boundTo': 'adiciona a {trip}',
+  'admin.placesUsageTitle': 'Para que a chave é usada',
+  'admin.mapsKeyHintShort': 'Adiciona fotos, avaliações e horários. Cada consulta passa então pelo Google.',
+  'admin.amapKeyHintShort': 'Para busca de lugares na China continental. Precisa de uma chave de serviço web, não de API JS.',
 };
 export default admin;

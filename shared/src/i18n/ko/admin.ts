@@ -177,12 +177,12 @@ const admin: TranslationStrings = {
     'Google에 접속할 수 없고 OpenStreetMap 데이터도 부족한 중국 본토에서 장소를 검색할 때 사용합니다. JS API 키가 아니라 "Web 服务"(웹 서비스) 유형의 키가 필요합니다. console.amap.com에서 발급받을 수 있습니다.',
   'admin.placesProvider.title': '장소 검색 제공자',
   'admin.placesProvider.subtitle':
-    '장소 검색, 자동 완성, 상세 정보를 어느 서비스가 처리할지 결정합니다. 자동은 Google 키가 있으면 Google을, 그다음 Amap을, 그다음 OpenStreetMap을 사용합니다.',
+    'TREK 자체 색인과 OpenStreetMap이 모든 검색에 답합니다. 여기서는 둘이 아무것도 찾지 못했을 때 누구에게 더 물을지 고릅니다. 자동은 키가 있으면 Google을, 그다음 Amap을 씁니다.',
   'admin.placesProvider.auto': '자동',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap(高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': '선택한 제공자에 API 키가 설정되어 있지 않아 장소 검색이 OpenStreetMap으로 대체됩니다.',
+  'admin.placesProvider.missingKey': '선택한 공급자에 API 키가 설정되어 있지 않아 장소 검색은 TREK 색인과 OpenStreetMap만 응답합니다.',
   'admin.placesProvider.saved': '장소 검색 제공자를 저장했습니다',
   'admin.validateKey': '테스트',
   'admin.keyValid': '연결됨',
@@ -766,5 +766,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': '여행 없음',
   'admin.invite.tripHint': '새 사용자가 이 링크를 통해 가입하면 해당 여행에 자동으로 추가됩니다.',
   'admin.invite.boundTo': '{trip}에 추가',
+  'admin.placesUsageTitle': '키를 사용하는 곳',
+  'admin.mapsKeyHintShort': '사진, 평점, 영업시간이 추가됩니다. 이후 모든 조회는 Google로 갑니다.',
+  'admin.amapKeyHintShort': '중국 본토에서의 장소 검색용. JS API 키가 아니라 웹 서비스 키가 필요합니다.',
 };
 export default admin;

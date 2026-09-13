@@ -138,13 +138,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Para la búsqueda de lugares en China continental, donde Google no es accesible y OpenStreetMap apenas tiene datos. Requiere una clave de tipo «Web 服务» (servicio web), no una clave de la API de JS. Consíguela en console.amap.com.',
   'admin.placesProvider.title': 'Proveedor de búsqueda de lugares',
-  'admin.placesProvider.subtitle':
-    'Qué servicio responde a la búsqueda de lugares, el autocompletado y los detalles. Automático usa Google si hay una clave de Google configurada, luego Amap y luego OpenStreetMap.',
+  'admin.placesProvider.subtitle': 'El índice propio de TREK y OpenStreetMap responden a cada búsqueda. Aquí se elige a quién más se consulta cuando no encuentran nada: Automático prefiere Google si hay clave, luego Amap.',
   'admin.placesProvider.auto': 'Automático',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'El proveedor seleccionado no tiene ninguna clave de API configurada, así que la búsqueda de lugares recurre a OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'El proveedor seleccionado no tiene clave de API configurada, así que la búsqueda de lugares la responden solo el índice de TREK y OpenStreetMap.',
   'admin.placesProvider.saved': 'Proveedor de búsqueda de lugares guardado',
   'admin.validateKey': 'Probar',
   'admin.keyValid': 'Conectado',
@@ -815,5 +814,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'El nuevo usuario se añade automáticamente a este viaje cuando se registra mediante el enlace.',
   'admin.invite.boundTo': 'se añade a {trip}',
+  'admin.placesUsageTitle': 'Para qué se usa la clave',
+  'admin.mapsKeyHintShort': 'Añade fotos, valoraciones y horarios. Cada consulta pasa entonces por Google.',
+  'admin.amapKeyHintShort': 'Para la búsqueda de lugares en China continental. Necesita una clave de servicio web, no de API JS.',
 };
 export default admin;

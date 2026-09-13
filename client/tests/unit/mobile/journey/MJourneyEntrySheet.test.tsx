@@ -131,7 +131,9 @@ describe('MJourneyEntrySheet quick capture', () => {
     // move arrived nameless and the day read as a column of placeholders
     // (discussion #2299). The story field is what Add details still unlocks.
     expect(screen.getByPlaceholderText('Give this moment a name...')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'Add details' }));
+    // Shortened to "+ Details": the old label wrapped onto two lines in the
+    // sheet's footer beside Cancel and Save (discussion #2299).
+    fireEvent.click(screen.getByRole('button', { name: '+ Details' }));
     expect(screen.getByPlaceholderText('Give this moment a name...')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('Write your story...')).toBeInTheDocument();
     await waitFor(() => expect(mapsApi.reverse).toHaveBeenCalled());

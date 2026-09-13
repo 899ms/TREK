@@ -444,13 +444,13 @@ const admin: TranslationStrings = {
     "Per a la cerca de llocs a la Xina continental, on Google no és accessible i la cobertura d'OpenStreetMap és escassa. Cal una clau «Web 服务» (servei web), no una clau de l'API JS. Se n'obté una a console.amap.com.",
   'admin.placesProvider.title': 'Proveïdor de la cerca de llocs',
   'admin.placesProvider.subtitle':
-    "Quin servei respon la cerca de llocs, l'autocompleció i els detalls. Automàtic fa servir Google quan hi ha una clau de Google configurada, després Amap i després OpenStreetMap.",
+    "L'índex propi de TREK i OpenStreetMap responen cada cerca. Aquí es tria a qui més es consulta quan no troben res: Automàtic prefereix Google si hi ha clau, després Amap.",
   'admin.placesProvider.auto': 'Automàtic',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
   'admin.placesProvider.missingKey':
-    'El proveïdor seleccionat no té cap clau API configurada, així que la cerca de llocs recorre a OpenStreetMap.',
+    "El proveïdor seleccionat no té cap clau d'API configurada, així que la cerca de llocs la responen només l'índex de TREK i OpenStreetMap.",
   'admin.placesProvider.saved': 'Proveïdor de la cerca de llocs desat',
   'admin.tabs.plugins': 'Connectors',
   'admin.tabs.storage': 'Emmagatzematge',
@@ -720,5 +720,8 @@ const admin: TranslationStrings = {
   'admin.plugins.metaRequires': 'Requereix',
   'admin.plugins.metaReviewed': 'Revisat el',
   'admin.plugins.downloads': 'Baixades',
+  'admin.placesUsageTitle': "Per a què s'usa la clau",
+  'admin.mapsKeyHintShort': 'Afegeix fotos, valoracions i horaris. Cada consulta passa llavors per Google.',
+  'admin.amapKeyHintShort': 'Per a la cerca de llocs a la Xina continental. Cal una clau de servei web, no una clau API JS.',
 };
 export default admin;

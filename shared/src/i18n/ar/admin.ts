@@ -159,12 +159,12 @@ const admin: TranslationStrings = {
     'للبحث عن الأماكن في البر الرئيسي للصين، حيث لا يمكن الوصول إلى Google وتكون بيانات OpenStreetMap شحيحة. يتطلب مفتاحًا من نوع «Web 服务» (خدمة ويب)، وليس مفتاح JS API. يمكن الحصول عليه من console.amap.com.',
   'admin.placesProvider.title': 'مزوّد البحث عن الأماكن',
   'admin.placesProvider.subtitle':
-    'الخدمة التي تتولى البحث عن الأماكن والإكمال التلقائي والتفاصيل. «تلقائي» يستخدم Google عند توفر مفتاح Google، ثم Amap، ثم OpenStreetMap.',
+    'يجيب فهرس TREK الخاص وOpenStreetMap عن كل بحث. هنا يُختار من يُسأل أيضاً عندما لا يجدان شيئاً: «تلقائي» يفضّل Google عند وجود مفتاح، ثم Amap.',
   'admin.placesProvider.auto': 'تلقائي',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'المزوّد المحدد لا يحتوي على مفتاح واجهة برمجة تطبيقات، لذا يعود البحث عن الأماكن إلى OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'لا يوجد مفتاح API للمزوّد المختار، لذا يجيب عن البحث عن الأماكن فهرس TREK وOpenStreetMap وحدهما.',
   'admin.placesProvider.saved': 'تم حفظ مزوّد البحث عن الأماكن',
   'admin.validateKey': 'اختبار',
   'admin.keyValid': 'متصل',
@@ -778,5 +778,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'بدون رحلة',
   'admin.invite.tripHint': 'تتم إضافة المستخدم الجديد تلقائيًا إلى هذه الرحلة عند تسجيله عبر الرابط.',
   'admin.invite.boundTo': 'يُضاف إلى {trip}',
+  'admin.placesUsageTitle': 'فيمَ يُستخدم المفتاح',
+  'admin.mapsKeyHintShort': 'يضيف الصور والتقييمات وساعات العمل. عندها يذهب كل بحث إلى Google.',
+  'admin.amapKeyHintShort': 'للبحث عن الأماكن داخل الصين القارية. يحتاج مفتاح خدمة ويب، لا مفتاح JS API.',
 };
 export default admin;

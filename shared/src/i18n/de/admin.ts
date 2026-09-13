@@ -138,13 +138,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Für die Ortssuche in Festlandchina, wo Google nicht erreichbar ist und OpenStreetMap kaum Daten hat. Benötigt einen Key vom Typ „Web 服务" (Webdienst), nicht einen JS-API-Key. Erhältlich auf console.amap.com.',
   'admin.placesProvider.title': 'Anbieter für die Ortssuche',
-  'admin.placesProvider.subtitle':
-    'Welcher Dienst Ortssuche, Vorschläge und Details beantwortet. Automatisch nutzt Google, wenn ein Google-Key hinterlegt ist, dann Amap, dann OpenStreetMap.',
+  'admin.placesProvider.subtitle': 'Der TREK-Index und OpenStreetMap beantworten jede Suche. Hier wird gewählt, wer zusätzlich gefragt wird, wenn die beiden nichts finden: Automatisch bevorzugt Google, wenn ein Schlüssel da ist, danach Amap.',
   'admin.placesProvider.auto': 'Automatisch',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Für den gewählten Anbieter ist kein API-Key hinterlegt, die Ortssuche fällt daher auf OpenStreetMap zurück.',
+  'admin.placesProvider.missingKey': 'Für den gewählten Anbieter ist kein API-Schlüssel hinterlegt, die Ortssuche beantworten daher nur der TREK-Index und OpenStreetMap.',
   'admin.placesProvider.saved': 'Anbieter für die Ortssuche gespeichert',
   'admin.validateKey': 'Test',
   'admin.keyValid': 'Verbunden',
@@ -805,5 +804,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'Der neue Nutzer wird automatisch zu diesem Trip hinzugefügt, wenn er sich über den Link registriert.',
   'admin.invite.boundTo': 'fügt zu {trip} hinzu',
+  'admin.placesUsageTitle': 'Wofür der Schlüssel benutzt wird',
+  'admin.mapsKeyHintShort': 'Ergänzt Fotos, Bewertungen und Öffnungszeiten. Jede Abfrage geht dann an Google.',
+  'admin.amapKeyHintShort': 'Für die Ortssuche in Festlandchina. Braucht einen Web-Service-Schlüssel, keinen JS-API-Schlüssel.',
 };
 export default admin;

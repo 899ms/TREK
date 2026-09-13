@@ -137,13 +137,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Per la ricerca di luoghi nella Cina continentale, dove Google non è raggiungibile e OpenStreetMap ha pochi dati. Serve una chiave di tipo «Web 服务» (servizio web), non una chiave API JS. Si ottiene su console.amap.com.',
   'admin.placesProvider.title': 'Provider per la ricerca di luoghi',
-  'admin.placesProvider.subtitle':
-    'Quale servizio risponde a ricerca di luoghi, completamento automatico e dettagli. Automatico usa Google se è configurata una chiave Google, poi Amap, poi OpenStreetMap.',
+  'admin.placesProvider.subtitle': "L'indice di TREK e OpenStreetMap rispondono a ogni ricerca. Qui si sceglie chi altro viene interrogato quando non trovano nulla: Automatico preferisce Google se esiste una chiave, poi Amap.",
   'admin.placesProvider.auto': 'Automatico',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Il provider selezionato non ha alcuna chiave API configurata, quindi la ricerca di luoghi ripiega su OpenStreetMap.',
+  'admin.placesProvider.missingKey': "Il provider selezionato non ha una chiave API configurata, quindi alla ricerca di luoghi rispondono solo l'indice TREK e OpenStreetMap.",
   'admin.placesProvider.saved': 'Provider per la ricerca di luoghi salvato',
   'admin.validateKey': 'Testa',
   'admin.keyValid': 'Connessa',
@@ -808,5 +807,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'Il nuovo utente viene aggiunto automaticamente a questo viaggio quando si registra tramite il link.',
   'admin.invite.boundTo': 'aggiunge a {trip}',
+  'admin.placesUsageTitle': 'A cosa serve la chiave',
+  'admin.mapsKeyHintShort': 'Aggiunge foto, valutazioni e orari. Ogni ricerca passa allora da Google.',
+  'admin.amapKeyHintShort': 'Per la ricerca di luoghi nella Cina continentale. Richiede una chiave web service, non una chiave API JS.',
 };
 export default admin;

@@ -274,7 +274,8 @@ describe('MAdminSettingsSection', () => {
     expect(screen.queryByLabelText('Google Maps API Key')).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Amap/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Unsplash API Key')).not.toBeInTheDocument();
-    expect(screen.getByDisplayValue('Automatic')).toBeInTheDocument();
+    // The native select became TREK's own picker: a button carrying the choice.
+    expect(screen.getByRole('button', { name: 'Automatic' })).toBeInTheDocument();
   });
 
   it('FE-MOB-ASET-016c: the missing-key notice follows app-config, not the fields', () => {
@@ -282,11 +283,11 @@ describe('MAdminSettingsSection', () => {
     // failing. Which of the two is true is app-config's answer: the key fields
     // are empty on a managed install and on a key set by the environment.
     const { unmount } = render(<Harness admin={buildAdminHook({ placesProvider: 'amap', hasAmapKey: false })} />);
-    expect(screen.getByText(/falls back to OpenStreetMap/i)).toBeInTheDocument();
+    expect(screen.getByText(/TREK index and OpenStreetMap alone/i)).toBeInTheDocument();
     unmount();
 
     renderSettings({ managed: true, placesProvider: 'google', mapsKey: '', hasMapsKey: true });
-    expect(screen.queryByText(/falls back to OpenStreetMap/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/TREK index and OpenStreetMap alone/i)).not.toBeInTheDocument();
   });
 
   it('FE-MOB-ASET-017: the Google Places toggles persist optimistically', async () => {
@@ -307,6 +308,9 @@ describe('MAdminSettingsSection', () => {
       }),
     );
     const admin = renderSettings();
+    // They live under the Google key now, folded away by default: set once when a
+    // key is pasted, never touched again.
+    await user.click(screen.getByRole('button', { name: 'What the key is used for' }));
 
     await user.click(toggle('Place Photos'));
     await user.click(toggle('Place Autocomplete'));
@@ -331,6 +335,7 @@ describe('MAdminSettingsSection', () => {
       placesAutocompleteEnabled: true,
       placesDetailsEnabled: true,
     });
+    await user.click(screen.getByRole('button', { name: 'What the key is used for' }));
 
     await user.click(toggle('Place Photos'));
     await user.click(toggle('Place Autocomplete'));
@@ -342,13 +347,14 @@ describe('MAdminSettingsSection', () => {
     expect(admin.setPlacesDetailsEnabledState).toHaveBeenLastCalledWith(true);
   });
 
-  it('FE-MOB-ASET-019: the Open-Meteo card lists the three facts', () => {
+  it('FE-MOB-ASET-019: the API-keys card is about keys, and weather needs none', () => {
+    // The Open-Meteo panel left this card, as it did on the desktop tab: it takes
+    // no key and has nothing to configure, so it had no business in a card about
+    // keys, where it had the loudest treatment of anything on it.
     renderSettings();
 
-    expect(screen.getByText('Weather Data')).toBeInTheDocument();
-    expect(screen.getByText('Free, no API key required')).toBeInTheDocument();
-    expect(screen.getByText('16-day forecast')).toBeInTheDocument();
-    expect(screen.getByText('10,000 requests / day')).toBeInTheDocument();
+    expect(screen.queryByText('Weather Data')).not.toBeInTheDocument();
+    expect(screen.queryByText('10,000 requests / day')).not.toBeInTheDocument();
   });
 
   it('FE-MOB-ASET-020: the OIDC form renders its values and saves a payload without an empty secret', async () => {

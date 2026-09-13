@@ -137,12 +137,12 @@ const admin: TranslationStrings = {
     'Pro hledání míst v kontinentální Číně, kde Google není dostupný a OpenStreetMap má málo dat. Vyžaduje klíč typu „Web 服务" (webová služba), nikoli klíč JS API. Získáte na console.amap.com.',
   'admin.placesProvider.title': 'Poskytovatel hledání míst',
   'admin.placesProvider.subtitle':
-    'Která služba obsluhuje hledání míst, našeptávač a podrobnosti. Automaticky použije Google, pokud je nastaven klíč Google, poté Amap a poté OpenStreetMap.',
+    'Vlastní index TREKu a OpenStreetMap odpovídají na každé hledání. Zde se volí, koho se zeptat navíc, když nic nenajdou: Automaticky upřednostní Google, pokud je klíč, pak Amap.',
   'admin.placesProvider.auto': 'Automaticky',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Pro vybraného poskytovatele není nastaven API klíč, hledání míst proto přejde na OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Zvolený poskytovatel nemá nastavený API klíč, na hledání míst tak odpovídá jen index TREKu a OpenStreetMap.',
   'admin.placesProvider.saved': 'Poskytovatel hledání míst uložen',
   'admin.validateKey': 'Testovat',
   'admin.keyValid': 'Připojeno',
@@ -790,5 +790,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Žádná cesta',
   'admin.invite.tripHint': 'Nový uživatel bude po registraci přes odkaz automaticky přidán k této cestě.',
   'admin.invite.boundTo': 'přidá k {trip}',
+  'admin.placesUsageTitle': 'K čemu se klíč používá',
+  'admin.mapsKeyHintShort': 'Přidá fotky, hodnocení a otevírací dobu. Každý dotaz pak jde na Google.',
+  'admin.amapKeyHintShort': 'Pro vyhledávání míst v pevninské Číně. Potřebuje klíč webové služby, ne klíč JS API.',
 };
 export default admin;

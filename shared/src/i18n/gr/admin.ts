@@ -184,12 +184,12 @@ const admin: TranslationStrings = {
     'Για αναζήτηση τοποθεσιών στην ηπειρωτική Κίνα, όπου το Google δεν είναι προσβάσιμο και το OpenStreetMap έχει ελάχιστα δεδομένα. Χρειάζεται κλειδί τύπου «Web 服务» (υπηρεσία web), όχι κλειδί JS API. Διαθέσιμο στο console.amap.com.',
   'admin.placesProvider.title': 'Πάροχος αναζήτησης τοποθεσιών',
   'admin.placesProvider.subtitle':
-    'Ποια υπηρεσία απαντά στην αναζήτηση τοποθεσιών, στις προτάσεις και στις λεπτομέρειες. Το «Αυτόματα» χρησιμοποιεί το Google όταν υπάρχει κλειδί Google, μετά το Amap και μετά το OpenStreetMap.',
+    'Το δικό του ευρετήριο του TREK και το OpenStreetMap απαντούν σε κάθε αναζήτηση. Εδώ επιλέγεται ποιος άλλος ρωτιέται όταν δεν βρίσκουν τίποτα: το Αυτόματο προτιμά τη Google αν υπάρχει κλειδί, μετά το Amap.',
   'admin.placesProvider.auto': 'Αυτόματα',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Ο επιλεγμένος πάροχος δεν έχει ρυθμισμένο κλειδί API, οπότε η αναζήτηση τοποθεσιών επιστρέφει στο OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Ο επιλεγμένος πάροχος δεν έχει ρυθμισμένο κλειδί API, οπότε στην αναζήτηση τόπων απαντούν μόνο το ευρετήριο του TREK και το OpenStreetMap.',
   'admin.placesProvider.saved': 'Ο πάροχος αναζήτησης τοποθεσιών αποθηκεύτηκε',
   'admin.validateKey': 'Δοκιμή',
   'admin.keyValid': 'Συνδέθηκε',
@@ -820,5 +820,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Χωρίς ταξίδι',
   'admin.invite.tripHint': 'Ο νέος χρήστης προστίθεται αυτόματα σε αυτό το ταξίδι όταν εγγραφεί μέσω του συνδέσμου.',
   'admin.invite.boundTo': 'προσθήκη στο {trip}',
+  'admin.placesUsageTitle': 'Σε τι χρησιμοποιείται το κλειδί',
+  'admin.mapsKeyHintShort': 'Προσθέτει φωτογραφίες, βαθμολογίες και ώρες λειτουργίας. Κάθε αναζήτηση πηγαίνει τότε στη Google.',
+  'admin.amapKeyHintShort': 'Για αναζήτηση τόπων στην ηπειρωτική Κίνα. Χρειάζεται κλειδί web service, όχι JS API.',
 };
 export default admin;

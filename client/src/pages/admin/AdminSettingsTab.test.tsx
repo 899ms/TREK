@@ -300,7 +300,7 @@ describe('AdminSettingsTab', () => {
     // failing, which is quiet enough to be mistaken for the provider working.
     renderTab({ placesProvider: 'amap', hasAmapKey: false });
     expect(
-      within(card('API Keys')).getByText(/falls back to OpenStreetMap/i),
+      within(card('API Keys')).getByText(/TREK index and OpenStreetMap alone/i),
     ).toBeInTheDocument();
   });
 

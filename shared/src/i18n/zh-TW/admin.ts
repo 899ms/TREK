@@ -176,12 +176,12 @@ const admin: TranslationStrings = {
     '用於中國大陸境內的地點搜尋（Google 無法存取，OpenStreetMap 內容也很少）。需要「Web 服務」類型的 Key，而非 JS API Key。在 console.amap.com 申請。',
   'admin.placesProvider.title': '地點搜尋來源',
   'admin.placesProvider.subtitle':
-    '決定由哪個服務處理地點搜尋、輸入提示和詳情。自動：配了 Google Key 就用 Google，否則用高德，都沒有則用 OpenStreetMap。',
+    'TREK 自有索引和 OpenStreetMap 會回應每一次搜尋。這裡選擇的是它們一無所獲時還問誰：自動在有金鑰時優先 Google，其次 Amap。',
   'admin.placesProvider.auto': '自動',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': '高德地圖',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': '所選來源尚未設定 API Key，地點搜尋會回退到 OpenStreetMap。',
+  'admin.placesProvider.missingKey': '所選服務商未設定 API 金鑰，因此地點搜尋僅由 TREK 索引和 OpenStreetMap 回應。',
   'admin.placesProvider.saved': '地點搜尋來源已儲存',
   'admin.validateKey': '測試',
   'admin.keyValid': '已連線',
@@ -744,5 +744,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': '不指定行程',
   'admin.invite.tripHint': '新使用者透過連結註冊時，會自動加入此行程。',
   'admin.invite.boundTo': '加入 {trip}',
+  'admin.placesUsageTitle': '金鑰用於什麼',
+  'admin.mapsKeyHintShort': '增加照片、評分和營業時間。之後每次查詢都會送往 Google。',
+  'admin.amapKeyHintShort': '用於中國大陸的地點搜尋。需要 Web 服務金鑰，而非 JS API 金鑰。',
 };
 export default admin;

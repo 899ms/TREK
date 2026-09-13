@@ -172,12 +172,12 @@ const admin: TranslationStrings = {
     'Google に接続できず OpenStreetMap のデータも少ない中国本土での地点検索用です。JS API キーではなく「Web 服务」（Web サービス）タイプのキーが必要です。console.amap.com で取得できます。',
   'admin.placesProvider.title': '地点検索のプロバイダー',
   'admin.placesProvider.subtitle':
-    '地点検索・入力候補・詳細をどのサービスが担当するか。自動は、Google キーが設定されていれば Google、次に Amap、次に OpenStreetMap を使います。',
+    'TREK 自身の索引と OpenStreetMap がすべての検索に答えます。ここでは、それらが何も見つけられなかったときに誰に尋ねるかを選びます。自動はキーがあれば Google を、次に Amap を選びます。',
   'admin.placesProvider.auto': '自動',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap（高德地图）',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': '選択したプロバイダーに API キーが設定されていないため、地点検索は OpenStreetMap にフォールバックします。',
+  'admin.placesProvider.missingKey': '選択したプロバイダに API キーが設定されていないため、地点検索には TREK の索引と OpenStreetMap だけが答えます。',
   'admin.placesProvider.saved': '地点検索のプロバイダーを保存しました',
   'admin.validateKey': 'テスト',
   'admin.keyValid': '接続済み',
@@ -769,5 +769,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': '旅行なし',
   'admin.invite.tripHint': '新しいユーザーがリンク経由で登録すると、自動的にこの旅行に追加されます。',
   'admin.invite.boundTo': '{trip}に追加',
+  'admin.placesUsageTitle': 'キーの使いみち',
+  'admin.mapsKeyHintShort': '写真・評価・営業時間が加わります。以降の検索はすべて Google に送られます。',
+  'admin.amapKeyHintShort': '中国本土での地点検索用。JS API キーではなく Web サービスキーが必要です。',
 };
 export default admin;

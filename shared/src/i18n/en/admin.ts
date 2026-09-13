@@ -178,13 +178,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'For place search inside mainland China, where Google is unreachable and OpenStreetMap coverage is thin. Needs a "Web 服务" (web service) key, not a JS API key. Get one at console.amap.com.',
   'admin.placesProvider.title': 'Place search provider',
-  'admin.placesProvider.subtitle':
-    'Which service answers place search, autocomplete and details. Automatic uses Google when a Google key is configured, then Amap, then OpenStreetMap.',
+  'admin.placesProvider.subtitle': "TREK's own index and OpenStreetMap answer every search. This picks who else is asked when they find nothing: Automatic prefers Google where a key exists, then Amap.",
   'admin.placesProvider.auto': 'Automatic',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'The selected provider has no API key configured, so place search falls back to OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'The selected provider has no API key configured, so place search is answered by the TREK index and OpenStreetMap alone.',
   'admin.placesProvider.saved': 'Place search provider saved',
   'admin.validateKey': 'Test',
   'admin.keyValid': 'Connected',
@@ -780,5 +779,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'No trip',
   'admin.invite.tripHint': 'The new user is automatically added to this trip when they register via the link.',
   'admin.invite.boundTo': 'adds to {trip}',
+  'admin.placesUsageTitle': 'What the key is used for',
+  'admin.mapsKeyHintShort': 'Adds photos, ratings and opening hours. Every lookup then goes to Google.',
+  'admin.amapKeyHintShort': 'For place search inside mainland China. Needs a web service key, not a JS API key.',
 };
 export default admin;

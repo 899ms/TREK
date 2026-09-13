@@ -138,13 +138,12 @@ const admin: TranslationStrings = {
   'admin.amapKeyHint':
     'Voor het zoeken naar plaatsen in het Chinese vasteland, waar Google onbereikbaar is en OpenStreetMap weinig gegevens heeft. Vereist een sleutel van het type ‘Web 服务’ (webservice), geen JS API-sleutel. Verkrijgbaar op console.amap.com.',
   'admin.placesProvider.title': 'Provider voor plaatszoeken',
-  'admin.placesProvider.subtitle':
-    'Welke dienst het zoeken naar plaatsen, de suggesties en de details verzorgt. Automatisch gebruikt Google als er een Google-sleutel is ingesteld, daarna Amap, daarna OpenStreetMap.',
+  'admin.placesProvider.subtitle': 'De eigen index van TREK en OpenStreetMap beantwoorden elke zoekopdracht. Hier kies je wie er nog meer wordt gevraagd als zij niets vinden: Automatisch geeft de voorkeur aan Google als er een sleutel is, daarna Amap.',
   'admin.placesProvider.auto': 'Automatisch',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Voor de gekozen provider is geen API-sleutel ingesteld, dus het zoeken naar plaatsen valt terug op OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Voor de gekozen aanbieder is geen API-sleutel ingesteld, dus plaatszoeken wordt alleen door de TREK-index en OpenStreetMap beantwoord.',
   'admin.placesProvider.saved': 'Provider voor plaatszoeken opgeslagen',
   'admin.validateKey': 'Testen',
   'admin.keyValid': 'Verbonden',
@@ -804,5 +803,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripHint':
     'De nieuwe gebruiker wordt automatisch aan deze reis toegevoegd wanneer hij zich via de link registreert.',
   'admin.invite.boundTo': 'voegt toe aan {trip}',
+  'admin.placesUsageTitle': 'Waar de sleutel voor wordt gebruikt',
+  'admin.mapsKeyHintShort': 'Voegt foto\'s, beoordelingen en openingstijden toe. Elke opzoeking gaat dan naar Google.',
+  'admin.amapKeyHintShort': 'Voor plaatszoeken in het vasteland van China. Vereist een webservicesleutel, geen JS-API-sleutel.',
 };
 export default admin;

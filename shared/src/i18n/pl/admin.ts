@@ -130,12 +130,12 @@ const admin: TranslationStrings = {
     'Do wyszukiwania miejsc w Chinach kontynentalnych, gdzie Google jest nieosiągalny, a OpenStreetMap ma niewiele danych. Wymaga klucza typu „Web 服务" (usługa sieciowa), a nie klucza JS API. Można go uzyskać na console.amap.com.',
   'admin.placesProvider.title': 'Dostawca wyszukiwania miejsc',
   'admin.placesProvider.subtitle':
-    'Która usługa obsługuje wyszukiwanie miejsc, podpowiedzi i szczegóły. Automatycznie używa Google, jeśli ustawiono klucz Google, następnie Amap, a potem OpenStreetMap.',
+    'Własny indeks TREK i OpenStreetMap odpowiadają na każde wyszukiwanie. Tutaj wybierasz, kogo zapytać dodatkowo, gdy nic nie znajdą: Automatycznie preferuje Google, jeśli jest klucz, potem Amap.',
   'admin.placesProvider.auto': 'Automatycznie',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Wybrany dostawca nie ma ustawionego klucza API, więc wyszukiwanie miejsc wróci do OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Wybrany dostawca nie ma skonfigurowanego klucza API, więc na wyszukiwanie miejsc odpowiadają tylko indeks TREK i OpenStreetMap.',
   'admin.placesProvider.saved': 'Zapisano dostawcę wyszukiwania miejsc',
   'admin.validateKey': 'Testuj',
   'admin.keyValid': 'Połączono',
@@ -812,5 +812,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Brak podróży',
   'admin.invite.tripHint': 'Nowy użytkownik zostanie automatycznie dodany do tej podróży po rejestracji przez link.',
   'admin.invite.boundTo': 'dodaje do {trip}',
+  'admin.placesUsageTitle': 'Do czego służy klucz',
+  'admin.mapsKeyHintShort': 'Dodaje zdjęcia, oceny i godziny otwarcia. Każde zapytanie trafia wtedy do Google.',
+  'admin.amapKeyHintShort': 'Do wyszukiwania miejsc w Chinach kontynentalnych. Wymaga klucza usługi webowej, nie klucza JS API.',
 };
 export default admin;

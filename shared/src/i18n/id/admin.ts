@@ -180,12 +180,12 @@ const admin: TranslationStrings = {
     'Untuk pencarian tempat di Tiongkok daratan, tempat Google tidak dapat diakses dan data OpenStreetMap sangat sedikit. Perlu kunci jenis "Web 服务" (layanan web), bukan kunci JS API. Dapatkan di console.amap.com.',
   'admin.placesProvider.title': 'Penyedia pencarian tempat',
   'admin.placesProvider.subtitle':
-    'Layanan mana yang menangani pencarian tempat, saran otomatis, dan detail. Otomatis memakai Google jika kunci Google tersedia, lalu Amap, lalu OpenStreetMap.',
+    'Indeks milik TREK dan OpenStreetMap menjawab setiap pencarian. Di sini dipilih siapa lagi yang ditanya bila keduanya tidak menemukan apa pun: Otomatis memilih Google bila ada kunci, lalu Amap.',
   'admin.placesProvider.auto': 'Otomatis',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
-  'admin.placesProvider.missingKey': 'Penyedia yang dipilih belum memiliki kunci API, sehingga pencarian tempat kembali ke OpenStreetMap.',
+  'admin.placesProvider.missingKey': 'Penyedia yang dipilih belum punya kunci API, jadi pencarian tempat hanya dijawab oleh indeks TREK dan OpenStreetMap.',
   'admin.placesProvider.saved': 'Penyedia pencarian tempat disimpan',
   'admin.validateKey': 'Uji',
   'admin.keyValid': 'Terhubung',
@@ -806,5 +806,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Tanpa perjalanan',
   'admin.invite.tripHint': 'Pengguna baru otomatis ditambahkan ke perjalanan ini saat mereka mendaftar melalui tautan.',
   'admin.invite.boundTo': 'menambahkan ke {trip}',
+  'admin.placesUsageTitle': 'Untuk apa kunci ini dipakai',
+  'admin.mapsKeyHintShort': 'Menambahkan foto, penilaian, dan jam buka. Setiap pencarian lalu ke Google.',
+  'admin.amapKeyHintShort': 'Untuk pencarian tempat di Tiongkok daratan. Perlu kunci layanan web, bukan kunci JS API.',
 };
 export default admin;

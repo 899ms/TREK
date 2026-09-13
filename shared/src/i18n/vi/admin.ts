@@ -180,13 +180,13 @@ const admin: TranslationStrings = {
     'Dùng cho tìm kiếm địa điểm tại Trung Quốc đại lục, nơi không truy cập được Google và dữ liệu OpenStreetMap còn thưa. Cần khóa loại "Web 服务" (dịch vụ web), không phải khóa JS API. Lấy khóa tại console.amap.com.',
   'admin.placesProvider.title': 'Nhà cung cấp tìm kiếm địa điểm',
   'admin.placesProvider.subtitle':
-    'Dịch vụ nào trả lời tìm kiếm địa điểm, tự động hoàn thành và chi tiết. Tự động dùng Google khi đã cấu hình khóa Google, sau đó là Amap, rồi đến OpenStreetMap.',
+    'Chỉ mục riêng của TREK và OpenStreetMap trả lời mọi tìm kiếm. Ở đây chọn ai được hỏi thêm khi chúng không tìm thấy gì: Tự động ưu tiên Google nếu có khóa, rồi đến Amap.',
   'admin.placesProvider.auto': 'Tự động',
   'admin.placesProvider.google': 'Google Places',
   'admin.placesProvider.amap': 'Amap (高德地图)',
   'admin.placesProvider.openstreetmap': 'OpenStreetMap',
   'admin.placesProvider.missingKey':
-    'Nhà cung cấp đã chọn chưa có khóa API, nên tìm kiếm địa điểm sẽ dùng OpenStreetMap thay thế.',
+    'Nhà cung cấp đã chọn chưa có khóa API, nên tìm kiếm địa điểm chỉ do chỉ mục TREK và OpenStreetMap trả lời.',
   'admin.placesProvider.saved': 'Đã lưu nhà cung cấp tìm kiếm địa điểm',
   'admin.validateKey': 'Bài kiểm tra',
   'admin.keyValid': 'Đã kết nối',
@@ -746,5 +746,8 @@ const admin: TranslationStrings = {
   'admin.invite.tripNone': 'Không có chuyến đi',
   'admin.invite.tripHint': 'Người dùng mới sẽ tự động được thêm vào chuyến đi này khi họ đăng ký qua liên kết.',
   'admin.invite.boundTo': 'thêm vào {trip}',
+  'admin.placesUsageTitle': 'Khóa được dùng cho việc gì',
+  'admin.mapsKeyHintShort': 'Thêm ảnh, đánh giá và giờ mở cửa. Mọi tra cứu khi đó sẽ đi qua Google.',
+  'admin.amapKeyHintShort': 'Cho tìm kiếm địa điểm tại Trung Quốc đại lục. Cần khóa dịch vụ web, không phải khóa JS API.',
 };
 export default admin;
