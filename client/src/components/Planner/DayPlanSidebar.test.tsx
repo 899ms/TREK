@@ -229,6 +229,28 @@ describe('DayPlanSidebar', () => {
     expect(screen.getByText('Amsterdam Day')).toBeInTheDocument()
   })
 
+  it('FE-PLANNER-DAYPLAN-002b: the stop a booked night wrote is not listed under the day', () => {
+    // Booking a night puts its hotel on the check-in day as a stop, because road trip
+    // mode drives to it. The day header already shows that booking as its own overnight
+    // block, so listing the stop here would be the same hotel twice. The one the
+    // traveller placed keeps its row.
+    const day = buildDay({ id: 10, date: '2025-06-01', title: 'Day One' })
+    const museum = buildPlace({ id: 601, name: 'Pergamonmuseum' })
+    const hotel = buildPlace({ id: 602, name: 'Hotel Adlon', stop_type: 'hotel' })
+    render(<DayPlanSidebar {...makeDefaultProps({
+      days: [day], places: [museum, hotel], selectedDayId: 10,
+      assignments: {
+        '10': [
+          buildAssignment({ id: 401, day_id: 10, order_index: 0, place: museum }),
+          buildAssignment({ id: 402, day_id: 10, order_index: 1, place: hotel, accommodation_id: 7 } as never),
+        ],
+      },
+    })} />)
+
+    expect(screen.getAllByText('Pergamonmuseum').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Hotel Adlon')).toBeNull()
+  })
+
   it('FE-PLANNER-DAYPLAN-003: renders day number when title is null', () => {
     const day = buildDay({ title: null, date: '2025-06-01' })
     render(<DayPlanSidebar {...makeDefaultProps({ days: [day] })} />)

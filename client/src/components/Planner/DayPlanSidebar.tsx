@@ -412,8 +412,20 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     })
   }
 
+  // Two reasons a stop can be road-trip-only, and they are not the same reason.
+  //
+  // The switch is the traveller's: it keeps the petrol stations and rest areas they
+  // added along the drive out of a day list they want to read as a plan.
+  //
+  // A stop a lodging booking put there is out whatever the switch says. The day
+  // already carries that booking as its own overnight block in the header, so the
+  // row would be the same hotel a second time. Road trip mode wants it, which is
+  // why it is a stop at all: the drive has to end somewhere, and that somewhere is
+  // where you sleep.
   const getDayAssignments = (dayId) =>
-    (assignments[String(dayId)] || []).filter(a => mirrorServiceStops || !isServiceStopType(a.place?.stop_type)).slice().sort((a, b) => a.order_index - b.order_index)
+    (assignments[String(dayId)] || [])
+      .filter(a => a.accommodation_id == null && (mirrorServiceStops || !isServiceStopType(a.place?.stop_type)))
+      .slice().sort((a, b) => a.order_index - b.order_index)
 
   // Compute initial day_plan_position for a transport based on time
   const computeTransportPosition = (r, da) => {
