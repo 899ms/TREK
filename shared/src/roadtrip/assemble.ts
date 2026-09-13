@@ -176,7 +176,15 @@ export function assembleRoadtrip({
     for (let i = 0; i < stops.length; i++) {
       const incoming = inboundAt.get(i);
       if (incoming?.seg) {
-        const incomingDrive = deriveDriveWarnings([incoming.seg], [false, false], limits, carryKm);
+        // Slot 1 is the stop the leg ARRIVES at, which for an inbound leg is this
+        // one. Hard-coded false, the range warning could never be suppressed by
+        // the very charger or petrol station that resolves it.
+        const incomingDrive = deriveDriveWarnings(
+          [incoming.seg],
+          [false, refuelsRange(stops[i]!.stopType, vehicleKind)],
+          limits,
+          carryKm,
+        );
         carryKm = incomingDrive.carryKm;
         drive.warnings.push(...incomingDrive.warnings.map((w) => ({ ...w, index: i })));
         for (const dry of incomingDrive.emptyAt) {
@@ -191,7 +199,11 @@ export function assembleRoadtrip({
       const leg = routed[i];
       const outgoing = deriveDriveWarnings(
         i < stops.length - 1 ? [leg?.seg] : [],
-        [refuelsRange(stops[i]!.stopType, vehicleKind), false],
+        // Departure, then arrival: this leg leaves stop i and reaches stop i + 1,
+        // so a range warning belongs to the next stop and is the next stop's to
+        // answer for. With false here, a day that stops at a charger 700 km in
+        // still reported running dry at the charger.
+        [refuelsRange(stops[i]!.stopType, vehicleKind), refuelsRange(stops[i + 1]?.stopType, vehicleKind)],
         limits,
         carryKm,
         [stops[i]!.fillPercent],

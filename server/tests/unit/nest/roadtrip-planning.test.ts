@@ -102,9 +102,11 @@ describe('roadtrip preferences', () => {
     expect(() => s.preferences.update(10, { roadtrip_day_end: '06:00', roadtrip_range_km: 200 })).toThrow();
     expect(s.preferenceDb.run).not.toHaveBeenCalled();
     s.preferences.update(10, { roadtrip_day_start: '06:00', roadtrip_day_end: '09:00' });
+    // The fourth argument is the socket that saved, so the tab that made the
+    // change is left out of its own echo. Undefined here: no header was sent.
     expect(s.realtime.broadcast).toHaveBeenCalledWith('10', 'roadtripPreferences:changed', {
       preferences: s.preferences.read(10),
-    });
+    }, undefined);
     expect(s.preferences.read(10).roadtrip_range_km).toBe(100);
   });
   it.each([

@@ -15,6 +15,9 @@ import {
   parseClock,
   effectiveRangeKm,
   parseAvoid,
+  formatDistance,
+  formatDurationShort,
+  type DistanceUnit,
   type RoadtripStop,
   type PlanDay,
   type RoutedLeg,
@@ -133,6 +136,8 @@ export class RoadtripPlanService {
     if (context.visits.length > 150)
       throw new HttpException({ error: 'This trip exceeds the 150-visit calculation limit.' }, 400);
     const asked = new Set<string>();
+    const distanceUnit: DistanceUnit =
+      this.settings.getUserSettings(userId).distance_unit === 'imperial' ? 'imperial' : 'metric';
     const fetchRun = async (stops: RoadtripStop[], dayId: number, profile: string) => {
       const points: { lat: number; lng: number }[] = [];
       const stopAt: number[] = [];
@@ -152,12 +157,28 @@ export class RoadtripPlanService {
       try {
         if (points.length > 100) throw new Error('Too many waypoints');
         const routed = await this.router.route(userId, tripId, dayId, points, profile, avoid);
-        const legs = routed.parts.map((part, index) => ({
-          ...routed.leg.seg,
-          ...part,
-          from: [points[index].lat, points[index].lng] as [number, number],
-          to: [points[index + 1].lat, points[index + 1].lng] as [number, number],
-        }));
+        // Spreading the run's own seg first carried its whole-route text and
+        // midpoint onto every leg of a multi-stop run: `part` only overrides the
+        // metres and the seconds, so leg one of a 480 km day reported 100 km with
+        // "480 km" printed beside it. The four texts and the midpoint are per leg
+        // now, the way the browser has always computed them — and in the reader's
+        // own unit, rather than the router's hard-coded kilometres.
+        const legs = routed.parts.map((part, index) => {
+          const from = [points[index].lat, points[index].lng] as [number, number];
+          const to = [points[index + 1].lat, points[index + 1].lng] as [number, number];
+          const durationText = formatDurationShort(part.duration);
+          return {
+            ...routed.leg.seg,
+            ...part,
+            from,
+            to,
+            mid: [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2] as [number, number],
+            distanceText: formatDistance(part.distance / 1000, distanceUnit),
+            durationText,
+            drivingText: durationText,
+            walkingText: durationText,
+          };
+        });
         Object.assign(
           allLegs,
           foldRouteRun(stops, stopAt, { coordinates: routed.leg.line, legs, vias: routed.leg.vias }, profile),
@@ -236,7 +257,7 @@ export class RoadtripPlanService {
       vehicleKind,
       connectDays,
       boundaries: context.boundaries,
-      distanceUnit: this.settings.getUserSettings(userId).distance_unit === 'imperial' ? 'imperial' : 'metric',
+      distanceUnit,
       labels: { start: 'Continue journey', end: 'End of day' },
     });
     return {
