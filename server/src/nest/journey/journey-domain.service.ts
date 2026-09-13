@@ -338,6 +338,9 @@ export class JourneyDomainService {
       cover_image: string;
       status: string;
       show_trip_tracks: boolean | number;
+      show_verdict: boolean | number;
+      show_mood: boolean | number;
+      show_weather: boolean | number;
     }>,
   ): Journey | null {
     // Journey-level settings (title, cover, status) are owner-only — editors
