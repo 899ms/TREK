@@ -120,6 +120,8 @@ export interface DayAssignment {
   end_day?: number;
   leg_transport_mode?: string | null;
   incoming_leg_transport_mode?: string | null;
+  /** The lodging booking that put this stop on the day, when one did. */
+  accommodation_id?: number | null;
   created_at?: string;
 }
 

@@ -114,6 +114,9 @@ export class DaysService {
         order_index: a.order_index,
         end_day: a.end_day === 1,
         notes: a.notes,
+        // Repeated here for the same reason stop_type is: the day list hides the stop
+        // a booking wrote, and this copy is one of the paths that feed it.
+        accommodation_id: a.accommodation_id ?? null,
         created_at: a.created_at,
         place: {
           id: a.place_id,

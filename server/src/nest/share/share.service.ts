@@ -316,6 +316,9 @@ export class ShareService {
           if (!byDay[a.day_id]) byDay[a.day_id] = [];
           byDay[a.day_id].push({
             id: a.id, day_id: a.day_id, order_index: a.order_index, notes: a.notes,
+            // The shared page shows the booking as its own chip on the day, so it needs
+            // to know which stop is that booking and leave it out of the list.
+            accommodation_id: a.accommodation_id ?? null,
             place: {
               id: a.place_id, name: a.place_name, description: a.place_description,
               lat: a.lat, lng: a.lng, address: a.address, category_id: a.category_id,

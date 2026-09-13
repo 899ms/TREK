@@ -124,14 +124,21 @@ export class AssignmentsService {
     return !!this.dbs.get('SELECT id FROM places WHERE id = ? AND trip_id = ?', placeId, tripId);
   }
 
-  createAssignment(dayId: string | number, placeId: unknown, notes?: string | null) {
+  /**
+   * @param opts.accommodationId The lodging booking this stop belongs to, when a
+   * booking is what put it there. Written by the INSERT rather than stamped on
+   * afterwards: the row this returns is what the answer hands the client, and a
+   * stop that reaches it without its booking id is one the day list cannot tell
+   * from a place the traveller added, so it draws the hotel a second time.
+   */
+  createAssignment(dayId: string | number, placeId: unknown, notes?: string | null, opts: { accommodationId?: number } = {}) {
     const result = this.dbs.transaction(() => {
       const maxOrder = this.dbs.get<{ max: number | null }>('SELECT MAX(order_index) as max FROM day_assignments WHERE day_id = ?', dayId)!;
       const orderIndex = (maxOrder.max !== null ? maxOrder.max : -1) + 1;
 
       return this.dbs.run(
-        'INSERT INTO day_assignments (day_id, place_id, order_index, notes) VALUES (?, ?, ?, ?)',
-        dayId, placeId, orderIndex, notes || null
+        'INSERT INTO day_assignments (day_id, place_id, order_index, notes, accommodation_id) VALUES (?, ?, ?, ?, ?)',
+        dayId, placeId, orderIndex, notes || null, opts.accommodationId ?? null
       );
     });
 

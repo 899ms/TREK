@@ -255,11 +255,13 @@ export class AccommodationsService {
     // Through AssignmentsService, so the stop lands at the end of the day with the
     // order_index every other new assignment gets. Evening is where you arrive at a
     // hotel, and the day planner has no drive to position it against anyway.
-    const created = this.assignments.createAssignment(dayId, placeId);
-    if (created) {
-      this.db.run('UPDATE day_assignments SET accommodation_id = ? WHERE id = ?', accommodationId, created.id);
-      mirror.created = created;
-    }
+    //
+    // The booking id goes in with the INSERT, not as an UPDATE afterwards: what this
+    // returns is the row the answer hands the client, and stamping the id on later
+    // would leave that copy without it. The day list has nothing else to tell the
+    // stop from a place the traveller added, so it would show the hotel a second
+    // time until the next reload.
+    mirror.created = this.assignments.createAssignment(dayId, placeId, null, { accommodationId });
     return mirror;
   }
 

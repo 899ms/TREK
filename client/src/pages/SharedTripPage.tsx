@@ -465,7 +465,11 @@ export default function SharedTripPage() {
             {/* Day Plan */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {sortedDays.map((day: any, di: number) => {
-                const da = assignments[String(day.id)] || [];
+                // Without the booked nights: the day already shows each of them as its
+                // own chip, and the stop a booking writes for the drive would be that
+                // same hotel a second time. There is no road trip view on a shared link,
+                // so the stop has nothing else to do here.
+                const da = (assignments[String(day.id)] || []).filter((a: any) => a.accommodation_id == null);
                 // A share can still carry an assignment for a deleted place. The timeline
                 // skips those rows, so the header must not count them either.
                 const dayPlaceCount = da.filter((a: any) => a.place).length;

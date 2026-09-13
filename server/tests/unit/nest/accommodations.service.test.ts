@@ -607,6 +607,11 @@ describe('the day stop a booking implies', () => {
     expect(stops).toHaveLength(1);
     expect(stops[0]).toMatchObject({ place_id: place.id, accommodation_id: accommodation.id });
     expect(mirror.created).toMatchObject({ id: stops[0].id, day_id: day.id, place_id: place.id });
+    // On the answer, not only in the table. This copy is what the client that booked
+    // the night puts in its store, and accommodation_id is the only thing telling the
+    // day list this row is the booking it already shows in the header. Without it the
+    // hotel appears a second time among the day's places until the next reload.
+    expect(mirror.created.accommodation_id).toBe(accommodation.id);
   });
 
   it('ACC-022 the stop lands at the end of the day, where you arrive at a hotel', () => {

@@ -1353,6 +1353,39 @@ describe('SharedTripPage', () => {
     });
   });
 
+  describe('FE-PAGE-SHARED-037b: a booked night is not listed twice on a shared day', () => {
+    // Booking a night puts its hotel on the check-in day as a stop, because road trip
+    // mode drives to it. A shared link has no road trip view and already shows the
+    // booking as its own chip on the day, so that stop would be the same hotel again.
+    const days = [{ id: 41, trip_id: 1, day_number: 1, date: '2026-07-01', title: 'Day One' }];
+    // The address is the tell: the list row prints it, the map marker's tooltip does not,
+    // so it says whether the row rendered rather than whether the place exists at all.
+    const place = (id: number, name: string, address: string) => ({
+      id, name, description: null, address, lat: 48.86, lng: 2.34, category_id: null,
+      price: null, place_time: null, end_time: null, duration_minutes: null, notes: null,
+      website: null, phone: null, image_url: null, transport_mode: null, category: null, tags: [],
+    });
+
+    it('leaves out the stop the booking wrote and keeps the one the traveller placed', async () => {
+      await open('stay-token', payload({
+        days,
+        assignments: {
+          41: [
+            { id: 401, day_id: 41, order_index: 0, notes: null, accommodation_id: null, place: place(601, 'Musee Rodin', '77 Rue de Varenne') },
+            { id: 402, day_id: 41, order_index: 1, notes: null, accommodation_id: 7, place: place(602, 'Hotel Adlon', 'Unter den Linden 77') },
+          ],
+        },
+        accommodations: [{ id: 7, place_id: 602, start_day_id: 41, end_day_id: 41, place_name: 'Hotel Adlon' }],
+      }));
+
+      fireEvent.click(screen.getByText('Day One'));
+      // The stop the traveller placed is listed, address and all.
+      await waitFor(() => expect(screen.getByText('77 Rue de Varenne')).toBeInTheDocument());
+      // The booked night is not: it is already on the day as its own chip.
+      expect(screen.queryByText('Unter den Linden 77')).toBeNull();
+    });
+  });
+
   // ── #2320: the richer read-only detail ─────────────────────────────────
 
   describe('FE-PAGE-SHARED-038: a stop shows its address, description, both notes, duration and contact (#2320)', () => {
