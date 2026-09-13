@@ -1,4 +1,4 @@
-import { MapPin } from 'lucide-react'
+import { MapPin, Plus } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { moodMeta, weatherMeta } from '../../mobile/screens/journey/mobileJourneyMeta'
 import CountryFlag from '../shared/CountryFlag'
@@ -130,9 +130,17 @@ export default function JourneyEntryCover({
           <CountryFlag code={entry.country_code} size={14} />
         </span>
       )}
+      {/* A mark rather than the word: "Suggestion" spelled out took a third of a
+          136px card and pushed the date off it. The plus is the same promise the
+          desktop suggestion card makes with its Add Entry button, and the card's
+          italic, dimmed title carries the rest. */}
       {isSuggestion && (
-        <span className={`absolute top-2 ${entry.country_code ? 'left-[30px]' : 'left-2'} ${badge} uppercase tracking-[0.06em]`}>
-          {t('journey.entry.suggestion')}
+        <span
+          className={`absolute top-2 ${entry.country_code ? 'left-[30px]' : 'left-2'} ${badgeDot} text-white`}
+          title={t('journey.entry.suggestion')}
+          aria-label={t('journey.entry.suggestion')}
+        >
+          <Plus size={12} strokeWidth={2.8} />
         </span>
       )}
 

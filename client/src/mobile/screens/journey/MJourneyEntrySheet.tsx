@@ -963,6 +963,24 @@ export default function MJourneyEntrySheet({
         )}
       </div>
 
+      {/* A suggestion is not deleted, it is put down: the row survives so the trip
+          sync does not offer the same place again (discussion #2299).
+
+          Its own row above the buttons rather than among them: the sentence is
+          longer than a button label and wrapped into two lines between Delete and
+          Cancel. Full width, it reads as what it is, an alternative to saving this
+          suggestion rather than a fourth thing competing with them. */}
+      {!readOnly && onDismiss && (
+        <button
+          type="button"
+          onClick={onDismiss}
+          className="mx-[18px] mt-1 mb-[10px] flex flex-none items-center gap-[9px] rounded-[14px] border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] px-[13px] py-[10px] text-left"
+        >
+          <EyeOff size={15} strokeWidth={2} className="flex-none text-m-muted" />
+          <span className="min-w-0 flex-1 text-[0.8125rem] font-semibold">{t('journey.suggestions.dismiss')}</span>
+        </button>
+      )}
+
       <div className="flex flex-none items-center gap-2 border-t border-[color:var(--m-rowbr)] px-[18px] pb-4 pt-3">
         {!readOnly && onDelete && (
           <button
@@ -972,18 +990,6 @@ export default function MJourneyEntrySheet({
           >
             <Trash2 size={13} strokeWidth={2} />
             {t('common.delete')}
-          </button>
-        )}
-        {/* A suggestion is not deleted, it is put down: the row survives so the trip
-            sync does not offer the same place again (discussion #2299). */}
-        {!readOnly && onDismiss && (
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="flex items-center gap-[5px] text-[0.75rem] font-bold text-m-muted"
-          >
-            <EyeOff size={13} strokeWidth={2} />
-            {t('journey.suggestions.dismiss')}
           </button>
         )}
         {!readOnly && captureOnly && (

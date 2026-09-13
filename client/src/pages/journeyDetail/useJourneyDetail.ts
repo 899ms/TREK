@@ -283,7 +283,7 @@ export function useJourneyDetail() {
       if (current) await loadJourney(current.id)
       toast.success(t('journey.suggestions.dismissed'))
     } catch {
-      toast.error(t('common.errorOccurred'))
+      toast.error(t('common.errorTitle'))
     }
   }, [updateEntry, loadJourney, current, toast, t])
 
@@ -294,7 +294,7 @@ export function useJourneyDetail() {
       await loadJourney(current.id)
       toast.success(t('journey.suggestions.restored', { count: String(restored) }))
     } catch {
-      toast.error(t('common.errorOccurred'))
+      toast.error(t('common.errorTitle'))
     }
   }, [current, loadJourney, toast, t])
 

@@ -481,7 +481,7 @@ function JourneyDetailPageDesktop() {
                             const [moved] = reordered.splice(idx, 1)
                             reordered.splice(target, 0, moved)
                             reorderEntries(current.id, reordered.map(e => e.id))
-                              .catch(() => toast.error(t('common.errorOccurred')))
+                              .catch(() => toast.error(t('common.errorTitle')))
                           }
                           // The active outline traces the card, so it has to know which
                           // card: the three kinds round their corners differently, and a

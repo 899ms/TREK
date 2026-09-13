@@ -61,8 +61,10 @@ describe('JourneyEntryCover', () => {
       />,
     )
 
-    // Once as the badge, once as the fallback title.
-    expect(screen.getAllByText('Suggestion').length).toBe(2)
+    // The corner mark says it to a screen reader; the title says it in words,
+    // since a suggestion pulled from a trip place is the one card with no story.
+    expect(screen.getByLabelText('Suggestion')).toBeInTheDocument()
+    expect(screen.getByText('Suggestion')).toBeInTheDocument()
   })
 
   it('FE-JRN-COVER-005: mood and weather appear only while the journey keeps those fields', () => {

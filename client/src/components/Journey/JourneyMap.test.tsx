@@ -48,6 +48,9 @@ vi.mock('leaflet', () => {
       divIcon: vi.fn(() => ({})),
       latLngBounds: vi.fn(() => ({})),
       layerGroup: vi.fn(() => ({ addLayer: vi.fn(), addTo: vi.fn(), remove: vi.fn() })),
+      // The map builds its own attribution control so it can collapse to the credit
+      // alone (see the GL twin: the phone lays a carousel over the bottom edge).
+      control: { attribution: vi.fn(() => ({ addTo: vi.fn() })) },
     },
     map: vi.fn(() => mockMap),
     tileLayer: vi.fn(() => ({ addTo: vi.fn(), setUrl: vi.fn() })),
@@ -55,6 +58,7 @@ vi.mock('leaflet', () => {
     polyline: vi.fn(() => { const line: any = { addTo: vi.fn(() => line), bindTooltip: vi.fn(() => line) }; return line }),
     divIcon: vi.fn(() => ({})),
     latLngBounds: vi.fn(() => ({})),
+    control: { attribution: vi.fn(() => ({ addTo: vi.fn() })) },
   };
 });
 
@@ -161,10 +165,11 @@ describe('JourneyMap', () => {
     render(
       <JourneyMap checkins={[]} entries={entriesWithCoords} />
     );
-    // Each marker calls bindTooltip with the entry label
+    // The tooltip is the same card the GL renderer draws now (#2299), so the title
+    // is inside its markup rather than being the whole label.
     const mockMarkerInstance = (L.marker as any).mock.results[0].value;
     expect(mockMarkerInstance.bindTooltip).toHaveBeenCalledWith(
-      'Paris',
+      expect.stringContaining('Paris'),
       expect.objectContaining({ direction: 'top' }),
     );
   });
@@ -205,12 +210,12 @@ describe('JourneyMap', () => {
     // Tooltips use the entry titles
     const mockMarker1 = (L.marker as any).mock.results[0].value;
     expect(mockMarker1.bindTooltip).toHaveBeenCalledWith(
-      'Happy Paris',
+      expect.stringContaining('Happy Paris'),
       expect.objectContaining({ direction: 'top' }),
     );
     const mockMarker2 = (L.marker as any).mock.results[1].value;
     expect(mockMarker2.bindTooltip).toHaveBeenCalledWith(
-      'Sad Berlin',
+      expect.stringContaining('Sad Berlin'),
       expect.objectContaining({ direction: 'top' }),
     );
   });
@@ -551,7 +556,9 @@ describe('JourneyMap', () => {
         ]}
       />
     );
-    const tooltipTitles = vi.mocked(mockedMarker().bindTooltip).mock.calls.map(c => c[0]);
+    const titleOf = (html: unknown) =>
+      String(html).match(/trek-journey-popup-title">([^<]*)</)?.[1] ?? '';
+    const tooltipTitles = vi.mocked(mockedMarker().bindTooltip).mock.calls.map(c => titleOf(c[0]));
     expect(tooltipTitles).toEqual(['Paris', 'Berlin']);
   });
 
@@ -562,7 +569,10 @@ describe('JourneyMap', () => {
         entries={[{ id: 'e0', lat: 1, lng: 2, title: null, mood: null, entry_date: '2025-06-01' }]}
       />
     );
-    expect(mockedMarker().bindTooltip).toHaveBeenCalledWith('Entry', expect.objectContaining({ direction: 'top' }));
+    expect(mockedMarker().bindTooltip).toHaveBeenCalledWith(
+      expect.stringContaining('Entry'),
+      expect.objectContaining({ direction: 'top' }),
+    );
   });
 
   it('FE-COMP-JOURNEYMAP-037: unmounting tears the leaflet map down', () => {
@@ -690,7 +700,7 @@ describe('JourneyMap', () => {
 
     const labels = vi.mocked(mockedMarker().bindTooltip).mock.calls.map(c => c[0]);
     expect(labels.some(l => typeof l === 'string' && l.includes('<img'))).toBe(false);
-    expect(labels).toContain('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;');
+    expect(labels.some(l => typeof l === 'string' && l.includes('&lt;img src=x onerror=&quot;alert(1)&quot;&gt;'))).toBe(true);
   });
   // #1614 — photos placed by their own capture coordinates, collapsed by proximity.
   it('FE-COMP-JOURNEYMAP-046: draws one thumbnail per cluster and counts the rest', () => {

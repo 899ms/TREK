@@ -195,7 +195,8 @@ describe('JourneyMapGL', () => {
     render(<JourneyMapGL checkins={[]} entries={entries} />)
     expect(mapboxgl.accessToken).toBe('pk.test_token')
     expect(mapboxgl.Map).toHaveBeenCalledTimes(1)
-    expect(mapOptions()).toMatchObject({ style: 'mapbox://styles/mapbox/standard', attributionControl: true })
+    // Collapsed to its ⓘ rather than a strip of text across the bottom (#2299).
+    expect(mapOptions()).toMatchObject({ style: 'mapbox://styles/mapbox/standard', attributionControl: { compact: true } })
   })
 
   it('FE-COMP-JMAPGL-003: maplibre needs no token and opts out of the around-center rotate', () => {
@@ -331,7 +332,7 @@ describe('JourneyMapGL', () => {
     const html = popupHtml()
     expect(html).toContain('>Louvre<')
     expect(html).toContain('trek-journey-popup-place')
-    expect(html).toContain('trek-journey-popup-sep')
+    expect(html).toContain('trek-journey-popup-chip')
   })
 
   it('FE-COMP-JMAPGL-014: the popup falls back to the location name when the entry has no title', () => {
@@ -349,9 +350,9 @@ describe('JourneyMapGL', () => {
 
     const html = popupHtml()
     expect(html).toContain('>Reykjavík<')
-    // the location moved to the title line, so there is no place chip left below
+    // the location moved to the title line, so there is no place chip left below.
+    // The date keeps its own chip, which is why only the place one is checked.
     expect(html).not.toContain('trek-journey-popup-place')
-    expect(html).not.toContain('trek-journey-popup-sep')
   })
 
   it('FE-COMP-JMAPGL-015: an entry with neither title nor place still gets a heading', () => {

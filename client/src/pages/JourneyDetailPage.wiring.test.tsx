@@ -248,7 +248,7 @@ describe('JourneyDetailPage wiring', () => {
     const reorderEntries = vi.fn(async () => { throw new Error('conflict'); });
     setup({ reorderEntries });
     fireEvent.click(screen.getAllByRole('button', { name: 'dayplan.moveDown' })[0]);
-    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('common.errorOccurred'));
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith('common.errorTitle'));
   });
 
   it('FE-JRN-DETWIRE-013: entry-card actions open the editor, the delete confirm and the lightbox', () => {

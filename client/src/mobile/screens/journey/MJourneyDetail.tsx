@@ -158,7 +158,7 @@ export default function MJourneyDetail() {
       await reorderEntries(current.id, reordered.map(e => e.id))
       await loadJourney(current.id)
     } catch {
-      toast.error(t('common.errorOccurred'))
+      toast.error(t('common.errorTitle'))
     }
   }, [current, entries, reorderEntries, loadJourney, toast, t])
 
