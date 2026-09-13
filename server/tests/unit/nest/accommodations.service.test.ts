@@ -779,6 +779,38 @@ describe('the day stop a booking implies', () => {
     expect(mirror.removed).toEqual([]);
   });
 
+  it('ACC-032b keepStop hands the mirrored stop to the traveller instead of taking it away', () => {
+    // The road trip popup switching a night back to an ordinary pause: the booking is
+    // what was cancelled, not the place, and the stop sits mid-drive where re-adding it
+    // would land it at the end of the day instead.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day.id, day.id);
+    const mirrored = stopsOn(day.id)[0];
+
+    const { mirror } = svc.deleteAccommodation(accommodation.id, { keepStop: true });
+
+    // Still there, and now unmarked: nothing may move or delete it on the next edit.
+    expect(stopsOn(day.id)).toEqual([expect.objectContaining({ id: mirrored.id, place_id: place.id, accommodation_id: null })]);
+    // Nothing to announce either — no session has to take a stop off its day plan.
+    expect(mirror.removed).toEqual([]);
+    expect(testDb.prepare('SELECT id FROM day_accommodations WHERE id = ?').get(accommodation.id)).toBeUndefined();
+  });
+
+  it('ACC-032c remove() forwards keepStop, which is the only door the REST route uses', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id, { name: 'Hotel Adlon' });
+    const { accommodation } = book(trip.id, place.id, day.id, day.id);
+
+    svc.remove(accommodation.id, { keepStop: true });
+
+    expect(stopsOn(day.id)).toEqual([expect.objectContaining({ place_id: place.id, accommodation_id: null })]);
+  });
+
   it('ACC-033 announceMirror sends the removal before the arrival', () => {
     // Order matters on a move: the day plan would briefly hold the place twice if the
     // arrival went first.

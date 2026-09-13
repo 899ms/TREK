@@ -96,6 +96,35 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
         .toEqual({ accommodation: { id: 9 }, assignment: mirror.created, removedAssignments: mirror.removed });
       expect(announceMirror).toHaveBeenCalledWith('5', mirror, expect.any(Function), 'sock');
     });
+
+    it('ACC-CTL-003 404s a place or day that is not on this trip, before the write', () => {
+      const get = vi.fn().mockReturnValue({ id: 9 });
+      const update = vi.fn();
+      const validateRefs = vi.fn().mockReturnValue([{ message: 'Place not found' }]);
+      const svc = makeService({ get, update, validateRefs } as Partial<AccommodationsService>);
+      expect(thrown(() => new AccommodationsController(svc).update(user, '5', '9', refs)))
+        .toEqual({ status: 404, body: { error: 'Place not found' } });
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it('ACC-CTL-004 the mirror sender is the same broadcast, socket id and all', () => {
+      // announceMirror decides which events a stay write implies; the controller only
+      // hands it the door out. That door has to carry the sender's socket id, or the
+      // session that just moved the booking is told about its own stop twice.
+      const get = vi.fn().mockReturnValue({ id: 9 });
+      const mirror = { created: { id: 78, day_id: 11 }, removed: [{ id: 77, dayId: 10 }], stamped: null };
+      const update = vi.fn().mockReturnValue({ accommodation: { id: 9 }, mirror });
+      const broadcast = vi.fn();
+      type Send = (event: string, payload: unknown) => void;
+      const announceMirror = vi.fn((_tripId: string, m: typeof mirror, send: Send) => {
+        for (const stop of m.removed) send('assignment:deleted', { assignmentId: stop.id, dayId: stop.dayId });
+        if (m.created) send('assignment:created', { assignment: m.created });
+      });
+      const svc = makeService({ get, update, broadcast, announceMirror } as Partial<AccommodationsService>);
+      new AccommodationsController(svc).update(user, '5', '9', refs, 'sock');
+      expect(broadcast).toHaveBeenCalledWith('5', 'assignment:deleted', { assignmentId: 77, dayId: 10 }, 'sock');
+      expect(broadcast).toHaveBeenCalledWith('5', 'assignment:created', { assignment: mirror.created }, 'sock');
+    });
   });
 
   describe('DELETE /:id', () => {
@@ -129,6 +158,25 @@ describe('AccommodationsController (parity with the legacy accommodations sub-ro
       new AccommodationsController(svc).remove(user, '5', '9', 'sock');
       expect(broadcast).toHaveBeenCalledWith('5', 'reservation:deleted', { reservationId: 4 }, 'sock');
       expect(broadcast).toHaveBeenCalledWith('5', 'reservation:deleted', { reservationId: 5 }, 'sock');
+    });
+
+    it('ACC-CTL-005 ?keepStop=true is what turns a night back into an ordinary pause', () => {
+      // The road trip popup switching the night off: the booking goes, the stop it
+      // brought stays where it is in the drive. Nothing else may pass that flag, so
+      // only the literal string counts.
+      const get = vi.fn().mockReturnValue({ id: 9 });
+      const remove = vi.fn().mockReturnValue({
+        linkedReservationId: null, deletedBudgetItemId: null,
+        linkedReservationIds: [], deletedBudgetItemIds: [], mirror: noMirror,
+      });
+      const svc = makeService({ get, remove } as Partial<AccommodationsService>);
+      const controller = new AccommodationsController(svc);
+
+      controller.remove(user, '5', '9', 'sock', 'true');
+      expect(remove).toHaveBeenLastCalledWith('9', { keepStop: true });
+
+      controller.remove(user, '5', '9', 'sock');
+      expect(remove).toHaveBeenLastCalledWith('9', { keepStop: false });
     });
   });
 });
