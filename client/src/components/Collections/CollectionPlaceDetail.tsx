@@ -216,23 +216,7 @@ export default function CollectionPlaceDetail({
         <div className="col-detail-head">
           {editing
             ? <input value={name} onChange={e => setName(e.target.value)} className="col-detail-name-input" autoFocus aria-label={t('collections.listName')} />
-            : (
-              /* Beside the name, not three rows below it: a label is part of what this
-                 place IS, the same as its name, and read on its own further down it
-                 looked like a property of the rating above it. */
-              <div className="col-detail-titlerow">
-                <h2 className="col-detail-name">{place.name}</h2>
-                {assignedLabels.length > 0 && (
-                  <div className="col-detail-labels on-cover">
-                    {assignedLabels.map(l => (
-                      <span key={l.id} className="col-labelchip on static" style={{ ['--label' as string]: l.color || 'var(--accent)' }}>
-                        <span className="col-labelchip-dot" /> {l.name}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            : <h2 className="col-detail-name">{place.name}</h2>}
         </div>
       </div>
 
@@ -251,11 +235,22 @@ export default function CollectionPlaceDetail({
         <StatusSegment status={place.status} onSet={canEdit ? onSetStatus : () => {}} t={t} />
 
         {/* Collaborative rating (#1435) — every member votes; the average shows. */}
-        {onRate && (
-          /* In a panel of full-width rows, a bare line of stars read as another row of
-             text. Set on its own ground it reads as the one thing here you can answer. */
-          <div className="col-detail-rating">
-            <PlaceRating ratings={place.ratings ?? []} ratingAvg={place.rating_avg} onRate={onRate} />
+        {/* Rating and labels on one line, each on its own ground.
+            A bare line of stars read as another row of text, and the labels tried the
+            cover photo first — where a blue chip on a blue sky is simply not there.
+            Side by side they are two badges answering two questions about the place. */}
+        {(onRate || assignedLabels.length > 0) && (
+          <div className="col-detail-badges">
+            {onRate && (
+              <div className="col-detail-rating">
+                <PlaceRating ratings={place.ratings ?? []} ratingAvg={place.rating_avg} onRate={onRate} />
+              </div>
+            )}
+            {!editing && assignedLabels.map(l => (
+              <span key={l.id} className="col-labelchip on static big" style={{ ['--label' as string]: l.color || 'var(--accent)' }}>
+                <span className="col-labelchip-dot" /> {l.name}
+              </span>
+            ))}
           </div>
         )}
 
