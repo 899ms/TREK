@@ -216,7 +216,23 @@ export default function CollectionPlaceDetail({
         <div className="col-detail-head">
           {editing
             ? <input value={name} onChange={e => setName(e.target.value)} className="col-detail-name-input" autoFocus aria-label={t('collections.listName')} />
-            : <h2 className="col-detail-name">{place.name}</h2>}
+            : (
+              /* Beside the name, not three rows below it: a label is part of what this
+                 place IS, the same as its name, and read on its own further down it
+                 looked like a property of the rating above it. */
+              <div className="col-detail-titlerow">
+                <h2 className="col-detail-name">{place.name}</h2>
+                {assignedLabels.length > 0 && (
+                  <div className="col-detail-labels on-cover">
+                    {assignedLabels.map(l => (
+                      <span key={l.id} className="col-labelchip on static" style={{ ['--label' as string]: l.color || 'var(--accent)' }}>
+                        <span className="col-labelchip-dot" /> {l.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
         </div>
       </div>
 
@@ -236,7 +252,9 @@ export default function CollectionPlaceDetail({
 
         {/* Collaborative rating (#1435) — every member votes; the average shows. */}
         {onRate && (
-          <div style={{ padding: '2px 0' }}>
+          /* In a panel of full-width rows, a bare line of stars read as another row of
+             text. Set on its own ground it reads as the one thing here you can answer. */
+          <div className="col-detail-rating">
             <PlaceRating ratings={place.ratings ?? []} ratingAvg={place.rating_avg} onRate={onRate} />
           </div>
         )}
@@ -311,15 +329,6 @@ export default function CollectionPlaceDetail({
           </div>
         ) : (
           <>
-            {assignedLabels.length > 0 && (
-              <div className="col-detail-labels">
-                {assignedLabels.map(l => (
-                  <span key={l.id} className="col-labelchip on static" style={{ ['--label' as string]: l.color || 'var(--accent)' }}>
-                    <span className="col-labelchip-dot" /> {l.name}
-                  </span>
-                ))}
-              </div>
-            )}
             {place.description && (
               <div className="col-detail-md collab-note-md">
                 <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownLinkComponents}>{place.description}</Markdown>

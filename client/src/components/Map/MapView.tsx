@@ -36,7 +36,9 @@ import L from 'leaflet'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { mapsApi } from '../../api/client'
-import { getCategoryIcon, CATEGORY_ICON_MAP } from '../shared/categoryIcons'
+import { CATEGORY_ICON_MAP } from '../shared/categoryIcons'
+import PlaceHoverCard from './PlaceHoverCard'
+import { ratingBadgeHtml } from './ratingBadge'
 import ReservationOverlay from './ReservationOverlay'
 import { PluginMapMarkers } from './MapPluginMarkers'
 import { PluginMapLayers } from './MapPluginLayers'
@@ -132,7 +134,7 @@ function RouteViaMarker({ via, controls, eventHandlers, children }: {
  * Shows image_url if available, otherwise category icon in colored circle.
  */
 function createPlaceIcon(place, orderNumbers, isSelected) {
-  const cacheKey = `${place.id}:${isSelected}:${place.image_url || ''}:${place.category_color || ''}:${place.category_icon || ''}:${place.stop_type || ''}:${orderNumbers?.join(',') || ''}`
+  const cacheKey = `${place.id}:${isSelected}:${place.image_url || ''}:${place.category_color || ''}:${place.category_icon || ''}:${place.stop_type || ''}:${orderNumbers?.join(',') || ''}:${(place as { rating_avg?: number | null }).rating_avg ?? ''}`
   const cached = iconCache.get(cacheKey)
   if (cached) return cached
 
@@ -157,8 +159,10 @@ function createPlaceIcon(place, orderNumbers, isSelected) {
     : '0 2px 8px rgba(0,0,0,0.22)'
   const bgColor = safeHexColor(place.category_color, '#6b7280')
 
-  // Number badges (bottom-right)
-  let badgeHtml = ''
+  // Number badges (bottom-right), or the rating where there are none: a numbered stop
+  // is one already planned into a day, and the rating answers the question asked before
+  // that. The two never want the same corner at the same time.
+  let badgeHtml = ratingBadgeHtml((place as { rating_avg?: number | null }).rating_avg)
   if (orderNumbers && orderNumbers.length > 0) {
     const label = orderNumbers.join(' · ')
     badgeHtml = `<span style="
@@ -970,7 +974,6 @@ export const MapView = memo(function MapView({
 
   const TooltipOverlay = !hoverDisabled && hoveredPlace && tooltipPos && !isTouchDevice
     && (!hoveredPlace.routeVia || routeVias.includes(hoveredPlace.routeVia))
-  const CatIcon = TooltipOverlay ? getCategoryIcon(hoveredPlace.category_icon) : null
 
   const { position: userPosition, mode: trackingMode, error: trackingError, errorCode: trackingErrorCode, cycleMode: cycleTrackingMode } = useGeolocation()
   // Desktop browsers only get IP-based geolocation (city-level accuracy),
@@ -1237,35 +1240,16 @@ export const MapView = memo(function MapView({
       <NightPauseTooltip label={hoveredPlace.name ?? ''} x={tooltipPos.x} y={tooltipPos.y} />
     )}
     {TooltipOverlay && !hoveredPlace.routeVia?.nightPause && (
-      <div data-testid="tooltip" style={{
-        position: 'fixed',
-        left: tooltipPos.x + 14,
-        top: tooltipPos.y - 10,
-        zIndex: 9999,
-        pointerEvents: 'none',
-        background: 'white',
-        borderRadius: 8,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-        padding: '6px 10px',
-        fontFamily: "var(--font-system)",
-        maxWidth: 220,
-        whiteSpace: 'nowrap',
-      }}>
-        <div style={{ fontWeight: 600, fontSize: 12, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {hoveredPlace.name}
-        </div>
-        {hoveredPlace.category_name && CatIcon && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-            <CatIcon size={10} style={{ color: hoveredPlace.category_color || '#6b7280', flexShrink: 0 }} />
-            <span style={{ fontSize: 11, color: '#6b7280' }}>{hoveredPlace.category_name}</span>
-          </div>
-        )}
-        {hoveredPlace.address && (
-          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {hoveredPlace.address}
-          </div>
-        )}
-      </div>
+      <PlaceHoverCard
+        x={tooltipPos.x}
+        y={tooltipPos.y}
+        name={hoveredPlace.name}
+        categoryName={hoveredPlace.category_name}
+        categoryIcon={hoveredPlace.category_icon}
+        categoryColor={hoveredPlace.category_color}
+        address={hoveredPlace.address}
+        rating={hoveredPlace.rating_avg}
+      />
     )}
     </>
   )

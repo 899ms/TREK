@@ -33,6 +33,8 @@ import { useHazardLayerGL } from './useHazardLayerGL'
 import { useDawarichTrailGL } from './useDawarichTrailGL'
 import { bindDayBoundaryDrag, type DayBoundaryControls } from './dayBoundaryDrag'
 import NightPauseTooltip from './NightPauseTooltip'
+import PlaceHoverCard from './PlaceHoverCard'
+import { ratingBadgeHtml } from './ratingBadge'
 import { POI_CATEGORY_BY_KEY, type Poi } from './poiCategories'
 import { resolveTrackColor, hasManualTrackColor } from './trackColors'
 import { buildPoiPopupHtml } from './placePopup'
@@ -336,7 +338,9 @@ function createMarkerElement(place: Place & { category_color?: string; category_
   // bleed outside it and the route lines would appear slightly off.
   const outer = size + borderWidth * 2
 
-  let badgeHtml = ''
+  // Same corner, same rule as the Leaflet map: numbers when the place is planned into a
+  // day, the rating when it is not.
+  let badgeHtml = ratingBadgeHtml((place as { rating_avg?: number | null }).rating_avg)
   if (orderNumbers && orderNumbers.length > 0) {
     const label = orderNumbers.join(' · ')
     badgeHtml = `<span style="
@@ -2288,8 +2292,6 @@ export function MapViewGL({
     ? 'calc(var(--bottom-nav-h, 84px) + 20px + var(--day-panel-h, 0px) + 12px)'
     : 'calc(var(--bottom-nav-h, 84px) + 12px)'
 
-  const HoverIcon = (hoverPlace?.category_icon && CATEGORY_ICON_MAP[hoverPlace.category_icon]) || CATEGORY_ICON_MAP['MapPin']
-
   return (
     <div className="w-full h-full relative">
       <div ref={containerRef} className="w-full h-full" />
@@ -2322,35 +2324,16 @@ export function MapViewGL({
         <NightPauseTooltip label={hoverPlace.name ?? ''} x={hoverPos.x} y={hoverPos.y} />
       )}
       {!hoverDisabled && hoverPlace && !hoverPlace.routeVia?.nightPause && hoverPos && !isMobile && (!hoverPlace.routeVia || routeVias.includes(hoverPlace.routeVia)) && (
-        <div data-testid="tooltip" style={{
-          position: 'fixed',
-          left: hoverPos.x + 14,
-          top: hoverPos.y - 10,
-          zIndex: 9999,
-          pointerEvents: 'none',
-          background: 'white',
-          borderRadius: 8,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-          padding: '6px 10px',
-          fontFamily: 'var(--font-system)',
-          maxWidth: 220,
-          whiteSpace: 'nowrap',
-        }}>
-          <div style={{ fontWeight: 600, fontSize: 12, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {hoverPlace.name}
-          </div>
-          {hoverPlace.category_name && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 3, marginTop: 1 }}>
-              <HoverIcon size={10} style={{ color: hoverPlace.category_color || '#6b7280', flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: '#6b7280' }}>{hoverPlace.category_name}</span>
-            </div>
-          )}
-          {hoverPlace.address && (
-            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {hoverPlace.address}
-            </div>
-          )}
-        </div>
+        <PlaceHoverCard
+          x={hoverPos.x}
+          y={hoverPos.y}
+          name={hoverPlace.name}
+          categoryName={hoverPlace.category_name}
+          categoryIcon={hoverPlace.category_icon}
+          categoryColor={hoverPlace.category_color}
+          address={hoverPlace.address}
+        rating={hoverPlace.rating_avg}
+        />
       )}
     </div>
   )
