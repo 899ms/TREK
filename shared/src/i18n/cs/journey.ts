@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Nálada',
   'journey.settings.showWeather': 'Počasí',
   'journey.entry.suggestion': 'Návrh',
+  'journey.editor.addDetails': '+ Podrobnosti',
 };
 export default journey;

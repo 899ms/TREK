@@ -35,6 +35,8 @@ interface Props {
   fullScreen?: boolean
   paddingBottom?: number
   hideMarkerTooltip?: boolean
+  /** Open an entry's photos from the marker card's thumbnail strip. GL renderer only. */
+  onMarkerPhotoClick?: (entryId: string, photoIndex: number) => void
 }
 
 function JourneyMapAuto({ ref, ...props }: Props) {

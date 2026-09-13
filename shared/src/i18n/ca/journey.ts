@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Estat d\'ànim',
   'journey.settings.showWeather': 'Temps',
   'journey.entry.suggestion': 'Suggeriment',
+  'journey.editor.addDetails': '+ Detalls',
 };
 export default journey;

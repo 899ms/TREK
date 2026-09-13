@@ -1,26 +1,25 @@
 // FE-JRN-CARDMODEL-001 to FE-JRN-CARDMODEL-010
 
 import { describe, it, expect } from 'vitest'
-import { cardDateLabel, cardPhotoId, cardPlace, cardTitle, countryFlag, dayColorOf, journeyDays } from './journeyCard'
+import { cardDateLabel, cardPhotoId, cardPlace, cardTitle, countryBadge, dayColorOf, journeyDays } from './journeyCard'
 import { DAY_COLORS } from './dayColors'
 
 const t = (key: string) => key
 
-describe('countryFlag', () => {
-  it('FE-JRN-CARDMODEL-001: turns an ISO code into the flag', () => {
-    expect(countryFlag('DE')).toBe('🇩🇪')
-    expect(countryFlag('jp')).toBe('🇯🇵')
+describe('countryBadge', () => {
+  it('FE-JRN-CARDMODEL-001: stamps the ISO code, upper case', () => {
+    // Letters, not the flag emoji: Windows has no flag glyphs and drew the bare
+    // code anyway, which read as something broken.
+    expect(countryBadge('DE')).toBe('DE')
+    expect(countryBadge('jp')).toBe('JP')
   })
 
-  it('FE-JRN-CARDMODEL-002: draws nothing rather than two stray letters', () => {
-    // Everything that is not a plain alpha-2 pair, plus Kosovo, which has no flag
-    // on any platform and would render as the letters XK in a corner.
-    expect(countryFlag(null)).toBe('')
-    expect(countryFlag(undefined)).toBe('')
-    expect(countryFlag('')).toBe('')
-    expect(countryFlag('DEU')).toBe('')
-    expect(countryFlag('D1')).toBe('')
-    expect(countryFlag('XK')).toBe('')
+  it('FE-JRN-CARDMODEL-002: stamps nothing when there is no country to stamp', () => {
+    expect(countryBadge(null)).toBe('')
+    expect(countryBadge(undefined)).toBe('')
+    expect(countryBadge('')).toBe('')
+    expect(countryBadge('DEU')).toBe('')
+    expect(countryBadge('D1')).toBe('')
   })
 })
 

@@ -18,12 +18,13 @@ describe('JourneyDayScrubber', () => {
     expect(screen.getAllByRole('button')).toHaveLength(3)
   })
 
-  it('FE-JRN-SCRUBBER-002: says which day you are on, and how far in', () => {
+  it('FE-JRN-SCRUBBER-002: says which day you are on, by its date', () => {
     render(<JourneyDayScrubber days={DAYS} activeDate="2026-03-16" onPick={() => {}} />)
 
-    expect(screen.getByText('Day 2')).toBeInTheDocument()
-    // The long date is the label the reader was missing on the cards.
+    // The long date is the label the reader was missing on the cards. "Day 2"
+    // stood beside it for a while and was the same fact told twice.
     expect(screen.getByText(/16/)).toBeInTheDocument()
+    expect(screen.queryByText(/^Day \d/)).toBeNull()
   })
 
   it('FE-JRN-SCRUBBER-003: marks the day it is on', () => {

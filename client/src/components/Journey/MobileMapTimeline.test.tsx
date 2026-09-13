@@ -122,7 +122,7 @@ describe('MobileMapTimeline', () => {
     expect(screen.getByTestId('journey-map')).toBeInTheDocument()
     // The strip below the map grew with the cover cards and the day bar (#2299), so
     // the map keeps that much clear when it frames the journey.
-    expect(lastMapProps.current).toMatchObject({ height: 9999, fullScreen: true, paddingBottom: 250, hideMarkerTooltip: true })
+    expect(lastMapProps.current).toMatchObject({ height: 9999, fullScreen: true, paddingBottom: 250 })
     expect(screen.getByText('Louvre')).toBeInTheDocument()
     expect(screen.getByText('Museumsinsel')).toBeInTheDocument()
     expect(screen.getByText('Reichstag')).toBeInTheDocument()
@@ -134,11 +134,11 @@ describe('MobileMapTimeline', () => {
     // survives is the colour, on a hairline at the foot of each card.
     const { container } = renderTimeline()
     const { cards } = carouselOf(container)
-    const dayBar = (card: HTMLElement) => [...card.querySelectorAll('span')].at(-1) as HTMLElement
+    const ring = (card: HTMLElement) => (card.querySelector('button') as HTMLElement).style.boxShadow
 
-    expect(dayBar(cards[0])).toHaveStyle({ background: DAY_COLORS[0] })
-    expect(dayBar(cards[1])).toHaveStyle({ background: DAY_COLORS[1] })
-    expect(dayBar(cards[2])).toHaveStyle({ background: DAY_COLORS[1] })
+    expect(ring(cards[0])).toContain(DAY_COLORS[0])
+    expect(ring(cards[1])).toContain(DAY_COLORS[1])
+    expect(ring(cards[2])).toContain(DAY_COLORS[1])
   })
 
   it('FE-COMP-JMAPTL-002b: the day bar offers one segment per day and jumps to it', async () => {

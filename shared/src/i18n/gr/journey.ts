@@ -643,5 +643,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Διάθεση',
   'journey.settings.showWeather': 'Καιρός',
   'journey.entry.suggestion': 'Πρόταση',
+  'journey.editor.addDetails': '+ Λεπτομέρειες',
 };
 export default journey;

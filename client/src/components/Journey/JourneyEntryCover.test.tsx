@@ -34,20 +34,21 @@ describe('JourneyEntryCover', () => {
     // wrote something down without taking a picture.
     const { container } = render(<JourneyEntryCover entry={buildEntry({ photos: [] })} dayColor="#6366f1" isActive={false} onClick={() => {}} />)
 
-    expect(container.querySelector('img')).toBeNull()
+    // The country's flag is an <img> of its own, so the photo is queried by source.
+    expect(container.querySelector('img[src*="/thumbnail"]')).toBeNull()
     expect(screen.getByText('Mercado da Ribeira')).toBeInTheDocument()
   })
 
-  it('FE-JRN-COVER-003: the country flag rides in the corner, and only with a country', () => {
+  it('FE-JRN-COVER-003: the country rides in the corner, and only with a country', () => {
     const { rerender } = render(
       <JourneyEntryCover entry={buildEntry()} dayColor="#6366f1" isActive={false} onClick={() => {}} />,
     )
-    expect(screen.getByText('🇵🇹')).toBeInTheDocument()
+    expect(screen.getByAltText('PT')).toBeInTheDocument()
 
     rerender(
       <JourneyEntryCover entry={buildEntry({ country_code: null })} dayColor="#6366f1" isActive={false} onClick={() => {}} />,
     )
-    expect(screen.queryByText('🇵🇹')).toBeNull()
+    expect(screen.queryByAltText('PT')).toBeNull()
   })
 
   it('FE-JRN-COVER-004: a suggestion says so, so it is not mistaken for somewhere you have been', () => {

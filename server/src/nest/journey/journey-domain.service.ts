@@ -1465,18 +1465,35 @@ export class JourneyDomainService {
       .get(entryId, galleryId) as JourneyPhoto | null;
   }
 
+  /**
+   * Attach an uploaded file to an entry.
+   *
+   * `media` carries what a clip needs beyond a picture: the type, so the viewer
+   * plays it instead of trying to draw it, and the duration the browser measured
+   * while it took the poster frame. The gallery route has taken both since #823;
+   * the entry route could not, which is why a video dropped on an entry came
+   * back as a 400 (issue #2341).
+   */
   addPhoto(
     entryId: number,
     userId: number,
     filePath: string,
     thumbnailPath?: string,
     caption?: string,
+    media?: { mediaType?: string; durationMs?: number | null },
   ): JourneyPhoto | null {
     const entry = this.db.prepare('SELECT * FROM journey_entries WHERE id = ?').get(entryId) as JourneyEntry | undefined;
     if (!entry) return null;
     if (!this.canEdit(entry.journey_id, userId)) return null;
 
-    const trekPhotoId = this.photos.getOrCreateLocal(filePath, thumbnailPath);
+    const trekPhotoId = this.photos.getOrCreateLocal(
+      filePath,
+      thumbnailPath,
+      null,
+      null,
+      media?.mediaType || 'image',
+      media?.durationMs ?? null,
+    );
     const galleryId = this.db.connection.transaction(() => this.ensureInGallery(entry.journey_id, trekPhotoId, caption))();
     const result = this.linkGalleryPhotoToEntry(galleryId, entryId);
     this.promoteSkeletonIfNeeded(entry);

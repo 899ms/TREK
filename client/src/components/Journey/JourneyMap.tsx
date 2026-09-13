@@ -7,16 +7,19 @@ import { OFM_DARK, OFM_POSITRON, attributionForTile } from '../../constants/mapD
 import { attachVectorBasemap, detachBasemapLayer, restyleBasemap, type BasemapLayer } from '../Map/VectorBasemap'
 import { crsForBasemap } from '../Map/gcj02Crs'
 import { escapeHtml, type JourneyTrack } from '@trek/shared'
+import { ensureJourneyPopupStyle, formatMarkerDate, journeyPopupHtml } from './journeyMapPopup'
 
 export interface MapMarkerItem {
   id: string
   lat: number
   lng: number
   label: string
+  locationName: string
   mood?: string | null
   time: string
   dayColor: string
   dayLabel: number
+  photoUrls: string[]
 }
 
 /**
@@ -77,10 +80,13 @@ interface MapEntry {
   lat: number
   lng: number
   title?: string | null
+  location_name?: string | null
   mood?: string | null
   entry_date: string
   dayColor?: string
   dayLabel?: number
+  /** Thumbnails for the marker card, already resolved by the caller (the share view signs its own). */
+  photoUrls?: string[]
 }
 
 interface Props {
@@ -122,10 +128,12 @@ function buildMarkerItems(entries: MapEntry[]): MapMarkerItem[] {
         lat: e.lat,
         lng: e.lng,
         label: e.title || 'Entry',
+        locationName: e.location_name || '',
         mood: e.mood,
         time: e.entry_date,
         dayColor: e.dayColor || '#52525B',
         dayLabel: e.dayLabel ?? 1,
+        photoUrls: e.photoUrls ?? [],
       })
     }
   }
@@ -268,11 +276,14 @@ function JourneyMap(
     const map = L.map(containerRef.current, {
       ...(crs ? { crs } : {}),
       zoomControl: false,
-      attributionControl: true,
+      // Added below with `prefix: false` so it collapses to the credit alone; see
+      // the GL twin for why it is not a strip of text across the bottom.
+      attributionControl: false,
       scrollWheelZoom: fullScreen ? true : false,
       dragging: true,
       touchZoom: true,
     })
+    L.control.attribution({ position: 'bottomright', prefix: false }).addTo(map)
     mapRef.current = map
     cancelledRef.current = false
 
@@ -370,14 +381,26 @@ function JourneyMap(
       })
 
       const marker = L.marker(pos, { icon }).addTo(map)
-      // Escaped for the same reason as the track tooltip above: the label is an
-      // entry title, and this map is what the public journey page renders.
+      // The same card the GL renderer shows, from the same builder: which map
+      // engine a reader happens to have selected should not change what a marker
+      // tells them (discussion #2299). The builder escapes everything that came
+      // from a person, which matters most here — this map is what the public
+      // journey page renders.
       if (!hideMarkerTooltipRef.current) {
-        marker.bindTooltip(escapeHtml(item.label), {
-          direction: 'top',
-          offset: [0, -MARKER_H],
-          className: 'map-tooltip',
-        })
+        ensureJourneyPopupStyle()
+        marker.bindTooltip(
+          journeyPopupHtml({
+            title: item.label || item.locationName || 'Entry',
+            place: item.label ? item.locationName : '',
+            date: formatMarkerDate(item.time),
+            photoUrls: item.photoUrls,
+          }),
+          {
+            direction: 'top',
+            offset: [0, -MARKER_H],
+            className: 'map-tooltip trek-journey-tooltip',
+          },
+        )
       }
 
       marker.on('click', () => {

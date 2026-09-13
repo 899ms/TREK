@@ -639,5 +639,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': '기분',
   'journey.settings.showWeather': '날씨',
   'journey.entry.suggestion': '제안',
+  'journey.editor.addDetails': '+ 세부 정보',
 };
 export default journey;

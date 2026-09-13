@@ -1,7 +1,8 @@
 import { MapPin } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import { moodMeta, weatherMeta } from '../../mobile/screens/journey/mobileJourneyMeta'
-import { cardDateLabel, cardPhotoId, cardPlace, cardTitle, countryFlag, type CardPhoto } from './journeyCard'
+import CountryFlag from '../shared/CountryFlag'
+import { cardDateLabel, cardPhotoId, cardPlace, cardTitle, type CardPhoto } from './journeyCard'
 import type { JourneyEntry } from '../../store/journeyStore'
 
 /**
@@ -73,12 +74,15 @@ export default function JourneyEntryCover({
 
   const title = cardTitle(entry, t)
   const place = cardPlace(entry)
-  const flag = countryFlag(entry.country_code)
   const date = cardDateLabel(entry.entry_date, locale)
   const mood = showMood ? moodMeta(entry.mood) : undefined
   const weather = showWeather ? weatherMeta(entry.weather) : undefined
 
-  const emptyGround = tone === 'mobile' ? 'bg-[color:var(--m-sheet)]' : 'bg-white/90 dark:bg-zinc-800/90'
+  const emptyGround = tone === 'mobile' ? 'bg-[color:var(--m-sheetop)]' : 'bg-white dark:bg-zinc-800'
+  // One ground for every corner mark. Dark rather than a white veil: these sit on
+  // whatever photograph the traveller took, and a bright sky swallowed the white one.
+  const badge = 'rounded-full bg-black/45 px-[7px] py-[2px] text-[10px] font-bold whitespace-nowrap text-white backdrop-blur-[2px]'
+  const badgeDot = 'flex h-[18px] w-[18px] items-center justify-center rounded-full bg-black/45 backdrop-blur-[2px]'
 
   return (
     <button
@@ -89,13 +93,23 @@ export default function JourneyEntryCover({
       // it is somewhere you planned to be, not somewhere you have written about.
       className={`relative flex-none overflow-hidden rounded-[18px] text-left transition-[width,height] duration-150 ${
         isActive ? 'h-[180px] w-[164px] shadow-[0_18px_40px_-16px_rgba(0,0,0,.55)]' : 'h-[152px] w-[136px] shadow-[0_10px_24px_-14px_rgba(0,0,0,.5)]'
-      } ${src ? '' : emptyGround} ${
-        isActive ? 'ring-2 ring-white/85 dark:ring-white/70' : 'ring-1 ring-black/10 dark:ring-white/15'
-      } ${isSuggestion ? 'opacity-90' : ''}`}
-      style={src ? undefined : { background: `linear-gradient(160deg, ${dayColor}2e, ${dayColor}0d)` }}
+      } ${src ? '' : emptyGround} ${isSuggestion ? 'opacity-90' : ''}`}
+      // backgroundImage, not background: the shorthand would drop the opaque colour
+      // the class supplies and leave the map showing through a card that is only a
+      // faint wash of the day's colour.
+      // The day is the card's own edge rather than a bar along its foot: a hairline
+      // all the way round groups a day at a glance without taking a strip of the
+      // photograph. The active card gets a heavier one of the same colour.
+      //
+      // Inset, not an outer ring: the carousel scrolls, so it clips, and an outer
+      // ring lost its top edge to that clip.
+      style={{
+        boxShadow: `inset 0 0 0 ${isActive ? 2.5 : 1.5}px ${dayColor}${isActive ? '' : 'b3'}`,
+        ...(src ? null : { backgroundImage: `linear-gradient(160deg, ${dayColor}2e, ${dayColor}0d)` }),
+      }}
     >
       {src ? (
-        <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+        <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full rounded-[18px] object-cover" />
       ) : (
         <span className="absolute inset-0 flex items-center justify-center">
           <MapPin size={24} strokeWidth={1.8} style={{ color: dayColor }} className="opacity-60" />
@@ -107,31 +121,35 @@ export default function JourneyEntryCover({
       <span className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/45 to-transparent" />
       <span className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/45 to-transparent" />
 
-      {/* Top left: where in the world, and whether this has happened yet. */}
-      <span className="absolute left-2 top-2 flex items-center gap-1">
-        {flag && <span className="text-[15px] leading-none drop-shadow-[0_1px_2px_rgba(0,0,0,.5)]">{flag}</span>}
-        {isSuggestion && (
-          <span className="rounded-full bg-white/22 px-[7px] py-[2px] text-[9px] font-bold uppercase tracking-[0.06em] text-white backdrop-blur-[2px]">
-            {t('journey.entry.suggestion')}
-          </span>
-        )}
-      </span>
+      {/* Just the flag: it is already a coloured mark of its own, and a chip behind
+          it only added a second shape to read. A drop shadow does the work the chip
+          was doing, against a bright sky. Sized and placed to sit on the same line
+          as the date opposite it. */}
+      {entry.country_code && (
+        <span className="absolute left-2 top-2 flex h-[18px] items-center drop-shadow-[0_1px_3px_rgba(0,0,0,.6)]">
+          <CountryFlag code={entry.country_code} size={14} />
+        </span>
+      )}
+      {isSuggestion && (
+        <span className={`absolute top-2 ${entry.country_code ? 'left-[30px]' : 'left-2'} ${badge} uppercase tracking-[0.06em]`}>
+          {t('journey.entry.suggestion')}
+        </span>
+      )}
 
-      {/* Top right: when, plus whatever the journey still keeps of mood and weather. */}
+      {/* Top right: when, and how it was. They fit beside each other now that the
+          flag on the left is a bare mark rather than a chip of its own. */}
       <span className="absolute right-2 top-2 flex items-center gap-1">
         {mood && (
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white/22 backdrop-blur-[2px]" style={{ color: mood.color }}>
+          <span className={badgeDot} style={{ color: mood.color }}>
             <mood.icon size={11} strokeWidth={2.4} />
           </span>
         )}
         {weather && (
-          <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-white/22 text-white backdrop-blur-[2px]">
+          <span className={`${badgeDot} text-white`}>
             <weather.icon size={11} strokeWidth={2.4} />
           </span>
         )}
-        <span className="rounded-full bg-white/22 px-[7px] py-[2px] text-[10px] font-bold whitespace-nowrap text-white backdrop-blur-[2px]">
-          {date}
-        </span>
+        <span className={badge}>{date}</span>
       </span>
 
       {/* Bottom: the name gets the room the thumbnail layout never had. */}
@@ -146,9 +164,6 @@ export default function JourneyEntryCover({
         )}
       </span>
 
-      {/* The day, as a colour. Sits under the text rather than beside it so it costs
-          the card no width, and reads as one bar across the carousel per day. */}
-      <span className="absolute inset-x-0 bottom-0 h-[3px]" style={{ background: dayColor }} />
     </button>
   )
 }

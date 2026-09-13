@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Ruh hâli',
   'journey.settings.showWeather': 'Hava durumu',
   'journey.entry.suggestion': 'Öneri',
+  'journey.editor.addDetails': '+ Ayrıntılar',
 };
 export default journey;

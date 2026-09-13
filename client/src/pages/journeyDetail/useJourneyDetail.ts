@@ -376,6 +376,9 @@ export function useJourneyDetail() {
         entry_date: e.entry_date,
         dayColor: DAY_COLORS[dayIdx % DAY_COLORS.length],
         dayLabel,
+        // A glimpse of the entry's own pictures on its marker card. Three is what
+        // the card has room for; the rest are one tap away in the entry itself.
+        photoUrls: (e.photos ?? []).slice(0, 3).map(p => `/api/photos/${p.photo_id}/thumbnail`),
       }
     })
   }, [mapEntries, current?.entries])

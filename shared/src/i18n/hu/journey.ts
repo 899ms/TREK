@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Hangulat',
   'journey.settings.showWeather': 'Időjárás',
   'journey.entry.suggestion': 'Javaslat',
+  'journey.editor.addDetails': '+ Részletek',
 };
 export default journey;

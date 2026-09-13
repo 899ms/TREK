@@ -345,7 +345,6 @@ export default function MJourneyDetail() {
           onMarkerClick={handleMarkerClick}
           fullScreen
           paddingBottom={250}
-          hideMarkerTooltip
         />
       </div>
 
@@ -483,9 +482,12 @@ export default function MJourneyDetail() {
         </MSheet>
       )}
 
-      {/* Day bar + horizontal card timeline */}
+      {/* Day bar + horizontal card timeline. The dock is a floating pill 62px tall
+          inside the 84px the variable reserves, so +16 left a band of map doing
+          nothing between the cards and it; two pixels keeps a hair of daylight and
+          gives the strip the rest. */}
       {view === 'timeline' && entries.length > 0 && (
-        <div className="absolute left-0 right-0 z-[8] bottom-[calc(var(--bottom-nav-h,84px)+16px)]">
+        <div className="absolute left-0 right-0 z-[8] bottom-[calc(var(--bottom-nav-h,84px)+2px)]">
         <JourneyDayScrubber
           days={scrubberDays}
           activeDate={entries[activeIndex]?.entry_date ?? null}
@@ -520,7 +522,10 @@ export default function MJourneyDetail() {
       <input ref={galleryFileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleGalleryUpload} />
 
       {/* Upload source chooser (device / providers) */}
-      <MSheet open={showUploadMenu} onClose={() => setShowUploadMenu(false)} variant="bottom" ariaLabel={t('common.upload')}>
+      {/* Opaque, not the glass default: these two sit over a full-screen map whose
+          card carousel is bright and busy, and the frosted material let the titles
+          behind read straight through the menu. */}
+      <MSheet open={showUploadMenu} onClose={() => setShowUploadMenu(false)} variant="bottom" material="opaque" ariaLabel={t('common.upload')}>
         <div className="flex flex-col gap-2 p-[10px]">
           <MListRow
             icon={Camera}
@@ -539,7 +544,7 @@ export default function MJourneyDetail() {
       </MSheet>
 
       {/* Journey actions: book export, suggestions switch, settings */}
-      <MSheet open={showActionMenu} onClose={() => setShowActionMenu(false)} variant="bottom" ariaLabel={t('files.menu')}>
+      <MSheet open={showActionMenu} onClose={() => setShowActionMenu(false)} variant="bottom" material="opaque" ariaLabel={t('files.menu')}>
         <div className="flex flex-col gap-1 p-[10px]">
           <div className="flex items-center gap-[11px] px-[10px] py-[11px]">
             <EyeOff size={16} strokeWidth={2} className="flex-none text-m-muted" />

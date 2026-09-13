@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import { localIsoDate } from '../../utils/localDate'
 import { X, Plus, Image, Minus, Check, MapPin, Locate, Camera } from 'lucide-react'
 import { normalizeImageFiles } from '../../utils/convertHeic'
+import { isVideoFile } from '../../utils/videoPoster'
 import { type ResilientResult, type UploadProgress } from '../../utils/uploadQueue'
 import { useTranslation } from '../../i18n'
 import { journeyApi, mapsApi, addonsApi, memoriesApi, weatherApi } from '../../api/client'
@@ -355,7 +356,7 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
           />
 
           <div>
-            <input ref={fileRef} type="file" accept="image/*" multiple onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} className="hidden" />
+            <input ref={fileRef} type="file" accept="image/*,video/*" multiple onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} className="hidden" />
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} className="hidden" />
             <div className="flex gap-2">
               <button type="button"
@@ -578,7 +579,14 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                   ))}
                   {pendingFiles.map((f, i) => (
                     <div key={`pending-${i}`} className="w-20 h-20 rounded-xl overflow-hidden relative group">
-                      <img src={pendingUrls[i]} className="w-full h-full object-cover" alt="" />
+                      {/* A clip in an <img> is a broken-image glyph (issue #2341). The
+                          same object URL in a <video> shows its first frame, which is
+                          the preview the poster frame will become after saving. */}
+                      {isVideoFile(f) ? (
+                        <video src={pendingUrls[i]} className="w-full h-full object-cover" muted playsInline preload="metadata" />
+                      ) : (
+                        <img src={pendingUrls[i]} className="w-full h-full object-cover" alt="" />
+                      )}
                       <button type="button"
                         onClick={() => setPendingFiles(prev => prev.filter((_, j) => j !== i))}
                         className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"

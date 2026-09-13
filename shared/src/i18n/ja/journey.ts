@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': '気分',
   'journey.settings.showWeather': '天気',
   'journey.entry.suggestion': '提案',
+  'journey.editor.addDetails': '＋詳細',
 };
 export default journey;

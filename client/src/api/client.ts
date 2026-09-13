@@ -1003,6 +1003,9 @@ export const journeyApi = {
     postMultipart(`/journeys/${journeyId}/gallery/photos`, formData, opts),
   uploadGalleryVideo: (journeyId: number, formData: FormData, opts?: UploadOptions) =>
     postMultipart(`/journeys/${journeyId}/gallery/video`, formData, opts),
+  /** A clip on one entry: the video plus the poster frame the browser grabbed (issue #2341). */
+  uploadEntryVideo: (entryId: number, formData: FormData, opts?: UploadOptions) =>
+    postMultipart(`/journeys/entries/${entryId}/video`, formData, opts),
   addProviderPhotosToGallery: (journeyId: number, provider: string, assetIds: string[], passphrase?: string, mediaTypes?: string[]) => apiClient.post(`/journeys/${journeyId}/gallery/provider-photos`, { provider, asset_ids: assetIds, ...(passphrase ? { passphrase } : {}), ...(mediaTypes ? { media_types: mediaTypes } : {}) } satisfies JourneyProviderPhotosRequest).then(r => r.data),
   addProviderPhoto: (entryId: number, provider: string, assetId: string, caption?: string, passphrase?: string) => apiClient.post(`/journeys/entries/${entryId}/provider-photos`, { provider, asset_id: assetId, caption, ...(passphrase ? { passphrase } : {}) }).then(r => r.data),
   addProviderPhotos: (entryId: number, provider: string, assetIds: string[], caption?: string, passphrase?: string, mediaTypes?: string[]) => apiClient.post(`/journeys/entries/${entryId}/provider-photos`, { provider, asset_ids: assetIds, caption, ...(passphrase ? { passphrase } : {}), ...(mediaTypes ? { media_types: mediaTypes } : {}) }).then(r => r.data),

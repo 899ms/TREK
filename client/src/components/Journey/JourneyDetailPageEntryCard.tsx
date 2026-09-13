@@ -8,6 +8,7 @@ import { usePluginStore } from '../../store/pluginStore'
 import type { JourneyEntry, JourneyPhoto } from '../../store/journeyStore'
 import { MOOD_CONFIG, WEATHER_CONFIG } from '../../pages/journeyDetail/JourneyDetailPage.constants'
 import { photoUrl } from '../../pages/journeyDetail/JourneyDetailPage.helpers'
+import { Tooltip } from '../shared/Tooltip'
 import { PhotoGrid } from './JourneyDetailPagePhotoGrid'
 import { MoodChip, WeatherChip } from './JourneyDetailPageChips'
 import { ExpandableStory } from './JourneyDetailPageExpandableStory'
@@ -233,16 +234,17 @@ export function SkeletonCard({ entry, onClick, onDismiss }: { entry: JourneyEntr
         </span>
       )}
       {onDismiss && (
-        <button
-          type="button"
-          onClick={e => { e.stopPropagation(); onDismiss() }}
-          aria-label={t('journey.suggestions.dismiss')}
-          title={t('journey.suggestions.dismiss')}
-          className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center opacity-45 hover:opacity-100 transition-opacity"
-          style={{ color: 'var(--vg-ink3)' }}
-        >
-          <X size={14} strokeWidth={2.4} />
-        </button>
+        <Tooltip label={t('journey.suggestions.dismiss')} placement="top">
+          <button
+            type="button"
+            onClick={e => { e.stopPropagation(); onDismiss() }}
+            aria-label={t('journey.suggestions.dismiss')}
+            className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center opacity-45 hover:opacity-100 transition-opacity"
+            style={{ color: 'var(--vg-ink3)' }}
+          >
+            <X size={14} strokeWidth={2.4} />
+          </button>
+        </Tooltip>
       )}
     </div>
   )

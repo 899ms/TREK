@@ -11,6 +11,7 @@ import { CustomDatePicker } from '../../../components/shared/CustomDateTimePicke
 import { journeyApi, mapsApi, weatherApi } from '../../../api/client'
 import { getApiErrorMessage } from '../../../types'
 import { normalizeImageFiles } from '../../../utils/convertHeic'
+import { isVideoFile } from '../../../utils/videoPoster'
 import { getCurrentPositionOnce } from '../../../hooks/useGeolocation'
 import type { ResilientResult, UploadProgress } from '../../../utils/uploadQueue'
 import type { JourneyEntry, JourneyPhoto, GalleryPhoto, JourneyTrip } from '../../../store/journeyStore'
@@ -430,7 +431,7 @@ export default function MJourneyEntrySheet({
         {!readOnly && (
           <>
             <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} />
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} />
+            <input ref={fileRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileChange} onClick={e => { (e.target as HTMLInputElement).value = '' }} />
             <div className="flex gap-2">
               <button
                 type="button"
@@ -656,9 +657,14 @@ export default function MJourneyEntrySheet({
                 )}
               </div>
             ))}
-            {pendingFiles.map((_, i) => (
+            {pendingFiles.map((f, i) => (
               <div key={`pending-${i}`} className="relative h-16 w-16 overflow-hidden rounded-[13px]">
-                <img src={pendingPreviews[i]} alt="" className="h-full w-full object-cover" />
+                {/* A clip in an <img> is a broken-image glyph (issue #2341). */}
+                {isVideoFile(f) ? (
+                  <video src={pendingPreviews[i]} className="h-full w-full object-cover" muted playsInline preload="metadata" />
+                ) : (
+                  <img src={pendingPreviews[i]} alt="" className="h-full w-full object-cover" />
+                )}
                 <button
                   type="button"
                   onClick={() => setPendingFiles(prev => prev.filter((_, j) => j !== i))}
@@ -984,9 +990,9 @@ export default function MJourneyEntrySheet({
           <button
             type="button"
             onClick={() => setCaptureOnly(false)}
-            className="rounded-full border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] px-4 py-[9px] text-[0.78125rem] font-semibold"
+            className="whitespace-nowrap rounded-full border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] px-4 py-[9px] text-[0.78125rem] font-semibold"
           >
-            {t('collections.addDetails')}
+            {t('journey.editor.addDetails')}
           </button>
         )}
         <button

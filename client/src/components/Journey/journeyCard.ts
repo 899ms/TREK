@@ -23,19 +23,17 @@ export function cardPhotoId(photo: CardPhoto | undefined): number | undefined {
 }
 
 /**
- * The flag of the country an entry happened in.
+ * The country an entry happened in, as the two letters to stamp on its card.
  *
- * Two regional-indicator code points, which every platform we ship to renders as
- * a flag and every other one renders as the country's two letters — a fair
- * fallback either way. Anything that is not a plain ISO 3166-1 alpha-2 pair
- * (including the UN's `XK` for Kosovo, which has no flag) draws nothing rather
- * than two stray letters in a corner.
+ * Letters rather than the flag emoji: the two regional-indicator code points
+ * that make a flag are only drawn as one on Apple platforms and Android. Windows
+ * has never shipped the glyphs, so a card there showed a bare "DE" where a flag
+ * was clearly meant — which reads as something broken rather than as a country.
+ * The code reads the same everywhere, and in a chip it looks deliberate.
  */
-export function countryFlag(code: string | null | undefined): string {
+export function countryBadge(code: string | null | undefined): string {
   if (!code || !/^[A-Za-z]{2}$/.test(code)) return ''
-  const upper = code.toUpperCase()
-  if (upper === 'XK') return ''
-  return String.fromCodePoint(...[...upper].map(c => 0x1f1e6 + c.charCodeAt(0) - 65))
+  return code.toUpperCase()
 }
 
 /** Short date for the card corner: "12 Sep", in the reader's locale and order. */

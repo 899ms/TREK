@@ -640,5 +640,6 @@ const journey: TranslationStrings = {
   'journey.settings.showMood': 'Tâm trạng',
   'journey.settings.showWeather': 'Thời tiết',
   'journey.entry.suggestion': 'Gợi ý',
+  'journey.editor.addDetails': '+ Chi tiết',
 };
 export default journey;

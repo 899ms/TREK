@@ -228,7 +228,6 @@ export default function MobileMapTimeline({
         fullScreen
         paddingBottom={250}
         cartoApiKey={cartoApiKey}
-        hideMarkerTooltip
       />
 
       {/* Day bar + card carousel, as one block at the bottom of the map */}

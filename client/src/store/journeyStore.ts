@@ -314,8 +314,19 @@ export const useJourneyStore = create<JourneyState>((set, get) => ({
       files,
       async (file, opts) => {
         const fd = new FormData()
-        fd.append('photos', file)
-        const data = await journeyApi.uploadPhotos(entryId, fd, opts)
+        let data: { photos?: JourneyPhoto[]; gallery?: GalleryPhoto[] }
+        if (isVideoFile(file)) {
+          // The same two-part upload the gallery has done since #823. Without it
+          // a clip went to the images-only route and came back 400 (issue #2341).
+          const { poster, durationMs } = await captureVideoPoster(file)
+          fd.append('video', file)
+          if (poster) fd.append('poster', poster, 'poster.jpg')
+          if (durationMs != null) fd.append('duration_ms', String(durationMs))
+          data = await journeyApi.uploadEntryVideo(entryId, fd, opts)
+        } else {
+          fd.append('photos', file)
+          data = await journeyApi.uploadPhotos(entryId, fd, opts)
+        }
         const photos: JourneyPhoto[] = data.photos || []
         set(s => {
           if (!s.current) return s
