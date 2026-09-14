@@ -574,6 +574,66 @@ describe('DawarichClient — listVisitedCities', () => {
   });
 });
 
+describe('DawarichClient, visited cities over a year', () => {
+  const YEAR_FROM = new Date('2025-09-14T20:00:00.000Z');
+  const YEAR_TO = new Date('2026-09-14T20:00:00.000Z');
+
+  it('DAWARICH-CLIENT-082: a year is asked for a month at a time, one request after another, and folded back', async () => {
+    // Dawarich computes this endpoint over every point in the window. A year in
+    // one request is what timed out on a tester's instance, so the client has to
+    // split it, and has to do so without firing thirteen computations at once.
+    let inFlight = 0;
+    let mostAtOnce = 0;
+    let served = 0;
+    safeFetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      inFlight++;
+      mostAtOnce = Math.max(mostAtOnce, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      inFlight--;
+      served++;
+      const body =
+        served === 1
+          ? { data: [{ country: 'Germany', cities: [{ city: 'Rostock', stayed_for: 90 }] }] }
+          : served === 7
+            ? { data: [{ country: 'Germany', cities: [{ city: 'Rostock', stayed_for: 30 }] }, { country: 'Poland', cities: [] }] }
+            : { data: [] };
+      return reply({ body }) as unknown as Response;
+    });
+
+    const out = await client.listVisitedCities(CREDS, YEAR_FROM, YEAR_TO);
+
+    expect(calls).toHaveLength(13);
+    expect(mostAtOnce).toBe(1);
+    expect(requestedUrl(0).searchParams.get('start_at')).toBe(unixSeconds(YEAR_FROM));
+    expect(requestedUrl(12).searchParams.get('end_at')).toBe(unixSeconds(YEAR_TO));
+    for (let i = 1; i < calls.length; i++) {
+      const previousEnd = Number(requestedUrl(i - 1).searchParams.get('end_at'));
+      expect(Number(requestedUrl(i).searchParams.get('start_at'))).toBe(previousEnd + 1);
+    }
+    expect(out).toEqual([
+      { country: 'Germany', cities: [{ city: 'Rostock', stayed_for: 120 }] },
+      { country: 'Poland', cities: [] },
+    ]);
+  });
+
+  it('DAWARICH-CLIENT-083: one month failing fails the whole year instead of passing off eleven as twelve', async () => {
+    let served = 0;
+    safeFetchMock.mockImplementation(async (url: string, init: RequestInit) => {
+      calls.push({ url, init });
+      served++;
+      if (served === 4) throw new Error('The operation was aborted due to timeout');
+      return reply({ body: { data: [] } }) as unknown as Response;
+    });
+
+    const err = await failure(() => client.listVisitedCities(CREDS, YEAR_FROM, YEAR_TO));
+    expect(err.code).toBe('unreachable');
+    // Stops at the failure rather than spending the remaining nine on a result
+    // that is already going to be refused.
+    expect(calls).toHaveLength(4);
+  });
+});
+
 describe('DawarichClient — findVisitsNear', () => {
   it('DAWARICH-CLIENT-090: pins the radius explicitly instead of letting Dawarich guess 500 m', async () => {
     const visits = [{ timestamp: 1788000000, distance_meters: 40, points_count: 12 }];

@@ -32,6 +32,7 @@ import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
+import { collapsedDayDates } from '../../components/Map/dawarichTrail'
 import { useRoadtripCorridor } from '../../components/Roadtrip/useRoadtripCorridor'
 import { useRoadtripVias } from '../../components/Roadtrip/useRoadtripVias'
 import { useRefuelSearch } from '../../components/Roadtrip/useRefuelSearch'
@@ -954,6 +955,19 @@ export function useTripPlanner() {
     }
     return plannedPlaces.filter(p => !hidden.has(p.id))
   }, [mapPlaces, assignments, roadtripRoutes.days, collapsedRoadtripDays])
+
+  // The recorded route follows the same folds as the places above, so a
+  // collapsed day does not leave its line behind on the map. Keyed on the joined
+  // dates rather than on the Set, because `days` changes identity on every store
+  // update and the GL overlay rebuilds its source whenever this reference moves.
+  const dawarichHiddenKey = useMemo(
+    () => collapsedDayDates(days, expandedDayIds, roadtripActive ? collapsedRoadtripDays : null).join('|'),
+    [days, expandedDayIds, roadtripActive, collapsedRoadtripDays],
+  )
+  const dawarichHiddenDates = useMemo(
+    () => (dawarichHiddenKey ? new Set(dawarichHiddenKey.split('|')) : null),
+    [dawarichHiddenKey],
+  )
 
   const roadtripLineColors = useMemo(
     () => {
@@ -2390,7 +2404,7 @@ export function useTripPlanner() {
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
     roadtripMode, toggleRoadtripMode, roadtripActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
     overviewShown, toggleOverview, overviewActive, tripOverview,
-    dawarichTrailShown, toggleDawarichTrail, dawarichTrail, dawarichEnabled: !!enabledAddons.dawarich,
+    dawarichTrailShown, toggleDawarichTrail, dawarichTrail, dawarichHiddenDates, dawarichEnabled: !!enabledAddons.dawarich,
     followTrack, roadtripViaCounts,
     allowedFileTypes, tripMembers, setTripMembers, refreshMembers, loadAccommodations,
     TRANSPORT_TYPES, TRIP_TABS, activeTab, setActiveTab, handleTabChange,

@@ -1,5 +1,5 @@
 /**
- * FE-DAWARICH-TRAILUI-001 to FE-DAWARICH-TRAILUI-007: the recorded-route
+ * FE-DAWARICH-TRAILUI-001 to FE-DAWARICH-TRAILUI-009: the recorded-route
  * toggle that sits with the compass and the layer switcher on the trip map.
  *
  * The pill is small but it carries the only explanation the user ever gets for
@@ -123,5 +123,27 @@ describe('DawarichTrailPill', () => {
     // never appears on a touch device, which is exactly where someone taps the
     // button to find out why the map is empty.
     expect(screen.getByRole('tooltip')).toHaveTextContent('Nothing was recorded on these dates')
+  })
+
+  it('FE-DAWARICH-TRAILUI-008: shows a spinning ring and a busy state while the route loads', () => {
+    pill({ active: true, status: 'loading' })
+
+    // A first fetch from somebody's own server can take a while. With nothing on
+    // the button it read as "done, no line", and the tester reloaded the page.
+    expect(screen.getByTestId('dawarich-trail-loading')).toBeInTheDocument()
+    expect(button()).toHaveAttribute('aria-busy', 'true')
+  })
+
+  it('FE-DAWARICH-TRAILUI-009: drops the ring once there is an answer, and never shows it while the layer is off', () => {
+    const view = pill({ active: true, status: 'loading' })
+
+    view.rerender(<DawarichTrailPill active status="ready" onToggle={vi.fn()} />)
+    expect(screen.queryByTestId('dawarich-trail-loading')).not.toBeInTheDocument()
+    expect(button()).toHaveAttribute('aria-busy', 'false')
+
+    // Switched off mid-load: the hook still reports its last status, the button
+    // must not keep spinning for a layer nobody asked for any more.
+    view.rerender(<DawarichTrailPill active={false} status="loading" onToggle={vi.fn()} />)
+    expect(screen.queryByTestId('dawarich-trail-loading')).not.toBeInTheDocument()
   })
 })

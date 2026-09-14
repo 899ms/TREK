@@ -197,6 +197,8 @@ interface Props {
   dawarichTrack?: DawarichTrack | null
   /** Draw only this local day of the recording. */
   dawarichSelectedDate?: string | null
+  /** Local dates whose day is collapsed in the day plan; their recording is not drawn. */
+  dawarichHiddenDates?: ReadonlySet<string> | null
   /** Via points to draw as draggable handles, keyed by day (#1797). */
   roadtripVias?: Record<number, RoadtripVia[]>
   onMoveVia?: (dayId: number, id: number, lat: number, lng: number) => void
@@ -646,6 +648,7 @@ export function MapViewGL({
   hazards,
   dawarichTrack = null,
   dawarichSelectedDate = null,
+  dawarichHiddenDates = null,
   dayOrderMap = NO_DAY_ORDER,
   leftWidth = 0,
   rightWidth = 0,
@@ -724,7 +727,7 @@ export function MapViewGL({
   const hazardPopupFactory = useCallback(() => new gl.Popup({ className: 'map-tooltip trek-hazard-popup', maxWidth: '320px' }), [gl])
   useHazardLayerGL(mapRef.current, mapReady, hazards, hazardPopupFactory)
   // Beneath the planned route's casing, the GL twin of the Leaflet pane order.
-  useDawarichTrailGL(mapRef.current, mapReady, dawarichTrack, dawarichSelectedDate, 'trip-route-casing')
+  useDawarichTrailGL(mapRef.current, mapReady, dawarichTrack, dawarichSelectedDate, 'trip-route-casing', dawarichHiddenDates)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<Map<number, PlacePin>>(new Map())
   // Own layer for the hand-positioned place pins (MapLibre path, see makePlacePin).

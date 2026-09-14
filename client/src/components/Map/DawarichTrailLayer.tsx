@@ -26,15 +26,18 @@ import {
 export default function DawarichTrailLayer({
   track,
   selectedDate,
+  hiddenDates,
   casingPane,
 }: {
   track: DawarichTrack | null
   /** When set, only that local day is drawn. */
   selectedDate?: string | null
+  /** Local dates whose day is folded away in the day plan. */
+  hiddenDates?: ReadonlySet<string> | null
   /** The `trek-track-casing` pane, when the renderer supports panes. */
   casingPane?: string
 }) {
-  const segments = useMemo(() => trailSegments(track, selectedDate), [track, selectedDate])
+  const segments = useMemo(() => trailSegments(track, selectedDate, hiddenDates), [track, selectedDate, hiddenDates])
   if (segments.length === 0) return null
 
   return (

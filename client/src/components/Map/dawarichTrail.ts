@@ -64,20 +64,21 @@ export interface DawarichTrailSegment {
 }
 
 /**
- * Flatten a fetched track into drawable segments, optionally limited to one day.
+ * Flatten a fetched track into drawable segments, optionally limited to one day
+ * and without the days folded away in the day plan.
  *
- * The day filter is what the timeline scrubber drives: selecting a day on the
- * planner should dim the rest of the trip rather than reload it, so the filter
- * happens here over data that is already in memory.
+ * Both filters work on data that is already in memory: selecting or collapsing a
+ * day changes what is drawn, it does not reload the recording.
  */
 export function trailSegments(
   track: DawarichTrack | null,
   onlyDate?: string | null,
+  hiddenDates?: ReadonlySet<string> | null,
 ): DawarichTrailSegment[] {
   if (!track) return []
-  const days: DawarichTrackDay[] = onlyDate
-    ? track.days.filter(day => day.date === onlyDate)
-    : track.days
+  const days: DawarichTrackDay[] = track.days.filter(
+    day => (!onlyDate || day.date === onlyDate) && !hiddenDates?.has(day.date),
+  )
 
   const out: DawarichTrailSegment[] = []
   for (const day of days) {
@@ -106,6 +107,30 @@ export function trailSegments(
     })
   }
   return out
+}
+
+/**
+ * The dates whose recording stays off the map because their day is collapsed.
+ *
+ * The same rule the planner already applies to places: a collapsed day takes
+ * its markers off the map, so it takes its route with it. Two folds count, as
+ * they do for places: the day plan's (`expandedDayIds`, null until the day plan
+ * has reported its state, and then nothing is hidden by it) and, in road trip
+ * mode, the road trip sidebar's own. A day without a date has nothing to match a
+ * recording against. Sorted, so the caller can key a memo on the joined list.
+ */
+export function collapsedDayDates(
+  days: ReadonlyArray<{ id: number; date?: string | null }>,
+  expandedDayIds: ReadonlySet<number> | null,
+  collapsedDayIds?: ReadonlySet<number> | null,
+): string[] {
+  const dates = new Set<string>()
+  for (const day of days) {
+    if (!day.date) continue
+    const foldedInPlan = !!expandedDayIds && !expandedDayIds.has(day.id)
+    if (foldedInPlan || collapsedDayIds?.has(day.id)) dates.add(day.date)
+  }
+  return [...dates].sort()
 }
 
 /** The overlay as a GeoJSON FeatureCollection, for the GL renderer. */

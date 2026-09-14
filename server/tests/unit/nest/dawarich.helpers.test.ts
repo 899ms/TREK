@@ -1,6 +1,6 @@
 /**
  * The pure half of the Dawarich integration — DAWARICH-TIME-001 through
- * DAWARICH-COUNT-003. Everything under test is a free function over plain
+ * DAWARICH-CITIES-006. Everything under test is a free function over plain
  * fixtures: no DB, no container, and no client. `dawarich.client` appears here
  * only as a type-only import (erased at compile time), so nothing in this file
  * can reach the network even by accident — there is no DawarichClient instance
@@ -19,10 +19,12 @@ import {
   distanceMeters,
   geoJsonToLatLng,
   localDateOf,
+  mergeVisitedCountries,
   minutesBetween,
   normalizeVisit,
   offsetMinutesOf,
   simplify,
+  splitWindow,
   syncWindow,
   toNumber,
   visitHash,
@@ -925,5 +927,87 @@ describe('countPoints', () => {
       track('2024-06-16T10:00:00Z', '2024-06-16T12:00:00Z', [[20, 20], [21, 21], [21, 22]]),
     ]);
     expect(countPoints(days)).toBe(6);
+  });
+});
+
+describe('visited cities over a long range', () => {
+  const DAY = 86_400_000;
+
+  it('DAWARICH-CITIES-001: a range within one window stays one request, bounds untouched', () => {
+    const from = new Date('2026-09-01T00:00:00Z');
+    const to = new Date('2026-09-02T00:00:00Z');
+    expect(splitWindow(from, to, 30)).toEqual([{ from, to }]);
+  });
+
+  it('DAWARICH-CITIES-002: a year becomes months that cover it without a gap or an overlap', () => {
+    // Dawarich reads start_at..end_at as inclusive on both ends, so touching
+    // bounds would hand the point on the seam to two windows.
+    const from = new Date('2025-09-14T20:00:00Z');
+    const to = new Date(from.getTime() + 365 * DAY);
+    const windows = splitWindow(from, to, 30);
+
+    expect(windows).toHaveLength(13);
+    expect(windows[0].from).toEqual(from);
+    expect(windows[windows.length - 1].to).toEqual(to);
+    for (let i = 1; i < windows.length; i++) {
+      expect(windows[i].from.getTime() - windows[i - 1].to.getTime()).toBe(1000);
+    }
+    for (const window of windows) {
+      expect(window.to.getTime() - window.from.getTime()).toBeLessThanOrEqual(30 * DAY);
+    }
+  });
+
+  it('DAWARICH-CITIES-003: bounds are whole seconds, the unit that goes on the wire', () => {
+    const windows = splitWindow(new Date('2026-01-01T00:00:00.750Z'), new Date('2026-03-01T00:00:00.250Z'), 30);
+    for (const window of windows) {
+      expect(window.from.getMilliseconds()).toBe(0);
+      expect(window.to.getMilliseconds()).toBe(0);
+    }
+  });
+
+  it('DAWARICH-CITIES-004: a range that ends before it starts asks nothing', () => {
+    expect(splitWindow(new Date('2026-09-02T00:00:00Z'), new Date('2026-09-01T00:00:00Z'), 30)).toEqual([]);
+  });
+
+  it('DAWARICH-CITIES-005: a city seen in two months adds up its time and keeps the later visit', () => {
+    const merged = mergeVisitedCountries([
+      [{ country: 'Germany', cities: [{ city: 'Rostock', points: 10, stayed_for: 90, timestamp: 1_700_000_000 }] }],
+      [
+        { country: 'Germany', cities: [{ city: 'Rostock', points: 5, stayed_for: 60, timestamp: 1_702_000_000 }, { city: 'Berlin', stayed_for: 120 }] },
+        { country: 'Poland', cities: [{ city: 'Szczecin', stayed_for: 75, timestamp: 1_701_000_000 }] },
+      ],
+    ]);
+
+    expect(merged).toEqual([
+      {
+        country: 'Germany',
+        cities: [
+          { city: 'Rostock', points: 15, stayed_for: 150, timestamp: 1_702_000_000 },
+          { city: 'Berlin', stayed_for: 120 },
+        ],
+      },
+      { country: 'Poland', cities: [{ city: 'Szczecin', stayed_for: 75, timestamp: 1_701_000_000 }] },
+    ]);
+  });
+
+  it('DAWARICH-CITIES-006: an unvalidated payload loses its unnamed entries, not its countries', () => {
+    const merged = mergeVisitedCountries([
+      [
+        null as never,
+        { country: 42 as never, cities: [] },
+        { country: 'Denmark', cities: null as never },
+      ],
+      [{ country: 'Denmark', cities: [null as never, {} as never, { city: 'Gedser', points: '7' as never }] }],
+    ]);
+
+    // A count that arrived as a string is still a count; a timestamp nobody sent
+    // stays absent instead of turning into -Infinity.
+    expect(merged).toEqual([{ country: 'Denmark', cities: [{ city: 'Gedser', points: '7' }] }]);
+
+    const again = mergeVisitedCountries([
+      [{ country: 'Denmark', cities: [{ city: 'Gedser', points: '7' as never }] }],
+      [{ country: 'Denmark', cities: [{ city: 'Gedser', points: 3 }] }],
+    ]);
+    expect(again[0].cities[0]).toEqual({ city: 'Gedser', points: 10, stayed_for: undefined, timestamp: undefined });
   });
 });

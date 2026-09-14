@@ -676,6 +676,7 @@ export const MapView = memo(function MapView({
   hazards,
   dawarichTrack = null,
   dawarichSelectedDate = null,
+  dawarichHiddenDates = null,
   accessLines = [],
   onPoiDropOnRoute,
   onRouteClick,
@@ -1201,6 +1202,7 @@ export const MapView = memo(function MapView({
       <DawarichTrailLayer
         track={dawarichTrack}
         selectedDate={dawarichSelectedDate}
+        hiddenDates={dawarichHiddenDates}
         casingPane={hasCasingPane ? TRACK_CASING_PANE : undefined}
       />
       <ClusteredPois pois={pois} enabled={clusterLoosely} onPoiClick={onPoiClick}>{poiMarkers}</ClusteredPois>

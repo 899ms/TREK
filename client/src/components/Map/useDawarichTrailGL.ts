@@ -28,14 +28,29 @@ export function useDawarichTrailGL(
   selectedDate?: string | null,
   /** Insert beneath this layer, so the planned route stays on top. */
   beforeId?: string,
+  /** Local dates whose day is folded away in the day plan. */
+  hiddenDates?: ReadonlySet<string> | null,
 ): void {
   useEffect(() => {
     if (!map || !ready) return
 
-    const data = trailGeoJson(trailSegments(track ?? null, selectedDate))
+    const data = trailGeoJson(trailSegments(track ?? null, selectedDate, hiddenDates))
 
+    // `isStyleLoaded()` does not mean "the style has loaded". It is false while
+    // any source still has tiles in flight, which is the usual state right after
+    // someone switches the overlay on and the map is still filling in. Giving up
+    // there left the line undrawn until something rebuilt the style, which in
+    // practice meant reloading the page. `idle` is the map saying everything it
+    // was fetching has arrived, so the draw waits for it once and tries again.
+    let waiting = false
     const draw = () => {
-      if (!map.isStyleLoaded()) return
+      if (!map.isStyleLoaded()) {
+        if (!waiting) {
+          waiting = true
+          map.once('idle', retry)
+        }
+        return
+      }
       const existing = map.getSource(SOURCE) as GeoJSONSource | undefined
       if (existing) {
         // setData rather than remove-and-add: a rebuilt source flickers, and a
@@ -77,14 +92,20 @@ export function useDawarichTrailGL(
       )
     }
 
+    const retry = () => {
+      waiting = false
+      draw()
+    }
+
     draw()
     map.on('style.load', draw)
     return () => {
       map.off('style.load', draw)
+      map.off('idle', retry)
       for (const layer of [LINE_LAYER, CASING_LAYER]) {
         if (map.getLayer(layer)) map.removeLayer(layer)
       }
       if (map.getSource(SOURCE)) map.removeSource(SOURCE)
     }
-  }, [map, ready, track, selectedDate, beforeId])
+  }, [map, ready, track, selectedDate, beforeId, hiddenDates])
 }

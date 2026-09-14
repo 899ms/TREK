@@ -1,5 +1,5 @@
 /**
- * FE-DAWARICH-TRAILUI-020 to FE-DAWARICH-TRAILUI-029: the recorded-route
+ * FE-DAWARICH-TRAILUI-020 to FE-DAWARICH-TRAILUI-032: the recorded-route
  * overlay on the GL renderer, the imperative twin of `DawarichTrailLayer`.
  *
  * A declarative overlay that gets its ordering wrong looks wrong. An imperative
@@ -28,6 +28,10 @@
  *    sources. Both paths are pinned, because which one a refresh takes is the
  *    difference between a line that blinks every two minutes and one that does
  *    not.
+ *  - **the wait for `idle`.** `isStyleLoaded()` is false while any tile is
+ *    still in flight, not only before the first style. A draw that gave up
+ *    there and only listened for `style.load` left the line off the map until
+ *    the page was reloaded, which is what a tester on dev1 ran into.
  *  - **one `style.load` subscription at a time.** The effect re-runs on every
  *    refresh, and a cleanup that forgot to unsubscribe would add one silent
  *    redraw per refresh for the life of the map.
@@ -61,6 +65,7 @@ function fakeGlMap({ styleLoaded = true, styleLayers = [] as string[] } = {}) {
   const layers = new Map<string, { spec: { id: string; paint?: Record<string, unknown> }; before: string | undefined }>()
   for (const id of styleLayers) layers.set(id, { spec: { id }, before: undefined })
   const listeners = new Map<string, Set<() => void>>()
+  const onceListeners = new Map<string, Set<() => void>>()
 
   const state = { styleLoaded }
   const map = {
@@ -84,7 +89,15 @@ function fakeGlMap({ styleLoaded = true, styleLayers = [] as string[] } = {}) {
       set.add(fn)
       listeners.set(type, set)
     }),
-    off: vi.fn((type: string, fn: () => void) => { listeners.get(type)?.delete(fn) }),
+    once: vi.fn((type: string, fn: () => void) => {
+      const set = onceListeners.get(type) ?? new Set<() => void>()
+      set.add(fn)
+      onceListeners.set(type, set)
+    }),
+    off: vi.fn((type: string, fn: () => void) => {
+      listeners.get(type)?.delete(fn)
+      onceListeners.get(type)?.delete(fn)
+    }),
   }
 
   return {
@@ -95,6 +108,13 @@ function fakeGlMap({ styleLoaded = true, styleLayers = [] as string[] } = {}) {
     state,
     styleLoadListeners: () => listeners.get('style.load')?.size ?? 0,
     emitStyleLoad: () => { listeners.get('style.load')?.forEach(fn => fn()) },
+    idleListeners: () => onceListeners.get('idle')?.size ?? 0,
+    /** A `once` listener is gone before it runs, the way GL's Evented does it. */
+    emitIdle: () => {
+      const pending = [...(onceListeners.get('idle') ?? [])]
+      onceListeners.delete('idle')
+      pending.forEach(fn => fn())
+    },
     /** What a style rebuild does to the map before `style.load` fires. */
     dropStyle: () => { sources.clear(); layers.clear() },
     drawn: () => sources.get(SOURCE)?.data as
@@ -109,10 +129,11 @@ interface Props {
   track?: DawarichTrack | null
   date?: string | null
   before?: string
+  hidden?: ReadonlySet<string> | null
 }
 
 const mount = (props: Props) =>
-  renderHook((p: Props) => useDawarichTrailGL(p.map, p.ready, p.track, p.date, p.before), {
+  renderHook((p: Props) => useDawarichTrailGL(p.map, p.ready, p.track, p.date, p.before, p.hidden), {
     initialProps: props,
   })
 
@@ -313,5 +334,54 @@ describe('useDawarichTrailGL', () => {
     // effect subscribes; without that the overlay would redraw once per style
     // change per refresh, for as long as the map lives.
     expect(gl.styleLoadListeners()).toBe(1)
+  })
+
+  it('FE-DAWARICH-TRAILUI-030: a route that lands while tiles are still loading is drawn once they have arrived', () => {
+    // The tester's case: the overlay switched on, the map still filling in,
+    // and the line only appearing after a reload.
+    const gl = fakeGlMap({ styleLoaded: false })
+    mount({ map: gl.map, ready: true, track: track([DAY_ONE]) })
+
+    expect(gl.spies.addSource).not.toHaveBeenCalled()
+    expect(gl.idleListeners()).toBe(1)
+
+    gl.state.styleLoaded = true
+    gl.emitIdle()
+
+    expect(gl.spies.addSource).toHaveBeenCalledTimes(1)
+    expect(gl.spies.addLayer).toHaveBeenCalledTimes(2)
+    expect(gl.idleListeners()).toBe(0)
+  })
+
+  it('FE-DAWARICH-TRAILUI-031: waits for idle once however often it is asked, and keeps waiting while the map is busy', () => {
+    const gl = fakeGlMap({ styleLoaded: false })
+    const view = mount({ map: gl.map, ready: true, track: track([DAY_ONE]) })
+
+    // A style.load that fires while tiles are still in flight is a second draw
+    // attempt; it must not stack a second wait on the first.
+    gl.emitStyleLoad()
+    expect(gl.idleListeners()).toBe(1)
+
+    // An idle that arrives before the style is ready (a transition finished,
+    // another source started) is not the end of the wait.
+    gl.emitIdle()
+    expect(gl.spies.addSource).not.toHaveBeenCalled()
+    expect(gl.idleListeners()).toBe(1)
+
+    view.unmount()
+    expect(gl.idleListeners()).toBe(0)
+    expect(gl.spies.off).toHaveBeenCalledWith('idle', expect.any(Function))
+  })
+
+  it('FE-DAWARICH-TRAILUI-032: leaves out the days folded away in the day plan without repainting the others', () => {
+    const gl = fakeGlMap()
+    const view = mount({ map: gl.map, ready: true, track: track([DAY_ONE, DAY_TWO]) })
+    const secondColour = gl.drawn()?.features[1]?.properties.color
+
+    view.rerender({ map: gl.map, ready: true, track: track([DAY_ONE, DAY_TWO]), hidden: new Set([DAY_ONE.date]) })
+
+    expect(gl.drawn()?.features).toHaveLength(1)
+    expect(gl.drawn()?.features[0]?.properties.date).toBe(DAY_TWO.date)
+    expect(gl.drawn()?.features[0]?.properties.color).toBe(secondColour)
   })
 })
