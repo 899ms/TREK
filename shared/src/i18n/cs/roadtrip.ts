@@ -207,6 +207,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Nejrychlejší',
   'roadtrip.alt.slower': 'o {time} déle',
   'roadtrip.alt.quicker': 'o {time} rychleji',
+  'roadtrip.alt.otherEngine': 'Čas spočítal server pro objížďky, ne ten hlavní.',
   'roadtrip.day': 'Den {number}',
   'roadtrip.quietDay.empty': 'Zatím žádné zastávky — přetáhněte sem',
   'roadtrip.quietDay.one': 'Zatím jen {name} — přetáhněte sem zastávku',

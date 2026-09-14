@@ -212,6 +212,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Η ταχύτερη',
   'roadtrip.alt.slower': '{time} πιο αργή',
   'roadtrip.alt.quicker': '{time} πιο γρήγορη',
+  'roadtrip.alt.otherEngine': 'Χρόνος από τον δρομολογητή αποφυγής, όχι τον κύριο.',
   'roadtrip.day': 'Ημέρα {number}',
   'roadtrip.quietDay.empty': 'Καμία στάση ακόμη — αφήστε μία εδώ',
   'roadtrip.quietDay.one': 'Μέχρι στιγμής μόνο {name} — αφήστε μια στάση εδώ',

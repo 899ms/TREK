@@ -207,6 +207,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': '最速',
   'roadtrip.alt.slower': '{time} 遅い',
   'roadtrip.alt.quicker': '{time} 速い',
+  'roadtrip.alt.otherEngine': '所要時間は主エンジンではなく回避用エンジンでの計算です。',
   'roadtrip.day': '{number} 日目',
   'roadtrip.quietDay.empty': 'まだ立ち寄り先がありません。ここにドロップ',
   'roadtrip.quietDay.one': '今のところ {name} だけです。立ち寄り先をここにドロップ',

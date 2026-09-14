@@ -211,6 +211,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'La més ràpida',
   'roadtrip.alt.slower': '{time} més lenta',
   'roadtrip.alt.quicker': '{time} més ràpida',
+  'roadtrip.alt.otherEngine': 'Temps de l’encaminador d’evitació, no del principal.',
   'roadtrip.day': 'Dia {number}',
   'roadtrip.quietDay.empty': 'Encara sense parades: deixa’n una aquí',
   'roadtrip.quietDay.one': 'De moment només {name}: deixa una parada aquí',

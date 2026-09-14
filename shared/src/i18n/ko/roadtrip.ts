@@ -206,6 +206,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': '가장 빠름',
   'roadtrip.alt.slower': '{time} 더 걸림',
   'roadtrip.alt.quicker': '{time} 더 빠름',
+  'roadtrip.alt.otherEngine': '기본 엔진이 아니라 회피 엔진이 계산한 시간입니다.',
   'roadtrip.day': '{number}일차',
   'roadtrip.quietDay.empty': '아직 경유지가 없습니다. 여기에 놓으세요',
   'roadtrip.quietDay.one': '지금은 {name}뿐입니다. 경유지를 여기에 놓으세요',

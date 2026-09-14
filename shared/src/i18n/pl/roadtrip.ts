@@ -208,6 +208,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Najszybsza',
   'roadtrip.alt.slower': '{time} dłużej',
   'roadtrip.alt.quicker': '{time} krócej',
+  'roadtrip.alt.otherEngine': 'Czas policzony silnikiem omijania, nie głównym.',
   'roadtrip.day': 'Dzień {number}',
   'roadtrip.quietDay.empty': 'Brak przystanków — upuść tutaj',
   'roadtrip.quietDay.one': 'Na razie tylko {name} — upuść tutaj przystanek',

@@ -209,6 +209,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'En hızlı',
   'roadtrip.alt.slower': '{time} daha uzun',
   'roadtrip.alt.quicker': '{time} daha kısa',
+  'roadtrip.alt.otherEngine': 'Süre, ana motorla değil kaçınma motoruyla hesaplandı.',
   'roadtrip.day': '{number}. gün',
   'roadtrip.quietDay.empty': 'Henüz mola yok — buraya bırakın',
   'roadtrip.quietDay.one': 'Şimdilik yalnızca {name} — buraya bir mola bırakın',

@@ -210,6 +210,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Tercepat',
   'roadtrip.alt.slower': '{time} lebih lama',
   'roadtrip.alt.quicker': '{time} lebih cepat',
+  'roadtrip.alt.otherEngine': 'Waktu dihitung mesin penghindaran, bukan mesin utama.',
   'roadtrip.day': 'Hari {number}',
   'roadtrip.quietDay.empty': 'Belum ada perhentian — jatuhkan di sini',
   'roadtrip.quietDay.one': 'Sejauh ini hanya {name} — jatuhkan perhentian di sini',

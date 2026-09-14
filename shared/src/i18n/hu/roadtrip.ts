@@ -208,6 +208,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Leggyorsabb',
   'roadtrip.alt.slower': '{time}-cel lassabb',
   'roadtrip.alt.quicker': '{time}-cel gyorsabb',
+  'roadtrip.alt.otherEngine': 'Az időt a kerülő útvonaltervező számolta, nem a fő.',
   'roadtrip.day': '{number}. nap',
   'roadtrip.quietDay.empty': 'Még nincs megálló — húzzon ide egyet',
   'roadtrip.quietDay.one': 'Egyelőre csak {name} — húzzon ide egy megállót',

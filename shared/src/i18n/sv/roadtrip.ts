@@ -207,6 +207,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Snabbast',
   'roadtrip.alt.slower': '{time} långsammare',
   'roadtrip.alt.quicker': '{time} snabbare',
+  'roadtrip.alt.otherEngine': 'Tid från undvikandemotorn, inte huvudmotorn.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Inga stopp än – släpp ett här',
   'roadtrip.quietDay.one': 'Hittills bara {name} – släpp ett stopp här',

@@ -16,6 +16,13 @@ export interface AlternativeOverlay {
   distance: number
   /** Seconds more than the quickest offer; negative never happens by construction. */
   slowerThanQuickest: number
+  /**
+   * True when this route's figures came from the other engine, so they cannot be read
+   * against the rest of the list. Nothing derived from a comparison is filled in for
+   * such a route: it takes no part in electing the quickest and its
+   * `slowerThanQuickest` stays zero.
+   */
+  otherEngine: boolean
   labelBg: string
   /** Where to hang the label — a point on this route and on no other. */
   at: { lat: number; lng: number }
@@ -91,7 +98,21 @@ export function buildAlternativeOverlays(
 
   // The quickest of what came back, which is what Apple calls out — not necessarily the
   // first entry, since the road currently driven is put at the top when there is one.
-  const quickest = routes.reduce((best, r, i) => (r.duration < routes[best].duration ? i : best), 0)
+  //
+  // Only among the routes one engine priced. The avoidance offer on a default install
+  // comes from the second engine, whose speed model differs by up to a seventh either
+  // way depending on the region, so letting it into this election decides which road is
+  // blue and how much slower every other road is called on nothing but that gap. On a
+  // Spanish motorway leg that is enough to crown a toll-free B-road detour and label
+  // the motorway somebody is actually driving as the slower way round.
+  //
+  // Index 0 is the fallback rather than -1: the first entry is the road being driven
+  // when there is one and the router's own pick otherwise, so if a list ever held
+  // nothing but second-engine routes, that is still the one to call primary.
+  const comparable = routes.map((r, i) => (r.engine ? -1 : i)).filter(i => i >= 0)
+  const quickest = comparable.length
+    ? comparable.reduce((best, i) => (routes[i].duration < routes[best].duration ? i : best), comparable[0])
+    : 0
   const anyCurrent = routes.some(r => r.current)
 
   return routes.map((route, index) => {
@@ -100,6 +121,7 @@ export function buildAlternativeOverlays(
     // Blue is the road you are on: the one currently driven, or the router's own pick
     // when nothing has been bent. Everything else is the pale blue of an offer.
     const primary = route.current || (!anyCurrent && index === quickest)
+    const otherEngine = !!route.engine
     return {
       index,
       coordinates: route.coordinates,
@@ -119,7 +141,14 @@ export function buildAlternativeOverlays(
               : index === quickest ? labels.fastest : '',
       duration: route.duration,
       distance: route.distance,
-      slowerThanQuickest: Math.max(0, Math.round(route.duration - routes[quickest].duration)),
+      // Left at zero for a route the other engine priced, and for every route when
+      // that is the only thing to measure against. The bar reads a zero as "no
+      // difference worth printing" and falls back to naming what the road is, which
+      // for these is always the class left out of it.
+      slowerThanQuickest: otherEngine || !!routes[quickest].engine
+        ? 0
+        : Math.max(0, Math.round(route.duration - routes[quickest].duration)),
+      otherEngine,
       labelBg: primary ? ALT_LABEL_PRIMARY_BG : ALT_LABEL_SECONDARY_BG,
       at: at ?? { lat: 0, lng: 0 },
     }

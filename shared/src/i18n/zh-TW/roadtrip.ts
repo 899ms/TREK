@@ -197,6 +197,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': '最快',
   'roadtrip.alt.slower': '慢 {time}',
   'roadtrip.alt.quicker': '快 {time}',
+  'roadtrip.alt.otherEngine': '駕駛時間由避開專用的路徑服務計算，無法與其他項比較。',
   'roadtrip.day': '第 {number} 天',
   'roadtrip.quietDay.empty': '尚無停靠點 — 拖到這裡',
   'roadtrip.quietDay.one': '目前只有 {name} — 把停靠點拖到這裡',

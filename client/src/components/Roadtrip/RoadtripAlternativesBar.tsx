@@ -1,6 +1,7 @@
 import React from 'react'
-import { Shuffle, X, AlertTriangle } from 'lucide-react'
+import { Shuffle, X, AlertTriangle, Info } from 'lucide-react'
 import { useTranslation } from '../../i18n/TranslationContext'
+import { Tooltip } from '../shared/Tooltip'
 import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
 import { formatDurationShort } from './roadtripModel'
@@ -92,6 +93,17 @@ export default function RoadtripAlternativesBar({
                     : t('roadtrip.alt.slower', { time: formatDurationShort(alt.slowerThanQuickest) })}
                 </span>
               </span>
+              {/* Only where the drive time on the map came from the other engine. The
+                  road and the length are the same question either way; the time is not,
+                  and two engines' times sitting next to each other on the map invite a
+                  subtraction that means nothing. Saying so here, where the choice is
+                  actually made, is cheaper than a second request per offer to restate
+                  the whole list in one engine's terms. */}
+              {alt.otherEngine ? (
+                <Tooltip label={t('roadtrip.alt.otherEngine')}>
+                  <Info size={12} className="shrink-0 text-content-faint" aria-label={t('roadtrip.alt.otherEngine')} />
+                </Tooltip>
+              ) : null}
             </button>
           ))}
         </div>

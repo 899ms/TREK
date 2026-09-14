@@ -143,4 +143,81 @@ describe('buildAlternativeOverlays', () => {
     )
     expect(out.filter(o => o.color === ALT_PRIMARY)).toHaveLength(1)
   })
+
+  it('FE-ALTOVL-011: a route the other engine priced cannot win the quickest election', () => {
+    // The shape a default install actually produces: OSRM answered with the one road
+    // it likes, and the toll-free offer beside it came from the avoidance router,
+    // whose speed model reads a Spanish motorway a seventh faster. Electing across
+    // the two paints the detour blue and calls the road being driven the slow way
+    // round, on nothing but that gap.
+    const out = buildAlternativeOverlays(
+      [
+        alt({ duration: 11_880, coordinates: line(20, 0) }),
+        alt({ duration: 10_140, coordinates: line(20, 1), avoids: 'toll', engine: 'valhalla' }),
+      ],
+      LABELS,
+    )
+    expect(out[0].color).toBe(ALT_PRIMARY)
+    expect(out[1].color).toBe(ALT_SECONDARY)
+    expect(out[0].note).toBe('Fastest')
+    expect(out[1].note).toBe('No tolls')
+  })
+
+  it('FE-ALTOVL-012: no difference is printed across two engines', () => {
+    const out = buildAlternativeOverlays(
+      [
+        alt({ duration: 11_880, coordinates: line(20, 0) }),
+        alt({ duration: 10_140, coordinates: line(20, 1), avoids: 'toll', engine: 'valhalla' }),
+      ],
+      LABELS,
+    )
+    expect(out[0].slowerThanQuickest).toBe(0)
+    expect(out[1].slowerThanQuickest).toBe(0)
+    expect(out[0].otherEngine).toBe(false)
+    expect(out[1].otherEngine).toBe(true)
+    // Each route still reports its own time; it is only the subtraction that is refused.
+    expect(out[0].duration).toBe(11_880)
+    expect(out[1].duration).toBe(10_140)
+  })
+
+  it('FE-ALTOVL-013: an instance whose own router answers still gets a real difference', () => {
+    // A self-hosted OSRM built through the MLD pipeline answers `exclude` itself, so
+    // the avoidance offer carries no engine of its own and the two figures are the
+    // same engine's. That comparison is sound and must keep working.
+    const out = buildAlternativeOverlays(
+      [
+        alt({ duration: 3600, coordinates: line(20, 0) }),
+        alt({ duration: 5400, coordinates: line(20, 1), avoids: 'toll' }),
+      ],
+      LABELS,
+    )
+    expect(out[1].slowerThanQuickest).toBe(1800)
+    expect(out.every(o => o.otherEngine === false)).toBe(true)
+  })
+
+  it('FE-ALTOVL-014: a list with nothing comparable in it still names one road primary', () => {
+    const out = buildAlternativeOverlays(
+      [
+        alt({ duration: 3600, coordinates: line(20, 0), engine: 'valhalla' }),
+        alt({ duration: 5400, coordinates: line(20, 1), avoids: 'toll', engine: 'valhalla' }),
+      ],
+      LABELS,
+    )
+    expect(out.filter(o => o.color === ALT_PRIMARY)).toHaveLength(1)
+    expect(out[0].color).toBe(ALT_PRIMARY)
+    expect(out.every(o => o.slowerThanQuickest === 0)).toBe(true)
+  })
+
+  it('FE-ALTOVL-015: the road being driven stays blue whatever the other engine says', () => {
+    const out = buildAlternativeOverlays(
+      [
+        alt({ duration: 11_880, coordinates: line(20, 0), current: true }),
+        alt({ duration: 10_140, coordinates: line(20, 1), avoids: 'toll', engine: 'valhalla' }),
+      ],
+      LABELS,
+    )
+    expect(out[0].color).toBe(ALT_PRIMARY)
+    expect(out[0].note).toBe('Current')
+    expect(out[1].color).toBe(ALT_SECONDARY)
+  })
 })

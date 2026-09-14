@@ -210,6 +210,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Snelste',
   'roadtrip.alt.slower': '{time} langzamer',
   'roadtrip.alt.quicker': '{time} sneller',
+  'roadtrip.alt.otherEngine': 'Tijd van de vermijdingsrouter, niet van de hoofdrouter.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Nog geen stops — laat er hier een vallen',
   'roadtrip.quietDay.one': 'Voorlopig alleen {name} — laat hier een stop vallen',

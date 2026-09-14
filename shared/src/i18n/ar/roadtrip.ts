@@ -204,6 +204,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'الأسرع',
   'roadtrip.alt.slower': 'أبطأ بـ {time}',
   'roadtrip.alt.quicker': 'أسرع بـ {time}',
+  'roadtrip.alt.otherEngine': 'الزمن محسوب بمحرك التجنب، لا بالمحرك الرئيسي.',
   'roadtrip.day': 'اليوم {number}',
   'roadtrip.quietDay.empty': 'لا توجد محطات بعد — أفلِت واحدة هنا',
   'roadtrip.quietDay.one': 'حتى الآن {name} فقط — أفلِت محطة هنا',

@@ -208,6 +208,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.fastest': 'Nhanh nhất',
   'roadtrip.alt.slower': 'chậm hơn {time}',
   'roadtrip.alt.quicker': 'nhanh hơn {time}',
+  'roadtrip.alt.otherEngine': 'Giờ do máy chủ định tuyến tránh đường tính, không phải máy chính.',
   'roadtrip.day': 'Ngày {number}',
   'roadtrip.quietDay.empty': 'Chưa có điểm dừng — thả vào đây',
   'roadtrip.quietDay.one': 'Hiện chỉ có {name} — thả một điểm dừng vào đây',
