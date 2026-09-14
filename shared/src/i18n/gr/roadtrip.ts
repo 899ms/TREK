@@ -11,6 +11,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Δημοσιευμένη χρέωση· ενδέχεται να ισχύουν φόροι, όροι και πρόσθετα τέλη. Η τιμή της κάρτας σας μπορεί να διαφέρει.',
   'roadtrip.charging.coverage': 'Ανοικτά δεδομένα· η κάλυψη εξαρτάται από την περιοχή και τον πάροχο.',
+  'roadtrip.charging.availability': 'Διαθεσιμότητα και χρεώσεις',
   'roadtrip.import.title': 'Εισαγωγή διαδρομής Google Maps',
   'roadtrip.import.note': 'Οι στάσεις προστίθενται στην επιλεγμένη ημέρα. Το TREK υπολογίζει ξανά τη διαδρομή.',
   'roadtrip.import.unresolved': 'Η τοποθεσία δεν βρέθηκε· αυτή η στάση θα παραλειφθεί.',

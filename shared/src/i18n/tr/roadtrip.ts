@@ -11,6 +11,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Yayımlanan tarife; vergi, koşullar ve ek ücretler uygulanabilir. Şarj kartı fiyatınız farklı olabilir.',
   'roadtrip.charging.coverage': 'Açık veri; kapsam bölge ve operatöre göre değişir.',
+  'roadtrip.charging.availability': 'Müsaitlik ve tarifeler',
   'roadtrip.import.title': 'Google Maps rotasını içe aktar',
   'roadtrip.import.note': 'Duraklar seçilen güne eklenir. TREK rotayı yeniden hesaplar.',
   'roadtrip.import.unresolved': 'Konum bulunamadı; bu durak atlanacak.',

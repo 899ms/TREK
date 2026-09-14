@@ -10,6 +10,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     '공개 요금입니다. 세금, 조건, 추가 요금이 적용될 수 있으며 충전 카드 요금은 다를 수 있습니다.',
   'roadtrip.charging.coverage': '공개 데이터로 지역과 운영사에 따라 범위가 다릅니다.',
+  'roadtrip.charging.availability': '이용 가능 여부와 요금',
   'roadtrip.import.title': 'Google Maps 경로 가져오기',
   'roadtrip.import.note': '경유지를 선택한 날짜에 추가합니다. TREK이 경로를 다시 계산합니다.',
   'roadtrip.import.unresolved': '위치를 찾을 수 없어 이 경유지를 건너뜁니다.',

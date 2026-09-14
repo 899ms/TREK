@@ -10,6 +10,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Tariffa pubblicata; verificare tasse, condizioni e supplementi. Il prezzo della tua tessera può variare.',
   'roadtrip.charging.coverage': 'Dati aperti; copertura variabile per regione e gestore.',
+  'roadtrip.charging.availability': 'Disponibilità e tariffe',
   'roadtrip.import.title': 'Importa percorso Google Maps',
   'roadtrip.import.note': 'Le tappe vengono aggiunte al giorno scelto. TREK ricalcola il percorso.',
   'roadtrip.import.unresolved': 'Posizione non trovata; questa tappa verrà saltata.',

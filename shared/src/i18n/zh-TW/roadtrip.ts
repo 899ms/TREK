@@ -9,6 +9,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.prices': '公布的費率',
   'roadtrip.charging.note': '公布的費率可能附帶稅費、條件和額外費用。您的充電卡價格可能不同。',
   'roadtrip.charging.coverage': '開放資料，涵蓋範圍因地區和營運商而異。',
+  'roadtrip.charging.availability': '可用狀態與費率',
   'roadtrip.import.title': '匯入 Google Maps 路線',
   'roadtrip.import.note': '停靠點將新增至所選日期。TREK 將重新計算路線。',
   'roadtrip.import.unresolved': '找不到位置；將略過此停靠點。',

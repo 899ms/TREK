@@ -10,6 +10,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Biểu giá công bố; có thể áp dụng thuế, điều kiện và phụ phí. Giá thẻ sạc của bạn có thể khác.',
   'roadtrip.charging.coverage': 'Dữ liệu mở; phạm vi phụ thuộc khu vực và nhà vận hành.',
+  'roadtrip.charging.availability': 'Tình trạng còn trống và biểu giá',
   'roadtrip.import.title': 'Nhập tuyến đường Google Maps',
   'roadtrip.import.note': 'Các điểm dừng được thêm vào ngày đã chọn. TREK tính lại tuyến đường.',
   'roadtrip.import.unresolved': 'Không tìm thấy vị trí; điểm dừng này sẽ bị bỏ qua.',

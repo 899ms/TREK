@@ -11,6 +11,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Tarif publié ; taxes, conditions et frais supplémentaires possibles. Le prix de votre carte peut différer.',
   'roadtrip.charging.coverage': 'Données ouvertes ; couverture variable selon la région et l’opérateur.',
+  'roadtrip.charging.availability': 'Disponibilité et tarifs',
   'roadtrip.import.title': 'Importer un itinéraire Google Maps',
   'roadtrip.import.note': 'Les étapes sont ajoutées au jour choisi. TREK recalcule le trajet.',
   'roadtrip.import.unresolved': 'Lieu introuvable ; cette étape sera ignorée.',

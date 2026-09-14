@@ -9,6 +9,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.prices': 'Publicerade priser',
   'roadtrip.charging.note': 'Publicerat pris; skatter, villkor och tillägg kan gälla. Ditt laddkorts pris kan avvika.',
   'roadtrip.charging.coverage': 'Öppna data; täckning varierar efter region och operatör.',
+  'roadtrip.charging.availability': 'Tillgänglighet och priser',
   'roadtrip.import.title': 'Importera Google Maps-rutt',
   'roadtrip.import.note': 'Stoppen läggs till på vald dag. TREK beräknar rutten på nytt.',
   'roadtrip.import.unresolved': 'Platsen hittades inte; stoppet hoppas över.',

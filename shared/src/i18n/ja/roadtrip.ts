@@ -11,6 +11,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     '公開料金です。税金、条件、追加料金をご確認ください。充電カードの料金は異なる場合があります。',
   'roadtrip.charging.coverage': 'オープンデータ。地域や事業者によって対応範囲が異なります。',
+  'roadtrip.charging.availability': '空き状況と料金',
   'roadtrip.import.title': 'Google Mapsのルートをインポート',
   'roadtrip.import.note': '立ち寄り先を選択した日に追加し、TREKでルートを再計算します。',
   'roadtrip.import.unresolved': '場所が見つからないため、この立ち寄り先はスキップされます。',

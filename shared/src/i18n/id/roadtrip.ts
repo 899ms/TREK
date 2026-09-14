@@ -10,6 +10,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.charging.note':
     'Tarif publik; pajak, syarat, dan biaya tambahan mungkin berlaku. Harga kartu pengisian Anda bisa berbeda.',
   'roadtrip.charging.coverage': 'Data terbuka; cakupan bergantung wilayah dan operator.',
+  'roadtrip.charging.availability': 'Ketersediaan dan tarif',
   'roadtrip.import.title': 'Impor rute Google Maps',
   'roadtrip.import.note': 'Perhentian ditambahkan ke hari yang dipilih. TREK menghitung ulang rute.',
   'roadtrip.import.unresolved': 'Lokasi tidak ditemukan; perhentian ini akan dilewati.',

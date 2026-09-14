@@ -30,3 +30,28 @@ export const chargingInfoSchema = z.object({
   pricesUnavailable: z.boolean(),
 });
 export type ChargingInfo = z.infer<typeof chargingInfoSchema>;
+
+/**
+ * A charging station addressed by where it is, rather than by a row in `places`.
+ *
+ * The saved-stop route answers for a place id, which a hit found along the route does
+ * not have yet, and "is anything free here, and what does it cost" is the question
+ * people want answered before adding the charger, not after. The match needs nothing
+ * more than this: a coordinate, and whatever the search called the place.
+ *
+ * One station per request, deliberately. A cache miss costs the upstream registry
+ * several requests, nothing rate-limits the route, and the caches on both sides of it
+ * are sized for the handful of stops a trip has. A batch would turn one click into a
+ * burst against shared public infrastructure.
+ */
+export const chargingLookupSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  /**
+   * An empty name is allowed. OSM charging nodes are frequently nameless, and the
+   * matcher already treats "nothing to go on" as its own case: it then insists the
+   * station be within 30 m instead of accepting the nearest one inside 100 m.
+   */
+  name: z.string().max(200),
+});
+export type ChargingLookup = z.infer<typeof chargingLookupSchema>;
