@@ -187,6 +187,31 @@ describe('DawarichClient — URL building', () => {
     await client.probe({ ...CREDS, baseUrl: 'http://192.168.178.9:3000/api' });
     expect(requestedUrl().href).toBe('http://192.168.178.9:3000/api/v1/users/me');
   });
+
+  it('DAWARICH-CLIENT-007: an undefined query value is dropped, not sent as the word "undefined"', async () => {
+    // Every method today builds its query out of String(), isoUtc() or
+    // unixSeconds(), so none of them can hand the helper an undefined; the
+    // helper's signature still accepts one, and the day a caller passes an
+    // optional filter through, `?per_page=undefined` is a request Dawarich
+    // would answer wrongly rather than reject. Reached through the private
+    // `get` because that is the only place the decision is made.
+    type PrivateGet = (
+      creds: DawarichCreds,
+      path: string,
+      query: Record<string, string | undefined>,
+    ) => Promise<{ data: unknown; headers: Headers }>;
+
+    answerWith(reply({ body: { id: 1 } }));
+    const get = (client as unknown as { get: PrivateGet }).get.bind(client);
+    await get(CREDS, '/visits', { page: '2', per_page: undefined, order: 'asc' });
+
+    const url = requestedUrl();
+    expect(url.pathname).toBe('/api/v1/visits');
+    expect(url.searchParams.get('page')).toBe('2');
+    expect(url.searchParams.get('order')).toBe('asc');
+    expect(url.searchParams.has('per_page')).toBe(false);
+    expect(url.search).not.toContain('undefined');
+  });
 });
 
 describe('DawarichClient — authentication', () => {
@@ -287,6 +312,18 @@ describe('DawarichClient — error classification', () => {
     expect(err.code).toBe('unreachable');
     expect(err.status).toBeUndefined();
     expect(err.detail).toContain('ENOTFOUND');
+  });
+
+  it('DAWARICH-CLIENT-042: a rejection that is not an Error is still "unreachable", with no detail invented', async () => {
+    // undici rejects with an Error, but the SSRF guard sits in front of it and
+    // is free to reject with anything at all. Reaching for `.message` on
+    // whatever arrived is how the catch block itself starts throwing. The
+    // honest answer for a string is no detail rather than the string "undefined"
+    // shown to the user under "why the connection failed".
+    safeFetchMock.mockImplementation(() => Promise.reject('socket hang up'));
+    const err = await failure(() => client.probe(CREDS));
+    expect(err.code).toBe('unreachable');
+    expect(err.detail).toBeUndefined();
   });
 
   it('DAWARICH-CLIENT-037: an HTML login page is "invalid_response", not a parse crash', async () => {
@@ -392,6 +429,17 @@ describe('DawarichClient — listVisits', () => {
     expect(new URL(calls[19].url).searchParams.get('page')).toBe('20');
   });
 
+  it('DAWARICH-CLIENT-055: an X-Total-Pages that is not a number means one page, not twenty', async () => {
+    // A reverse proxy that rewrites or truncates the header must not turn one
+    // window into twenty identical requests against somebody's home server.
+    answerWith(reply({ body: [visit(1)], headers: { 'X-Total-Pages': 'many' } }));
+    const out = await client.listVisits(CREDS, FROM, TO);
+
+    expect(calls).toHaveLength(1);
+    expect(out.visits).toHaveLength(1);
+    expect(out.truncated).toBe(false);
+  });
+
   it('DAWARICH-CLIENT-054: a payload that is not a list is "invalid_response"', async () => {
     answerWith(reply({ body: { visits: [] } }));
     const err = await failure(() => client.listVisits(CREDS, FROM, TO));
@@ -444,6 +492,14 @@ describe('DawarichClient — listTracks', () => {
     expect(calls).toHaveLength(20);
     expect(capped.truncated).toBe(true);
   });
+
+  it('DAWARICH-CLIENT-063: an unreadable X-Total-Pages means one page', async () => {
+    answerWith(reply({ body: { features: [feature(1)] }, headers: { 'X-Total-Pages': 'unknown' } }));
+    const out = await client.listTracks(CREDS, FROM, TO);
+
+    expect(calls).toHaveLength(1);
+    expect(out).toEqual({ features: [feature(1)], truncated: false });
+  });
 });
 
 describe('DawarichClient — listPoints', () => {
@@ -479,6 +535,14 @@ describe('DawarichClient — listPoints', () => {
     expect(calls).toHaveLength(20);
     expect(capped.points).toHaveLength(20);
     expect(capped.truncated).toBe(true);
+  });
+
+  it('DAWARICH-CLIENT-073: an unreadable X-Total-Pages means one page', async () => {
+    answerWith(reply({ body: [point(1)], headers: { 'X-Total-Pages': 'lots' } }));
+    const out = await client.listPoints(CREDS, FROM, TO);
+
+    expect(calls).toHaveLength(1);
+    expect(out).toEqual({ points: [point(1)], truncated: false });
   });
 
   it('DAWARICH-CLIENT-072: a payload that is not a list is "invalid_response"', async () => {

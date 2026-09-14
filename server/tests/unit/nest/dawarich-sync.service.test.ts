@@ -534,6 +534,23 @@ describe('DawarichSyncService — bucket-list matching', () => {
     expect(matched).not.toBe(far);
   });
 
+  it('DAWARICH-SYNC-073: the first wish in range keeps it when the next one is farther away', async () => {
+    // The mirror image of 033. Wishes come back in the order they were stored,
+    // so storing the near one first is what makes the farther candidate arrive
+    // with a winner already held. The loop then has to keep what it has instead
+    // of taking whatever it looked at last; both wishes are inside the radius,
+    // so nothing else in the loop can decide it.
+    const near = bucketItem('Brandenburger Tor', LAT + 0.0005, LNG); // ~56 m
+    const far = bucketItem('Pariser Platz', LAT + 0.002, LNG); // ~222 m, still inside 250 m
+
+    withVisits(visit({ id: 808 }));
+    await svc.syncUser(USER);
+
+    const matched = only().matched_bucket_list_item_id;
+    expect(matched).toBe(near);
+    expect(matched).not.toBe(far);
+  });
+
   it('DAWARICH-SYNC-034: ignores a wish belonging to another user', async () => {
     const other = createUser(testDb).user.id;
     bucketItem('Brandenburger Tor', LAT + 0.0005, LNG, other);
@@ -585,6 +602,90 @@ describe('DawarichSyncService — bucket-list matching', () => {
     const all = rows();
     expect(all.find((r) => r.source_visit_id === '821')!.matched_bucket_list_item_id).toBe(wish);
     expect(all.find((r) => r.source_visit_id === '822')!.matched_bucket_list_item_id).toBeNull();
+  });
+
+  it('DAWARICH-SYNC-068: of two stays exactly as close, the longer one takes the wish', async () => {
+    // Both stays are at the wish's own coordinate, so the distances are the
+    // same number rather than merely similar and the tie-break is the only
+    // thing left to decide it. Standing somewhere for three hours is a better
+    // answer to "were you there" than half an hour on the way past.
+    const wish = bucketItem('Museum Ludwig', LAT, LNG);
+    withVisits(
+      visit({
+        id: 840,
+        name: 'A quick look',
+        started_at: `${VISIT_DAY}T09:00:00Z`,
+        ended_at: `${VISIT_DAY}T09:30:00Z`,
+        place: { latitude: LAT, longitude: LNG, id: 1 },
+      }),
+      visit({
+        id: 841,
+        name: 'The whole afternoon',
+        started_at: `${VISIT_DAY}T13:00:00Z`,
+        ended_at: `${VISIT_DAY}T16:00:00Z`,
+        place: { latitude: LAT, longitude: LNG, id: 1 },
+      }),
+    );
+
+    await svc.syncUser(USER);
+
+    const all = rows();
+    expect(all.find((r) => r.source_visit_id === '841')!.matched_bucket_list_item_id).toBe(wish);
+    expect(all.find((r) => r.source_visit_id === '840')!.matched_bucket_list_item_id).toBeNull();
+  });
+
+  it('DAWARICH-SYNC-069: the tie-break holds when the longer stay is the one already holding the wish', async () => {
+    // The mirror image of 068. Here the incoming stay is the short one, so the
+    // claim has to be refused rather than won. Otherwise the answer would
+    // depend on the order the payload happened to list them in.
+    const wish = bucketItem('Museum Ludwig', LAT, LNG);
+    withVisits(
+      visit({
+        id: 850,
+        name: 'The whole afternoon',
+        started_at: `${VISIT_DAY}T13:00:00Z`,
+        ended_at: `${VISIT_DAY}T16:00:00Z`,
+        place: { latitude: LAT, longitude: LNG, id: 1 },
+      }),
+      visit({
+        id: 851,
+        name: 'A quick look',
+        started_at: `${VISIT_DAY}T17:00:00Z`,
+        ended_at: `${VISIT_DAY}T17:30:00Z`,
+        place: { latitude: LAT, longitude: LNG, id: 1 },
+      }),
+    );
+
+    await svc.syncUser(USER);
+
+    const all = rows();
+    expect(all.find((r) => r.source_visit_id === '850')!.matched_bucket_list_item_id).toBe(wish);
+    expect(all.find((r) => r.source_visit_id === '851')!.matched_bucket_list_item_id).toBeNull();
+  });
+
+  it('DAWARICH-SYNC-070: a holder that lost its coordinates cannot block a stay that still has them', async () => {
+    // A suggestion whose place came back without a position keeps its link but
+    // can no longer be measured against anything. Skipping it is what lets the
+    // next real stay take the wish; treating an unmeasurable holder as the
+    // winner would freeze the match on a row nobody can act on. Dated well
+    // outside the synced window so the reconciliation leaves it alone.
+    const wish = bucketItem('Brandenburger Tor', LAT, LNG);
+    testDb
+      .prepare(
+        `INSERT INTO dawarich_visit_suggestions
+           (user_id, source_visit_id, trip_id, name, lat, lng, started_at, ended_at, duration_minutes,
+            local_date, source_status, state, source_hash, matched_bucket_list_item_id)
+         VALUES (?, '990', ?, 'Stay without a position', NULL, NULL, '2019-01-01T10:00:00Z',
+                 '2019-01-01T12:00:00Z', 120, '2019-01-01', 'suggested', 'new', 'deadbeef', ?)`,
+      )
+      .run(USER, TRIP, wish);
+
+    withVisits(visit({ id: 842 }));
+    await svc.syncUser(USER);
+
+    const all = rows();
+    expect(all.find((r) => r.source_visit_id === '842')!.matched_bucket_list_item_id).toBe(wish);
+    expect(all.find((r) => r.source_visit_id === '990')!.matched_bucket_list_item_id).toBeNull();
   });
 
   it('DAWARICH-SYNC-036: a suggestion still in state "new" is re-matched on a later run', async () => {
@@ -663,6 +764,21 @@ describe('DawarichSyncService — syncUser result state', () => {
 
     expect(result).toMatchObject({ state: 'ok', created: 0, updated: 0, missing: 0 });
     expect(listVisits).not.toHaveBeenCalled();
+    expect(connection()).toMatchObject({ last_sync_state: 'ok', last_sync_error: null });
+  });
+
+  it('DAWARICH-SYNC-072: a trip whose start date is not a date is skipped, not asked about', async () => {
+    // An imported or hand-edited trip can hold something that passes the SQL
+    // filter and still is not a date. Without the window guard the request
+    // would go out with a NaN boundary, which Dawarich reads as "everything",
+    // and the answer would be the user's entire archive.
+    testDb.prepare("UPDATE trips SET start_date = '0000-00-00', end_date = NULL WHERE id = ?").run(TRIP);
+
+    const result = await svc.syncUser(USER);
+
+    expect(listVisits).not.toHaveBeenCalled();
+    // Nothing failed: there was simply nothing answerable to ask.
+    expect(result).toMatchObject({ state: 'ok', created: 0, updated: 0, missing: 0 });
     expect(connection()).toMatchObject({ last_sync_state: 'ok', last_sync_error: null });
   });
 
@@ -776,6 +892,24 @@ describe('DawarichSyncService — runSync', () => {
     expect(recordSyncResult).toHaveBeenCalledWith(other, 'ok', null);
   });
 
+  it('DAWARICH-SYNC-071: a throw that is not an Error is survived just the same', async () => {
+    // The catch reads `.message` off whatever arrived. A rejection that is not
+    // an Error (a string from a native module, a plain object from a
+    // credential store) would otherwise throw a second time inside the
+    // handler, out of the loop, and take every remaining user with it.
+    const other = createUser(testDb).user.id;
+    createTrip(testDb, other, { start_date: TRIP_START, end_date: TRIP_END });
+    connect(other);
+    withVisits();
+    getCredentials.mockImplementationOnce(() => {
+      throw 'credential store returned a string';
+    });
+
+    await svc.runSync();
+
+    expect(recordSyncResult).toHaveBeenCalledWith(other, 'ok', null);
+  });
+
   it('DAWARICH-SYNC-062: skips a connection whose background sync is switched off', async () => {
     connect(USER, { syncEnabled: false });
     withVisits();
@@ -824,5 +958,44 @@ describe('DawarichSyncService — runSync', () => {
     await first;
     // And the guard is released, so the next press does run.
     expect((await svc.syncUser(USER)).alreadyRunning).toBeUndefined();
+  });
+
+  it('DAWARICH-SYNC-066: the refused press reports the state the card already shows, not a fresh one', async () => {
+    // The run in flight will record its own result. Until it does, the honest
+    // answer is what the connection currently holds. Answering "ok" would
+    // clear a warning nobody fixed, and answering "never" would wipe the
+    // history of a connection that has synced for months.
+    testDb
+      .prepare("UPDATE dawarich_connections SET last_sync_state = 'partial' WHERE user_id = ?")
+      .run(USER);
+    let release: (value: { visits: DawarichVisitRaw[]; truncated: boolean; version: string | null }) => void =
+      () => {};
+    listVisits.mockReturnValue(
+      new Promise((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    const first = svc.syncUser(USER);
+    const second = await svc.syncUser(USER);
+
+    expect(second).toEqual({ state: 'partial', created: 0, updated: 0, missing: 0, alreadyRunning: true });
+    release({ visits: [], truncated: false, version: null });
+    await first;
+  });
+
+  it('DAWARICH-SYNC-067: a connection that no longer exists reads as "never" rather than as undefined', async () => {
+    // Disconnecting mid-sync is a real sequence: the settings card deletes the
+    // row while the button press it triggered is still walking windows. There
+    // is no stored state left to report, and `never` is the one the wire
+    // contract allows.
+    testDb.prepare('DELETE FROM dawarich_connections WHERE user_id = ?').run(USER);
+
+    const first = svc.syncUser(USER);
+    const second = await svc.syncUser(USER);
+
+    expect(second.state).toBe('never');
+    expect(second.alreadyRunning).toBe(true);
+    await first;
   });
 });
