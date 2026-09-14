@@ -106,7 +106,11 @@ Driving settings includes **Show hazard areas**, off by default and shared by th
 
 Driving settings also controls **Show in Days too** under **Service stops**. It is on by default and applies to every service stop in the trip, including existing stops. Turn it off to keep service stops exclusively in the Roadtrip view and omit them from the normal Days view and its route. Turning it on restores their visibility without creating duplicates. The setting is shared with fellow travellers and can also be changed through `update_roadtrip_settings` using `roadtrip_service_stops_in_days`.
 
-**Looking for** in Roadtrip also searches installed place-search plugins. Plugin results show their source and can be added like other stops. Search remains online-only and runs on request. Results outside the chosen corridor are removed, and failed sources are shown beside the remaining results.
+**Looking for** in Roadtrip also searches installed place-search plugins. Plugin results show their source and can be added like other stops. Search remains online-only and runs on request. Results outside the chosen corridor are removed, and failed sources are shown beside the remaining results. It opens on Charging when the trip's vehicle is electric and on Fuel otherwise, and the choice is yours from then on.
+
+Clicking a result brings it into view on the map, which is how you tell which side of the road it is on. **Clear results** above the list empties both the list and its pins, along with the name, section, plug and power filters.
+
+**Add manually**, beside Search, is for the stop the search does not know about: a good share of the chargers standing at a junction are in no OpenStreetMap extract. Look the place up by name and TREK works out which leg of which day it belongs on, measured against the drawn route. **Add between** offers every leg of every routed day if that guess is wrong, and a place well away from the route is accepted rather than refused, with a note saying how far off it sits. From there it opens the same dialog a found result does, so the kind of stop and the time spent there are chosen in one place.
 
 > **AI / MCP:** `search_roadtrip_corridor` uses the same combined sources and reports `failedSources`.
 
@@ -116,7 +120,9 @@ In Roadtrip, open the three-dot menu beside the day selector to import a Google 
 
 Roadtrip charging stops show compact availability and published energy-price badges. The place detail panel adds source attribution, timestamps and tariff conditions. Data comes from the public MobiData BW OCPDB aggregation, including participating German operators and Swiss data, without an API key or account. Coverage varies; an unknown or stale status does not mean a charger is free. Prices are published source tariffs, not personal charging-card quotes. Data refreshes while Roadtrip is visible and is not advertised as live offline.
 
-> **AI / MCP:** get_roadtrip_charging_info reads the same availability, tariff components, freshness and source information for a saved charging stop.
+The same panel appears in the dialog that adds a station found along the route, so availability and price can be read before the stop exists. It is fetched once per opened dialog and only for a stop being added as a charging stop, never per row of the result list.
+
+> **AI / MCP:** get_roadtrip_charging_info reads the same availability, tariff components, freshness and source information for a saved charging stop. lookup_roadtrip_charging_info reads it for a station that is not on the trip, named by coordinate instead of by place id.
 
 GDACS warning popups show the current episode score when supplied, falling back to the overall event score. The compact scale indicates GDACS humanitarian impact, not whether roads are passable.
 
