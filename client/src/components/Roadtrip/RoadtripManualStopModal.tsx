@@ -126,6 +126,21 @@ export default function RoadtripManualStopModal({
     return () => document.removeEventListener('mousedown', onPointer)
   }, [listOpen])
 
+  /**
+   * The search hint, held by content rather than by identity.
+   *
+   * `useLocationBias` rebuilds its answer whenever the trip's places change, and the
+   * effect below has to re-ask when the hint really moves. Depending on the object
+   * itself makes that a question about identity instead: any caller whose hook hands
+   * back a fresh literal per render turns the effect into a render loop, because the
+   * effect sets state on a short query and the next render brings a new object. The
+   * hint is three numbers, so the key is those three numbers, and the value itself is
+   * read out of a ref at the moment the request actually goes out.
+   */
+  const biasKey = locationBias ? `${locationBias.lat},${locationBias.lng},${locationBias.radius ?? ''}` : ''
+  const biasRef = useRef(locationBias)
+  biasRef.current = locationBias
+
   // Debounced, and with a cancelled flag rather than a bare `.then(setState)`: the
   // endpoint takes no signal, so the only way a stale answer cannot overwrite a newer
   // one is for the run it belongs to to know it has been superseded.
@@ -140,7 +155,7 @@ export default function RoadtripManualStopModal({
     let cancelled = false
     debounceRef.current = setTimeout(() => {
       setLoading(true)
-      mapsApi.search(trimmed, locale, locationBias)
+      mapsApi.search(trimmed, locale, biasRef.current)
         .then(data => {
           if (cancelled) return
           setResults(data.places.map(toHit).filter((hit): hit is PlaceHit => hit !== null))
@@ -158,7 +173,7 @@ export default function RoadtripManualStopModal({
       cancelled = true
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [query, picked, locale, locationBias])
+  }, [query, picked, locale, biasKey])
 
   /**
    * Every leg of every routed day, flat.

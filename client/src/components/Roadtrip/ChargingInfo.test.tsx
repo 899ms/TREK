@@ -66,7 +66,10 @@ describe('Charging information', () => {
     render(<TranslationProvider><ChargingInfo lat={48.137} lng={11.575} name="Ladepark Nord" /></TranslationProvider>)
 
     // Said twice over: once where the free count would be, once where the price would.
-    expect(await screen.findAllByText('No reliable data available')).toHaveLength(2)
+    // Counted only once the answer is in. The price line says the same thing while the
+    // request is still out, so a plain findAllByText settles on that one alone and the
+    // count would pass for the wrong reason.
+    await waitFor(() => expect(screen.getAllByText('No reliable data available')).toHaveLength(2))
     expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument()
   })
 })

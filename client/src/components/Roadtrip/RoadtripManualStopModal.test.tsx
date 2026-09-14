@@ -12,9 +12,10 @@ vi.mock('../../api/client', async (importOriginal) => ({
   mapsApi: { search },
 }))
 // The hint is the trip's own doing and has its own suite; here it only has to arrive.
-vi.mock('../../hooks/useLocationBias', () => ({
-  useLocationBias: () => ({ point: { lat: 53, lng: 10, radius: 5000 } }),
-}))
+// Hoisted to one object rather than built per call, the way the real hook's useMemo
+// hands back the same one until the trip's places move.
+const BIAS = { point: { lat: 53, lng: 10, radius: 5000 } }
+vi.mock('../../hooks/useLocationBias', () => ({ useLocationBias: () => BIAS }))
 
 import RoadtripManualStopModal from './RoadtripManualStopModal'
 
@@ -100,20 +101,32 @@ function setup(over: Partial<React.ComponentProps<typeof RoadtripManualStopModal
 /** The place box, by the placeholder every place search in TREK carries. */
 const queryBox = () => screen.getByLabelText('Search places...')
 
-/** Type, then wait out the debounce and whatever the answer resolves into. */
-async function type(value: string, wait = DEBOUNCE): Promise<void> {
-  fireEvent.change(queryBox(), { target: { value } })
-  await act(async () => { vi.advanceTimersByTime(wait) })
+/**
+ * Typing, on the real clock.
+ *
+ * Deliberately not on a fake one. A faked timer here has to be installed before the
+ * dialog mounts, and React's own scheduler and Testing Library's waiting helpers both
+ * run on the same timers, so the pair deadlocks the worker before a single test
+ * reports. Every assertion below is reached through `waitFor` instead, and the two
+ * that have to prove something did NOT happen wait out a real pause.
+ */
+async function type(value: string): Promise<void> {
+  await act(async () => { fireEvent.change(queryBox(), { target: { value } }) })
 }
 
+/** A real pause, long enough for the debounce to have fired if it were going to. */
+const settle = (ms = DEBOUNCE + 200) => act(async () => { await new Promise(resolve => setTimeout(resolve, ms)) })
+
+/** The rows of the suggestion list, once the dialog has asked and been answered. */
+const answered = () => waitFor(() => expect(search).toHaveBeenCalled())
+
 beforeEach(() => {
-  vi.useFakeTimers({ shouldAdvanceTime: true })
   search.mockReset()
   search.mockResolvedValue({ places: [hit()], source: 'openstreetmap' })
 })
 
 afterEach(() => {
-  vi.useRealTimers()
+  vi.restoreAllMocks()
 })
 
 describe('RoadtripManualStopModal', () => {
@@ -121,19 +134,23 @@ describe('RoadtripManualStopModal', () => {
     // A single common word without a region is refused upstream as too expensive to
     // answer, and asking anyway spends a request to be told so.
     setup()
-    await type('Su', DEBOUNCE * 2)
+    await type('Su')
+    await settle()
 
     expect(search).not.toHaveBeenCalled()
   })
 
   it('FE-ROADTRIP-MANUAL-002: the search waits for a pause in the typing', async () => {
     setup()
+    await type('Supercharger')
 
-    fireEvent.change(queryBox(), { target: { value: 'Supercharger' } })
-    await act(async () => { vi.advanceTimersByTime(DEBOUNCE - 120) })
+    // Nothing goes out on the keystroke itself. The pause after it is measured on the
+    // real clock, so the test asks whether the request is debounced at all rather than
+    // whether the gap is exactly 320 ms: a busy runner can stretch any wall-clock
+    // window, and a boundary asserted against one is a flake waiting to happen.
     expect(search).not.toHaveBeenCalled()
 
-    await act(async () => { vi.advanceTimersByTime(120) })
+    await answered()
     expect(search).toHaveBeenCalledTimes(1)
     // The query, the locale, and the hint that decides which of a thousand identically
     // named places is meant.
@@ -143,13 +160,12 @@ describe('RoadtripManualStopModal', () => {
   it('FE-ROADTRIP-MANUAL-003: keystroke after keystroke is one question, not one each', async () => {
     setup()
 
-    fireEvent.change(queryBox(), { target: { value: 'Sup' } })
-    await act(async () => { vi.advanceTimersByTime(100) })
-    fireEvent.change(queryBox(), { target: { value: 'Super' } })
-    await act(async () => { vi.advanceTimersByTime(100) })
-    fireEvent.change(queryBox(), { target: { value: 'Supercharger' } })
-    await act(async () => { vi.advanceTimersByTime(DEBOUNCE) })
+    await type('Sup')
+    await type('Super')
+    await type('Supercharger')
 
+    await answered()
+    await settle()
     expect(search).toHaveBeenCalledTimes(1)
     expect(search).toHaveBeenCalledWith('Supercharger', expect.any(String), expect.anything())
   })
@@ -278,6 +294,7 @@ describe('RoadtripManualStopModal', () => {
     search.mockRejectedValue(new Error('offline'))
     setup()
     await type('Supercharger')
+    await answered()
 
     // The rejection is swallowed on purpose (it is a typeahead, not a submit), but the
     // list has to stop saying it is loading.

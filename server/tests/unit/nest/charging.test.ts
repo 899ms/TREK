@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { chargingLookupSchema } from '@trek/shared';
 import { ChargingService, empty } from '../../../src/nest/roadtrip/charging.service';
 import { ChargingLookupController, ChargingLookupDto } from '../../../src/nest/roadtrip/charging-lookup.controller';
@@ -70,6 +70,21 @@ describe('Open charging data', () => {
  * difference is how the station is named.
  */
 describe('Open charging data before the stop exists', () => {
+  /**
+   * The clock, pinned to the instant the fixtures above are written at.
+   *
+   * `normalizeCharging` takes the current time as an argument and the tests further up
+   * pass it; the service does not, so it reads the real one, and its freshness window is
+   * twenty minutes. Left alone, every answer that goes through the service is stale by
+   * construction and `available` comes back null, which is the field this is here to
+   * prove survives the trip from the registry to the dialog.
+   *
+   * Only `Date.now` is pinned, never the timers: the outbound requests carry an
+   * `AbortSignal.timeout` that has to keep running.
+   */
+  beforeEach(() => { vi.spyOn(Date, 'now').mockReturnValue(now); });
+  afterEach(() => { vi.restoreAllMocks(); });
+
   const answers = (tariffs: unknown) => vi.fn(async (url: string) => {
     if (url.includes('/sources')) return new Response(JSON.stringify({ items: [source] }));
     if (url.includes('/locations')) return new Response(JSON.stringify({ items: [station], total_count: 1 }));
