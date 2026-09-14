@@ -1,5 +1,5 @@
 /**
- * Unit tests for DawarichSuggestionsService — DAWARICH-SUG-001..030.
+ * Unit tests for DawarichSuggestionsService: DAWARICH-SUG-001..062.
  *
  * This is the only service in the Dawarich domain that writes into TREK proper,
  * and every write it makes crosses an ownership line: a suggestion belongs to
@@ -24,7 +24,11 @@ const { testDb, dbMock } = vi.hoisted(() => {
     db,
     closeDb: () => {},
     reinitialize: () => {},
-    getPlaceWithTags: () => null,
+    // A spy rather than a constant: the acceptance re-reads the place it just
+    // created so the broadcast carries the `source` mark, and the fallback for
+    // a re-read that finds nothing is a branch of its own. armStubs() gives it
+    // the real lookup; one case takes it away again.
+    getPlaceWithTags: vi.fn(),
     canAccessTrip: (tripId: unknown, userId: number) =>
       db.prepare(`
         SELECT t.id, t.user_id FROM trips t
@@ -45,6 +49,7 @@ vi.mock('../../../src/config', () => ({
 }));
 vi.mock('../../../src/websocket', () => ({ broadcast: vi.fn() }));
 
+import { DAWARICH_BUCKET_SCAN_LIMIT } from '@trek/shared';
 import type { DawarichConnection } from '@trek/shared';
 import { createTables } from '../../../src/db/schema';
 import { runMigrations } from '../../../src/db/migrations';
@@ -133,6 +138,13 @@ function insertPlaceRow(tripId: string, body: { name?: string; lat?: number; lng
 }
 
 function armStubs(): void {
+  // The real helper's job, minus the tag join nothing here asserts on: the row
+  // as it stands after the acceptance stamped `source` on it.
+  dbMock.getPlaceWithTags
+    .mockReset()
+    .mockImplementation(
+      (placeId: unknown) => testDb.prepare('SELECT * FROM places WHERE id = ?').get(placeId) ?? null,
+    );
   dawarichStub.getConnection.mockReset().mockReturnValue({ ...CONNECTION });
   dawarichStub.getCredentials.mockReset().mockReturnValue({ ...CREDS });
   clientStub.findVisitsNear.mockReset();
@@ -364,6 +376,34 @@ describe('DawarichSuggestionsService — the review list', () => {
     expect(svc.getOne(user.id, theirs)).toBeNull();
     expect(svc.getOne(stranger.id, theirs)?.name).toBe('Their Kitchen');
   });
+
+  it('DAWARICH-SUG-059: the flags the panel warns with are read off the row, never acted on', () => {
+    const { user } = createUser(testDb);
+    const wish = seedBucketItem(user.id);
+    const id = seedSuggestion({ userId: user.id });
+    svc.accept(user.id, id, { target: 'bucket_list', bucketListItemId: wish });
+
+    // Everything a later sync is allowed to do to a row somebody already
+    // accepted: the detector re-ran and the hash moved, it upgraded the stay
+    // from suggested to confirmed, and then the visit disappeared from
+    // Dawarich altogether. The tick the user made stands through all of it.
+    testDb
+      .prepare(
+        `UPDATE dawarich_visit_suggestions
+            SET source_hash = 'hash-after-redetection', source_status = 'confirmed',
+                source_missing_at = '2026-09-07T00:00:00Z'
+          WHERE id = ?`,
+      )
+      .run(id);
+
+    const wire = svc.getOne(user.id, id)!;
+    expect(wire.sourceStatus).toBe('confirmed');
+    expect(wire.sourceChanged).toBe(true);
+    expect(wire.sourceMissing).toBe(true);
+    expect(wire.state).toBe('accepted');
+    expect(wire.target).toBe('bucket_list');
+    expect(wire.acceptedBucketListItemId).toBe(wish);
+  });
 });
 
 // ── accept: place ────────────────────────────────────────────────────────────
@@ -455,6 +495,89 @@ describe('DawarichSuggestionsService — accepting into a trip', () => {
     expect(placesStub.create).not.toHaveBeenCalled();
   });
 
+  it('DAWARICH-SUG-043: every field the review step lets someone correct beats the recorded one', () => {
+    // The review step exists so a detector's guess can be fixed rather than
+    // swallowed; a correction that silently lost to the recording would make
+    // the whole form decorative.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({ userId: user.id, tripId: trip.id, name: 'Unnamed stay' });
+
+    svc.accept(user.id, id, {
+      target: 'place',
+      tripId: trip.id,
+      name: '  Cafe Central  ',
+      notes: 'the good table by the window',
+      time: '10:00',
+      endTime: '12:15',
+      lat: 48.2,
+      lng: 16.3,
+    });
+
+    expect(placesStub.create).toHaveBeenCalledWith(
+      String(trip.id),
+      expect.objectContaining({
+        // Trimmed here as well as by the contract: this path is also reached
+        // from MCP, where nothing has trimmed it first.
+        name: 'Cafe Central',
+        notes: 'the good table by the window',
+        place_time: '10:00',
+        end_time: '12:15',
+        lat: 48.2,
+        lng: 16.3,
+      }),
+    );
+  });
+
+  it('DAWARICH-SUG-044: a stay with no position and no measurable length passes neither on', () => {
+    // `undefined` rather than null or zero: PlacesService applies its own
+    // defaults for a field nobody supplied, and a place pinned at 0,0 off the
+    // coast of Africa with a duration of "0 min" is worse than one with none.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({ userId: user.id, tripId: trip.id, lat: null, lng: null, durationMinutes: 0 });
+
+    svc.accept(user.id, id, { target: 'place', tripId: trip.id });
+
+    const body = placesStub.create.mock.calls[0][1] as Record<string, unknown>;
+    expect(body.lat).toBeUndefined();
+    expect(body.lng).toBeUndefined();
+    expect(body.duration_minutes).toBeUndefined();
+  });
+
+  it('DAWARICH-SUG-045: with no trip in the body, the one the sync filed the stay under is used', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({ userId: user.id, tripId: trip.id });
+
+    const result = svc.accept(user.id, id, { target: 'place' });
+
+    expect(placesStub.create).toHaveBeenCalledWith(String(trip.id), expect.anything());
+    expect(result.createdPlaceId).not.toBeNull();
+  });
+
+  it('DAWARICH-SUG-046: a timestamp with no clock time in it yields no time rather than a wrong one', () => {
+    // Dawarich normally sends a full ISO instant, but a visit imported from a
+    // GPX or an older schema can arrive as a bare date. Slicing characters 11
+    // to 16 out of that would put the last five characters of the date into a
+    // time field.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({
+      userId: user.id,
+      tripId: trip.id,
+      startedAt: '2026-09-01',
+      endedAt: '2026-09-01',
+    });
+
+    svc.accept(user.id, id, { target: 'place', tripId: trip.id });
+
+    expect(placesStub.create).toHaveBeenCalledWith(
+      String(trip.id),
+      expect.objectContaining({ place_time: null, end_time: null }),
+    );
+  });
+
   it("DAWARICH-SUG-009: accepting a stranger's suggestion is a 404 before any target is looked at", () => {
     const { user } = createUser(testDb);
     const { user: stranger } = createUser(testDb);
@@ -524,6 +647,60 @@ describe('DawarichSuggestionsService — accepting into a journey', () => {
     expect(err.status).toBe(400);
     expect(err.code).toBe('journal_required');
     expect(journeyStub.canEdit).not.toHaveBeenCalled();
+  });
+
+  it('DAWARICH-SUG-047: a corrected entry carries the corrections, not the recording', () => {
+    const { user } = createUser(testDb);
+    const id = seedSuggestion({ userId: user.id, name: 'Cafe Central', localDate: '2026-09-01' });
+
+    svc.accept(user.id, id, {
+      target: 'journal',
+      journalId: 88,
+      name: 'Dinner at the Naschmarkt',
+      notes: 'the one with the bad wine',
+      date: '2026-09-02',
+      time: '19:30',
+      lat: 48.198,
+      lng: 16.363,
+    });
+
+    expect(journeyStub.createEntry).toHaveBeenCalledWith(
+      88,
+      user.id,
+      expect.objectContaining({
+        title: 'Dinner at the Naschmarkt',
+        story: 'the one with the bad wine',
+        entry_date: '2026-09-02',
+        entry_time: '19:30',
+        location_name: 'Dinner at the Naschmarkt',
+        location_lat: 48.198,
+        location_lng: 16.363,
+      }),
+      undefined,
+    );
+  });
+
+  it('DAWARICH-SUG-048: a stay with no position and no clock time writes an entry without either', () => {
+    // The journey domain treats a missing field and an empty one differently
+    // (a location_lat of null would put a pin on the map at the equator), so
+    // everything unknown has to arrive as undefined rather than as null.
+    const { user } = createUser(testDb);
+    const id = seedSuggestion({
+      userId: user.id,
+      lat: null,
+      lng: null,
+      startedAt: '2026-09-03',
+      localDate: '2026-09-03',
+    });
+
+    svc.accept(user.id, id, { target: 'journal', journalId: 88 });
+
+    const body = journeyStub.createEntry.mock.calls[0][2] as Record<string, unknown>;
+    expect(body.entry_date).toBe('2026-09-03');
+    expect(body.entry_time).toBeUndefined();
+    expect(body.location_lat).toBeUndefined();
+    expect(body.location_lng).toBeUndefined();
+    expect(body.story).toBeUndefined();
   });
 
   it('DAWARICH-SUG-013: a journey domain that returns nothing leaves the suggestion in review', () => {
@@ -683,6 +860,21 @@ describe('DawarichSuggestionsService — confirming a scan', () => {
     expect(bucketOf(mine).visited_at).not.toBeNull();
   });
 
+  it('DAWARICH-SUG-056: a confirmed wish is dated from the stay that matched it, not from today', () => {
+    // A wish somebody reached in 2023, ticked off with today's date, is a wrong
+    // entry in a list people keep for years. The clock is only the answer when
+    // nothing else knows better.
+    const { user } = createUser(testDb);
+    const wish = seedBucketItem(user.id, { name: 'Hallstatt' });
+    seedSuggestion({ userId: user.id, matchedBucketListItemId: wish, startedAt: '2023-07-14T08:20:00Z' });
+
+    const updated = svc.confirmBucketVisits(user.id, [wish]);
+
+    expect(updated).toBe(1);
+    expect(bucketOf(wish).visited_at).toBe('2023-07-14T08:20:00Z');
+    expect(bucketOf(wish).visited_source).toBe('dawarich');
+  });
+
   it('DAWARICH-SUG-024: clearBucketVisit clears the source with the date, and only for the owner', () => {
     const { user } = createUser(testDb);
     const { user: stranger } = createUser(testDb);
@@ -744,6 +936,157 @@ describe('DawarichSuggestionsService — scanning for stays', () => {
       alreadyVisited: false,
       match: { at: '2026-09-04T12:00:00Z', minutes: 90, distanceMeters: 180, points: 42 },
     });
+  });
+
+  it('DAWARICH-SUG-049: past the cap the scan says so instead of reporting the rest as unmatched', async () => {
+    // One upstream request per wish is why there is a cap at all. A user with
+    // eighty wishes being told the other thirty had no match is the failure
+    // mode this flag exists to prevent.
+    const { user } = createUser(testDb);
+    for (let i = 0; i < DAWARICH_BUCKET_SCAN_LIMIT + 1; i++) {
+      seedBucketItem(user.id, { name: `Wish ${i}` });
+    }
+    clientStub.findVisitsNear.mockResolvedValue([]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches).toHaveLength(DAWARICH_BUCKET_SCAN_LIMIT);
+    expect(scan.truncated).toBe(true);
+    expect(scan.skippedWithoutCoordinates).toBe(0);
+    // Exactly one request per wish that was actually looked at.
+    expect(clientStub.findVisitsNear).toHaveBeenCalledTimes(DAWARICH_BUCKET_SCAN_LIMIT);
+  });
+
+  it('DAWARICH-SUG-050: a wish already ticked is scanned last and marked as such', async () => {
+    // Still scanned, because the recordings may date it better than the hand
+    // tick did, but flagged, so the list reads as "these are new" rather than
+    // as a wall of things the user has known for years.
+    const { user } = createUser(testDb);
+    const open = seedBucketItem(user.id, { name: 'Hallstatt' });
+    const ticked = seedBucketItem(user.id, { name: 'Kyoto', visitedAt: '2023-04-02T09:00:00Z' });
+    clientStub.findVisitsNear.mockResolvedValue([]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches.map((m) => m.itemId)).toEqual([open, ticked]);
+    expect(scan.matches[0].alreadyVisited).toBe(false);
+    expect(scan.matches[1].alreadyVisited).toBe(true);
+  });
+
+  it('DAWARICH-SUG-051: a stay beyond the radius is no match, however long it lasted', async () => {
+    // `radius_override` is a request, not a guarantee: an instance that ignores
+    // it answers with stays from its own default 500 m, and a four-hour stay
+    // 600 m away is somewhere else entirely.
+    const { user } = createUser(testDb);
+    seedBucketItem(user.id, { name: 'Hallstatt' });
+    clientStub.findVisitsNear.mockResolvedValue([
+      {
+        timestamp: 1757000000,
+        distance_meters: 600,
+        points_count: 90,
+        visit_details: {
+          start_time: '2026-09-04T10:00:00Z',
+          end_time: '2026-09-04T14:00:00Z',
+          duration_minutes: 240,
+        },
+      },
+    ]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches[0].match).toBeNull();
+  });
+
+  it('DAWARICH-SUG-052: with no duration reported the two timestamps decide, and a stay with no details is skipped', async () => {
+    const { user } = createUser(testDb);
+    seedBucketItem(user.id, { name: 'Hallstatt' });
+    clientStub.findVisitsNear.mockResolvedValue([
+      // Nothing to measure at all: no duration, no times. It cannot clear the
+      // dwell threshold, so it is not a visit.
+      { timestamp: 1757000000, distance_meters: 10, visit_details: null },
+      {
+        timestamp: 1757003600,
+        distance_meters: 20,
+        visit_details: { start_time: '2026-09-04T10:00:00Z', end_time: '2026-09-04T10:45:00Z' },
+      },
+    ]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches[0].match).toEqual({
+      at: '2026-09-04T10:00:00Z',
+      minutes: 45,
+      distanceMeters: 20,
+      // No points_count reported is zero, not undefined on the wire.
+      points: 0,
+    });
+  });
+
+  it('DAWARICH-SUG-053: with no distance reported the stay is taken at the radius and dated from its instant', async () => {
+    // The endpoint does not always carry `distance_meters`, and it was asked
+    // for a 250 m radius: treating the answer as "at most the radius" keeps the
+    // stay rather than dropping a real match over a missing field.
+    const { user } = createUser(testDb);
+    seedBucketItem(user.id, { name: 'Hallstatt' });
+    clientStub.findVisitsNear.mockResolvedValue([
+      {
+        timestamp: 1_757_000_000,
+        points_count: 12,
+        visit_details: { end_time: '2025-09-04T16:13:20Z', duration_minutes: 40 },
+      },
+    ]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches[0].match).toEqual({
+      at: '2025-09-04T15:33:20.000Z',
+      minutes: 40,
+      distanceMeters: 250,
+      points: 12,
+    });
+  });
+
+  it('DAWARICH-SUG-054: a stay that cannot be dated at all is skipped, not ticked off on 1970-01-01', async () => {
+    const { user } = createUser(testDb);
+    seedBucketItem(user.id, { name: 'Hallstatt' });
+    clientStub.findVisitsNear.mockResolvedValue([
+      { timestamp: null, distance_meters: 10, points_count: 8, visit_details: { duration_minutes: 60 } },
+    ]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    expect(scan.matches[0].match).toBeNull();
+  });
+
+  it('DAWARICH-SUG-055: the longest qualifying stay wins, and a later shorter one does not displace it', async () => {
+    const { user } = createUser(testDb);
+    seedBucketItem(user.id, { name: 'Hallstatt' });
+    clientStub.findVisitsNear.mockResolvedValue([
+      {
+        timestamp: 1757000000,
+        distance_meters: 30,
+        points_count: 3,
+        visit_details: { start_time: '2026-09-04T08:00:00Z', end_time: '2026-09-04T08:30:00Z', duration_minutes: 30 },
+      },
+      {
+        timestamp: 1757010000,
+        distance_meters: 200,
+        points_count: 40,
+        visit_details: { start_time: '2026-09-04T10:00:00Z', end_time: '2026-09-04T11:30:00Z', duration_minutes: 90 },
+      },
+      {
+        timestamp: 1757020000,
+        distance_meters: 5,
+        points_count: 20,
+        visit_details: { start_time: '2026-09-04T14:00:00Z', end_time: '2026-09-04T14:45:00Z', duration_minutes: 45 },
+      },
+    ]);
+
+    const scan = await svc.scanBucketList(user.id);
+
+    // The nearest stay is the 5 m one and the first one is the earliest; the
+    // ninety-minute one in the middle is still the visit.
+    expect(scan.matches[0].match).toMatchObject({ minutes: 90, distanceMeters: 200 });
   });
 
   it('DAWARICH-SUG-027: a wish whose lookup fails reads as "no match", not as a failed scan', async () => {
@@ -810,6 +1153,60 @@ describe('DawarichSuggestionsService — the Atlas hand-off', () => {
     // A country TREK cannot code is still a country the user went to.
     expect(suggestions.unresolved).toEqual(['Absurdistan']);
   });
+
+  it('DAWARICH-SUG-057: atlasSuggestions without a connection refuses before a request', async () => {
+    const { user } = createUser(testDb);
+    dawarichStub.getCredentials.mockReturnValue(null);
+
+    const err = await asyncRefusalFrom(() =>
+      svc.atlasSuggestions(user.id, new Date('2026-08-01'), new Date('2026-09-01')),
+    );
+
+    expect(err.status).toBe(400);
+    expect(err.code).toBe('not_connected');
+    expect(clientStub.listVisitedCities).not.toHaveBeenCalled();
+  });
+
+  it('DAWARICH-SUG-058: a country with no name is dropped, and a nameless city does not become a blank row', async () => {
+    // The endpoint groups by a name string it derived itself, so an entry can
+    // arrive with that field empty or missing entirely. Those are the rows that
+    // would otherwise reach the Atlas dialog as an empty checkbox.
+    clientStub.listVisitedCities.mockResolvedValue([
+      { cities: [] },
+      { country: '   ', cities: [{ city: 'Nowhere' }] },
+      { country: 'Austria' },
+      { country: 'Germany', cities: [{ city: '' }, { city: 'Berlin' }] },
+    ]);
+
+    const { user } = createUser(testDb);
+    const suggestions = await svc.atlasSuggestions(user.id, new Date('2026-08-01'), new Date('2026-09-01'));
+
+    expect(suggestions.countries.map((c) => c.countryCode)).toEqual(['AT', 'DE']);
+    // No cities array at all is an empty list, not a crash.
+    expect(suggestions.countries[0].cities).toEqual([]);
+    // A city with neither a stay length nor a timestamp still counts as a city
+    // the user was in; it just has nothing to say about when.
+    expect(suggestions.countries[1].cities).toEqual([{ name: 'Berlin', minutes: 0, lastSeenAt: null }]);
+    expect(suggestions.unresolved).toEqual([]);
+  });
+
+  it('DAWARICH-SUG-062: a hole in the cities array, and a city object without the field, are both dropped', async () => {
+    // `/countries/visited_cities` is upstream JSON that TREK does not validate,
+    // so the array can hold a null where a city object should be, or an object
+    // that simply never got the field. Both have to fall through to the empty
+    // name the filter removes: reading `.city` off a null would take the whole
+    // Atlas hand-off down, and one malformed city is not worth losing the
+    // country it sat in.
+    clientStub.listVisitedCities.mockResolvedValue([
+      { country: 'Germany', cities: [null, {}, { city: 'Hamburg', stayed_for: 45 }] },
+    ]);
+
+    const { user } = createUser(testDb);
+    const suggestions = await svc.atlasSuggestions(user.id, new Date('2026-08-01'), new Date('2026-09-01'));
+
+    expect(suggestions.countries.map((c) => c.countryCode)).toEqual(['DE']);
+    expect(suggestions.countries[0].cities).toEqual([{ name: 'Hamburg', minutes: 45, lastSeenAt: null }]);
+  });
   // ── What an acceptance tells the rest of the trip ──────────────────────────
 
   it('DAWARICH-SUG-031: accepting as a place broadcasts it like any other place, socket id and all', () => {
@@ -827,6 +1224,41 @@ describe('DawarichSuggestionsService — the Atlas hand-off', () => {
     );
     // The journey mirror is the other half of what the places controller does.
     expect(placesStub.onCreated).toHaveBeenCalledWith(String(trip.id), result.createdPlaceId);
+  });
+
+  it('DAWARICH-SUG-060: the broadcast carries the re-read row, so everyone on the trip sees the dawarich mark', () => {
+    // `source` is stamped after PlacesService.create returns, so the object
+    // that call handed back does not have it. Broadcasting that one would leave
+    // every other client showing the place without its provenance until the
+    // next full load, which is the state this re-read exists to avoid.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({ userId: user.id, tripId: trip.id, name: 'Museum Ludwig' });
+
+    const result = svc.accept(user.id, id, { target: 'place', tripId: trip.id });
+
+    const payload = placesStub.broadcast.mock.calls[0][2] as { place: { id: number; source: string | null } };
+    expect(payload.place.id).toBe(result.createdPlaceId);
+    expect(payload.place.source).toBe('dawarich');
+  });
+
+  it('DAWARICH-SUG-061: a re-read that comes back empty still broadcasts the place that was created', () => {
+    // The re-read is an improvement on the payload, not a precondition for it:
+    // if it finds nothing the acceptance has still happened, and a broadcast
+    // the trip never receives is a place that needs a page reload to appear.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const id = seedSuggestion({ userId: user.id, tripId: trip.id });
+    dbMock.getPlaceWithTags.mockReturnValue(null);
+
+    const result = svc.accept(user.id, id, { target: 'place', tripId: trip.id }, 'socket-3');
+
+    expect(placesStub.broadcast).toHaveBeenCalledWith(
+      String(trip.id),
+      'place:created',
+      { place: { id: result.createdPlaceId } },
+      'socket-3',
+    );
   });
 
   it('DAWARICH-SUG-039: a member refused place_edit is refused here too', () => {

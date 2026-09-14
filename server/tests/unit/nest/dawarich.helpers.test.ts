@@ -227,6 +227,15 @@ describe('visitHash', () => {
   it('DAWARICH-HASH-009: a missing place does not throw', () => {
     expect(visitHash(visit({ place: null }))).toMatch(/^[0-9a-f]{64}$/);
   });
+
+  it('DAWARICH-HASH-010: a missing status and an empty status are the same visit', () => {
+    // `status` is nullable in the payload, so it is folded to the same blank a
+    // visit with an empty one gets. Without that, a null would hash as the
+    // literal "null" and a provider filling the field in with "" later would
+    // look like every unscored visit changing at once.
+    expect(visitHash(visit({ status: null }))).toBe(visitHash(visit({ status: '' })));
+    expect(visitHash(visit({ status: null }))).not.toBe(visitHash(BASE_VISIT));
+  });
 });
 
 // ── toNumber ─────────────────────────────────────────────────────────────────
@@ -396,6 +405,19 @@ describe('normalizeVisit', () => {
     expect(Date.parse(result!.endedAt) - Date.parse(result!.startedAt)).toBe(1_800_000);
     expect(result?.durationMinutes).toBe(30);
   });
+
+  it('DAWARICH-VISIT-017: an unreadable end plus a duration of zero or less collapses onto the arrival', () => {
+    // A reported duration is only usable as a repair while it is positive: zero
+    // is "the detector had nothing", and a negative one is the same accident
+    // that produced the unreadable end. Either way the end moves to the
+    // arrival, which is the one timestamp that was actually readable. It never
+    // moves backwards from it.
+    for (const duration of [0, -45, '0'] as const) {
+      const result = normalizeVisit(visit({ duration, ended_at: 'sometime' }));
+      expect(result?.endedAt).toBe(new Date(Date.parse(result!.startedAt)).toISOString());
+      expect(result?.durationMinutes).toBe(0);
+    }
+  });
 });
 
 // ── distanceMeters ───────────────────────────────────────────────────────────
@@ -453,6 +475,27 @@ describe('simplify', () => {
     const pair: Array<[number, number]> = [[0, 0], [1, 1]];
     expect(simplify(pair, 0.00005)).toBe(pair);
     expect(simplify([], 0.00005)).toEqual([]);
+  });
+
+  it('DAWARICH-GEO-024: a loop back to the start is measured from the point, not from a zero-length baseline', () => {
+    // A day that ends where it began gives the algorithm a segment whose two
+    // ends are the same coordinate. The gradient it normally projects onto does
+    // not exist there, so the distance has to fall back to "how far is this
+    // point from that one". Without it the division is 0/0 and every detour on
+    // a round trip would simplify away as NaN.
+    const loop: Array<[number, number]> = [[0, 0], [0, 1], [0, 0]];
+    expect(simplify(loop, 0.00005)).toEqual(loop);
+    // And the same shape, a metre wide instead of a degree, still collapses.
+    expect(simplify([[0, 0], [0, 0.00001], [0, 0]], 0.00005)).toEqual([[0, 0], [0, 0]]);
+  });
+
+  it('DAWARICH-GEO-025: an unreadable latitude cannot collapse the longitude scale', () => {
+    // The metric scales longitude by the cosine of the latitude, and guards
+    // that scale so it is never zero. A latitude that is not a real number
+    // gives no cosine at all, and the fallback keeps the scale at 1 rather
+    // than multiplying every longitude by nothing. The bad point measures as
+    // no deviation and is dropped; the ends of the line still come back.
+    expect(simplify([[0, 0], [NaN, 0.5], [0, 1]], 0.00005)).toEqual([[0, 0], [0, 1]]);
   });
 
   it('DAWARICH-GEO-011: the first and last point are always kept', () => {
@@ -824,6 +867,27 @@ describe('bucketTracksByDay', () => {
       epsilon: 0.00005,
     });
     expect(days[0]!.segments[0]!.points).toHaveLength(5);
+  });
+
+  it('DAWARICH-TRACK-015: a cut that lands on the last point ends the walk instead of emitting an empty tail', () => {
+    // Midnight falls at 98% of this track's time span, so the proportional cut
+    // puts every point before it. What is left afterwards is one point, which
+    // is not a line: the loop stops there rather than pushing a tail piece that
+    // would render as nothing and carry a start after its own end.
+    const days = bucketTracksByDay([
+      track('2024-06-15T00:00:00Z', '2024-06-16T00:30:00Z', [[10, 10], [11, 12], [12, 10]], {
+        distance: 7000,
+      }),
+    ]);
+
+    expect(days.map((d) => d.date)).toEqual(['2024-06-15']);
+    const segment = days[0]!.segments[0]!;
+    expect(segment.points).toEqual([[10, 10], [12, 11], [10, 12]]);
+    expect(segment.startedAt).toBe('2024-06-15T00:00:00.000Z');
+    expect(segment.endedAt).toBe('2024-06-16T00:00:00.000Z');
+    // It was cut, even though only one piece came out, so the measured distance
+    // no longer describes it.
+    expect(segment.distanceMeters).toBeNull();
   });
 
   it('DAWARICH-TRACK-013: an empty feature list is an empty result', () => {

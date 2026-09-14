@@ -342,6 +342,17 @@ describe('DawarichController suggestion routes', () => {
       expect(r).toEqual({ status: 404, body: { error: 'Bucket-list entry not found' } }));
   });
 
+  it('DAWARICH-CTRL-076: DELETE bucket-list/:itemId/visit answers 200 { success: true } when a tick was cleared', () => {
+    // The counterpart to 046: the service reports whether a row changed, and
+    // only the "nothing changed" answer is a 404. A cleared tick must not come
+    // back as one, or undoing a wish would look like it failed.
+    const clearBucketVisit = vi.fn().mockReturnValue(true);
+    expect(makeController({ suggestions: { clearBucketVisit } }).clearBucketVisit(user, '4')).toEqual({
+      success: true,
+    });
+    expect(clearBucketVisit).toHaveBeenCalledWith(7, 4);
+  });
+
   it('DAWARICH-CTRL-047: POST atlas/accept wraps the marked count', () => {
     const acceptAtlasCountries = vi.fn().mockReturnValue(2);
     expect(makeController({ suggestions: { acceptAtlasCountries } })
@@ -570,13 +581,13 @@ describe('DawarichController GET /trips/:tripId/track', () => {
     },
   );
 
-  it('DAWARICH-CTRL-074: a trip the caller cannot read is a 404 — the service says null, the controller says not found', async () => {
+  it('DAWARICH-CTRL-077: a trip the caller cannot read is a 404 (the service says null, the controller says not found)', async () => {
     const forTrip = vi.fn().mockResolvedValue(null);
     expect(await thrown(() => makeController({ tracks: { forTrip } }).tripTrack(user, '5')))
       .toEqual({ status: 404, body: { error: 'Trip not found' } });
   });
 
-  it('DAWARICH-CTRL-075: a track comes back untouched', async () => {
+  it('DAWARICH-CTRL-078: a track comes back untouched', async () => {
     const track = { days: [{ date: '2026-05-01', segments: [] }], truncated: false };
     const forTrip = vi.fn().mockResolvedValue(track);
     await expect(makeController({ tracks: { forTrip } }).tripTrack(user, '5')).resolves.toBe(track);

@@ -1,4 +1,4 @@
-// FE-DAWARICH-SUGMODEL-001 to FE-DAWARICH-SUGMODEL-012
+// FE-DAWARICH-SUGMODEL-001 to FE-DAWARICH-SUGMODEL-014
 import { describe, it, expect } from 'vitest'
 import type { DawarichSuggestion } from '@trek/shared'
 import {
@@ -74,6 +74,24 @@ describe('groupByDay', () => {
   it('FE-DAWARICH-SUGMODEL-003: nothing in, nothing out', () => {
     expect(groupByDay([])).toEqual([])
   })
+
+  it('FE-DAWARICH-SUGMODEL-013: a day that already reads in order is left in it', () => {
+    // Three stays rather than two: with two, a comparator that answered the
+    // same thing both ways would still look right half the time.
+    const input = [
+      stay({ id: 1, localDate: '2026-09-10', startedAt: '2026-09-10T09:00:00+02:00' }),
+      stay({ id: 2, localDate: '2026-09-10', startedAt: '2026-09-10T18:00:00+02:00' }),
+      stay({ id: 3, localDate: '2026-09-10', startedAt: '2026-09-10T13:30:00+02:00' }),
+    ]
+
+    const days = groupByDay(input)
+
+    expect(days).toHaveLength(1)
+    expect(days[0].stays.map(s => s.id)).toEqual([1, 3, 2])
+    // The list handed in belongs to the store. Sorting it in place would
+    // reorder what the panel is rendering from underneath it.
+    expect(input.map(s => s.id)).toEqual([1, 2, 3])
+  })
 })
 
 describe('clockOf / timeRange', () => {
@@ -114,6 +132,16 @@ describe('formatDayHeading', () => {
 
   it('FE-DAWARICH-SUGMODEL-010: an unparseable date is shown as it came', () => {
     expect(formatDayHeading('not-a-date', 'en-GB')).toBe('not-a-date')
+  })
+
+  it('FE-DAWARICH-SUGMODEL-014: a date missing its month or its day is shown as it came too', () => {
+    // Each guard on its own, because `Date` would rather guess than refuse:
+    // month 0 rolls the heading back into December of the previous year, and a
+    // missing day silently becomes the first of the month. Either one reads as
+    // a real date, which is worse than showing the string that arrived.
+    expect(formatDayHeading('2026-00-10', 'en-GB')).toBe('2026-00-10')
+    expect(formatDayHeading('2026-09-00', 'en-GB')).toBe('2026-09-00')
+    expect(formatDayHeading('2026-09', 'en-GB')).toBe('2026-09')
   })
 })
 
