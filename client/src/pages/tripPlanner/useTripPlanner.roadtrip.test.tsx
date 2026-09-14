@@ -1231,6 +1231,24 @@ describe('useTripPlanner road trip: dropping a hit where it belongs', () => {
     expect(result.current.stopDraft?.poi.osm_id).toBe('node/7')
   })
 
+  it('FE-TP-ROAD-089: a dropped hit is placed by the same rule as a clicked one', async () => {
+    // Computed on the side, a drop on the drive from the day before went in after this
+    // card's first stop while the click on the same hit went in ahead of it.
+    corridorWithHit()
+    rt.corridor.day = {
+      dayId: 6,
+      dayNumber: 2,
+      stops: [drawn(1301, 52.52, 13.4, 6, 0), drawn(1302, 52.0, 14.5, 6, 1)],
+    }
+    rt.corridor.insertIndexFor.mockReturnValue(0)
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.dropPoiOnRoute('node/7', 53.0, 11.5) })
+
+    expect(rt.corridor.insertIndexFor).toHaveBeenCalledWith(expect.objectContaining({ alongKm: expect.any(Number) }))
+    expect(result.current.stopDraft).toMatchObject({ dayId: 6, position: 0 })
+  })
+
   it('FE-TP-ROAD-054: a drop nowhere near the drive is ignored rather than guessed at', async () => {
     corridorWithHit()
     const { result } = await renderRoadtrip()

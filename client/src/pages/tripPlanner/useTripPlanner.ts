@@ -1728,7 +1728,7 @@ export function useTripPlanner() {
     if (!hit || !day) return
     const at = projectOntoRoute({ lat, lng }, roadtripCorridor.search.spine)
     if (!at || at.offRouteKm > roadtripCorridor.widthKm) return
-    const insert = roadtripInsertion(day, insertIndexForAlong(roadtripCorridor.stopsAlongKm, at.alongKm))
+    const insert = roadtripInsertion(day, roadtripCorridor.insertIndexFor(at))
     if (!insert) return
     setStopDraft({
       poi: hit,

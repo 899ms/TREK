@@ -259,4 +259,58 @@ describe('useRoadtripCorridor', () => {
 
     expect(result.current.visible).toBe(hits)
   })
+
+  describe('a card that opens with the drive from the day before', () => {
+    /**
+     * Three stops, so "before the first" and "after the first" are different answers:
+     * with two, every hit lands between them whatever the rule is. The line starts where
+     * the previous day ended, 250-odd km before this card's first stop.
+     */
+    const stopAt = (index: number, lat: number, lng: number) => ({
+      assignmentId: 10 + index, ownerDayId: 2, ownerIndex: index, placeId: 100 + index, name: `S${index}`,
+      lat, lng, time: null, dwellMinutes: null, legMode: null, incomingLegMode: null, stopType: null,
+    })
+    const spine = [
+      { lat: 53.5, lng: 9.9 }, { lat: 53.0, lng: 11.0 }, { lat: 52.5, lng: 13.4 }, { lat: 52.0, lng: 14.5 }, { lat: 51.5, lng: 15.0 },
+    ]
+    const arriving = (over: Partial<RoadtripDay>) => day({
+      dayId: 2,
+      dayNumber: 2,
+      stops: [stopAt(0, 52.5, 13.4), stopAt(1, 52.0, 14.5), stopAt(2, 51.5, 15.0)],
+      geometry: spine.map(p => [p.lat, p.lng] as [number, number]),
+      ...over,
+    })
+    const beforeFirstStop = poi({ osm_id: 'early', name: 'Rasthof', alongKm: 60 })
+    const pastFirstStop = poi({ osm_id: 'late', name: 'Autohof', alongKm: 300 })
+
+    beforeEach(() => {
+      useCorridorPois.mockReturnValue({ ...searchWith([beforeFirstStop, pastFirstStop]), spine })
+    })
+
+    it('FE-ROADTRIP-CORRIDORSTATE-035: a hit on the drive from the connected day before goes in ahead of the first stop', () => {
+      // Filed after the first stop, the day drove to that stop, turned back to the hit
+      // and then came the same way again.
+      const previousLast = { ...stopAt(4, 53.5, 9.9), ownerDayId: 1 }
+      const { result } = renderHook(() => useRoadtripCorridor(routes([arriving({ arrivingFrom: previousLast })])))
+
+      expect(result.current.insertIndexFor(beforeFirstStop)).toBe(0)
+      expect(result.current.insertIndexFor(pastFirstStop)).toBe(1)
+    })
+
+    it('FE-ROADTRIP-CORRIDORSTATE-036: the same holds for the drive a night carried over', () => {
+      const previousLast = { ...stopAt(4, 53.5, 9.9), ownerDayId: 1 }
+      const spill = { at: 0, count: 1, fromDayNumber: 1, departure: null, leg: undefined, line: [], fromStop: previousLast }
+      const { result } = renderHook(() => useRoadtripCorridor(routes([arriving({ spills: [spill] })])))
+
+      expect(result.current.insertIndexFor(beforeFirstStop)).toBe(0)
+    })
+
+    it('FE-ROADTRIP-CORRIDORSTATE-037: a day nothing arrives on keeps its first stop first', () => {
+      // Its line starts at that stop, so a hit measured ahead of it is a projection
+      // wobble, and a new first stop would move where the whole day sets off from.
+      const { result } = renderHook(() => useRoadtripCorridor(routes([arriving({})])))
+
+      expect(result.current.insertIndexFor(beforeFirstStop)).toBe(1)
+    })
+  })
 })

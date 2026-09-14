@@ -52,7 +52,7 @@ export interface RoadtripCorridor {
    * Which position in the day's chain a hit belongs at, so adding one lands it in the
    * order it will actually be driven past rather than at the end of the day.
    */
-  insertIndexFor: (poi: CorridorPoi) => number
+  insertIndexFor: (poi: Pick<CorridorPoi, 'alongKm'>) => number
   /** How far along the drive each of the day's stops sits, in the same units as a hit. */
   stopsAlongKm: number[]
   /**
@@ -227,8 +227,17 @@ export function useRoadtripCorridor(routes: RoadtripRoutes, tripId?: number | st
   }, [search.results, nameFilter, socketFilter, minKw, anchorKm, sectionKm])
 
   const insertIndexFor = useCallback(
-    (poi: CorridorPoi) => insertIndexForAlong(stopsAlongKm, poi.alongKm),
-    [stopsAlongKm],
+    (poi: Pick<CorridorPoi, 'alongKm'>) => {
+      // A card can open with a drive that left from a stop on the day before: the one a
+      // night carried over, or on connected days the road from where yesterday ended. A
+      // hit on that stretch is passed before this card's first stop, so it goes in ahead
+      // of it. `insertIndexForAlong` never answers 0, which is right for every other card,
+      // whose line starts at its first stop.
+      const arrivesFromEarlier = day?.spills?.find(sp => sp.at === 0)?.fromStop ?? day?.arrivingFrom
+      if (arrivesFromEarlier && stopsAlongKm.length > 1 && poi.alongKm < stopsAlongKm[0]!) return 0
+      return insertIndexForAlong(stopsAlongKm, poi.alongKm)
+    },
+    [day, stopsAlongKm],
   )
 
   /**
