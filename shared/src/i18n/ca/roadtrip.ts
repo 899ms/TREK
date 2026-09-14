@@ -210,6 +210,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} fora de la ruta: comprova a quin trajecte pertany.',
   'roadtrip.poi.manualAppend': 'Encara no hi ha cap ruta calculada, així que va al final del dia {number}.',
   'roadtrip.poi.manualNoResults': 'No s’ha trobat cap lloc.',
+  'roadtrip.poi.manualNoCoords':
+    'Sense una posició, això va als llocs del viatge en comptes d’anar a un trajecte. Tria un resultat de la cerca de dalt o omple les coordenades.',
   'roadtrip.summary.distance': 'Distància',
   'roadtrip.summary.driving': 'Temps de conducció',
   'roadtrip.alt.ask': 'Altres rutes',

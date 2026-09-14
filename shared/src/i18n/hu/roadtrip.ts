@@ -207,6 +207,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} az útvonaltól, ezért nézd meg, melyik szakaszhoz tartozik.',
   'roadtrip.poi.manualAppend': 'Még nincs kiszámolt útvonal, ezért a(z) {number}. nap végére kerül.',
   'roadtrip.poi.manualNoResults': 'Nincs találat.',
+  'roadtrip.poi.manualNoCoords':
+    'Pozíció nélkül ez az utazás helyei közé kerül, nem egy nap útvonalára. Válassz egyet a fenti keresésből, vagy töltsd ki a koordinátákat.',
   'roadtrip.summary.distance': 'Távolság',
   'roadtrip.summary.driving': 'Vezetési idő',
   'roadtrip.alt.ask': 'Más útvonalak',

@@ -211,6 +211,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} από τη διαδρομή, οπότε ελέγξτε σε ποιο σκέλος ανήκει.',
   'roadtrip.poi.manualAppend': 'Δεν έχει υπολογιστεί ακόμη διαδρομή, οπότε μπαίνει στο τέλος της ημέρας {number}.',
   'roadtrip.poi.manualNoResults': 'Δεν βρέθηκαν τοποθεσίες.',
+  'roadtrip.poi.manualNoCoords':
+    'Χωρίς θέση, αυτό μπαίνει στα μέρη του ταξιδιού και όχι σε μια διαδρομή ημέρας. Διαλέξτε ένα αποτέλεσμα από την αναζήτηση πιο πάνω ή συμπληρώστε τις συντεταγμένες.',
   'roadtrip.summary.distance': 'Απόσταση',
   'roadtrip.summary.driving': 'Χρόνος οδήγησης',
   'roadtrip.alt.ask': 'Άλλες διαδρομές',

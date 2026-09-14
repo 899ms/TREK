@@ -206,6 +206,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} från rutten, så kontrollera vilken sträcka den hör till.',
   'roadtrip.poi.manualAppend': 'Ingen rutt är beräknad än, så den läggs sist på dag {number}.',
   'roadtrip.poi.manualNoResults': 'Inga platser hittades.',
+  'roadtrip.poi.manualNoCoords':
+    'Utan position hamnar stoppet bland resans platser i stället för på en körning. Välj en träff i sökningen ovan eller fyll i koordinaterna.',
   'roadtrip.summary.distance': 'Sträcka',
   'roadtrip.summary.driving': 'Körtid',
   'roadtrip.alt.ask': 'Andra vägar',

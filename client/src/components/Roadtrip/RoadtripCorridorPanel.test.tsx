@@ -3,14 +3,14 @@ import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n'
 
-// jsdom reports every element as zero by side, so the row that decides whether the two
-// actions keep their labels can only be driven from here. Zero is what the component
-// reads as "not measured yet", which is also the default below.
-const { rowWidth } = vi.hoisted(() => ({ rowWidth: { value: 0 } }))
+// jsdom reports every element as zero by side, so the panel width that decides whether the
+// heading and the two actions keep their words can only be driven from here. Zero is what
+// the component reads as "not measured yet", which is also the default below.
+const { panelWidth } = vi.hoisted(() => ({ panelWidth: { value: 0 } }))
 vi.mock('../../hooks/useElementSize', () => ({
-  useElementSize: () => ({ ref: () => {}, width: rowWidth.value, height: 0 }),
+  useElementSize: () => ({ ref: () => {}, width: panelWidth.value, height: 0 }),
 }))
-afterEach(() => { rowWidth.value = 0 })
+afterEach(() => { panelWidth.value = 0 })
 
 import RoadtripCorridorPanel from './RoadtripCorridorPanel'
 import type { CorridorPoi } from './useCorridorPois'
@@ -285,7 +285,7 @@ describe('RoadtripCorridorPanel', () => {
   })
 
   it('FE-ROADTRIP-PANEL-013: while searching it reports progress rather than sitting still', () => {
-    rowWidth.value = 320
+    panelWidth.value = 320
     const c = corridor({}, { loading: true, progress: { done: 3, total: 12 } })
     wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} />)
 
@@ -437,11 +437,10 @@ describe('RoadtripCorridorPanel', () => {
     expect(searchButton.className).toContain('flex-1')
     expect(manual.className).toContain('flex-1')
 
-    // It opens the dialog. Nothing is added until a place and a position are picked
-    // there, and the kind of stop is still the stop popup's question.
+    // It opens the place form, which is the planner's to open: the panel asks, and
+    // nothing is added until a place has been found and saved in there.
     fireEvent.click(manual)
-    expect(onAddManual).not.toHaveBeenCalled()
-    expect(screen.getByLabelText('Search places...')).toBeInTheDocument()
+    expect(onAddManual).toHaveBeenCalledTimes(1)
   })
 
   it('FE-ROADTRIP-PANEL-026: with no drive on the trip there is nowhere to add one by hand', () => {
@@ -452,7 +451,7 @@ describe('RoadtripCorridorPanel', () => {
   })
 
   it('FE-ROADTRIP-PANEL-029: a roomy row keeps both words, and the manual one is the short form', () => {
-    rowWidth.value = 320
+    panelWidth.value = 320
     wrap(
       <RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />,
     )
@@ -468,7 +467,7 @@ describe('RoadtripCorridorPanel', () => {
   it('FE-ROADTRIP-PANEL-030: a narrow row drops the words rather than cutting them short', () => {
     // "Add manu…" is neither the label nor a shape anybody recognises. Below the
     // threshold both actions are their icon, and both keep their full names.
-    rowWidth.value = 150
+    panelWidth.value = 150
     wrap(
       <RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />,
     )
@@ -483,9 +482,38 @@ describe('RoadtripCorridorPanel', () => {
     expect(manual.className).toContain('flex-1')
   })
 
+  it('FE-ROADTRIP-PANEL-032: a narrow panel gives the heading up before it gives up a control', () => {
+    // The heading repeats what the column already is, and the day picker beside it is
+    // the part somebody came here to change.
+    panelWidth.value = 320
+    const { unmount } = wrap(<RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1), day(2, 2)])} />)
+    expect(screen.getByRole('heading', { name: 'Along the route' })).toBeInTheDocument()
+    unmount()
+
+    panelWidth.value = 150
+    wrap(<RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1), day(2, 2)])} />)
+    expect(screen.queryByRole('heading', { name: 'Along the route' })).toBeNull()
+    // The day is still pickable, which is the whole point of freeing the room.
+    expect(screen.getByText('Day 1')).toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-PANEL-033: a narrow panel drops the prompt but keeps every real answer', () => {
+    panelWidth.value = 150
+    const { unmount } = wrap(<RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1)])} />)
+    // Telling somebody to press the button they are looking at is not worth three
+    // wrapped lines; the mascot says the same thing.
+    expect(screen.queryByText('Pick what you need and search.')).toBeNull()
+    unmount()
+
+    // An answer to something the reader did stays, however narrow the column is.
+    const filtered = corridor({ nameFilter: 'Shell', visible: [] }, { results: [poi({ osm_id: 'a', name: 'Aral' })] })
+    wrap(<RoadtripCorridorPanel corridor={filtered} routes={routes([day(1, 1)])} />)
+    expect(screen.getByText('Nothing on the way matches “Shell”.')).toBeInTheDocument()
+  })
+
   it('FE-ROADTRIP-PANEL-031: a narrow row loses the words even while a search is running', () => {
     // The spinner replaces the magnifier, and there is still no text to cut off.
-    rowWidth.value = 150
+    panelWidth.value = 150
     const c = corridor({}, { loading: true, progress: { done: 3, total: 12 } })
     wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />)
 

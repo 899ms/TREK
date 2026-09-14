@@ -207,6 +207,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': 'Cách lộ trình {distance}, hãy kiểm tra xem nó thuộc chặng nào.',
   'roadtrip.poi.manualAppend': 'Chưa có lộ trình nào được tính, nên nó sẽ nằm ở cuối ngày {number}.',
   'roadtrip.poi.manualNoResults': 'Không tìm thấy địa điểm nào.',
+  'roadtrip.poi.manualNoCoords':
+    'Không có vị trí, nó sẽ vào danh sách địa điểm của chuyến đi chứ không nằm trên một chặng lái xe. Hãy chọn một kết quả ở ô tìm kiếm phía trên, hoặc điền tọa độ.',
   'roadtrip.summary.distance': 'Quãng đường',
   'roadtrip.summary.driving': 'Thời gian lái xe',
   'roadtrip.alt.ask': 'Lộ trình khác',

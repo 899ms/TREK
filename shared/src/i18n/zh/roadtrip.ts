@@ -195,6 +195,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '偏离路线 {distance}，请确认它属于哪个路段。',
   'roadtrip.poi.manualAppend': '还没有路线，因此它将添加到第 {number} 天的末尾。',
   'roadtrip.poi.manualNoResults': '未找到地点。',
+  'roadtrip.poi.manualNoCoords':
+    '没有位置信息时，它只会保存到本次行程的地点中，不会安排到某天的车程上。请从上方的搜索结果中选择一处，或填写坐标。',
   'roadtrip.summary.distance': '距离',
   'roadtrip.summary.driving': '驾驶时间',
   'roadtrip.alt.ask': '其他路线',

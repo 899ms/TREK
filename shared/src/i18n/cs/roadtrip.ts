@@ -206,6 +206,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} od trasy, ověřte proto, do kterého úseku patří.',
   'roadtrip.poi.manualAppend': 'Zatím není spočítaná žádná trasa, přidá se proto na konec dne {number}.',
   'roadtrip.poi.manualNoResults': 'Žádná místa nenalezena.',
+  'roadtrip.poi.manualNoCoords':
+    'Bez polohy se zastávka uloží mezi místa cesty, ne do jízdy. Vyberte výsledek z vyhledávání nahoře, nebo vyplňte souřadnice.',
   'roadtrip.summary.distance': 'Vzdálenost',
   'roadtrip.summary.driving': 'Doba jízdy',
   'roadtrip.alt.ask': 'Jiné trasy',

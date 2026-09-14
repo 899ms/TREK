@@ -208,6 +208,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} fora da rota, então confira a que trecho ele pertence.',
   'roadtrip.poi.manualAppend': 'Nenhuma rota foi calculada ainda, então ele entra no fim do dia {number}.',
   'roadtrip.poi.manualNoResults': 'Nenhum local encontrado.',
+  'roadtrip.poi.manualNoCoords':
+    'Sem uma posição, ele vai para os locais da viagem em vez de entrar em um trecho do trajeto. Escolha um resultado da busca acima ou preencha as coordenadas.',
   'roadtrip.summary.distance': 'Distância',
   'roadtrip.summary.driving': 'Tempo de direção',
   'roadtrip.alt.ask': 'Outras rotas',

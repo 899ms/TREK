@@ -209,6 +209,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} от маршрута, проверьте, к какому участку оно относится.',
   'roadtrip.poi.manualAppend': 'Маршрутов пока нет, поэтому место встанет в конце дня {number}.',
   'roadtrip.poi.manualNoResults': 'Места не найдены.',
+  'roadtrip.poi.manualNoCoords':
+    'Без координат это останется среди мест поездки и не попадёт на участок маршрута. Выберите вариант из поиска выше или заполните координаты.',
   'roadtrip.summary.distance': 'Расстояние',
   'roadtrip.summary.driving': 'Время в пути',
   'roadtrip.alt.ask': 'Другие маршруты',

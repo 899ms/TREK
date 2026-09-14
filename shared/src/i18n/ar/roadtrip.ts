@@ -203,6 +203,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} عن المسار، لذا تحقق من المرحلة التي تناسبها.',
   'roadtrip.poi.manualAppend': 'لا يوجد مسار بعد، لذا تُضاف في نهاية اليوم {number}.',
   'roadtrip.poi.manualNoResults': 'لم يُعثر على أي مكان.',
+  'roadtrip.poi.manualNoCoords':
+    'بدون موضع، يُضاف هذا إلى أماكن الرحلة بدلاً من إحدى مراحل القيادة. اختر نتيجة من البحث أعلاه، أو أدخل الإحداثيات.',
   'roadtrip.summary.distance': 'المسافة',
   'roadtrip.summary.driving': 'مدة القيادة',
   'roadtrip.alt.ask': 'مسارات أخرى',

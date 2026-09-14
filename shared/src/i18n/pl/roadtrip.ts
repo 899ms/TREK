@@ -207,6 +207,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} od trasy, więc sprawdź, do którego odcinka należy.',
   'roadtrip.poi.manualAppend': 'Nie wyznaczono jeszcze żadnej trasy, więc trafi na koniec dnia {number}.',
   'roadtrip.poi.manualNoResults': 'Nie znaleziono miejsc.',
+  'roadtrip.poi.manualNoCoords':
+    'Bez pozycji trafi do miejsc podróży, a nie na przejazd. Wybierz wynik wyszukiwania powyżej albo uzupełnij współrzędne.',
   'roadtrip.summary.distance': 'Dystans',
   'roadtrip.summary.driving': 'Czas jazdy',
   'roadtrip.alt.ask': 'Inne trasy',

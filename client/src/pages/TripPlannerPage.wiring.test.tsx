@@ -232,6 +232,9 @@ function baseState(): HookState {
     setPrefillCoords: vi.fn(),
     editingAssignmentId: null,
     setEditingAssignmentId: vi.fn(),
+    serviceStopMode: null,
+    setServiceStopForm: vi.fn(),
+    openManualRoadtripStop: vi.fn(),
     showTripForm: false,
     setShowTripForm: vi.fn(),
     showMembersModal: false,
@@ -1056,6 +1059,9 @@ describe('TripPlannerPage — modals', () => {
     expect(hookState.setShowPlaceForm).toHaveBeenCalledWith(false)
     expect(hookState.setEditingPlace).toHaveBeenCalledWith(null)
     expect(hookState.setPrefillCoords).toHaveBeenCalledWith(null)
+    // The road trip's manual add is one of the ways this form opens; closing it has to
+    // put the form back to the one every other caller gets.
+    expect(hookState.setServiceStopForm).toHaveBeenCalledWith(false)
 
     act(() => { props('placeForm').onCategoryCreated({ id: 3, name: 'Food' }) })
     const tripActions = hookState.tripActions as Record<string, ReturnType<typeof vi.fn>>

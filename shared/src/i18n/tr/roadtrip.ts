@@ -208,6 +208,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': 'Rotadan {distance}, bu yüzden hangi etaba ait olduğunu kontrol edin.',
   'roadtrip.poi.manualAppend': 'Henüz rota hesaplanmadı, bu yüzden {number}. günün sonuna eklenir.',
   'roadtrip.poi.manualNoResults': 'Yer bulunamadı.',
+  'roadtrip.poi.manualNoCoords':
+    'Konum olmadan bu yer, bir sürüşe değil gezinin yerleri arasına eklenir. Yukarıdaki aramadan birini seçin veya koordinatları girin.',
   'roadtrip.summary.distance': 'Mesafe',
   'roadtrip.summary.driving': 'Sürüş süresi',
   'roadtrip.alt.ask': 'Başka yollar',

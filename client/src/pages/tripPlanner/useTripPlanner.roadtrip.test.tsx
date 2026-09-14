@@ -17,7 +17,6 @@ import {
 } from '../../api/client'
 import { accommodationRepo } from '../../repo/accommodationRepo'
 import { dayColor } from '../../components/Roadtrip/dayColors'
-import type { ManualStopPlace } from '../../components/Roadtrip/manualStop'
 
 /**
  * The road trip half of the planner hook.
@@ -1277,18 +1276,6 @@ describe('useTripPlanner road trip: a stop added by hand', () => {
     }]
   }
 
-  const place = (over: Partial<ManualStopPlace> = {}): ManualStopPlace => ({
-    name: 'Supercharger Dammer Berge',
-    lat: 52.9,
-    lng: 11.4,
-    address: 'A1',
-    website: null,
-    phone: null,
-    osm_id: 'node/9',
-    category: null,
-    ...over,
-  })
-
   it('FE-TP-ROAD-075: a hand-picked place is measured onto the drive it is nearest', async () => {
     routedDay()
     const { result } = await renderRoadtrip()
@@ -1321,36 +1308,171 @@ describe('useTripPlanner road trip: a stop added by hand', () => {
     expect(result.current.manualStopTargetFor(53.0, 11.5)).toBeNull()
   })
 
-  it('FE-TP-ROAD-078: adding one by hand opens the popup a corridor hit goes through', async () => {
+  it('FE-TP-ROAD-078: adding one by hand opens the place form on nothing at all', async () => {
     routedDay()
     const { result } = await renderRoadtrip()
 
-    act(() => {
-      result.current.addManualRoadtripStop(place(), { dayId: 5, position: 1, offRouteKm: 3.2 })
-    })
+    act(() => { result.current.openManualRoadtripStop() })
 
-    expect(result.current.stopDraft).toMatchObject({ dayId: 5, position: 1, dayNumber: 1 })
-    expect(result.current.stopDraft?.poi).toMatchObject({
-      name: 'Supercharger Dammer Berge', osm_id: 'node/9', offRouteKm: 3.2, alongKm: 0,
-    })
-    // Neither the full form nor a write: the kind of stop and the dwell are still to be
-    // chosen, in the one dialog that asks them.
-    expect(result.current.showPlaceForm).toBe(false)
+    // The real form, with its own typed-ahead search: nothing is known about the place
+    // yet, so nothing is prefilled and no day is fixed.
+    expect(result.current.showPlaceForm).toBe(true)
+    expect(result.current.prefillCoords).toBeNull()
+    expect(result.current.editingPlace).toBeNull()
+    expect(result.current.stopDraft).toBeNull()
     expect(actions.addPlace).not.toHaveBeenCalled()
-    // A charger is not somewhere to sleep.
-    expect(result.current.stopDraft?.overnight).toBeUndefined()
   })
 
-  it('FE-TP-ROAD-079: somewhere to sleep opens in overnight mode, the same as a corridor hit', async () => {
+  it('FE-TP-ROAD-079: the form is handed every leg of the drive to choose between', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+    expect(result.current.serviceStopMode).toBeNull()
+
+    act(() => { result.current.openManualRoadtripStop() })
+
+    expect(result.current.serviceStopMode).toMatchObject({
+      days: [{ dayId: 5, dayNumber: 1 }],
+      appendDay: { dayId: 5, dayNumber: 1, position: 2 },
+    })
+    expect(result.current.serviceStopMode?.targetFor(53.0, 11.5)).toMatchObject({ dayId: 5, position: 1 })
+  })
+
+  it('FE-TP-ROAD-081: with nothing routed there is no leg, only the day the panel is on', async () => {
+    routedDay()
+    // Two stops and no line between them: the trip has places but no drive yet.
+    rt.routes.days = [{ dayId: 5, dayNumber: 1, stops: [{ lat: 53.55, lng: 9.99 }, { lat: 52.52, lng: 13.4 }], geometry: [] }]
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.openManualRoadtripStop() })
+
+    expect(result.current.serviceStopMode?.days).toEqual([])
+    expect(result.current.serviceStopMode?.appendDay).toMatchObject({ dayId: 5, position: 2 })
+  })
+
+  it('FE-TP-ROAD-082: the stop lands where the SAVE says, not where the form opened', async () => {
     routedDay()
     const { result } = await renderRoadtrip()
 
-    act(() => {
-      result.current.addManualRoadtripStop(place({ category: 'hotel' }), { dayId: 5, position: 1, offRouteKm: 0.2 })
+    act(() => { result.current.openManualRoadtripStop() })
+    await act(async () => {
+      await result.current.handleSavePlace({
+        name: 'Supercharger Dammer Berge',
+        lat: 52.9,
+        lng: 11.4,
+        stop_type: 'charging',
+        duration_minutes: 30,
+        // Worked out in the form from the coordinates above, long after it opened.
+        _serviceStop: { dayId: 5, position: 1, offRouteKm: 3.2 },
+      })
     })
 
-    // The night ends on the next day of the trip, which is what a night usually means.
-    expect(result.current.stopDraft?.overnight?.defaultEndDayId).toBe(6)
+    // The transport field never reaches the write.
+    expect(actions.addPlace).toHaveBeenCalledWith(42, expect.not.objectContaining({ _serviceStop: expect.anything() }))
+    expect(actions.assignPlaceToDay).toHaveBeenCalledWith(42, 5, 900, 1)
+    expect(updateRouteForDay).toHaveBeenCalledWith(5)
+  })
+
+  it('FE-TP-ROAD-083: a leg named by the card is filed under the day the stop is STORED on', async () => {
+    // A card can open with yesterday's last stop (`nightSpill.ts`), so the card and the
+    // position in it are not the day and the position the assignment is written at.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    rt.routes.days = [{
+      dayId: 6,
+      dayNumber: 2,
+      stops: [
+        { lat: 53.55, lng: 9.99, ownerDayId: 5, ownerIndex: 2 },
+        { lat: 53.0, lng: 11.5, ownerDayId: 6, ownerIndex: 0 },
+        { lat: 52.52, lng: 13.4, ownerDayId: 6, ownerIndex: 1 },
+      ],
+      geometry: [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.openManualRoadtripStop() })
+    await act(async () => {
+      await result.current.handleSavePlace({
+        name: 'Rasthof',
+        lat: 53.2,
+        lng: 10.7,
+        _serviceStop: { dayId: 6, position: 1, offRouteKm: 0 },
+      })
+    })
+
+    // Not (42, 6, 900, 1): the stop the leg ends at is the second day's first, stored
+    // at index 0 there.
+    expect(actions.assignPlaceToDay).toHaveBeenCalledWith(42, 6, 900, 0)
+  })
+
+  it('FE-TP-ROAD-084: a stop dropped into a routed day re-anchors its vias before it re-routes', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [{ lat: 53.55, lng: 9.99 }, { lat: 53.0, lng: 11.5 }, { lat: 52.52, lng: 13.4 }],
+      geometry: [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4]],
+    }]
+    // One via on the second leg, anchored behind the stop the new one goes in front of.
+    rt.vias.byDay = { 5: [via(11, 5, 1, 0, 52.8, 12.2)] }
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.openManualRoadtripStop() })
+    await act(async () => {
+      await result.current.handleSavePlace({
+        name: 'Supercharger Dammer Berge',
+        lat: 53.2,
+        lng: 10.7,
+        _serviceStop: { dayId: 5, position: 1, offRouteKm: 1.2 },
+      })
+    })
+
+    // `after_order_index` is a POSITION in the day's stop list. Left alone, the via keeps
+    // index 1 and is redrawn onto the leg the new stop just took: the road then runs
+    // forward, doubles back and runs out again.
+    expect(actions.assignPlaceToDay).toHaveBeenCalledWith(42, 5, 900, 1)
+    expect(rt.vias.reanchor).toHaveBeenCalledWith(5, { vias: [{ id: 11, after_order_index: 2 }], remove: [] })
+    // Awaited before the re-route: a correction landing after it would draw the wrong
+    // road first and the right one a moment later.
+    const assigned = actions.assignPlaceToDay.mock.invocationCallOrder[0] ?? 0
+    const corrected = rt.vias.reanchor.mock.invocationCallOrder[0] ?? 0
+    const routes = updateRouteForDay.mock.invocationCallOrder
+    const routed = routes[routes.length - 1] ?? 0
+    expect(assigned).toBeLessThan(corrected)
+    expect(corrected).toBeLessThan(routed)
+  })
+
+  it('FE-TP-ROAD-085: the form is handed the road of each leg, to measure the place against', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.openManualRoadtripStop() })
+
+    // One line per leg, cut out of the day's drawn road: the form measures the place
+    // against each of them and offers the nearest first.
+    const day = result.current.serviceStopMode?.days[0]
+    expect(day?.legLines).toHaveLength(1)
+    expect(day?.legLines?.[0]?.length).toBeGreaterThan(1)
+  })
+
+  it('FE-TP-ROAD-086: a stop the form could not place goes to the trip places, not onto a day', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.openManualRoadtripStop() })
+    await act(async () => {
+      await result.current.handleSavePlace({
+        name: 'Supercharger Dammer Berge',
+        lat: null,
+        lng: null,
+        // A name with no coordinates cannot be measured onto a road, so the form says so
+        // and sends no placement at all.
+        _serviceStop: null,
+      })
+    })
+
+    expect(actions.addPlace).toHaveBeenCalled()
+    expect(actions.assignPlaceToDay).not.toHaveBeenCalled()
   })
 
   it('FE-TP-ROAD-080: a reader may not add one by hand either', async () => {
@@ -1358,11 +1480,10 @@ describe('useTripPlanner road trip: a stop added by hand', () => {
     routedDay()
     const { result } = await renderRoadtrip()
 
-    act(() => {
-      result.current.addManualRoadtripStop(place(), { dayId: 5, position: 1, offRouteKm: 0 })
-    })
+    act(() => { result.current.openManualRoadtripStop() })
 
-    expect(result.current.stopDraft).toBeNull()
+    expect(result.current.showPlaceForm).toBe(false)
+    expect(result.current.serviceStopMode).toBeNull()
   })
 })
 

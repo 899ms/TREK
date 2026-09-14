@@ -206,6 +206,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': 'ルートから {distance} 離れています。どの区間に入れるか確認してください。',
   'roadtrip.poi.manualAppend': 'まだルートがないため、{number} 日目の最後に追加します。',
   'roadtrip.poi.manualNoResults': '場所が見つかりませんでした。',
+  'roadtrip.poi.manualNoCoords': 'この場所は位置情報がないため、その日の走行ではなく旅行の場所一覧に追加されます。上の検索から選ぶか、緯度と経度を入力してください。',
   'roadtrip.summary.distance': '距離',
   'roadtrip.summary.driving': '運転時間',
   'roadtrip.alt.ask': '別のルート',

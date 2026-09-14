@@ -25,6 +25,9 @@ import type { BookingExpenseRequest } from './BookingCostsSection.types'
 import type { Place, Category, Assignment, BudgetItem } from '../../types'
 import { NumericInput } from '../shared/NumericInput'
 import { PlacesSession } from '../../utils/placesSession'
+import ServiceStopSection from '../Roadtrip/ServiceStopSection'
+import { DEFAULT_SERVICE_KIND, serviceStopChoice, type ServiceStopMode } from '../Roadtrip/manualStop'
+import { STOP_KIND_BY_KEY } from '../Roadtrip/stopKinds'
 
 // The submit payload mirrors the form, but lat/lng are parsed to numbers and
 // category_id is normalised, plus any files chosen before the place existed.
@@ -33,6 +36,12 @@ export interface PlaceSubmitData extends Omit<PlaceFormData, 'lat' | 'lng' | 'ca
   lng: number | null
   category_id: string | null
   _pendingFiles?: File[]
+  /**
+   * Where a road-trip service stop belongs on the drive, worked out from the
+   * coordinates being saved. Travels the same way `_pendingFiles` does: the planner
+   * reads it, strips it, and assigns the new place at that position.
+   */
+  _serviceStop?: { dayId: number; position: number; offRouteKm: number } | null
 }
 
 interface PlaceFormModalProps {
@@ -53,6 +62,12 @@ interface PlaceFormModalProps {
   /** Opens the Costs editor for this place's linked expense (#1298) — the same
    *  seam the booking and transport modals use. */
   onOpenExpense?: (req: BookingExpenseRequest) => void
+  /**
+   * Turns this into the form a road trip's service stop is added on: the category
+   * control becomes the kind of stop, the costs section goes, and a row asks which leg
+   * of the drive it belongs on. Absent, nothing about the form changes.
+   */
+  serviceStop?: ServiceStopMode | null
 }
 
 
@@ -90,17 +105,32 @@ function SourceBadge({ label }: { label: string | null }) {
 // trip place if it shares the Google Place ID, the (case-insensitive) name, or
 // near-identical coordinates (~11 m). Mirrors the server-side import dedup.
 const DUP_COORD_TOLERANCE = 0.0001
+/**
+ * Which resemblances count as evidence.
+ *
+ * The defaults are the ordinary add place and are not to be changed. A stop on a drive
+ * asks a different question: brand names repeat along a motorway and the map record does
+ * not, so it turns the name off and the OSM object on.
+ */
+interface DuplicateRules {
+  byName?: boolean
+  byOsmId?: boolean
+}
 function findDuplicatePlace(
   form: PlaceFormData,
-  places: { name?: string | null; lat?: number | null; lng?: number | null; google_place_id?: string | null }[],
+  places: { name?: string | null; lat?: number | null; lng?: number | null; google_place_id?: string | null; osm_id?: string | null }[],
+  rules: DuplicateRules = {},
 ): { name?: string | null } | null {
+  const { byName = true, byOsmId = false } = rules
   const name = (form.name || '').trim().toLowerCase()
   const gid = (form.google_place_id || '').trim()
+  const osmId = (form.osm_id || '').trim()
   const lat = form.lat ? Number.parseFloat(form.lat) : null
   const lng = form.lng ? Number.parseFloat(form.lng) : null
   for (const p of places || []) {
     if (gid && p.google_place_id && p.google_place_id === gid) return p
-    if (name && p.name && p.name.trim().toLowerCase() === name) return p
+    if (byOsmId && osmId && p.osm_id && p.osm_id === osmId) return p
+    if (byName && name && p.name && p.name.trim().toLowerCase() === name) return p
     if (
       lat != null && lng != null && p.lat != null && p.lng != null &&
       Math.abs(Number(p.lat) - lat) <= DUP_COORD_TOLERANCE &&
@@ -114,7 +144,7 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
   const {
   isOpen, onClose, onSave, place, prefillCoords, tripId, categories,
   onCategoryCreated, assignmentId, dayAssignments = [], isMobile = false,
-  onOpenExpense,
+  onOpenExpense, serviceStop = null,
   } = props
   // Hidden while the addon is off, because the kinds only mean anything to the road trip
   // rail: on an instance without it they would be six labels that change nothing.
@@ -143,6 +173,12 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
   // user's and survives. See mergeResult.
   const autoFilledRef = useRef<Set<ResultField>>(new Set())
   const [pendingFiles, setPendingFiles] = useState([])
+  /**
+   * The leg of the drive the traveller picked, or empty while the projection's own
+   * answer stands. Empty rather than seeded, because there is nothing to project onto
+   * until a place has been chosen and the answer has to follow the coordinates.
+   */
+  const [serviceStopLeg, setServiceStopLeg] = useState('')
   const fileRef = useRef(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [acSuggestions, setAcSuggestions] = useState<Suggestion[]>([])
@@ -211,6 +247,18 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
         stop_type: prefillCoords.stop_type ?? null,
         duration_minutes: prefillCoords.duration_minutes,
       })
+    } else if (serviceStop) {
+      // A stop on a drive is a kind and a dwell before it is anything else, so the form
+      // opens on one rather than on nothing: a service stop left without a kind is a
+      // numbered destination that counts in every total, which is the very thing this
+      // path exists to avoid. Read out of the closure rather than watched, because the
+      // mode is fixed for the life of one opening and a rebuilt drive must not reset a
+      // half-filled form.
+      setForm({
+        ...DEFAULT_FORM,
+        stop_type: DEFAULT_SERVICE_KIND,
+        duration_minutes: STOP_KIND_BY_KEY[DEFAULT_SERVICE_KIND].defaultMinutes,
+      })
     } else {
       setForm(DEFAULT_FORM)
     }
@@ -227,7 +275,14 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
         : [],
     )
     setPendingFiles([])
+    setServiceStopLeg('')
     setDuplicateWarning(null)
+    // A fresh dialog owns no intention either. The ref is armed by a click on the Costs
+    // section and spent by the save that follows it; a save that never happened leaves it
+    // armed, and the next opening would consume it for a place nobody linked an expense
+    // to. In service-stop mode that opening has no Costs section at all, so the editor
+    // would arrive out of nowhere, on a petrol stop, filed as an activity.
+    expenseIntentRef.current = null
     // The column follows whatever the dialog was opened with, not only a search
     // pick: a POI tapped on the map and a right-click place arrive as
     // prefillCoords, and editing an existing place arrives as `place`. Without
@@ -271,6 +326,19 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
   // thousand identically named places is meant. Autocomplete wants a box, the
   // search wants a point; useLocationBias derives both from the same places.
   const { box: locationBias, point: locationBiasPoint } = useLocationBias()
+
+  /**
+   * What a stop on a drive might be a second copy of, said while the form is being filled.
+   *
+   * By the map record and by where it stands, never by its name: two Arals on one
+   * motorway are two petrol stations, and a check that called them one refused the save
+   * the first time it was pressed. This one refuses nothing: it is a note beside the
+   * name, and the reader decides.
+   */
+  const serviceStopDuplicate = useMemo(() => {
+    if (!serviceStop || place) return null
+    return findDuplicatePlace(form, places, { byName: false, byOsmId: true })?.name ?? null
+  }, [serviceStop, place, form, places])
 
   // Autocomplete fetch — aborts any in-flight request before starting a new one
   const fetchSuggestions = useCallback(async (query: string) => {
@@ -494,6 +562,21 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     }
   }
 
+  /**
+   * The kind of stop, and with it how long that kind usually takes.
+   *
+   * Picking a kind is also picking a dwell, until the user says otherwise: a charge is
+   * not a fuel stop. Only ever called for a kind that is not already on, so a dwell set
+   * by hand survives a second click on the same pill.
+   */
+  const handleStopKind = useCallback((kind: RoadtripStopType) => {
+    setForm(prev => ({ ...prev, stop_type: kind, duration_minutes: STOP_KIND_BY_KEY[kind].defaultMinutes }))
+  }, [])
+
+  const handleStopMinutes = useCallback((minutes: number) => {
+    setForm(prev => ({ ...prev, duration_minutes: minutes }))
+  }, [])
+
   const handleCreateCategory = async () => {
     if (!newCategoryName.trim()) return
     try {
@@ -544,21 +627,34 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     }
     // #1152: only for new places, and only on the first attempt — a second click
     // (with the warning already showing) is the explicit "add anyway" confirmation.
-    if (!place && !duplicateWarning) {
+    //
+    // Never for a stop on a drive. Most of what that check catches is a repeated name,
+    // and on a motorway a repeated name is the normal case: the second Aral is four
+    // hundred kilometres from the first and is a different petrol station. The popup this
+    // path replaced compared the OSM object for exactly that reason and never gated the
+    // save on it, only noted it. So the note is shown beside the name while the form is
+    // being filled (see serviceStopDuplicate), which is the earlier word anyway, and the
+    // press that saves is the press that saves.
+    if (!place && !serviceStop && !duplicateWarning) {
       const dup = findDuplicatePlace(form, places)
       if (dup) {
         const dupName = dup.name || form.name
         setDuplicateWarning(dupName)
         toast.warning(t('places.duplicateExists', { name: dupName }))
+        // Nothing was saved, so an expense intent from a previous click is stale, and
+        // the next plain Save would otherwise open a Costs editor out of nowhere.
+        expenseIntentRef.current = null
         return
       }
     }
     setIsSaving(true)
     try {
+      const lat = form.lat ? Number.parseFloat(form.lat) : null
+      const lng = form.lng ? Number.parseFloat(form.lng) : null
       const payload = {
         ...form,
-        lat: form.lat ? Number.parseFloat(form.lat) : null,
-        lng: form.lng ? Number.parseFloat(form.lng) : null,
+        lat,
+        lng,
         category_id: form.category_id || null,
         // An explicit null is how a stop stops being a fuel stop; the service reads it
         // that way rather than as "leave alone", which is what a missing key means.
@@ -568,6 +664,12 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
         // stay belongs to the rail's dialog and sending it here would overwrite it.
         ...(!place && form.stop_type && form.duration_minutes
           ? { duration_minutes: form.duration_minutes }
+          : {}),
+        // Where on the drive it goes, worked out HERE and not when the dialog opened: a
+        // stop added by hand has no coordinates at all until a place has been chosen in
+        // it, so the answer has to follow what is actually being saved.
+        ...(serviceStop
+          ? { _serviceStop: serviceStopChoice(serviceStop, lat, lng, serviceStopLeg).placement }
           : {}),
         _pendingFiles: pendingFiles.length > 0 ? pendingFiles : undefined,
       }
@@ -592,6 +694,10 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
       }
       onClose()
     } catch (err: unknown) {
+      // The save did not happen, so the intent behind it cannot be honoured: the place
+      // the expense would point at does not exist. Left armed it would ride along to
+      // whatever the next press saves.
+      expenseIntentRef.current = null
       toast.error(err instanceof Error ? err.message : t('places.saveError'))
     } finally {
       setIsSaving(false)
@@ -673,6 +779,12 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     handleCreateExpense,
     handleEditExpense,
     handleRemoveExpense,
+    serviceStop,
+    serviceStopDuplicate,
+    serviceStopLeg,
+    setServiceStopLeg,
+    handleStopKind,
+    handleStopMinutes,
   }
 }
 
@@ -745,6 +857,12 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
     handleCreateExpense,
     handleEditExpense,
     handleRemoveExpense,
+    serviceStop,
+    serviceStopDuplicate,
+    serviceStopLeg,
+    setServiceStopLeg,
+    handleStopKind,
+    handleStopMinutes,
   } = S
   // Desktop + Collections addon → the saved-place picker on the right. Mobile
   // always keeps the original single-column form untouched.
@@ -760,7 +878,9 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title={place ? t('places.editPlace') : t('places.addPlace')}
+      // A stop on a drive is not an activity, and the title is the first thing that says
+      // which of the two this dialog is asking about.
+      title={place ? t('places.editPlace') : serviceStop ? t('roadtrip.stop.addTitle') : t('places.addPlace')}
       size={modalSize}
       footer={
         <div className="flex justify-end gap-3">
@@ -895,6 +1015,14 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
               </div>
             )}
           </div>
+          {/* A stop on a drive that looks like one already on the trip. Said here, while
+              the form is being filled, and never as a condition of saving: the press that
+              saves is the press that saves. */}
+          {serviceStopDuplicate && (
+            <p className="mt-1 text-caption text-warning">
+              {t('roadtrip.stop.duplicate', { name: serviceStopDuplicate })}
+            </p>
+          )}
         </div>
 
         {/* Description */}
@@ -968,7 +1096,24 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
           </div>
         </div>
 
-        {/* Category */}
+        {/* Category, or for a stop on a drive the kind of stop and where it belongs.
+
+            One or the other, never both: refuelling is not a taste, it is a fact about
+            the place, so it lives in `places.stop_type` and not in the trip's own
+            editable category list. */}
+        {serviceStop ? (
+          <ServiceStopSection
+            mode={serviceStop}
+            stopType={form.stop_type ?? null}
+            onStopType={handleStopKind}
+            minutes={form.duration_minutes ?? 0}
+            onMinutes={handleStopMinutes}
+            leg={serviceStopLeg}
+            onLeg={setServiceStopLeg}
+            lat={form.lat ? Number.parseFloat(form.lat) : null}
+            lng={form.lng ? Number.parseFloat(form.lng) : null}
+          />
+        ) : (
         <div>
           <label className="block text-sm font-medium text-content-secondary mb-1">{t('places.formCategory')}</label>
           {!showNewCategory ? (
@@ -1018,6 +1163,7 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
             </div>
           )}
         </div>
+        )}
 
         {/* Time is per day-assignment: only shown when a single assignment is in
             context (itinerary edit, or a single-assignment pool edit). Hidden when
@@ -1089,8 +1235,11 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
         )}
 
         {/* Costs — create / view the expense linked to this place (#1298).
-            Same block, same flow as a booking: save first, then the editor. */}
-        {isBudgetEnabled && (
+            Same block, same flow as a booking: save first, then the editor.
+
+            Never for a stop on a drive: a petrol stop is not an activity with a budget
+            line, and the fuel it buys is an expense of the trip rather than of a place. */}
+        {isBudgetEnabled && !serviceStop && (
           <BookingCostsSection
             placeId={place?.id ?? null}
             reservationId={null}

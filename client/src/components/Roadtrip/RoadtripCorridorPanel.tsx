@@ -11,11 +11,9 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
 import CustomSelect from '../shared/CustomSelect'
 import RoadtripCategoryPicker from './RoadtripCategoryPicker'
-import RoadtripManualStopModal from './RoadtripManualStopModal'
 import { serviceColor } from './roadtripModel'
 import { CORRIDOR_CATEGORY_BY_KEY } from './stopKinds'
 import { FS } from './typeScale'
-import type { ManualStopPlace, ManualStopTarget } from './manualStop'
 import { CORRIDOR_CATEGORY_KEYS, CORRIDOR_SECTION_KM, CORRIDOR_WIDTHS_KM, type RoadtripCorridor } from './useRoadtripCorridor'
 import type { CorridorPoi } from './useCorridorPois'
 import type { RoadtripRoutes } from './useRoadtripRoutes'
@@ -37,12 +35,10 @@ interface RoadtripCorridorPanelProps {
    */
   onFocusPoint?: (lat: number, lng: number) => void
   /**
-   * Adds a place the search never found, at a position on the drive. Given only to
-   * somebody who may add places, which is what keeps the button off a reader's panel.
+   * Opens the place form for a stop the search never found. Given only to somebody who
+   * may add places, which is what keeps the button off a reader's panel.
    */
-  onAddManual?: (place: ManualStopPlace, target: ManualStopTarget) => void
-  /** Where a freely chosen point belongs on the drive, from the planner's projection. */
-  manualStopTargetFor?: (lat: number, lng: number) => ManualStopTarget | null
+  onAddManual?: () => void
 }
 
 /**
@@ -57,14 +53,17 @@ interface RoadtripCorridorPanelProps {
 const KW_STEPS = [11, 22, 50, 150]
 
 /**
- * Below this, the two actions at the foot of the search card are icons alone, in pixels.
+ * Below this the panel is cramped and stops spending width on words, in pixels.
  *
- * Measured from what they need rather than picked round: two buttons, an eight pixel gap
- * and their own padding leave each of them about ninety pixels for a fifteen pixel icon,
- * a gap and a word. "Search" and the shortest sensible word beside it fit that; a hair
- * under it and the first thing to go is the end of the longer word.
+ * Measured from what the tightest row needs rather than picked round. The two actions at
+ * the foot of the search card sit inside two levels of padding, which leaves each of them
+ * about ninety pixels for a fifteen pixel icon, a gap and a word: "Search" and the
+ * shortest sensible word beside it fit that, and a hair under it the first thing to go is
+ * the end of the longer word. The panel's own heading goes at the same point, for the
+ * same reason and to the same end: what it says is already the name of the column, and
+ * the room it takes is the room the day picker beside it wants.
  */
-const ICON_ONLY_BELOW_PX = 200
+const NARROW_PANEL_PX = 260
 
 const SOCKET_LABEL: Record<string, string> = {
   type2: 'Type 2',
@@ -299,29 +298,23 @@ function ResultGroup({ category, pois, dayId, insertIndexFor, onAddPoi, onFocusP
  * conditions.
  */
 export default function RoadtripCorridorPanel({
-  corridor, routes, onAddPoi, onFocusPoint, onAddManual, manualStopTargetFor, tripId, canImport,
+  corridor, routes, onAddPoi, onFocusPoint, onAddManual, tripId, canImport,
 }: RoadtripCorridorPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   const { search } = corridor
   /**
-   * Whether the manual dialog is up.
+   * The column itself, measured, because it is resizable.
    *
-   * Local, and the dialog is mounted rather than merely hidden: it is a way of adding
-   * one stop, not a setting, and unmounting it on close is what stops a half-typed
-   * search from being there the next time somebody opens it.
+   * A media query would ask about the window, which is the wrong question: this panel
+   * can be narrow on a wide screen, so what it may spend on words depends on what it
+   * actually got. One measurement rather than one per row, so the heading and the two
+   * actions give way at the same width instead of at two widths a few pixels apart.
+   * Zero means it has not been measured yet, and that reads as roomy rather than
+   * cramped so nothing flashes away on the first paint.
    */
-  const [manualOpen, setManualOpen] = useState(false)
-  /**
-   * The row the two actions share, measured, because this column is resizable.
-   *
-   * A media query would ask about the window, which is the wrong question: the panel
-   * can be narrow on a wide screen and the labels have to go by what the row itself
-   * got. Zero means the row has not been measured yet, and that reads as roomy rather
-   * than cramped so the labels do not flash away on the first paint.
-   */
-  const actionRow = useElementSize<HTMLDivElement>()
-  const iconOnly = actionRow.width > 0 && actionRow.width < ICON_ONLY_BELOW_PX
+  const panel = useElementSize<HTMLDivElement>()
+  const narrow = panel.width > 0 && panel.width < NARROW_PANEL_PX
 
   const dayOptions = routes.days.map(d => ({
     value: String(d.dayId),
@@ -381,12 +374,18 @@ export default function RoadtripCorridorPanel({
   // The two warnings that remain are about a search that did not happen.
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3 px-3.5 pb-3.5 pt-3">
-      {/* Header — the panel's name, and the day the question is about. */}
+    <div ref={panel.ref} className="flex h-full min-h-0 flex-col gap-3 px-3.5 pb-3.5 pt-3">
+      {/* Header: the panel's name, and the day the question is about.
+
+          Pulled at, the name is the first thing to go. It repeats what the column
+          already is, the day picker beside it is the part somebody came here to change,
+          and a heading that shortens to an ellipsis says less than no heading at all. */}
       <div className="flex flex-shrink-0 items-center gap-2.5 px-1">
-        <h2 className="font-semibold tracking-[-0.022em] text-content" style={{ fontSize: FS.panelTitle }}>
-          {t('roadtrip.poi.title')}
-        </h2>
+        {narrow ? null : (
+          <h2 className="min-w-0 truncate font-semibold tracking-[-0.022em] text-content" style={{ fontSize: FS.panelTitle }}>
+            {t('roadtrip.poi.title')}
+          </h2>
+        )}
         {dayOptions.length > 1 ? (
           <div className="ms-auto min-w-0">
             <CustomSelect
@@ -453,13 +452,13 @@ export default function RoadtripCorridorPanel({
             them. A truncated word is worse than no word: "Add manu…" is neither the
             label nor a shape you recognise, while the plus and the magnifier are both
             read at a glance and keep their full names for a pointer and a reader. */}
-        <div ref={actionRow.ref} className="flex gap-2">
+        <div className="flex gap-2">
           <button
             type="button"
             onClick={search.search}
             disabled={!canSearch}
             aria-label={t('roadtrip.poi.search')}
-            title={iconOnly ? t('roadtrip.poi.search') : undefined}
+            title={narrow ? t('roadtrip.poi.search') : undefined}
             className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-accent text-body font-semibold text-accent-text transition-opacity disabled:opacity-50"
           >
             {search.loading
@@ -469,7 +468,7 @@ export default function RoadtripCorridorPanel({
                 the run is on. It used to become "Searching 3 of 12", which is both the
                 longest label in the panel and the very sentence the progress row right
                 underneath prints, next to the share as a figure. */}
-            {iconOnly ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.search')}</span>}
+            {narrow ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.search')}</span>}
           </button>
           {/* The day is part of the offer: with no drive on the trip at all there is
               nowhere for a stop to go, and a dialog that can only be cancelled is worse
@@ -477,7 +476,7 @@ export default function RoadtripCorridorPanel({
           {onAddPoi && onAddManual && corridor.day ? (
             <button
               type="button"
-              onClick={() => setManualOpen(true)}
+              onClick={onAddManual}
               // The full sentence is the accessible name and the tooltip; the face of
               // the button carries the one word that fits beside "Search".
               aria-label={t('roadtrip.poi.addManual')}
@@ -485,7 +484,7 @@ export default function RoadtripCorridorPanel({
               className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-edge bg-surface-card text-body font-semibold text-content transition-colors hover:bg-surface-hover"
             >
               <Plus size={15} strokeWidth={2.2} className="shrink-0" aria-hidden />
-              {iconOnly ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.addManualShort')}</span>}
+              {narrow ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.addManualShort')}</span>}
             </button>
           ) : null}
         </div>
@@ -689,7 +688,12 @@ export default function RoadtripCorridorPanel({
                     ? corridor.nameFilter.trim()
                       ? t('roadtrip.poi.noMatch', { name: corridor.nameFilter.trim() })
                       : t('roadtrip.poi.noneMatchFilters')
-                    : t('roadtrip.poi.empty')
+                    // The one sentence here that nothing has happened yet to explain.
+                    // In a narrow column it wraps over three lines to tell somebody to
+                    // press the button they are already looking at, so the mascot makes
+                    // the point on its own. The other three are answers to something
+                    // the reader did, and those are worth the room at any width.
+                    : narrow ? '' : t('roadtrip.poi.empty')
               }
             />
           ) : (
@@ -717,18 +721,6 @@ export default function RoadtripCorridorPanel({
           )}
         </div>
       </div>
-
-      {manualOpen && onAddManual ? (
-        <RoadtripManualStopModal
-          routes={routes}
-          dayId={corridor.day?.dayId ?? null}
-          targetFor={manualStopTargetFor}
-          onClose={() => setManualOpen(false)}
-          // Closed before the handover: what opens next is the stop popup, and two
-          // dialogs over each other is not a choice anybody made.
-          onSubmit={(place, target) => { setManualOpen(false); onAddManual(place, target) }}
-        />
-      ) : null}
     </div>
   )
 }

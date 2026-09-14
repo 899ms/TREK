@@ -277,7 +277,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
     setRoadtripStopFill,
     saveRoadtripLimit, roadtripSettingsLoading, storedAssignments,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, resetDayBoundaries,
-    manualStopTargetFor, addManualRoadtripStop,
+    openManualRoadtripStop, serviceStopMode, setServiceStopForm,
     routeAlternatives, askRouteAlternatives, refuel, askRefuel, acceptRefuel, chooseRouteAlternative, alternativeOverlays, alternativeFocusPoints, mapFocusPoints, roadtripMapVias, focusRoadtripPoint, dayBoundaryControls,
     stayDraft, setStayDraft, editRoadtripStay, setRoadtripStay, roadtripEndDay, roadtripStay,
     highlightedAlternative, setHighlightedAlternative,
@@ -731,8 +731,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                         corridor={roadtripCorridor}
                         routes={roadtripRoutes}
                         onAddPoi={can('place_edit', trip) ? handlePoiClick : undefined}
-                        onAddManual={can('place_edit', trip) ? addManualRoadtripStop : undefined}
-                        manualStopTargetFor={manualStopTargetFor}
+                        onAddManual={can('place_edit', trip) ? openManualRoadtripStop : undefined}
                         onFocusPoint={focusRoadtripPoint}
                       />
                       {/* Under the search, because the limits are read while looking at
@@ -1058,7 +1057,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
           />
         </LazyPanel>
       )}
-      <PlaceFormModal isOpen={showPlaceForm} onClose={() => { setShowPlaceForm(false); setEditingPlace(null); setEditingAssignmentId(null); setPrefillCoords(null) }} onSave={handleSavePlace} place={editingPlace} prefillCoords={prefillCoords} assignmentId={editingAssignmentId} dayAssignments={editingPlace ? Object.values(assignments).flat() : []} tripId={tripId} categories={categories} onCategoryCreated={cat => tripActions.addCategory?.(cat)} isMobile={isMobile} onOpenExpense={openBookingExpense} />
+      <PlaceFormModal isOpen={showPlaceForm} onClose={() => { setShowPlaceForm(false); setEditingPlace(null); setEditingAssignmentId(null); setPrefillCoords(null); setServiceStopForm(false) }} onSave={handleSavePlace} place={editingPlace} prefillCoords={prefillCoords} assignmentId={editingAssignmentId} dayAssignments={editingPlace ? Object.values(assignments).flat() : []} tripId={tripId} categories={categories} onCategoryCreated={cat => tripActions.addCategory?.(cat)} isMobile={isMobile} onOpenExpense={openBookingExpense} serviceStop={serviceStopMode} />
       <TripFormModal
         isOpen={showTripForm}
         onClose={() => setShowTripForm(false)}

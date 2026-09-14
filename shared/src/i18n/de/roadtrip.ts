@@ -205,6 +205,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} abseits der Route, prüfe also, zu welcher Etappe er gehört.',
   'roadtrip.poi.manualAppend': 'Noch ist keine Route berechnet, also kommt der Stopp ans Ende von Tag {number}.',
   'roadtrip.poi.manualNoResults': 'Keine Orte gefunden.',
+  'roadtrip.poi.manualNoCoords':
+    'Ohne Position landet dieser Halt bei den Orten der Reise statt auf einer Fahrt. Wähle oben in der Suche ein Ergebnis aus oder trage die Koordinaten ein.',
   'roadtrip.summary.distance': 'Strecke',
   'roadtrip.summary.driving': 'Fahrzeit',
   'roadtrip.alt.ask': 'Andere Wege',

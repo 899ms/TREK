@@ -209,6 +209,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} van de route, controleer dus bij welke rit hij hoort.',
   'roadtrip.poi.manualAppend': 'Er is nog geen route berekend, dus hij komt aan het einde van dag {number}.',
   'roadtrip.poi.manualNoResults': 'Geen plaatsen gevonden.',
+  'roadtrip.poi.manualNoCoords':
+    'Zonder positie komt hij bij de plaatsen van de reis terecht en niet in een rit. Kies er een via de zoekfunctie hierboven, of vul de coördinaten in.',
   'roadtrip.summary.distance': 'Afstand',
   'roadtrip.summary.driving': 'Rijtijd',
   'roadtrip.alt.ask': 'Andere routes',

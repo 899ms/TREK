@@ -204,6 +204,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '경로에서 {distance} 떨어져 있으니 어느 구간에 속하는지 확인하세요.',
   'roadtrip.poi.manualAppend': '아직 계산된 경로가 없어 {number}일차 마지막에 추가됩니다.',
   'roadtrip.poi.manualNoResults': '장소를 찾지 못했습니다.',
+  'roadtrip.poi.manualNoCoords': '위치가 없으면 주행에 배치되지 않고 여행의 장소 목록에 추가됩니다. 위 검색에서 하나를 고르거나 좌표를 입력하세요.',
   'roadtrip.summary.distance': '거리',
   'roadtrip.summary.driving': '운전 시간',
   'roadtrip.alt.ask': '다른 경로',

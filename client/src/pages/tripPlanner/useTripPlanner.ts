@@ -41,14 +41,14 @@ import { useRouteAlternatives } from '../../components/Roadtrip/useRouteAlternat
 import { buildAlternativeOverlays } from '../../components/Roadtrip/alternativeOverlays'
 import { stopArrival } from '../../components/Roadtrip/stopArrival'
 import type { CorridorPoi } from '../../components/Roadtrip/useCorridorPois'
-import { projectOntoRoute, type LatLng } from '../../components/Roadtrip/corridor'
+import { projectOntoRoute, sliceAtMeters, type LatLng } from '../../components/Roadtrip/corridor'
 import {
   insertIndexForAlong,
   reanchorAfterInsert,
   reanchorAfterRemove,
   reanchorByStopOrder,
   isServiceStopType, refuelStopTypeFor, reanchorAfterReorder, type DryPoint } from '../../components/Roadtrip/roadtripModel'
-import type { ManualStopPlace, ManualStopTarget } from '../../components/Roadtrip/manualStop'
+import type { ManualStopTarget, ServiceStopMode } from '../../components/Roadtrip/manualStop'
 import type { RoadtripStopDraft } from '../../components/Roadtrip/RoadtripStopPopup'
 import type { RoadtripStopType } from '@trek/shared'
 import { usePlaceSelection } from '../../hooks/usePlaceSelection'
@@ -302,6 +302,14 @@ export function useTripPlanner() {
    * Null means the old behaviour: the server appends it at the end.
    */
   const [placeFormPosition, setPlaceFormPosition] = useState<number | null>(null)
+  /**
+   * Whether the open place form is asking for a service stop on the drive.
+   *
+   * Only the road trip's "add manually" sets it, and everything that opens the form for
+   * anything else clears it, so the ordinary add, the edit and the corridor hit are the
+   * form they have always been.
+   */
+  const [serviceStopForm, setServiceStopForm] = useState(false)
   /**
    * The corridor hit waiting to become a stop, while the small popup is open.
    *
@@ -724,6 +732,7 @@ export function useTripPlanner() {
     setEditingPlace(null)
     setEditingAssignmentId(null)
     setPlaceFormDayId(dayId ?? null)
+    setServiceStopForm(false)
     setShowPlaceForm(true)
     try {
       const { mapsApi } = await import('../../api/client')
@@ -764,6 +773,7 @@ export function useTripPlanner() {
     setEditingAssignmentId(null)
     setPlaceFormDayId(dayId ?? null)
     setPlaceFormPosition(position ?? null)
+    setServiceStopForm(false)
     setShowPlaceForm(true)
   }, [trip])
 
@@ -1524,51 +1534,71 @@ export function useTripPlanner() {
   }, [anchorFor, roadtripRoutes.days])
 
   /**
-   * A place looked up by hand, on its way to the popup a corridor hit goes through.
+   * Adding a stop the corridor search never found.
    *
-   * Not a write of its own. The popup is where the kind of stop and the dwell are
-   * decided, it defaults both from the category, and everything after it (the place, the
-   * assignment at the right position, the via re-anchoring, the re-route) is already
-   * right there and pinned by tests. The search finding a charger and somebody typing its
-   * name must not become two ways of adding one.
+   * The search reads OpenStreetMap, and a good share of the chargers actually standing
+   * at a motorway junction are not in it. The way round it was to leave road trip mode,
+   * add the place under Days, drag it onto the right day, come back and mark it a
+   * charging stop.
+   *
+   * So this opens the form the rest of TREK adds places with, on nothing at all: no
+   * place, no coordinates, no day. The traveller finds the charger in the form's own
+   * typed-ahead search, which is the whole reason to use it, and where the stop belongs
+   * is worked out at the save, from what the save carries.
    */
-  const addManualRoadtripStop = useCallback((place: ManualStopPlace, target: ManualStopTarget) => {
+  const openManualRoadtripStop = useCallback(() => {
     if (!can('place_edit', trip)) return
-    const card = roadtripRoutes.days.find(day => day.dayId === target.dayId)
-    // Through `roadtripInsertion` like every other path into this popup, so a night drive
-    // files the stop under the day it is stored on rather than under the card it is drawn
-    // on. A day with nothing drawn yet has no card to measure against and keeps the
-    // position it was given.
-    const insert = (card && roadtripInsertion(card, target.position)) || { dayId: target.dayId, position: target.position }
-    const category = place.category ?? ''
-    setStopDraft({
-      poi: {
-        osm_id: place.osm_id,
-        name: place.name,
-        lat: place.lat,
-        lng: place.lng,
-        category,
-        poi_type: category,
-        address: place.address,
-        website: place.website,
-        phone: place.phone,
-        opening_hours: null,
-        cuisine: null,
-        source: 'manual',
-        offRouteKm: target.offRouteKm,
-        // Nothing measured this one along the drive: its position came from the leg it
-        // was put on rather than from a distance. No arrival time is offered either, for
-        // the same reason: a guess printed as a clock reading is worse than a blank.
-        alongKm: 0,
-      },
-      ...insert,
-      dayNumber: card?.dayNumber ?? days.find(day => day.id === insert.dayId)?.day_number ?? 0,
-      // Only for somewhere you could sleep, and the same branch the corridor path takes.
-      // A charger never is one; diverging here would be a second answer to a question
-      // that already has one.
-      ...(isOvernightCategory(category) ? { overnight: overnightOptions(insert.dayId) } : {}),
-    })
-  }, [roadtripRoutes.days, days, overnightOptions, can, trip])
+    setEditingPlace(null)
+    setEditingAssignmentId(null)
+    setPrefillCoords(null)
+    // Deliberately nowhere. A corridor hit knows its day and its position before the
+    // form opens; this one cannot, because nothing has been chosen yet.
+    setPlaceFormDayId(null)
+    setPlaceFormPosition(null)
+    setServiceStopForm(true)
+    setShowPlaceForm(true)
+  }, [can, trip])
+
+  /**
+   * What the place form needs to ask for a service stop, or null for every other use.
+   *
+   * The legs are flat across the whole drive rather than per card, because the charger
+   * the search missed is as likely to be on tomorrow's stretch as on today's. The names
+   * travel as plain strings so the form does its own labelling and this stays free of
+   * translated text.
+   */
+  const serviceStopMode = useMemo<ServiceStopMode | null>(() => {
+    if (!serviceStopForm) return null
+    const panelDay = roadtripCorridor.day
+    return {
+      // A day that has not routed has no order to place anything in.
+      days: roadtripRoutes.days
+        .filter(day => day.geometry.length > 1)
+        .map(day => {
+          const spine: LatLng[] = day.geometry.map(([la, ln]) => ({ lat: la, lng: ln }))
+          const stopsAlong = day.stops.map(stop => projectOntoRoute({ lat: stop.lat, lng: stop.lng }, spine)?.alongKm ?? 0)
+          return {
+            dayId: day.dayId,
+            dayNumber: day.dayNumber,
+            stops: day.stops.map(stop => stop.name),
+            // Each leg's own road, cut out of the day's line where the two stops it runs
+            // between fall on it. The form measures the place against each of these, so
+            // the leg it offers first is visibly the nearest one rather than a guess the
+            // reader has to take on trust.
+            legLines: day.stops.slice(0, -1).map((_, i) =>
+              sliceAtMeters(spine, (stopsAlong[i] ?? 0) * 1000, (stopsAlong[i + 1] ?? 0) * 1000)),
+          }
+        }),
+      // The end of the day the panel is looking at, which is what the dialog this
+      // replaced did. Offered whatever else has routed, not only when nothing has: with
+      // its neighbours drawn and its own line still coming, a day left out of this list
+      // is a day a stop meant for it cannot be put on at all.
+      appendDay: panelDay
+        ? { dayId: panelDay.dayId, dayNumber: panelDay.dayNumber, position: panelDay.stops.length }
+        : null,
+      targetFor: manualStopTargetFor,
+    }
+  }, [serviceStopForm, roadtripRoutes.days, roadtripCorridor.day, manualStopTargetFor])
 
   const addRoadtripVia = useCallback(async (lat: number, lng: number) => {
     if (!can('day_edit', trip)) return
@@ -1739,6 +1769,11 @@ export function useTripPlanner() {
   const handleSavePlace = useCallback(async (data) => {
     const pendingFiles = data._pendingFiles
     delete data._pendingFiles
+    // Where a service stop added by hand belongs on the drive. The form worked it out
+    // from the coordinates being saved, because until a place was chosen in it there
+    // were none to project.
+    const serviceStop = data._serviceStop
+    delete data._serviceStop
     if (editingPlace) {
       // Always strip time fields from place update — time is per-assignment only.
       // Same for the day-specific note (#2163): it belongs to the assignment,
@@ -1768,15 +1803,41 @@ export function useTripPlanner() {
       return { id: editingPlace.id }
     } else {
       const place = await tripActions.addPlace(tripId, data)
+      // A card of the rail can draw stops that are STORED on the day before it
+      // (`nightSpill.ts`), so a leg named by the card and the position in it is
+      // translated once here, the same way every other path into this write is.
+      const card = serviceStop && roadtripRoutes.days.find(day => day.dayId === serviceStop.dayId)
+      const insert = serviceStop
+        ? (card && roadtripInsertion(card, serviceStop.position)) || { dayId: serviceStop.dayId, position: serviceStop.position }
+        : null
+      const dayId = insert ? insert.dayId : placeFormDayId
+      const position = insert ? insert.position : placeFormPosition
       // Added from inside a day? Then it belongs to that day. Without this the
       // place drops into the unplanned pool and, on mobile, into a different
       // screen entirely — which reads as "it wasn't saved" (#1998).
-      if (place?.id && placeFormDayId != null) {
+      if (place?.id && dayId != null) {
+        // Worked out BEFORE the stop lands, against the day as it stands and the road as
+        // it is currently driven: once the list has shifted there is no record of which
+        // leg each via was drawn for. A via is stored as (day, after_order_index) and
+        // that index is a POSITION in the day's stop list, so a stop dropped into the
+        // middle of a routed day pushes every via at or behind it onto the wrong leg and
+        // the drawn road runs forward, doubles back and runs out again.
+        const plan = insert && typeof data.lat === 'number' && typeof data.lng === 'number'
+          ? reanchorAfterInsert(
+            roadtripVias.byDay[insert.dayId] ?? [],
+            insert.position,
+            viaLiesBefore(insert.dayId, { lat: data.lat, lng: data.lng }),
+          )
+          : null
         try {
           // With a position the stop lands where it will be driven past, not at the end
           // of the day. The slice has taken one all along; nothing ever passed it.
-          await tripActions.assignPlaceToDay(tripId, placeFormDayId, place.id, placeFormPosition)
-          updateRouteForDay(placeFormDayId)
+          await tripActions.assignPlaceToDay(tripId, dayId, place.id, position)
+          // Awaited before the day re-routes: the routing effect reads the anchors against
+          // the new stop list, so a correction landing after it would draw the wrong road
+          // first and the right one a moment later.
+          if (plan) await roadtripVias.reanchor(dayId, plan)
+          updateRouteForDay(dayId)
         } catch (err: unknown) {
           // The place itself exists; only the day link failed.
           toast.error(err instanceof Error ? err.message : t('common.unknownError'))
@@ -1801,7 +1862,7 @@ export function useTripPlanner() {
       // exist a moment ago (#1298), the same way the booking modals work.
       return place?.id ? { id: place.id } : undefined
     }
-  }, [editingPlace, editingAssignmentId, placeFormDayId, placeFormPosition, tripId, toast, pushUndo, updateRouteForDay])
+  }, [editingPlace, editingAssignmentId, placeFormDayId, placeFormPosition, roadtripRoutes.days, tripId, toast, pushUndo, updateRouteForDay, roadtripVias, viaLiesBefore])
 
   // Open the place editor from any entry point (Places pool, inspector, map).
   // Times live per day-assignment, so when no day is in context resolve the
@@ -1830,6 +1891,7 @@ export function useTripPlanner() {
     setEditingPlace(place)
     setEditingAssignmentId(preferredAssignmentId ?? resolvePoolAssignmentId(assignments, place.id))
     setPlaceFormDayId(null)
+    setServiceStopForm(false)
     setShowPlaceForm(true)
   }, [assignments, roadtripActive, tripAccommodations, days, overnightOptions, roadtripRoutes.days])
 
@@ -2344,7 +2406,7 @@ export function useTripPlanner() {
     roadtripSettingsLoading: !roadtripPreferencesState.ready && !roadtripPreferencesState.failed,
     saveRoadtripLimit: roadtripPreferencesState.ready && can('day_edit', trip) ? saveRoadtripLimit : undefined,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, dayBoundaryControls, resetDayBoundaries,
-    manualStopTargetFor, addManualRoadtripStop,
+    manualStopTargetFor, openManualRoadtripStop, serviceStopMode, setServiceStopForm,
     refuel, askRefuel, acceptRefuel,
     routeAlternatives, askRouteAlternatives, chooseRouteAlternative, alternativeOverlays, alternativeFocusPoints, mapFocusPoints, roadtripMapVias, focusRoadtripPoint,
     stayDraft, setStayDraft, editRoadtripStay, setRoadtripStay, roadtripEndDay, roadtripStay,

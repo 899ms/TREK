@@ -6,8 +6,8 @@ import StayPortals from './StayPortals'
 import ChargingInfo from './ChargingInfo'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { safeExternalHref } from '../../utils/safeUrl'
-import { formatDurationShort } from './roadtripModel'
 import { STOP_KINDS, STOP_KIND_BY_KEY } from './stopKinds'
+import { StopKindChips, StopStayChips } from './StopChips'
 import type { CorridorPoi } from './useCorridorPois'
 import type { RoadtripStopType } from '@trek/shared'
 
@@ -24,9 +24,6 @@ import type { RoadtripStopType } from '@trek/shared'
  */
 // The kinds, their icons, their colours and how long each one usually takes all come
 // from the one table in stopKinds.ts.
-
-/** How long to stand still, offered as the few answers anyone actually gives. */
-const DWELL_CHOICES = [5, 10, 20, 30, 45, 60]
 
 export interface RoadtripStopDraft {
   editing?: { placeId: number; dwellMinutes: number; stopType: RoadtripStopType | null; accommodationId?: number; checkIn?: string; checkOut?: string }
@@ -216,56 +213,23 @@ export default function RoadtripStopPopup({
           <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
             {t('roadtrip.stop.kind')}
           </span>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {STOP_KINDS.map(({ key, labelKey, Icon }) => {
-              const on = stopType === key
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => {
-                    setStopType(key)
-                    // Picking a kind is also picking how long it takes, until the user
-                    // says otherwise — a charge is not a fuel stop.
-                    if (!on) setDwell(STOP_KIND_BY_KEY[key].defaultMinutes)
-                  }}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-caption transition-colors ${
-                    on
-                      ? 'border-transparent bg-accent font-semibold text-accent-text'
-                      : 'border-edge text-content-secondary hover:border-content-faint hover:text-content'
-                  }`}
-                >
-                  <Icon size={12} aria-hidden />
-                  {t(labelKey)}
-                </button>
-              )
-            })}
-          </div>
+          <StopKindChips
+            value={stopType}
+            onPick={(key, wasChosen) => {
+              setStopType(key)
+              // Picking a kind is also picking how long it takes, until the user says
+              // otherwise: a charge is not a fuel stop. Clicking the kind already on
+              // changes nothing, so a dwell set by hand survives it.
+              if (!wasChosen) setDwell(STOP_KIND_BY_KEY[key].defaultMinutes)
+            }}
+          />
         </div>
 
         <div>
           <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
             {t('roadtrip.stop.stay')}
           </span>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {DWELL_CHOICES.map(minutes => (
-              <button
-                key={minutes}
-                type="button"
-                aria-pressed={dwell === minutes}
-                onClick={() => setDwell(minutes)}
-                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-caption tabular-nums transition-colors ${
-                  dwell === minutes
-                    ? 'border-transparent bg-accent font-semibold text-accent-text'
-                    : 'border-edge text-content-secondary hover:border-content-faint hover:text-content'
-                }`}
-              >
-                <Hourglass size={11} aria-hidden />
-                {formatDurationShort(minutes * 60)}
-              </button>
-            ))}
-          </div>
+          <StopStayChips value={dwell} onPick={setDwell} />
         </div>
 
         {/* How busy the charging area is and what it charges, while the stop is still

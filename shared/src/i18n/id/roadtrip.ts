@@ -209,6 +209,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} dari rute, jadi periksa ia masuk ke ruas yang mana.',
   'roadtrip.poi.manualAppend': 'Belum ada rute yang dihitung, jadi ia masuk di akhir hari {number}.',
   'roadtrip.poi.manualNoResults': 'Tidak ada tempat yang ditemukan.',
+  'roadtrip.poi.manualNoCoords':
+    'Tanpa posisi, ia masuk ke daftar tempat perjalanan, bukan ke salah satu ruas berkendara. Pilih satu dari hasil pencarian di atas, atau isi koordinatnya.',
   'roadtrip.summary.distance': 'Jarak',
   'roadtrip.summary.driving': 'Waktu berkendara',
   'roadtrip.alt.ask': 'Rute lain',

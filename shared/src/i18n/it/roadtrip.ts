@@ -209,6 +209,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.manualOffRoute': '{distance} fuori percorso: controlla a quale tratto appartiene.',
   'roadtrip.poi.manualAppend': 'Nessun percorso è ancora calcolato, quindi va alla fine del giorno {number}.',
   'roadtrip.poi.manualNoResults': 'Nessun luogo trovato.',
+  'roadtrip.poi.manualNoCoords':
+    'Senza una posizione finisce tra i luoghi del viaggio, non su un tragitto. Scegli un risultato dalla ricerca qui sopra oppure inserisci le coordinate.',
   'roadtrip.summary.distance': 'Distanza',
   'roadtrip.summary.driving': 'Tempo di guida',
   'roadtrip.alt.ask': 'Altri percorsi',
