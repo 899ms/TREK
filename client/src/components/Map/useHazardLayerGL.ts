@@ -11,8 +11,19 @@ export function useHazardLayerGL(map: Map | null, ready: boolean, hazards: Roadt
     const source = 'roadtrip-hazards'
     const layers = [`${source}-fill`, `${source}-line`, `${source}-point`]
     let detail: Popup | undefined
+    // Waits for `idle` rather than giving up while tiles are still loading, for
+    // the reason spelled out in useDawarichTrailGL: `isStyleLoaded()` is false
+    // for as long as any source has tiles in flight.
+    let waiting = false
     const draw = () => {
-      if (!map.isStyleLoaded() || map.getSource(source)) return
+      if (map.getSource(source)) return
+      if (!map.isStyleLoaded()) {
+        if (!waiting) {
+          waiting = true
+          map.once('idle', retry)
+        }
+        return
+      }
       const color = getComputedStyle(document.documentElement).getPropertyValue('--warning').trim()
       map.addSource(source, { type: 'geojson', data: { type: 'FeatureCollection', features: hazards.map(hazardFeature) } })
       map.addLayer({ id: layers[0], type: 'fill', source, filter: ['!=', ['geometry-type'], 'Point'], paint: { 'fill-color': color, 'fill-opacity': 0.16 } })
@@ -27,12 +38,17 @@ export function useHazardLayerGL(map: Map | null, ready: boolean, hazards: Roadt
       detail?.remove()
       detail = popup().setLngLat(event.lngLat).setDOMContent(hazardPopup(hazard, t('roadtrip.hazards.note'), t('roadtrip.hazards.point'))).addTo(map)
     }
+    const retry = () => {
+      waiting = false
+      draw()
+    }
     draw()
     map.on('style.load', draw)
     map.on('click', click)
     return () => {
       detail?.remove()
       map.off('style.load', draw)
+      map.off('idle', retry)
       map.off('click', click)
       for (const layer of layers) if (map.getLayer(layer)) map.removeLayer(layer)
       if (map.getSource(source)) map.removeSource(source)

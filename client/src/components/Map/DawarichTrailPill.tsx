@@ -40,10 +40,15 @@ export function DawarichTrailPill({
   // A problem worth seeing without reading the tooltip: the layer is on and
   // there is nothing to show.
   const muted = active && (status === 'empty' || status === 'offline' || status === 'unavailable')
+  // Loading has to be visible too. A first fetch from somebody's own server can
+  // take a while, and with nothing on the button it looked exactly like "done,
+  // but no line", so testers reloaded the page to find out.
+  const loading = active && status === 'loading'
 
   return (
     <div
       style={{
+        position: 'relative',
         display: 'inline-flex',
         alignItems: 'center',
         padding: 4,
@@ -64,6 +69,7 @@ export function DawarichTrailPill({
         onClick={onToggle}
         aria-label={label}
         aria-pressed={active}
+        aria-busy={loading}
         data-testid="dawarich-trail-pill"
         style={{
           display: 'block',
@@ -88,6 +94,22 @@ export function DawarichTrailPill({
         <DawarichIcon fill />
       </button>
       </Tooltip>
+      {loading && (
+        <span
+          aria-hidden="true"
+          data-testid="dawarich-trail-loading"
+          className="motion-safe:animate-spin"
+          style={{
+            position: 'absolute',
+            inset: 2,
+            borderRadius: 999,
+            border: '2px solid transparent',
+            borderTopColor: 'var(--accent)',
+            borderRightColor: 'var(--accent)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   )
 }

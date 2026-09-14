@@ -1,5 +1,6 @@
 /**
- * dawarichTrail unit tests: FE-DAWARICH-TRAIL-001 to FE-DAWARICH-TRAIL-008.
+ * dawarichTrail unit tests: FE-DAWARICH-TRAIL-001 to FE-DAWARICH-TRAIL-008, and
+ * FE-DAWARICH-TRAIL-030 to FE-DAWARICH-TRAIL-032 for the days folded away.
  *
  * This module is the whole of what the two map renderers agree on about the
  * recorded route: Leaflet turns `trailSegments` into `<Polyline>` elements, the
@@ -32,6 +33,7 @@ import {
   DAWARICH_DAY_COLORS,
   DAWARICH_TRAIL_CASING,
   DAWARICH_TRAIL_COLOR,
+  collapsedDayDates,
   dayColor,
   trailDistanceKm,
   trailGeoJson,
@@ -225,5 +227,42 @@ describe('trailDistanceKm', () => {
     // sentences and the pill is allowed to render only one of them.
     expect(trailDistanceKm(unknownOnly)).toBeNull()
     expect(trailDistanceKm([])).toBeNull()
+  })
+})
+
+describe('the days folded away in the day plan', () => {
+  it('FE-DAWARICH-TRAIL-030: a collapsed day takes its route off the map and leaves the colours of the rest alone', () => {
+    const all = trailSegments(THREE_DAYS)
+    const visible = trailSegments(THREE_DAYS, null, new Set(['2026-05-02']))
+
+    expect(visible.map(segment => segment.date)).toEqual(['2026-05-01', '2026-05-01', '2026-05-03'])
+    // Folding day two must not shift day three onto day two's colour.
+    expect(visible.find(segment => segment.date === '2026-05-03')?.color)
+      .toBe(all.find(segment => segment.date === '2026-05-03')?.color)
+  })
+
+  it('FE-DAWARICH-TRAIL-031: a picked day that is also folded away draws nothing', () => {
+    expect(trailSegments(THREE_DAYS, '2026-05-01', new Set(['2026-05-01']))).toEqual([])
+    expect(trailSegments(THREE_DAYS, '2026-05-01', new Set(['2026-05-03']))).toHaveLength(2)
+  })
+
+  it('FE-DAWARICH-TRAIL-032: follows both folds the places follow, and nothing before the day plan has spoken', () => {
+    const days = [
+      { id: 1, date: '2026-05-03' },
+      { id: 2, date: '2026-05-01' },
+      { id: 3, date: null },
+      { id: 4, date: '2026-05-02' },
+    ]
+
+    // Null is "the day plan has not reported yet": the places show, so the
+    // route shows too.
+    expect(collapsedDayDates(days, null)).toEqual([])
+
+    // Sorted, deduplicated, and a day without a date matches no recording.
+    expect(collapsedDayDates(days, new Set([4]))).toEqual(['2026-05-01', '2026-05-03'])
+
+    // Road trip mode folds days in its own sidebar, on top of the day plan.
+    expect(collapsedDayDates(days, null, new Set([4]))).toEqual(['2026-05-02'])
+    expect(collapsedDayDates(days, new Set([1, 2, 3, 4]), new Set([1, 3]))).toEqual(['2026-05-03'])
   })
 })

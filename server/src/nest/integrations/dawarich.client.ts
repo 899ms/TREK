@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DawarichErrorCode } from '@trek/shared';
 import { safeFetch } from '../../utils/ssrfGuard';
 import { readCappedJson } from '../../utils/cappedFetch';
+import { mergeVisitedCountries, splitWindow, VISITED_CITIES_WINDOW_DAYS } from './dawarich.helpers';
 
 /**
  * Thin HTTP client for the Dawarich REST API (github.com/Freika/dawarich).
@@ -385,17 +386,31 @@ export class DawarichClient {
     return { points, truncated };
   }
 
-  /** Countries and cities the recordings put the user in, for the Atlas. */
+  /**
+   * Countries and cities the recordings put the user in, for the Atlas.
+   *
+   * Asked for a month at a time and folded back together: Dawarich computes this
+   * over every point in the window, so a year in one request outlasted the
+   * timeout for anyone who records densely (see VISITED_CITIES_WINDOW_DAYS).
+   * The windows go one after another rather than in parallel, because each one
+   * is a full computation on the user's own server.
+   */
   async listVisitedCities(
     creds: DawarichCreds,
     from: Date,
     to: Date,
   ): Promise<DawarichVisitedCountry[]> {
-    const { data } = await this.get<{ data?: DawarichVisitedCountry[] }>(creds, '/countries/visited_cities', {
-      start_at: unixSeconds(from),
-      end_at: unixSeconds(to),
-    });
-    return Array.isArray(data?.data) ? data.data : [];
+    const answers: DawarichVisitedCountry[][] = [];
+    for (const window of splitWindow(from, to, VISITED_CITIES_WINDOW_DAYS)) {
+      const { data } = await this.get<{ data?: DawarichVisitedCountry[] }>(creds, '/countries/visited_cities', {
+        start_at: unixSeconds(window.from),
+        end_at: unixSeconds(window.to),
+      });
+      answers.push(Array.isArray(data?.data) ? data.data : []);
+    }
+    // A single window is passed through untouched, so the probe and every short
+    // range see exactly what Dawarich sent.
+    return answers.length === 1 ? answers[0] : mergeVisitedCountries(answers);
   }
 
   /**

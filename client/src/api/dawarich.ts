@@ -18,6 +18,28 @@ import type {
  * client has not caught up with is a typecheck failure rather than a runtime
  * surprise.
  */
+/**
+ * How long the browser waits for a call that makes the server go and ask
+ * Dawarich.
+ *
+ * The shared 8 s on `apiClient` is right for TREK's own routes and wrong for
+ * these: the server allows each request to Dawarich 15 s by itself, walks pages
+ * of points for a route, and runs six probes one after another to test a
+ * connection. Cut off at 8 s, the browser gave up while the server carried on
+ * and cached the answer, so the recorded route showed "unavailable" and then
+ * appeared on the next reload.
+ */
+export const DAWARICH_UPSTREAM_TIMEOUT_MS = 120_000
+
+/**
+ * The Atlas asks for a year of visited cities a month at a time, one request
+ * after another, so it gets longer again. Still bounded, and under Node's own
+ * five-minute request limit on the server side.
+ */
+export const DAWARICH_ATLAS_TIMEOUT_MS = 240_000
+
+const upstream = { timeout: DAWARICH_UPSTREAM_TIMEOUT_MS }
+
 export const dawarichApi = {
   // ── Connection ─────────────────────────────────────────────────────────────
   getSettings: (): Promise<DawarichConnection> =>
@@ -31,13 +53,13 @@ export const dawarichApi = {
     /** The address it resolved to, for the private-IP warning. */
     warningIp?: string
   }> =>
-    apiClient.put('/integrations/dawarich/settings', data).then(r => r.data),
+    apiClient.put('/integrations/dawarich/settings', data, upstream).then(r => r.data),
   disconnect: (): Promise<{ success: boolean }> =>
     apiClient.delete('/integrations/dawarich/settings').then(r => r.data),
   test: (data: Partial<DawarichSettings>): Promise<DawarichStatus> =>
-    apiClient.post('/integrations/dawarich/test', data).then(r => r.data),
+    apiClient.post('/integrations/dawarich/test', data, upstream).then(r => r.data),
   syncNow: (): Promise<{ state: string; created: number; updated: number; missing: number; alreadyRunning?: boolean }> =>
-    apiClient.post('/integrations/dawarich/sync').then(r => r.data),
+    apiClient.post('/integrations/dawarich/sync', undefined, upstream).then(r => r.data),
 
   // ── Suggestions ────────────────────────────────────────────────────────────
   listSuggestions: (params?: { tripId?: number; state?: string }): Promise<DawarichSuggestionList> =>
@@ -49,7 +71,7 @@ export const dawarichApi = {
 
   // ── Bucket list ────────────────────────────────────────────────────────────
   scanBucketList: (): Promise<DawarichBucketScan> =>
-    apiClient.post('/integrations/dawarich/bucket-list/scan').then(r => r.data),
+    apiClient.post('/integrations/dawarich/bucket-list/scan', undefined, upstream).then(r => r.data),
   confirmBucketVisits: (itemIds: number[], visitedAt?: string): Promise<{ updated: number }> =>
     apiClient.post('/integrations/dawarich/bucket-list/confirm', { itemIds, visitedAt }).then(r => r.data),
   clearBucketVisit: (itemId: number): Promise<{ success: boolean }> =>
@@ -57,7 +79,9 @@ export const dawarichApi = {
 
   // ── Atlas ──────────────────────────────────────────────────────────────────
   atlasSuggestions: (from: string, to: string): Promise<DawarichAtlasSuggestions> =>
-    apiClient.get('/integrations/dawarich/atlas/suggestions', { params: { from, to } }).then(r => r.data),
+    apiClient
+      .get('/integrations/dawarich/atlas/suggestions', { params: { from, to }, timeout: DAWARICH_ATLAS_TIMEOUT_MS })
+      .then(r => r.data),
   acceptAtlasCountries: (countryCodes: string[]): Promise<{ marked: number }> =>
     apiClient.post('/integrations/dawarich/atlas/accept', { countryCodes }).then(r => r.data),
 
@@ -69,11 +93,11 @@ export const dawarichApi = {
   // the wrong day of the trip.
   tripTrack: (tripId: number, params?: { from?: string; to?: string }, signal?: AbortSignal): Promise<DawarichTrack> =>
     apiClient
-      .get(`/integrations/dawarich/trips/${tripId}/track`, { params: { ...params, offset: localOffsetMinutes() }, signal })
+      .get(`/integrations/dawarich/trips/${tripId}/track`, { ...upstream, params: { ...params, offset: localOffsetMinutes() }, signal })
       .then(r => r.data),
   windowTrack: (from: string, to: string, signal?: AbortSignal): Promise<DawarichTrack> =>
     apiClient
-      .get('/integrations/dawarich/track', { params: { from, to, offset: localOffsetMinutes() }, signal })
+      .get('/integrations/dawarich/track', { ...upstream, params: { from, to, offset: localOffsetMinutes() }, signal })
       .then(r => r.data),
 }
 

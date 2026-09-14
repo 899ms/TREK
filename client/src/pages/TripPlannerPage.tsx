@@ -261,7 +261,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
     roadtripMode, toggleRoadtripMode, roadtripActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
     overviewActive, tripOverview, toggleOverview, overviewShown,
-    dawarichEnabled, dawarichTrailShown, toggleDawarichTrail, dawarichTrail,
+    dawarichEnabled, dawarichTrailShown, toggleDawarichTrail, dawarichTrail, dawarichHiddenDates,
     followTrack, roadtripViaCounts,
     allowedFileTypes, tripMembers, setTripMembers, refreshMembers, loadAccommodations,
     TRANSPORT_TYPES, TRIP_TABS, activeTab, setActiveTab, handleTabChange,
@@ -415,6 +415,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
             <MapView
               tripId={tripId}
               dawarichTrack={dawarichTrail.track}
+              dawarichHiddenDates={dawarichHiddenDates}
               places={roadtripActive ? roadtripMapPlaces : mapPlaces}
               dayPlaces={dayPlaces}
               route={roadtripActive ? roadtripMapLines : overviewActive ? tripOverview.lines : route}

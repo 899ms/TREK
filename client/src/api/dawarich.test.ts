@@ -1,5 +1,6 @@
 /**
- * FE-DAWARICH-API-001 to FE-DAWARICH-API-019
+ * FE-DAWARICH-API-001 to FE-DAWARICH-API-019, plus FE-DAWARICH-API-040 and -041
+ * for how long the browser waits.
  *
  * `dawarichApi` is one line per endpoint: a verb, a URL, and the shape of what
  * goes into the body or the query string. There is no logic in it to get wrong,
@@ -30,7 +31,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { http, HttpResponse, delay, type JsonBodyType } from 'msw'
 import { server } from '../../tests/helpers/msw/server'
-import { dawarichApi } from './dawarich'
+import { dawarichApi, DAWARICH_ATLAS_TIMEOUT_MS, DAWARICH_UPSTREAM_TIMEOUT_MS } from './dawarich'
+import apiClient from './client'
 import type {
   DawarichAtlasSuggestions,
   DawarichBucketScan,
@@ -402,5 +404,56 @@ describe('dawarichApi track overlay', () => {
     vi.spyOn(Date.prototype, 'getTimezoneOffset').mockReturnValue(0)
     await dawarichApi.windowTrack('2026-09-10', '2026-09-12')
     expect(query().get('offset')).toBe('0')
+  })
+})
+
+describe('dawarichApi: how long the browser waits', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('FE-DAWARICH-API-040: every call that makes the server ask Dawarich outlasts the shared 8 s', async () => {
+    // The server gives each request to Dawarich 15 s on its own. At the shared
+    // 8 s the browser gave up first, the server cached the answer anyway, and the
+    // recorded route turned up only after a reload.
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: {} })
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: {} })
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: {} })
+
+    await dawarichApi.tripTrack(7)
+    await dawarichApi.windowTrack('2026-09-01T00:00:00Z', '2026-09-02T00:00:00Z')
+    await dawarichApi.test({ url: 'https://dawarich.example' })
+    await dawarichApi.syncNow()
+    await dawarichApi.scanBucketList()
+    await dawarichApi.saveSettings({ url: 'https://dawarich.example', allowInsecureTls: false, syncEnabled: true })
+
+    const configs = [
+      ...get.mock.calls.map(call => call[1]),
+      ...post.mock.calls.map(call => call[2]),
+      ...put.mock.calls.map(call => call[2]),
+    ]
+    expect(configs).toHaveLength(6)
+    for (const config of configs) {
+      expect(config).toEqual(expect.objectContaining({ timeout: DAWARICH_UPSTREAM_TIMEOUT_MS }))
+    }
+    expect(DAWARICH_UPSTREAM_TIMEOUT_MS).toBeGreaterThan(15_000)
+    // The track calls still carry their offset alongside the longer wait.
+    expect(get.mock.calls[0][1]).toEqual(expect.objectContaining({ params: expect.objectContaining({ offset: expect.any(Number) }) }))
+  })
+
+  it('FE-DAWARICH-API-041: the Atlas waits longest, and the purely local calls keep the shared default', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: {} })
+    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: {} })
+
+    await dawarichApi.atlasSuggestions('2025-09-14T00:00:00Z', '2026-09-14T00:00:00Z')
+    expect(get.mock.calls[0][1]).toEqual(expect.objectContaining({ timeout: DAWARICH_ATLAS_TIMEOUT_MS }))
+    expect(DAWARICH_ATLAS_TIMEOUT_MS).toBeGreaterThan(DAWARICH_UPSTREAM_TIMEOUT_MS)
+
+    // Reading suggestions and confirming countries touch TREK's own database
+    // only; a two-minute wait there would just hide a stuck server.
+    await dawarichApi.listSuggestions()
+    await dawarichApi.acceptAtlasCountries(['DE'])
+    expect(get.mock.calls[1][1]).not.toEqual(expect.objectContaining({ timeout: expect.anything() }))
+    expect(post.mock.calls[0][2]).toBeUndefined()
   })
 })

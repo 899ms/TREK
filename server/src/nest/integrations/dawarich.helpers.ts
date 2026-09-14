@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import type { DawarichTrackDay, DawarichTrackSegment } from '@trek/shared';
-import type { DawarichSlimPoint, DawarichTrackFeature, DawarichVisitRaw } from './dawarich.client';
+import type { DawarichSlimPoint, DawarichTrackFeature, DawarichVisitRaw, DawarichVisitedCountry } from './dawarich.client';
 
 /**
  * Pure helpers for the Dawarich integration — no database, no HTTP, no
@@ -513,4 +513,89 @@ export function countPoints(days: DawarichTrackDay[]): number {
     (total, day) => total + day.segments.reduce((sum, segment) => sum + segment.points.length, 0),
     0,
   );
+}
+
+// ── Visited cities ───────────────────────────────────────────────────────────
+
+/**
+ * How much recording one `visited_cities` request may cover.
+ *
+ * Dawarich computes that endpoint on the spot: it loads every point in the
+ * window, sorts them in memory and walks them into stays, with nothing cached.
+ * A year in one request is fine for someone who records a point a minute and a
+ * certain timeout for someone who records one every few seconds, because the
+ * work grows with the points while the request budget stays fixed. A month is
+ * a twelfth of that work per request.
+ */
+export const VISITED_CITIES_WINDOW_DAYS = 30;
+
+/**
+ * `[from, to]` cut into consecutive windows of at most `days`.
+ *
+ * Dawarich reads the bounds as an inclusive range (`start_at..end_at`), so each
+ * window after the first starts one second past the end of the one before. With
+ * touching bounds a point recorded on that exact second would be counted twice.
+ * Bounds are whole seconds for the same reason: that is what goes on the wire.
+ */
+export function splitWindow(from: Date, to: Date, days: number): Array<{ from: Date; to: Date }> {
+  const step = days * 86_400_000;
+  const end = Math.floor(to.getTime() / 1000) * 1000;
+  const windows: Array<{ from: Date; to: Date }> = [];
+  let start = Math.floor(from.getTime() / 1000) * 1000;
+  while (start <= end) {
+    const stop = Math.min(start + step, end);
+    windows.push({ from: new Date(start), to: new Date(stop) });
+    if (stop === end) break;
+    start = stop + 1000;
+  }
+  return windows;
+}
+
+/**
+ * Several `visited_cities` answers folded into one, as if the whole range had
+ * been asked for at once.
+ *
+ * Countries keep the order they were first seen in, cities within a country
+ * likewise. A city seen in more than one window adds up its minutes and points
+ * and keeps the latest timestamp. The payload arrives unvalidated, so an entry
+ * without a usable name is skipped here rather than guessed at.
+ *
+ * One thing a split cannot recover: Dawarich drops a stay shorter than the
+ * user's minimum per window, so a stay cut in half by a window boundary can fall
+ * under it on both sides. That costs a city at most, never a country the rest of
+ * the recording found.
+ */
+export function mergeVisitedCountries(answers: DawarichVisitedCountry[][]): DawarichVisitedCountry[] {
+  const countries = new Map<string, Map<string, DawarichVisitedCountry['cities'][number]>>();
+  for (const answer of answers) {
+    for (const entry of answer) {
+      if (!entry || typeof entry.country !== 'string') continue;
+      let cities = countries.get(entry.country);
+      if (!cities) {
+        cities = new Map();
+        countries.set(entry.country, cities);
+      }
+      for (const city of Array.isArray(entry.cities) ? entry.cities : []) {
+        if (!city || typeof city.city !== 'string') continue;
+        const seen = cities.get(city.city);
+        if (!seen) {
+          cities.set(city.city, { ...city });
+          continue;
+        }
+        seen.points = sumOf(seen.points, city.points);
+        seen.stayed_for = sumOf(seen.stayed_for, city.stayed_for);
+        const latest = Math.max(toNumber(seen.timestamp) ?? -Infinity, toNumber(city.timestamp) ?? -Infinity);
+        seen.timestamp = Number.isFinite(latest) ? latest : undefined;
+      }
+    }
+  }
+  return [...countries].map(([country, cities]) => ({ country, cities: [...cities.values()] }));
+}
+
+/** Two optional counts added up; absent when neither side had one. */
+function sumOf(a: unknown, b: unknown): number | undefined {
+  const left = toNumber(a);
+  const right = toNumber(b);
+  if (left === null && right === null) return undefined;
+  return (left ?? 0) + (right ?? 0);
 }
