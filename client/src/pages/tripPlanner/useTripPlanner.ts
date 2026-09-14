@@ -1469,10 +1469,12 @@ export function useTripPlanner() {
       if (best && hit.offRouteKm >= best.offRouteKm) continue
       // Which stop the via follows: the last one the car passes before reaching it.
       const stopsAlong = day.stops.map(stop => projectOntoRoute({ lat: stop.lat, lng: stop.lng }, spine)?.alongKm ?? 0)
-      // Before the card's first stop means the incoming night drive, which is drawn here
-      // but leaves from a stop on the card BEFORE this one (`nightSpill.ts`). Anchoring
-      // it to this card's first stop would file the via on the leg AFTER that stop, and
-      // the route would run forward, double back to the point, and carry on.
+      // Before the card's first stop means a drive that arrives here but leaves from a
+      // stop on the card BEFORE this one: the incoming night drive (`nightSpill.ts`), or
+      // on a trip with connected days the drive from where yesterday ended, which is drawn
+      // at the head of this card in yesterday's colour. Anchoring either to this card's
+      // first stop would file the via on the leg AFTER that stop, and the route would run
+      // forward, double back to the point, and carry on.
       //
       // Asked of the distance rather than of the index, because the index cannot answer
       // it: `insertIndexForAlong` clamps to at least 1 for any list of two or more, and
@@ -1480,11 +1482,11 @@ export function useTripPlanner() {
       // index this read as a guard and behaved as dead code, so a via dropped on the
       // night stretch went to the first drawn stop after all, which is the exact failure
       // the paragraph above describes.
-      const spilledIn = day.spills?.find(sp => sp.at === 0)?.fromStop
-      if (spilledIn && hit.alongKm < (stopsAlong[0] ?? 0)) {
-        const owner = spilledIn.ownerDayId ?? day.dayId
+      const arrivedFrom = day.spills?.find(sp => sp.at === 0)?.fromStop ?? day.arrivingFrom
+      if (arrivedFrom && hit.alongKm < (stopsAlong[0] ?? 0)) {
+        const owner = arrivedFrom.ownerDayId ?? day.dayId
         if (onlyDayId !== undefined && owner !== onlyDayId) continue
-        best = { dayId: owner, afterIndex: spilledIn.ownerIndex ?? 0, offRouteKm: hit.offRouteKm }
+        best = { dayId: owner, afterIndex: arrivedFrom.ownerIndex ?? 0, offRouteKm: hit.offRouteKm }
         continue
       }
       const at = insertIndexForAlong(stopsAlong, hit.alongKm) - 1

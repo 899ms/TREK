@@ -1,5 +1,6 @@
 /**
- * ROADTRIP-ASSEMBLE-001..003 — what the assembler does with the model's warnings.
+ * ROADTRIP-ASSEMBLE-001..005: what the assembler does with the model's warnings, and
+ * what it tells a surface about the drive between connected days.
  *
  * The model itself is pinned by roadtripModel.spec.ts. This file pins the
  * wrapper, which is where the arguments are chosen: `deriveDriveWarnings` takes
@@ -100,5 +101,65 @@ describe('assembleRoadtrip drive warnings', () => {
     // 500 after a charge is inside a 600 km range, however far the day drove
     // before it.
     expect(rangeWarnings(assemble(stops, [700, 500]))).toEqual([]);
+  });
+});
+
+describe('assembleRoadtrip connected days', () => {
+  const lineFrom = (from: RoadtripStop, to: RoadtripStop): RoutedLeg => ({
+    ...leg(100),
+    line: [
+      [from.lat, from.lng],
+      [to.lat, to.lng],
+    ],
+  });
+
+  function assembleTwoDays(connectDays: boolean) {
+    const first = [stop({ ownerIndex: 0 }), stop({ ownerIndex: 1 }), stop({ ownerIndex: 2 })];
+    const second = [
+      stop({ ownerDayId: 2, ownerIndex: 0, assignmentId: 300, placeId: 400, lat: 60 }),
+      stop({ ownerDayId: 2, ownerIndex: 1, assignmentId: 301, placeId: 401, lat: 61 }),
+    ];
+    const allLegs: Record<string, RoutedLeg> = {};
+    for (const run of [first, second, [first[2]!, second[0]!]]) {
+      run.slice(0, -1).forEach((from, i) => {
+        allLegs[legKey(from, run[i + 1]!)] = lineFrom(from, run[i + 1]!);
+      });
+    }
+    return assembleRoadtrip({
+      plan: [
+        { dayId: 1, dayNumber: 1, date: '2026-06-01', title: null, stops: first },
+        { dayId: 2, dayNumber: 2, date: '2026-06-02', title: null, stops: second },
+      ],
+      quietDays: [],
+      window: null,
+      distanceUnit: 'metric',
+      allLegs,
+      snapByDay: {},
+      missedByDay: {},
+      loading: false,
+      limits: { rangeKm: null, legMinutes: null, dayMinutes: null },
+      vehicleKind: null,
+      connectDays,
+      boundaries: [],
+      labels: { start: 'start', end: 'end' },
+    });
+  }
+
+  it('ROADTRIP-ASSEMBLE-004: the drive drawn at the head of a connected day names the stop it left from', () => {
+    const routes = assembleTwoDays(true);
+    const [first, second] = routes.days;
+
+    // Yesterday's last stop, with the numbers it is stored under. A via placed on that
+    // stretch has to be filed after it, and the card's own stops cannot say which it is.
+    expect(second!.arrivingFrom).toEqual(expect.objectContaining({ ownerDayId: 1, ownerIndex: 2 }));
+    expect(second!.geometry[0]).toEqual([first!.stops[2]!.lat, first!.stops[2]!.lng]);
+    expect(first!.arrivingFrom).toBeUndefined();
+  });
+
+  it('ROADTRIP-ASSEMBLE-005: days that are not connected draw no such drive and name no such stop', () => {
+    const routes = assembleTwoDays(false);
+
+    expect(routes.days[1]!.arrivingFrom).toBeUndefined();
+    expect(routes.days[1]!.geometry[0]).toEqual([60, 10]);
   });
 });

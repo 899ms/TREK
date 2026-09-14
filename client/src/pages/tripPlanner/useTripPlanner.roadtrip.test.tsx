@@ -1691,6 +1691,49 @@ describe('useTripPlanner road trip: a card that opens with yesterday stop', () =
     expect(rt.vias.add).toHaveBeenCalledWith(5, 1, 53.3, 10.7)
   })
 
+  /**
+   * A card on a trip with connected days: the drive from where day 5 ended to where day 6
+   * begins is drawn at the head of card 6, in day 5's colour, with no night drive involved.
+   * Day 5 ends on its third stop, so the index the via has to take differs from anything
+   * card 6 could offer.
+   */
+  const connectedCard = () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    rt.routes.days = [{
+      dayId: 6,
+      dayNumber: 2,
+      stops: [drawn(1103, 52.52, 13.4, 6, 0), drawn(1104, 52.0, 14.5, 6, 1)],
+      geometry: [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4], [52.3, 14.0], [52.0, 14.5]],
+      spills: [],
+      arrivingFrom: drawn(1102, 53.55, 9.99, 5, 2),
+    }]
+  }
+
+  it('FE-TP-ROAD-087: a via dropped on the drive between two connected days follows the stop that drive left from', async () => {
+    // The reported bug: the click was filed after the first stop of the day the drive
+    // arrives on, so that day ran out to the point, turned and came back, while the
+    // stretch the traveller meant to bend stayed as it was.
+    connectedCard()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53.0, 11.5) })
+    expect(rt.vias.add).toHaveBeenCalledWith(5, 2, 53.0, 11.5)
+
+    // Past the first stop it is the card's own leg again.
+    await act(async () => { await result.current.addRoadtripVia(52.3, 14.0) })
+    expect(rt.vias.add).toHaveBeenLastCalledWith(6, 0, 52.3, 14.0)
+  })
+
+  it('FE-TP-ROAD-088: a via on the drive between connected days can be dragged along it without changing hands', async () => {
+    connectedCard()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.moveRoadtripVia(5, 9, 53.2, 11.0) })
+
+    expect(rt.vias.move).toHaveBeenCalledWith(5, 9, 53.2, 11.0, 2)
+  })
+
   it('FE-TP-ROAD-067: a drag keeps to the day the via is stored on, wherever that day stops are drawn', async () => {
     // Not "the card with that id". After a night drive the stops of day 5 are drawn on
     // card 6, and measuring the drag against card 5 alone leaves it with no anchor to

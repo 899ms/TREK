@@ -111,6 +111,19 @@ export interface RoadtripDay {
    */
   arrivingLeg?: RouteSegment;
 
+  /**
+   * The stop the drive at the head of this card's `geometry` sets off from, when the
+   * days are connected.
+   *
+   * Kept even where `arrivingLeg` is withheld for a crossing further down the card: the
+   * band goes, the road stays drawn. A point placed on that stretch belongs after THIS
+   * stop, on the day it is stored on, and nothing else on the card says which stop that
+   * is. Measured against the card's own first stop instead, a via dropped there was
+   * filed on the leg after it, and the drive ran on, turned back to the point and came
+   * the same way again.
+   */
+  arrivingFrom?: RoadtripStop;
+
   schedule: Schedule;
 
   legVias: RouteVia[][];
