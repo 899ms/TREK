@@ -649,6 +649,19 @@ export interface RouteAlternative {
   divergence: { lat: number; lng: number } | null
   /** Set when this way exists because a road class was left out of it. */
   avoids?: AvoidClass
+  /**
+   * Which engine priced this route, when it was not the one that priced the rest.
+   *
+   * Absent for everything OSRM answered, which is every route in a list except the
+   * avoidance offer on a default install. It exists because the two engines do not
+   * agree on speed: measured over twelve European legs the per-leg drive times run
+   * from 14.7 % under OSRM's to 13.2 % over, and the sign depends on the region:
+   * Valhalla is faster on Spanish autovía and slower through a city. So a figure from
+   * one of them subtracted from a figure from the other is not a difference in
+   * driving time, it is the gap between two speed models, and the reader has no way
+   * of telling the two apart.
+   */
+  engine?: 'valhalla'
 }
 
 /**
@@ -684,10 +697,12 @@ const SAME_ROAD_KM = 0.5
  * Two lines are the same road.
  *
  * Length and duration used to decide this, and stopped being enough when a second engine
- * started answering. Valhalla prices roads differently — measured over ten European legs
- * its distances ran 2.8 % above OSRM's and its times 5.4 % — so on a 470 km leg the same
- * road comes back thirteen kilometres apart and a 200 m tolerance calls it a discovery.
- * Two identical blue lines on the map is exactly what that looks like.
+ * started answering. Valhalla prices roads differently: measured over twelve European
+ * legs its distances ran 1.8 % above OSRM's, so on a 470 km leg the same road comes back
+ * thirteen kilometres apart and a 200 m tolerance calls it a discovery. Two identical
+ * blue lines on the map is exactly what that looks like. Duration is the worse of the
+ * two to lean on: over the same twelve legs it ranged from 14.7 % under OSRM's to 13.2 %
+ * over, with the sign set by the region rather than by the road.
  *
  * The geometry does not care which engine drew it, so it decides whenever there is one.
  * The numbers stay as the fallback for a line with no shape to compare.
@@ -778,6 +793,7 @@ async function valhallaExcluding(
     distance: leg.distance,
     duration: leg.duration,
     divergence: null,
+    engine: 'valhalla',
   }
 }
 

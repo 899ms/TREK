@@ -25,6 +25,7 @@ const overlay = (over: Partial<AlternativeOverlay> = {}): AlternativeOverlay => 
   duration: 10_800,
   distance: 290_000,
   slowerThanQuickest: 0,
+  otherEngine: false,
   labelBg: '#0a84ff',
   at: { lat: 53, lng: 11 },
   ...over,
@@ -141,5 +142,20 @@ describe('RoadtripAlternativesBar', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /close/i }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('FE-ALTBAR-010: an offer the other engine timed says so, and the rest do not', () => {
+    render(
+      <RoadtripAlternativesBar
+        open={leg()}
+        overlays={[
+          overlay({ note: 'Fastest' }),
+          overlay({ index: 1, note: 'No tolls', otherEngine: true }),
+        ]}
+        onChoose={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getAllByLabelText(/avoidance router/i)).toHaveLength(1)
   })
 })

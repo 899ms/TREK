@@ -1,11 +1,27 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { beforeEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n'
 import RoadtripStopPopup, { type RoadtripStopDraft } from './RoadtripStopPopup'
+import { chargingRepo } from '../../repo/chargingRepo'
 import type { CorridorPoi } from './useCorridorPois'
 
+// The dialog carries the charging panel, which reads the open availability data for a
+// station that is not on the trip yet. Both of its collaborators are stubbed: the trip
+// is whichever one is open, and the data comes off the network.
+vi.mock('../../store/tripStore', () => ({ useTripStore: (select: (s: { trip: { id: number } }) => unknown) => select({ trip: { id: 1 } }) }))
+vi.mock('../../repo/chargingRepo', () => ({ chargingRepo: { read: vi.fn(), readAt: vi.fn() } }))
+
 const wrap = (ui: React.ReactElement) => render(<TranslationProvider>{ui}</TranslationProvider>)
+
+const charging = {
+  checkedAt: new Date().toISOString(), status: 'ok' as const, station: 'Ladepark Nord',
+  source: 'Operator', sourceUrl: 'https://example.com', license: 'CC-0',
+  updatedAt: new Date().toISOString(), stale: false, available: 2, total: 4, unknown: 0,
+  tariffs: [], pricesUnavailable: false,
+}
+
+beforeEach(() => { vi.clearAllMocks() })
 
 function poi(over: Partial<CorridorPoi> = {}): CorridorPoi {
   return {
@@ -116,15 +132,24 @@ describe('RoadtripStopPopup', () => {
     ['sights', 'Sights'],
   ]
 
+  /**
+   * One kind pill, by the name on it.
+   *
+   * Filtered on `aria-pressed` rather than taken as the only match: for a charging hit
+   * the dialog also carries the charging panel, whose `<summary>` reads "Charging" too.
+   */
+  const kindPill = (label: string): HTMLElement =>
+    screen.getAllByRole('button', { name: new RegExp(label) }).filter(el => el.hasAttribute('aria-pressed'))[0]
+
   it.each(CORRIDOR_KINDS)('FE-ROADTRIP-STOPPOPUP-008: a %s hit preselects its own kind', (category, label) => {
     const { unmount } = wrap(<RoadtripStopPopup draft={draft({ poi: poi({ category, name: 'Found on the way' }) })} {...noop} />)
 
-    expect(screen.getByRole('button', { name: new RegExp(label) })).toHaveAttribute('aria-pressed', 'true')
+    expect(kindPill(label)).toHaveAttribute('aria-pressed', 'true')
     // Every other kind is off, so the preselect cannot be reading the wrong row. Scoped
     // to the kind buttons: the dwell presets use `aria-pressed` for their own state.
     for (const [, other] of CORRIDOR_KINDS) {
       if (other === label) continue
-      expect(screen.getByRole('button', { name: new RegExp(other) })).toHaveAttribute('aria-pressed', 'false')
+      expect(kindPill(other)).toHaveAttribute('aria-pressed', 'false')
     }
     unmount()
   })
@@ -268,6 +293,56 @@ describe('RoadtripStopPopup', () => {
       expect(screen.queryByRole('link', { name: 'Website' }), bad).not.toBeInTheDocument()
       unmount()
     }
+  })
+
+  // ── Charging, before the add ───────────────────────────────────────────────
+  //
+  // The data was only reachable once the charger was on the trip, which is the wrong
+  // way round: how busy the place is and what it charges is what decides whether to
+  // add it at all.
+
+  const chargingDraft = () => draft({ poi: poi({ category: 'charging', name: 'Ladepark Nord', lat: 48.137, lng: 11.575 }) })
+
+  it('FE-ROADTRIP-STOPPOPUP-030: a charging hit is asked about by where it is', async () => {
+    vi.mocked(chargingRepo.readAt).mockResolvedValue(charging)
+    wrap(<RoadtripStopPopup draft={chargingDraft()} {...noop} />)
+
+    // By coordinate and name: there is no place row to name it by yet.
+    await waitFor(() => expect(chargingRepo.readAt).toHaveBeenCalledWith(1, 48.137, 11.575, 'Ladepark Nord'))
+    expect(await screen.findByText('2/4 available')).toBeInTheDocument()
+    // The licence line travels with the numbers wherever they are shown.
+    expect(screen.getByRole('link', { name: 'Operator' })).toHaveAttribute('href', 'https://example.com')
+  })
+
+  it('FE-ROADTRIP-STOPPOPUP-031: a fuel stop costs nothing', () => {
+    wrap(<RoadtripStopPopup draft={draft()} {...noop} />)
+
+    expect(chargingRepo.readAt).not.toHaveBeenCalled()
+    expect(screen.queryByText('Published tariffs')).not.toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-STOPPOPUP-032: the question follows the kind that is picked', async () => {
+    vi.mocked(chargingRepo.readAt).mockResolvedValue(charging)
+    wrap(<RoadtripStopPopup draft={draft()} {...noop} />)
+    expect(chargingRepo.readAt).not.toHaveBeenCalled()
+
+    fireEvent.click(kindPill('Charging'))
+    await waitFor(() => expect(chargingRepo.readAt).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(kindPill('Fuel'))
+    expect(screen.queryByText('2/4 available')).not.toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-STOPPOPUP-033: one station, one question, however much else is changed', async () => {
+    // A cache miss upstream costs several requests against a shared public registry, so
+    // the dialog asks once and re-rendering it for an unrelated answer must not re-ask.
+    vi.mocked(chargingRepo.readAt).mockResolvedValue(charging)
+    wrap(<RoadtripStopPopup draft={chargingDraft()} {...noop} />)
+    await waitFor(() => expect(chargingRepo.readAt).toHaveBeenCalledTimes(1))
+
+    fireEvent.click(screen.getByRole('button', { name: /45 min/ }))
+
+    expect(chargingRepo.readAt).toHaveBeenCalledTimes(1)
   })
 
   it('FE-ROADTRIP-STOPPOPUP-025: without a way to book a night the switch stays away', () => {

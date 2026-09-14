@@ -110,9 +110,21 @@ function corridor(over: Partial<RoadtripCorridor> = {}, search: Partial<Roadtrip
     visible: searchState.results,
     insertIndexFor: vi.fn(() => 1),
     stopsAlongKm: [0, 100],
+    clear: vi.fn(),
     ...over,
     search: searchState,
   }
+}
+
+/**
+ * The buttons of the "what to look for" card's last row, in order.
+ *
+ * By position rather than by label: which half is which is the point of the row, and a
+ * label is a translation that would make this a test about wording.
+ */
+const searchRow = (): HTMLButtonElement[] => {
+  const searchButton = screen.getByRole('button', { name: 'Search' })
+  return [...(searchButton.parentElement?.querySelectorAll('button') ?? [])] as HTMLButtonElement[]
 }
 
 describe('RoadtripCorridorPanel', () => {
@@ -354,6 +366,103 @@ describe('RoadtripCorridorPanel', () => {
 
     expect(screen.getByText(/Nothing on the way matches/)).toBeInTheDocument()
     expect(screen.queryByText('Pick what you need and search.')).not.toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-PANEL-024: what was found carries the way to throw it away', () => {
+    const nothing = corridor()
+    const { unmount } = wrap(<RoadtripCorridorPanel corridor={nothing} routes={routes([day(1, 1)])} />)
+    // Before a search there is nothing to count and nothing to clear, and a dead control
+    // is worse than none.
+    expect(screen.queryByText(/on the way/)).not.toBeInTheDocument()
+    unmount()
+
+    // Two fuel hits and a campsite, so the total over the filters is a different
+    // sentence from any one group's count and can anchor the query on its own.
+    const c = corridor({ categories: ['fuel', 'campsite'] }, {
+      results: [
+        poi({ osm_id: 'a', name: 'Aral' }),
+        poi({ osm_id: 'b', name: 'Shell' }),
+        poi({ osm_id: 'c', name: 'Camping Elbe', category: 'campsite' }),
+      ],
+    })
+    wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} />)
+
+    const header = screen.getByText('3 on the way').closest('div')!
+    fireEvent.click(within(header).getByRole('button'))
+    expect(c.clear).toHaveBeenCalledTimes(1)
+    // Clearing asks the place search for nothing at all.
+    expect(c.search.search).not.toHaveBeenCalled()
+  })
+
+  it('FE-ROADTRIP-PANEL-025: the search shares its row with a manual add, and only where one may add', () => {
+    const reader = corridor()
+    const { unmount } = wrap(<RoadtripCorridorPanel corridor={reader} routes={routes([day(1, 1)])} />)
+    expect(searchRow()).toHaveLength(1)
+    unmount()
+
+    const onAddManual = vi.fn()
+    const c = corridor()
+    wrap(
+      <RoadtripCorridorPanel
+        corridor={c}
+        routes={routes([day(1, 1)])}
+        onAddPoi={vi.fn()}
+        onAddManual={onAddManual}
+      />,
+    )
+
+    // One row, two halves of it, not a second button under the first.
+    const [searchButton, manual] = searchRow()
+    expect(manual).toBeDefined()
+    expect(searchButton.className).toContain('flex-1')
+    expect(manual.className).toContain('flex-1')
+
+    // It opens the dialog. Nothing is added until a place and a position are picked
+    // there, and the kind of stop is still the stop popup's question.
+    fireEvent.click(manual)
+    expect(onAddManual).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Search places...')).toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-PANEL-026: with no drive on the trip there is nowhere to add one by hand', () => {
+    const dayless = corridor({ day: undefined })
+    wrap(<RoadtripCorridorPanel corridor={dayless} routes={routes([])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />)
+
+    expect(searchRow()).toHaveLength(1)
+  })
+
+  it('FE-ROADTRIP-PANEL-027: clicking a row brings that hit into view, and adding it does not', () => {
+    const onFocusPoint = vi.fn()
+    const onAddPoi = vi.fn()
+    const c = corridor({}, { results: [poi({ osm_id: 'a', name: 'Aral', lat: 53.14, lng: 9.82 })] })
+    wrap(
+      <RoadtripCorridorPanel
+        corridor={c}
+        routes={routes([day(1, 1)])}
+        onAddPoi={onAddPoi}
+        onFocusPoint={onFocusPoint}
+      />,
+    )
+
+    fireEvent.click(screen.getByText('Aral'))
+    expect(onFocusPoint).toHaveBeenCalledWith(53.14, 9.82)
+    expect(onAddPoi).not.toHaveBeenCalled()
+
+    // The Add button is the row's sibling and not a button inside a button, so adding a
+    // stop does not also move the camera out from under the list.
+    onFocusPoint.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(onAddPoi).toHaveBeenCalledTimes(1)
+    expect(onFocusPoint).not.toHaveBeenCalled()
+  })
+
+  it('FE-ROADTRIP-PANEL-028: a row is inert where there is no map to move', () => {
+    const c = corridor({}, { results: [poi({ osm_id: 'a', name: 'Aral' })] })
+    wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} />)
+
+    // No handler, no button: a control that does nothing is one a keyboard user reaches
+    // for and finds empty.
+    expect(screen.getByText('Aral').closest('button')).toBeNull()
   })
 
   it('FE-ROADTRIP-PANEL-022: without permission to add, no hit offers an Add button', () => {

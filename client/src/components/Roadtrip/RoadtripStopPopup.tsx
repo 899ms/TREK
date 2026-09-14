@@ -3,6 +3,7 @@ import { ParkingSquare, Hourglass, AlertTriangle, BedDouble } from 'lucide-react
 import Modal from '../shared/Modal'
 import CustomTimePicker from '../shared/CustomTimePicker'
 import StayPortals from './StayPortals'
+import ChargingInfo from './ChargingInfo'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { safeExternalHref } from '../../utils/safeUrl'
 import { formatDurationShort } from './roadtripModel'
@@ -266,6 +267,26 @@ export default function RoadtripStopPopup({
             ))}
           </div>
         </div>
+
+        {/* How busy the charging area is and what it charges, while the stop is still
+            being considered rather than once it is on the trip. Only for the kind that
+            has an answer: a petrol station or a bakery asks nothing, so picking either
+            of those costs no request at all.
+
+            One panel for one station, for as long as the dialog is open. The corridor
+            list deliberately does not do this per row: it publishes results box by
+            box, each row would own its own refresh timer, and a station in a dense
+            row of chargers is the case the upstream match refuses as ambiguous. */}
+        {stopType === 'charging' ? (
+          <div>
+            <span className="text-caption font-medium uppercase tracking-wide text-content-faint">
+              {t('roadtrip.charging.availability')}
+            </span>
+            <div className="mt-1.5">
+              <ChargingInfo lat={draft.poi.lat} lng={draft.poi.lng} name={draft.poi.name} />
+            </div>
+          </div>
+        ) : null}
         </>
         )}
 

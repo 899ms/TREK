@@ -48,6 +48,7 @@ import {
   reanchorAfterRemove,
   reanchorByStopOrder,
   isServiceStopType, refuelStopTypeFor, reanchorAfterReorder, type DryPoint } from '../../components/Roadtrip/roadtripModel'
+import type { ManualStopPlace, ManualStopTarget } from '../../components/Roadtrip/manualStop'
 import type { RoadtripStopDraft } from '../../components/Roadtrip/RoadtripStopPopup'
 import type { RoadtripStopType } from '@trek/shared'
 import { usePlaceSelection } from '../../hooks/usePlaceSelection'
@@ -646,7 +647,9 @@ export function useTripPlanner() {
     tripAccommodations,
   )
   // Lives here rather than in the panel because the map draws what it finds.
-  const roadtripCorridor = useRoadtripCorridor(roadtripRoutes)
+  // The trip comes with it for the vehicle: an electric car looks for chargers rather
+  // than for pumps, and that preference is stored per trip.
+  const roadtripCorridor = useRoadtripCorridor(roadtripRoutes, tripId)
   // Applying a track is a long job — a routing round trip per refinement — so it lives
   // above the dialog: a component that unmounted halfway would leave the day holding
   // half a chain of vias.
@@ -1493,6 +1496,80 @@ export function useTripPlanner() {
     return best
   }, [roadtripRoutes.days])
 
+  /**
+   * Where a place chosen by hand belongs in the drive, as a card and a position in it.
+   *
+   * `anchorFor` answers in the space a via is STORED in: the day the anchor stop belongs
+   * to, and its index there. A stop is placed at a position counted along the card it is
+   * drawn on, which is the same thing on every day that does not drive past midnight and
+   * a different one on the days that do (`nightSpill.ts`). Translating between the two
+   * happens here, once, rather than at whichever surface asked.
+   *
+   * Deliberately with no distance limit, unlike `addRoadtripVia`: the place this answers
+   * for is the charger the corridor search did not find, which is exactly the one sitting
+   * further off the drawn line than a via is allowed to be. The projection is the default
+   * the dialog offers, never a gate it applies.
+   */
+  const manualStopTargetFor = useCallback((lat: number, lng: number): ManualStopTarget | null => {
+    const anchor = anchorFor(lat, lng)
+    if (!anchor) return null
+    for (const day of roadtripRoutes.days) {
+      const at = day.stops.findIndex(stop => stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
+      if (at >= 0) return { dayId: day.dayId, position: at + 1, offRouteKm: anchor.offRouteKm }
+    }
+    // No card draws that stop, which happens while the rail is between rebuilds. Its own
+    // numbers are the best answer there is, and `roadtripInsertion` measures them against
+    // the card again when the stop actually lands.
+    return { dayId: anchor.dayId, position: anchor.afterIndex + 1, offRouteKm: anchor.offRouteKm }
+  }, [anchorFor, roadtripRoutes.days])
+
+  /**
+   * A place looked up by hand, on its way to the popup a corridor hit goes through.
+   *
+   * Not a write of its own. The popup is where the kind of stop and the dwell are
+   * decided, it defaults both from the category, and everything after it (the place, the
+   * assignment at the right position, the via re-anchoring, the re-route) is already
+   * right there and pinned by tests. The search finding a charger and somebody typing its
+   * name must not become two ways of adding one.
+   */
+  const addManualRoadtripStop = useCallback((place: ManualStopPlace, target: ManualStopTarget) => {
+    if (!can('place_edit', trip)) return
+    const card = roadtripRoutes.days.find(day => day.dayId === target.dayId)
+    // Through `roadtripInsertion` like every other path into this popup, so a night drive
+    // files the stop under the day it is stored on rather than under the card it is drawn
+    // on. A day with nothing drawn yet has no card to measure against and keeps the
+    // position it was given.
+    const insert = (card && roadtripInsertion(card, target.position)) || { dayId: target.dayId, position: target.position }
+    const category = place.category ?? ''
+    setStopDraft({
+      poi: {
+        osm_id: place.osm_id,
+        name: place.name,
+        lat: place.lat,
+        lng: place.lng,
+        category,
+        poi_type: category,
+        address: place.address,
+        website: place.website,
+        phone: place.phone,
+        opening_hours: null,
+        cuisine: null,
+        source: 'manual',
+        offRouteKm: target.offRouteKm,
+        // Nothing measured this one along the drive: its position came from the leg it
+        // was put on rather than from a distance. No arrival time is offered either, for
+        // the same reason: a guess printed as a clock reading is worse than a blank.
+        alongKm: 0,
+      },
+      ...insert,
+      dayNumber: card?.dayNumber ?? days.find(day => day.id === insert.dayId)?.day_number ?? 0,
+      // Only for somewhere you could sleep, and the same branch the corridor path takes.
+      // A charger never is one; diverging here would be a second answer to a question
+      // that already has one.
+      ...(isOvernightCategory(category) ? { overnight: overnightOptions(insert.dayId) } : {}),
+    })
+  }, [roadtripRoutes.days, days, overnightOptions, can, trip])
+
   const addRoadtripVia = useCallback(async (lat: number, lng: number) => {
     if (!can('day_edit', trip)) return
     const best = anchorFor(lat, lng)
@@ -2267,6 +2344,7 @@ export function useTripPlanner() {
     roadtripSettingsLoading: !roadtripPreferencesState.ready && !roadtripPreferencesState.failed,
     saveRoadtripLimit: roadtripPreferencesState.ready && can('day_edit', trip) ? saveRoadtripLimit : undefined,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, dayBoundaryControls, resetDayBoundaries,
+    manualStopTargetFor, addManualRoadtripStop,
     refuel, askRefuel, acceptRefuel,
     routeAlternatives, askRouteAlternatives, chooseRouteAlternative, alternativeOverlays, alternativeFocusPoints, mapFocusPoints, roadtripMapVias, focusRoadtripPoint,
     stayDraft, setStayDraft, editRoadtripStay, setRoadtripStay, roadtripEndDay, roadtripStay,

@@ -146,6 +146,26 @@ describe('Roadtrip e2e (real guard chain + temp SQLite)', () => {
       expect(read).toHaveBeenCalledTimes(1);
     } finally { read.mockRestore(); }
   });
+  it('gates the coordinate lookup like the saved stop and validates before fetching', async () => {
+    const lookup = vi.spyOn(app.get(ChargingService), 'lookup').mockResolvedValue({} as never);
+    const body = { lat: 48.137, lng: 11.575, name: 'Ladepark Nord' };
+    const post = () => request(server).post('/api/trips/5/roadtrip/charging-lookup').set('Cookie', cookie());
+    try {
+      await request(server).post('/api/trips/5/roadtrip/charging-lookup').send(body).expect(401);
+      await request(server).post('/api/trips/6/roadtrip/charging-lookup').set('Cookie', cookie()).send(body).expect(404);
+      await post().send({ ...body, lat: 91 }).expect(400);
+      // A list is the shape a caller would reach for to fan a whole corridor out in one
+      // request. There is no rate limiter here and each miss costs the upstream registry
+      // several requests, so the contract refuses it before anything leaves the server.
+      await post().send([body]).expect(400);
+      expect(lookup).not.toHaveBeenCalled();
+      await post().send(body).expect(200);
+      expect(lookup).toHaveBeenCalledWith(48.137, 11.575, 'Ladepark Nord');
+      setAddon(false);
+      await post().send(body).expect(404);
+      expect(lookup).toHaveBeenCalledTimes(1);
+    } finally { lookup.mockRestore(); }
+  });
   it('validates Google route preview and import before executing either service', async () => {
     const routes = app.get(GoogleRouteService);
     const preview = vi.spyOn(routes, 'preview').mockResolvedValue({ stops: [] });

@@ -17,6 +17,7 @@ import {
 } from '../../api/client'
 import { accommodationRepo } from '../../repo/accommodationRepo'
 import { dayColor } from '../../components/Roadtrip/dayColors'
+import type { ManualStopPlace } from '../../components/Roadtrip/manualStop'
 
 /**
  * The road trip half of the planner hook.
@@ -134,6 +135,7 @@ const rt = vi.hoisted(() => {
     visible: [] as Array<Record<string, unknown>>,
     insertIndexFor: vi.fn(() => 1),
     stopsAlongKm: [] as number[],
+    clear: vi.fn(),
   }
   const alt = {
     open: null as null | Record<string, unknown>,
@@ -1257,6 +1259,108 @@ describe('useTripPlanner road trip: dropping a hit where it belongs', () => {
     const { result } = await renderRoadtrip()
 
     act(() => { result.current.dropPoiOnRoute('node/7', 53.0, 11.5) })
+
+    expect(result.current.stopDraft).toBeNull()
+  })
+})
+
+describe('useTripPlanner road trip: a stop added by hand', () => {
+  /** One routed day of two stops, and a second day beside it. */
+  const routedDay = () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [{ lat: 53.55, lng: 9.99 }, { lat: 52.52, lng: 13.4 }],
+      geometry: [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4]],
+    }]
+  }
+
+  const place = (over: Partial<ManualStopPlace> = {}): ManualStopPlace => ({
+    name: 'Supercharger Dammer Berge',
+    lat: 52.9,
+    lng: 11.4,
+    address: 'A1',
+    website: null,
+    phone: null,
+    osm_id: 'node/9',
+    category: null,
+    ...over,
+  })
+
+  it('FE-TP-ROAD-075: a hand-picked place is measured onto the drive it is nearest', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    // Named by the card the stops are DRAWN on and the position in it, which is the
+    // index space a stop is placed at, not the one a via is stored in.
+    expect(result.current.manualStopTargetFor(53.0, 11.5)).toMatchObject({ dayId: 5, position: 1 })
+  })
+
+  it('FE-TP-ROAD-076: a place well off the road is placed all the same', async () => {
+    // A via is refused past two kilometres and stays refused. The stop this answers for
+    // is the charger the corridor search missed, which is exactly the one sitting
+    // further off the drawn line than that: refusing it would refuse the request.
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    const target = result.current.manualStopTargetFor(41.9, 12.5)
+    expect(target?.offRouteKm).toBeGreaterThan(2)
+    expect(target).toMatchObject({ dayId: 5 })
+
+    await act(async () => { await result.current.addRoadtripVia(41.9, 12.5) })
+    expect(rt.vias.add).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-077: a day with no drawn line is nowhere to measure against', async () => {
+    routedDay()
+    rt.routes.days = [{ dayId: 5, dayNumber: 1, stops: [], geometry: [] }]
+    const { result } = await renderRoadtrip()
+
+    expect(result.current.manualStopTargetFor(53.0, 11.5)).toBeNull()
+  })
+
+  it('FE-TP-ROAD-078: adding one by hand opens the popup a corridor hit goes through', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    act(() => {
+      result.current.addManualRoadtripStop(place(), { dayId: 5, position: 1, offRouteKm: 3.2 })
+    })
+
+    expect(result.current.stopDraft).toMatchObject({ dayId: 5, position: 1, dayNumber: 1 })
+    expect(result.current.stopDraft?.poi).toMatchObject({
+      name: 'Supercharger Dammer Berge', osm_id: 'node/9', offRouteKm: 3.2, alongKm: 0,
+    })
+    // Neither the full form nor a write: the kind of stop and the dwell are still to be
+    // chosen, in the one dialog that asks them.
+    expect(result.current.showPlaceForm).toBe(false)
+    expect(actions.addPlace).not.toHaveBeenCalled()
+    // A charger is not somewhere to sleep.
+    expect(result.current.stopDraft?.overnight).toBeUndefined()
+  })
+
+  it('FE-TP-ROAD-079: somewhere to sleep opens in overnight mode, the same as a corridor hit', async () => {
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    act(() => {
+      result.current.addManualRoadtripStop(place({ category: 'hotel' }), { dayId: 5, position: 1, offRouteKm: 0.2 })
+    })
+
+    // The night ends on the next day of the trip, which is what a night usually means.
+    expect(result.current.stopDraft?.overnight?.defaultEndDayId).toBe(6)
+  })
+
+  it('FE-TP-ROAD-080: a reader may not add one by hand either', async () => {
+    asReader('place_edit')
+    routedDay()
+    const { result } = await renderRoadtrip()
+
+    act(() => {
+      result.current.addManualRoadtripStop(place(), { dayId: 5, position: 1, offRouteKm: 0 })
+    })
 
     expect(result.current.stopDraft).toBeNull()
   })

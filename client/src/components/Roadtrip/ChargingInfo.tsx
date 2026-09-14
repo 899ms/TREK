@@ -7,7 +7,20 @@ import { chargingRepo } from '../../repo/chargingRepo'
 import { isEffectivelyOffline } from '../../sync/networkMode'
 import { Tooltip } from '../shared/Tooltip'
 
-export default function ChargingInfo({ placeId, compact = false }: { placeId: number; compact?: boolean }) {
+/**
+ * Which station the panel is asking about, one way or the other.
+ *
+ * A stop on the trip is named by its `places` row. A station found along the route has
+ * no row yet, and the availability and the price are exactly what somebody wants before
+ * deciding to add it, so that one is named by where it is instead. The two are mutually
+ * exclusive: the optional `undefined` members are what stop a caller passing both and
+ * leaving it to the component to guess which it meant.
+ */
+type ChargingTarget =
+  | { placeId: number; lat?: undefined; lng?: undefined; name?: undefined }
+  | { placeId?: undefined; lat: number; lng: number; name: string }
+
+export default function ChargingInfo({ placeId, lat, lng, name, compact = false }: ChargingTarget & { compact?: boolean }) {
   const tripId = useTripStore(s => s.trip?.id)
   const { t } = useTranslation()
   const [info, setInfo] = useState<Info | null>(null)
@@ -17,7 +30,12 @@ export default function ChargingInfo({ placeId, compact = false }: { placeId: nu
     setInfo(null); setLoading(true)
     const refresh = async () => {
       if (!tripId || document.hidden) return
-      try { const value = await chargingRepo.read(tripId, placeId); if (active) setInfo(value) }
+      try {
+        const value = placeId != null
+          ? await chargingRepo.read(tripId, placeId)
+          : await chargingRepo.readAt(tripId, lat!, lng!, name!)
+        if (active) setInfo(value)
+      }
       catch { if (active) setInfo(null) }
       finally { if (active) setLoading(false) }
     }
@@ -28,7 +46,9 @@ export default function ChargingInfo({ placeId, compact = false }: { placeId: nu
     window.addEventListener('online', refresh)
     document.addEventListener('visibilitychange', refresh)
     return () => { active = false; clearInterval(timer); window.removeEventListener('offline', offline); window.removeEventListener('online', refresh); document.removeEventListener('visibilitychange', refresh) }
-  }, [tripId, placeId])
+    // The identity of the station, whichever way it was given: a changed coordinate is a
+    // different charger and has to re-ask, exactly as a changed place id does.
+  }, [tripId, placeId, lat, lng, name])
   const known = !isEffectivelyOffline() && info?.available != null && !info.stale && Date.now() - Date.parse(info.checkedAt) < 120000
   const status = loading ? t('common.loading') : known ? `${info.available}/${info.total} ${t('roadtrip.charging.available')}` : t(info?.stale ? 'roadtrip.charging.stale' : 'roadtrip.charging.unknown')
   const components = info?.tariffs.flatMap(tariff => tariff.components.map(component => ({ ...component, currency: tariff.currency }))) ?? []

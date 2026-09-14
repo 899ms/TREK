@@ -22,10 +22,14 @@ import type { Waypoint, SnappedWaypoint, RouteAvoidClass } from '../../types'
  *   - it refuses a point it cannot bind to a road, where OSRM still snaps one. The
  *     Stephansdom, in a pedestrian zone, answers `No path could be found for input`
  *     until a search radius is allowed;
- *   - it prices roads differently. Over ten European legs its drive times sat 5.4 %
- *     above OSRM's on average and 36 % above on one, and those times feed the arrival
- *     clocks of a road trip day. Mixing engines inside one chain would move times
- *     nobody asked to move.
+ *   - it prices roads differently, and not by a constant anybody could correct for.
+ *     Over twelve European legs the per-leg drive time ran from 14.7 % under OSRM's to
+ *     13.2 % over, and the sign follows the region rather than the road: on Spanish
+ *     autovía Valhalla is the faster of the two on every leg measured, through a city
+ *     it is half again slower. Those times feed the arrival clocks of a road trip day,
+ *     so mixing engines inside one chain would move times nobody asked to move, and
+ *     subtracting one engine's figure from the other's, which is what an offer beside
+ *     a route invites, measures the gap between two speed models and nothing else.
  *
  * Which leaves exactly the shape this module serves: two points, one avoidance, asked
  * on demand, drawn as an offer next to the route rather than replacing it.
