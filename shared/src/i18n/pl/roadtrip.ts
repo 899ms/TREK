@@ -200,6 +200,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'po {distance}',
   'roadtrip.poi.clearResults': 'Wyczyść wyniki',
   'roadtrip.poi.addManual': 'Dodaj ręcznie',
+  'roadtrip.poi.addManualShort': 'Ręcznie',
   'roadtrip.poi.manualHint':
     'Wyszukiwanie miejsc nie znajdzie każdej ładowarki ani stacji paliw. Wyszukaj ją po nazwie i wskaż, gdzie na trasie ma się znaleźć.',
   'roadtrip.poi.addBetween': 'Dodaj między',

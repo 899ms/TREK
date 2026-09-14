@@ -189,6 +189,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': '{distance} 處',
   'roadtrip.poi.clearResults': '清除結果',
   'roadtrip.poi.addManual': '手動新增',
+  'roadtrip.poi.addManualShort': '手動',
   'roadtrip.poi.manualHint': '地點搜尋不一定能找到每個充電站或加油站。請自行用名稱搜尋，並指定它在行程中的位置。',
   'roadtrip.poi.addBetween': '新增於兩站之間',
   'roadtrip.poi.manualOffRoute': '偏離路線 {distance}，請確認它屬於哪一段。',

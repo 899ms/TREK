@@ -201,6 +201,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': '{distance} sonra',
   'roadtrip.poi.clearResults': 'Sonuçları temizle',
   'roadtrip.poi.addManual': 'Elle ekle',
+  'roadtrip.poi.addManualShort': 'Elle',
   'roadtrip.poi.manualHint':
     'Yer araması her şarj noktasını veya benzin istasyonunu bulamaz. Adıyla arayın ve sürüşün neresine gireceğini söyleyin.',
   'roadtrip.poi.addBetween': 'Araya ekle',

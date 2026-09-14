@@ -204,6 +204,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'μετά από {distance}',
   'roadtrip.poi.clearResults': 'Καθαρισμός αποτελεσμάτων',
   'roadtrip.poi.addManual': 'Χειροκίνητη προσθήκη',
+  'roadtrip.poi.addManualShort': 'Χειροκίνητα',
   'roadtrip.poi.manualHint':
     'Η αναζήτηση τοποθεσιών δεν βρίσκει κάθε φορτιστή ή πρατήριο καυσίμων. Βρείτε ένα με το όνομά του και δηλώστε πού μπαίνει στη διαδρομή.',
   'roadtrip.poi.addBetween': 'Προσθήκη ανάμεσα',

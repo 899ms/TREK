@@ -199,6 +199,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'efter {distance}',
   'roadtrip.poi.clearResults': 'Rensa träffar',
   'roadtrip.poi.addManual': 'Lägg till manuellt',
+  'roadtrip.poi.addManualShort': 'Manuellt',
   'roadtrip.poi.manualHint':
     'Platssökningen hittar inte alla laddare eller bensinstationer. Sök upp en på namn och ange var i körningen den ska ligga.',
   'roadtrip.poi.addBetween': 'Lägg till mellan',

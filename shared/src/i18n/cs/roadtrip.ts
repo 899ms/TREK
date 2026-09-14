@@ -199,6 +199,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'po {distance}',
   'roadtrip.poi.clearResults': 'Vymazat výsledky',
   'roadtrip.poi.addManual': 'Přidat ručně',
+  'roadtrip.poi.addManualShort': 'Ručně',
   'roadtrip.poi.manualHint':
     'Vyhledávání míst nenajde každou nabíječku nebo pumpu. Najděte ji podle názvu a určete, kam na cestě patří.',
   'roadtrip.poi.addBetween': 'Přidat mezi',

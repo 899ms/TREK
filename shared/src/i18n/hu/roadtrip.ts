@@ -200,6 +200,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': '{distance} után',
   'roadtrip.poi.clearResults': 'Találatok törlése',
   'roadtrip.poi.addManual': 'Hozzáadás kézzel',
+  'roadtrip.poi.addManualShort': 'Kézzel',
   'roadtrip.poi.manualHint':
     'A helykeresés nem talál meg minden töltőt vagy benzinkutat. Keresd meg név szerint, és add meg, hová kerüljön az úton.',
   'roadtrip.poi.addBetween': 'Beszúrás két megálló közé',

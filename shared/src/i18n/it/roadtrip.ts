@@ -202,6 +202,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'dopo {distance}',
   'roadtrip.poi.clearResults': 'Svuota risultati',
   'roadtrip.poi.addManual': 'Aggiungi a mano',
+  'roadtrip.poi.addManualShort': 'A mano',
   'roadtrip.poi.manualHint':
     'La ricerca dei luoghi non trova ogni colonnina o distributore. Cercane uno per nome e indica dove si inserisce nel viaggio.',
   'roadtrip.poi.addBetween': 'Inserisci tra',

@@ -1,7 +1,17 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, within, fireEvent } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n'
+
+// jsdom reports every element as zero by side, so the row that decides whether the two
+// actions keep their labels can only be driven from here. Zero is what the component
+// reads as "not measured yet", which is also the default below.
+const { rowWidth } = vi.hoisted(() => ({ rowWidth: { value: 0 } }))
+vi.mock('../../hooks/useElementSize', () => ({
+  useElementSize: () => ({ ref: () => {}, width: rowWidth.value, height: 0 }),
+}))
+afterEach(() => { rowWidth.value = 0 })
+
 import RoadtripCorridorPanel from './RoadtripCorridorPanel'
 import type { CorridorPoi } from './useCorridorPois'
 import type { RoadtripCorridor } from './useRoadtripCorridor'
@@ -275,11 +285,21 @@ describe('RoadtripCorridorPanel', () => {
   })
 
   it('FE-ROADTRIP-PANEL-013: while searching it reports progress rather than sitting still', () => {
+    rowWidth.value = 320
     const c = corridor({}, { loading: true, progress: { done: 3, total: 12 } })
     wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} />)
 
-    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '25')
-    expect(screen.getByRole('button', { name: /3/ })).toBeDisabled()
+    // The sentence and the share belong to the row of their own, once. The button used
+    // to restate them, which made the longest label in the panel and was the one being
+    // cut off; it keeps its word, and the spinner in front of it says the run is on.
+    const bar = screen.getByRole('progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '25')
+    expect(bar).toHaveTextContent('Searching 3 of 12')
+
+    const [searchButton] = searchRow()
+    expect(searchButton).toHaveTextContent('Search')
+    expect(within(searchButton).queryByText(/Searching/)).toBeNull()
+    expect(searchButton).toBeDisabled()
   })
 
   it('FE-ROADTRIP-PANEL-014: a partial answer says which stretches nobody looked at', () => {
@@ -429,6 +449,52 @@ describe('RoadtripCorridorPanel', () => {
     wrap(<RoadtripCorridorPanel corridor={dayless} routes={routes([])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />)
 
     expect(searchRow()).toHaveLength(1)
+  })
+
+  it('FE-ROADTRIP-PANEL-029: a roomy row keeps both words, and the manual one is the short form', () => {
+    rowWidth.value = 320
+    wrap(
+      <RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />,
+    )
+
+    const [searchButton, manual] = searchRow()
+    expect(searchButton).toHaveTextContent('Search')
+    // The face of the button is the one word that fits beside it; the sentence stays
+    // as the name a reader and a tooltip get.
+    expect(manual).toHaveTextContent('Manual')
+    expect(manual).toHaveAttribute('aria-label', 'Add manually')
+  })
+
+  it('FE-ROADTRIP-PANEL-030: a narrow row drops the words rather than cutting them short', () => {
+    // "Add manu…" is neither the label nor a shape anybody recognises. Below the
+    // threshold both actions are their icon, and both keep their full names.
+    rowWidth.value = 150
+    wrap(
+      <RoadtripCorridorPanel corridor={corridor()} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />,
+    )
+
+    const [searchButton, manual] = searchRow()
+    expect(searchButton).toHaveTextContent('')
+    expect(manual).toHaveTextContent('')
+    expect(searchButton).toHaveAttribute('aria-label', 'Search')
+    expect(manual).toHaveAttribute('aria-label', 'Add manually')
+    // Still one row of two halves, not a stack.
+    expect(searchButton.className).toContain('flex-1')
+    expect(manual.className).toContain('flex-1')
+  })
+
+  it('FE-ROADTRIP-PANEL-031: a narrow row loses the words even while a search is running', () => {
+    // The spinner replaces the magnifier, and there is still no text to cut off.
+    rowWidth.value = 150
+    const c = corridor({}, { loading: true, progress: { done: 3, total: 12 } })
+    wrap(<RoadtripCorridorPanel corridor={c} routes={routes([day(1, 1)])} onAddPoi={vi.fn()} onAddManual={vi.fn()} />)
+
+    const [searchButton, manual] = searchRow()
+    expect(searchButton).toHaveTextContent('')
+    expect(manual).toHaveTextContent('')
+    expect(searchButton).toHaveAttribute('aria-label', 'Search')
+    // The progress row is where the sentence lives, whatever the panel's width.
+    expect(screen.getByRole('progressbar')).toHaveTextContent('Searching 3 of 12')
   })
 
   it('FE-ROADTRIP-PANEL-027: clicking a row brings that hit into view, and adding it does not', () => {

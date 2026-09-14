@@ -202,6 +202,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'na {distance}',
   'roadtrip.poi.clearResults': 'Resultaten wissen',
   'roadtrip.poi.addManual': 'Handmatig toevoegen',
+  'roadtrip.poi.addManualShort': 'Handmatig',
   'roadtrip.poi.manualHint':
     'De plaatszoekfunctie vindt niet elk laadpunt of tankstation. Zoek er zelf een op naam en geef aan waar in de rit hij hoort.',
   'roadtrip.poi.addBetween': 'Toevoegen tussen',

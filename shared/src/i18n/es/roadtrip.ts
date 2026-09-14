@@ -202,6 +202,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'tras {distance}',
   'roadtrip.poi.clearResults': 'Borrar resultados',
   'roadtrip.poi.addManual': 'Añadir a mano',
+  'roadtrip.poi.addManualShort': 'A mano',
   'roadtrip.poi.manualHint':
     'La búsqueda de lugares no encuentra todos los puntos de recarga ni todas las gasolineras. Busca uno por su nombre e indica en qué punto del recorrido va.',
   'roadtrip.poi.addBetween': 'Añadir entre',

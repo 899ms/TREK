@@ -202,6 +202,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'setelah {distance}',
   'roadtrip.poi.clearResults': 'Hapus hasil',
   'roadtrip.poi.addManual': 'Tambah manual',
+  'roadtrip.poi.addManualShort': 'Manual',
   'roadtrip.poi.manualHint':
     'Pencarian tempat tidak menemukan setiap pengisian daya atau pompa bahan bakar. Cari satu menurut nama dan tentukan di bagian perjalanan mana ia ditempatkan.',
   'roadtrip.poi.addBetween': 'Tambahkan di antara',

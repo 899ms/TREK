@@ -6,6 +6,7 @@ import {
 import { useTranslation } from '../../i18n/TranslationContext'
 import { Tooltip } from '../shared/Tooltip'
 import EmptyState from '../shared/EmptyState'
+import { useElementSize } from '../../hooks/useElementSize'
 import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
 import CustomSelect from '../shared/CustomSelect'
@@ -54,6 +55,16 @@ interface RoadtripCorridorPanelProps {
  */
 /** The steps worth offering: a household socket, a fast AC post, and the two DC tiers. */
 const KW_STEPS = [11, 22, 50, 150]
+
+/**
+ * Below this, the two actions at the foot of the search card are icons alone, in pixels.
+ *
+ * Measured from what they need rather than picked round: two buttons, an eight pixel gap
+ * and their own padding leave each of them about ninety pixels for a fifteen pixel icon,
+ * a gap and a word. "Search" and the shortest sensible word beside it fit that; a hair
+ * under it and the first thing to go is the end of the longer word.
+ */
+const ICON_ONLY_BELOW_PX = 200
 
 const SOCKET_LABEL: Record<string, string> = {
   type2: 'Type 2',
@@ -301,6 +312,16 @@ export default function RoadtripCorridorPanel({
    * search from being there the next time somebody opens it.
    */
   const [manualOpen, setManualOpen] = useState(false)
+  /**
+   * The row the two actions share, measured, because this column is resizable.
+   *
+   * A media query would ask about the window, which is the wrong question: the panel
+   * can be narrow on a wide screen and the labels have to go by what the row itself
+   * got. Zero means the row has not been measured yet, and that reads as roomy rather
+   * than cramped so the labels do not flash away on the first paint.
+   */
+  const actionRow = useElementSize<HTMLDivElement>()
+  const iconOnly = actionRow.width > 0 && actionRow.width < ICON_ONLY_BELOW_PX
 
   const dayOptions = routes.days.map(d => ({
     value: String(d.dayId),
@@ -426,25 +447,29 @@ export default function RoadtripCorridorPanel({
             Two halves of one row, because the search finds most of what is out there and
             not all of it: a good share of the chargers standing at a junction are in
             nobody's OpenStreetMap extract. The second button is the way to those, and it
-            sits beside the search rather than under it so neither is the afterthought. */}
-        <div className="flex gap-2">
+            sits beside the search rather than under it so neither is the afterthought.
+
+            Below `ICON_ONLY_BELOW_PX` the two drop their labels rather than shortening
+            them. A truncated word is worse than no word: "Add manu…" is neither the
+            label nor a shape you recognise, while the plus and the magnifier are both
+            read at a glance and keep their full names for a pointer and a reader. */}
+        <div ref={actionRow.ref} className="flex gap-2">
           <button
             type="button"
             onClick={search.search}
             disabled={!canSearch}
+            aria-label={t('roadtrip.poi.search')}
+            title={iconOnly ? t('roadtrip.poi.search') : undefined}
             className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-accent text-body font-semibold text-accent-text transition-opacity disabled:opacity-50"
           >
             {search.loading
               ? <RotateCw size={15} className="shrink-0 animate-spin" aria-hidden />
               : <Search size={15} strokeWidth={2} className="shrink-0" aria-hidden />}
-            {/* The label grows into "Searching 3 of 12" while a run is on. Sharing the
-                row it has to shorten rather than push its neighbour off the panel, and
-                the panel is resizable down to a width where that matters. */}
-            <span className="min-w-0 truncate">
-              {search.loading
-                ? t('roadtrip.poi.searching', { done: search.progress.done, total: search.progress.total })
-                : t('roadtrip.poi.search')}
-            </span>
+            {/* The word stays put while a run is on, and the spinner in front of it says
+                the run is on. It used to become "Searching 3 of 12", which is both the
+                longest label in the panel and the very sentence the progress row right
+                underneath prints, next to the share as a figure. */}
+            {iconOnly ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.search')}</span>}
           </button>
           {/* The day is part of the offer: with no drive on the trip at all there is
               nowhere for a stop to go, and a dialog that can only be cancelled is worse
@@ -453,10 +478,14 @@ export default function RoadtripCorridorPanel({
             <button
               type="button"
               onClick={() => setManualOpen(true)}
-              className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-edge bg-surface-card text-body font-semibold text-content transition-colors hover:bg-surface-hover disabled:opacity-50"
+              // The full sentence is the accessible name and the tooltip; the face of
+              // the button carries the one word that fits beside "Search".
+              aria-label={t('roadtrip.poi.addManual')}
+              title={t('roadtrip.poi.addManual')}
+              className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-edge bg-surface-card text-body font-semibold text-content transition-colors hover:bg-surface-hover"
             >
               <Plus size={15} strokeWidth={2.2} className="shrink-0" aria-hidden />
-              <span className="min-w-0 truncate">{t('roadtrip.poi.addManual')}</span>
+              {iconOnly ? null : <span className="min-w-0 truncate">{t('roadtrip.poi.addManualShort')}</span>}
             </button>
           ) : null}
         </div>

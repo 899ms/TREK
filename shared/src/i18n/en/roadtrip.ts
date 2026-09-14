@@ -195,6 +195,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'after {distance}',
   'roadtrip.poi.clearResults': 'Clear results',
   'roadtrip.poi.addManual': 'Add manually',
+  'roadtrip.poi.addManualShort': 'Manual',
   'roadtrip.poi.manualHint':
     'The place search does not find every charger or pump. Look one up by name and say where on the drive it goes.',
   'roadtrip.poi.addBetween': 'Add between',

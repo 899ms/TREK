@@ -196,6 +196,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'بعد {distance}',
   'roadtrip.poi.clearResults': 'مسح النتائج',
   'roadtrip.poi.addManual': 'إضافة يدوية',
+  'roadtrip.poi.addManualShort': 'يدوي',
   'roadtrip.poi.manualHint':
     'لا يجد البحث عن الأماكن كل محطة شحن أو وقود. ابحث عن واحدة بالاسم وحدّد موضعها في الرحلة.',
   'roadtrip.poi.addBetween': 'الإضافة بين محطتين',

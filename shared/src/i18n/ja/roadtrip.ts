@@ -199,6 +199,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': '{distance} 地点',
   'roadtrip.poi.clearResults': '結果を消去',
   'roadtrip.poi.addManual': '手動で追加',
+  'roadtrip.poi.addManualShort': '手動',
   'roadtrip.poi.manualHint':
     '場所の検索では、すべての充電スポットや給油所は見つかりません。名前で探して、道中のどこに入れるかを指定してください。',
   'roadtrip.poi.addBetween': '追加する区間',

@@ -201,6 +201,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'через {distance}',
   'roadtrip.poi.clearResults': 'Очистити результати',
   'roadtrip.poi.addManual': 'Додати вручну',
+  'roadtrip.poi.addManualShort': 'Вручну',
   'roadtrip.poi.manualHint':
     'Пошук місць знаходить не кожну зарядку чи заправку. Знайдіть потрібну за назвою та вкажіть, де в дорозі вона має бути.',
   'roadtrip.poi.addBetween': 'Додати між',

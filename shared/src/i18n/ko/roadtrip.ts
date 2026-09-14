@@ -198,6 +198,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': '{distance} 지점',
   'roadtrip.poi.clearResults': '결과 지우기',
   'roadtrip.poi.addManual': '직접 추가',
+  'roadtrip.poi.addManualShort': '직접',
   'roadtrip.poi.manualHint': '장소 검색이 모든 충전소나 주유소를 찾아내지는 못합니다. 이름으로 직접 찾아 주행 중 어디에 들어갈지 지정하세요.',
   'roadtrip.poi.addBetween': '사이에 추가',
   'roadtrip.poi.manualOffRoute': '경로에서 {distance} 떨어져 있으니 어느 구간에 속하는지 확인하세요.',

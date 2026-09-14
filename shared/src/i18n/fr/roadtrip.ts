@@ -202,6 +202,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'après {distance}',
   'roadtrip.poi.clearResults': 'Effacer les résultats',
   'roadtrip.poi.addManual': 'Ajouter manuellement',
+  'roadtrip.poi.addManualShort': 'Manuel',
   'roadtrip.poi.manualHint':
     'La recherche de lieux ne trouve pas toutes les bornes ni toutes les stations-service. Cherchez-en une par son nom et indiquez où elle se place sur le trajet.',
   'roadtrip.poi.addBetween': 'Ajouter entre',

@@ -200,6 +200,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'sau {distance}',
   'roadtrip.poi.clearResults': 'Xóa kết quả',
   'roadtrip.poi.addManual': 'Thêm thủ công',
+  'roadtrip.poi.addManualShort': 'Thủ công',
   'roadtrip.poi.manualHint':
     'Tìm kiếm địa điểm không tìm ra mọi trạm sạc hay trạm xăng. Hãy tra theo tên và cho biết nó nằm ở đâu trên hành trình.',
   'roadtrip.poi.addBetween': 'Thêm vào giữa',

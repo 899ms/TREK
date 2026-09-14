@@ -198,6 +198,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.poi.alongRoute': 'nach {distance}',
   'roadtrip.poi.clearResults': 'Ergebnisse löschen',
   'roadtrip.poi.addManual': 'Selbst hinzufügen',
+  'roadtrip.poi.addManualShort': 'Selbst',
   'roadtrip.poi.manualHint':
     'Die Ortssuche findet nicht jede Ladesäule und nicht jede Tankstelle. Suche einen Ort per Name und lege fest, wo unterwegs er hingehört.',
   'roadtrip.poi.addBetween': 'Einfügen zwischen',
