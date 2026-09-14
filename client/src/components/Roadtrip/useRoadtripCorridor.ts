@@ -3,6 +3,7 @@ import { useCorridorPois, type CorridorPoi, type CorridorSearch } from './useCor
 import { sectionAnchors, insertIndexForAlong } from './roadtripModel'
 import type { SectionAnchor } from './roadtripModel'
 import { projectOntoRoute, type LatLng } from './corridor'
+import { useVehicleRange } from './useVehicleRange'
 import type { RoadtripDay, RoadtripRoutes } from './useRoadtripRoutes'
 
 // The categories come from the one table now, which is also the only place that knows
@@ -54,6 +55,16 @@ export interface RoadtripCorridor {
   insertIndexFor: (poi: CorridorPoi) => number
   /** How far along the drive each of the day's stops sits, in the same units as a hit. */
   stopsAlongKm: number[]
+  /**
+   * Back to "nothing asked yet": the hits go, and with them the pins on the map.
+   *
+   * Both halves, deliberately. `search.clear()` alone leaves the four narrowing states
+   * standing, so a plug type or a minimum power set for the last question would quietly
+   * shrink the answer to the next one. The categories and the corridor width stay put:
+   * they are the question rather than the answer, and clearing them would turn asking
+   * the same thing again into a handful of clicks.
+   */
+  clear: () => void
 }
 
 /**
@@ -63,7 +74,7 @@ export interface RoadtripCorridor {
  * answer if you cannot see which one is on your side of the road — so the results have to
  * live above both the panel and the map rather than inside the panel.
  */
-export function useRoadtripCorridor(routes: RoadtripRoutes): RoadtripCorridor {
+export function useRoadtripCorridor(routes: RoadtripRoutes, tripId?: number | string | null): RoadtripCorridor {
   const [dayId, setDayId] = useState<string>('')
   const [categories, setCategories] = useState<string[]>(['fuel'])
   const [widthKm, setWidthKm] = useState<number>(5)
@@ -100,9 +111,41 @@ export function useRoadtripCorridor(routes: RoadtripRoutes): RoadtripCorridor {
 
   const search = useCorridorPois(line, categories, widthKm)
 
+  /**
+   * Whether what the panel looks for has been decided yet.
+   *
+   * The vehicle is a stored, trip-scoped preference, so it is not known at first render;
+   * the default below therefore cannot be a `useState` initialiser. Once it has been
+   * applied (or once the traveller has picked the kinds themselves) it is never
+   * applied again: a category somebody switched off on purpose coming back by itself
+   * would make the picker unusable.
+   */
+  const categoriesSeeded = useRef(false)
+
   const toggleCategory = useCallback((key: string) => {
+    categoriesSeeded.current = true
     setCategories(prev => (prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]))
   }, [])
+
+  /**
+   * An electric car looks for chargers, not for pumps.
+   *
+   * Only for `electric`. The preference has four stored states and `useVehicleRange`
+   * folds three of them into null (a combustion sibling written as an empty string, no
+   * answer at all, and the moment before the preference has loaded), and none of those
+   * is a reason to change what a panel looks for. Every traveller who never opened the
+   * driving settings keeps the fuel they have always had.
+   */
+  const { vehicleKind } = useVehicleRange(tripId)
+  useEffect(() => {
+    if (categoriesSeeded.current || vehicleKind !== 'electric') return
+    categoriesSeeded.current = true
+    // Never over a running or finished search. `useCorridorPois` drops its results
+    // whenever the categories change, so a preference that lands a second after the
+    // panel did would empty a list somebody is already reading.
+    if (search.loading || search.results.length > 0) return
+    setCategories(['charging'])
+  }, [vehicleKind, search.loading, search.results.length])
 
   // A filter kept across a new search would hide the fresh answer behind the old question.
   // Cleared when a search STARTS, not whenever results change: hits arrive box by box and
@@ -188,6 +231,29 @@ export function useRoadtripCorridor(routes: RoadtripRoutes): RoadtripCorridor {
     [stopsAlongKm],
   )
 
+  /**
+   * Throwing the answer away, which nothing could do before.
+   *
+   * A search that turned up the wrong thing left its hits in the list and its pins on
+   * the map, and the only way out was switching to the day plan and back. The search's
+   * own `clear` aborts what is in flight and empties the results (`visible` collapses
+   * with them and the map re-merges, so no layer needs telling), and the four narrowing
+   * states go too, because they were set for a question that no longer has an answer.
+   *
+   * Pulled out of `search` into its own name rather than depended on as `search.clear`:
+   * the object is rebuilt on every publish of the hook below, so a dependency on it
+   * would rebuild this callback on every box that answers, while the function itself
+   * never changes.
+   */
+  const clearResults = search.clear
+  const clear = useCallback(() => {
+    clearResults()
+    setNameFilter('')
+    setSection(null)
+    setSocketFilter('')
+    setMinKw(0)
+  }, [clearResults])
+
   return {
     dayId: day ? String(day.dayId) : '',
     setDayId,
@@ -211,5 +277,6 @@ export function useRoadtripCorridor(routes: RoadtripRoutes): RoadtripCorridor {
     visible,
     insertIndexFor,
     stopsAlongKm,
+    clear,
   }
 }

@@ -10,9 +10,11 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
 import CustomSelect from '../shared/CustomSelect'
 import RoadtripCategoryPicker from './RoadtripCategoryPicker'
+import RoadtripManualStopModal from './RoadtripManualStopModal'
 import { serviceColor } from './roadtripModel'
 import { CORRIDOR_CATEGORY_BY_KEY } from './stopKinds'
 import { FS } from './typeScale'
+import type { ManualStopPlace, ManualStopTarget } from './manualStop'
 import { CORRIDOR_CATEGORY_KEYS, CORRIDOR_SECTION_KM, CORRIDOR_WIDTHS_KM, type RoadtripCorridor } from './useRoadtripCorridor'
 import type { CorridorPoi } from './useCorridorPois'
 import type { RoadtripRoutes } from './useRoadtripRoutes'
@@ -28,6 +30,18 @@ interface RoadtripCorridorPanelProps {
     dayId?: number | null,
     position?: number | null,
   ) => void
+  /**
+   * Brings a hit into view on the map. A row is where you decide a place is worth
+   * looking at, and looking at it means seeing which side of the road it is on.
+   */
+  onFocusPoint?: (lat: number, lng: number) => void
+  /**
+   * Adds a place the search never found, at a position on the drive. Given only to
+   * somebody who may add places, which is what keeps the button off a reader's panel.
+   */
+  onAddManual?: (place: ManualStopPlace, target: ManualStopTarget) => void
+  /** Where a freely chosen point belongs on the drive, from the planner's projection. */
+  manualStopTargetFor?: (lat: number, lng: number) => ManualStopTarget | null
 }
 
 /**
@@ -96,51 +110,69 @@ function ResultBadge({ category }: { category: string }): React.ReactElement {
  */
 const POI_CHIP = 'inline-flex items-center rounded-md bg-surface-secondary px-1.5 py-0.5 leading-none tabular-nums text-content-muted'
 
-function ResultRow({ poi, onAdd }: { poi: CorridorPoi; onAdd?: () => void }): React.ReactElement {
+function ResultRow({ poi, onAdd, onFocus }: { poi: CorridorPoi; onAdd?: () => void; onFocus?: () => void }): React.ReactElement {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
+  /**
+   * The badge and the text are one target, the Add button beside them another.
+   *
+   * Not the row itself and not a button around the lot: an Add button inside a row
+   * button is markup neither a browser nor a screen reader can make sense of, and the
+   * `<li>` has to stay one for the list around it to still be a list. Same shape
+   * `AutomaticDayStop` uses: an element that is a button only when there is somewhere
+   * for it to go, so a row without the map behind it is not a dead control.
+   */
+  const Block = onFocus ? 'button' : 'div'
   return (
     <li className="group flex items-center gap-3 rounded-xl py-1.5 pe-1.5 ps-1 transition-colors hover:bg-surface-hover">
-      <ResultBadge category={poi.category} />
-      <div className="min-w-0 flex-1">
-        <div className="truncate font-semibold tracking-[-0.012em] text-content" style={{ fontSize: FS.name }}>
-          {poi.name}
-        </div>
-        {poi.pluginId && <p className="truncate text-caption text-content-muted">{poi.pluginId}</p>}
-        {/* Two facts, two chips. Where it is off the road and how far into the drive it
-            comes are separate answers, and as two phrases sharing a line they read as one
-            run-on sentence about the same thing. A chip each gives them an edge, and the
-            row still wraps cleanly at a narrow width because nothing has to break around
-            a separator. */}
-        <div className="flex flex-wrap items-center gap-1" style={{ fontSize: FS.meta }}>
-          <span className={POI_CHIP}>
-            {t('roadtrip.poi.offRoute', { distance: formatDistance(poi.offRouteKm, distanceUnit) })}
-          </span>
-          <span className={POI_CHIP}>
-            {poi.alongKm < 0.5
-              ? t('roadtrip.poi.atStart')
-              : t('roadtrip.poi.alongRoute', { distance: formatDistance(poi.alongKm, distanceUnit) })}
-          </span>
-          {/* What the charger offers, where OSM says. Socket names are proper nouns and
-              stay as they are; the numbers around them are what decides whether a car can
-              use it at all. A station that says nothing shows nothing rather than a row
-              of dashes, because "not stated" is not "no". */}
-          {poi.charging?.sockets.length ? (
-            <span className="flex flex-wrap items-baseline gap-x-1.5">
-              {poi.charging.sockets.slice(0, 3).map(s => (
-                <span key={s.type} className="text-content-muted">
-                  {SOCKET_LABEL[s.type] ?? s.type}
-                  {s.kw ? ` ${s.kw} kW` : ''}
-                  {s.count && s.count > 1 ? ` ×${s.count}` : ''}
-                </span>
-              ))}
+      <Block
+        type={onFocus ? 'button' : undefined}
+        onClick={onFocus}
+        // The hover surface stays the whole row: this only carries the focus ring, so
+        // a keyboard lands on the same thing the pointer highlights.
+        className={`flex min-w-0 flex-1 items-center gap-3 text-start ${onFocus ? 'rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent' : ''}`}
+      >
+        <ResultBadge category={poi.category} />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-semibold tracking-[-0.012em] text-content" style={{ fontSize: FS.name }}>
+            {poi.name}
+          </div>
+          {poi.pluginId && <p className="truncate text-caption text-content-muted">{poi.pluginId}</p>}
+          {/* Two facts, two chips. Where it is off the road and how far into the drive it
+              comes are separate answers, and as two phrases sharing a line they read as one
+              run-on sentence about the same thing. A chip each gives them an edge, and the
+              row still wraps cleanly at a narrow width because nothing has to break around
+              a separator. */}
+          <div className="flex flex-wrap items-center gap-1" style={{ fontSize: FS.meta }}>
+            <span className={POI_CHIP}>
+              {t('roadtrip.poi.offRoute', { distance: formatDistance(poi.offRouteKm, distanceUnit) })}
             </span>
-          ) : null}
-          {poi.charging?.fee === false ? (
-            <span className="text-success">{t('roadtrip.poi.free')}</span>
-          ) : null}
+            <span className={POI_CHIP}>
+              {poi.alongKm < 0.5
+                ? t('roadtrip.poi.atStart')
+                : t('roadtrip.poi.alongRoute', { distance: formatDistance(poi.alongKm, distanceUnit) })}
+            </span>
+            {/* What the charger offers, where OSM says. Socket names are proper nouns and
+                stay as they are; the numbers around them are what decides whether a car can
+                use it at all. A station that says nothing shows nothing rather than a row
+                of dashes, because "not stated" is not "no". */}
+            {poi.charging?.sockets.length ? (
+              <span className="flex flex-wrap items-baseline gap-x-1.5">
+                {poi.charging.sockets.slice(0, 3).map(s => (
+                  <span key={s.type} className="text-content-muted">
+                    {SOCKET_LABEL[s.type] ?? s.type}
+                    {s.kw ? ` ${s.kw} kW` : ''}
+                    {s.count && s.count > 1 ? ` ×${s.count}` : ''}
+                  </span>
+                ))}
+              </span>
+            ) : null}
+            {poi.charging?.fee === false ? (
+              <span className="text-success">{t('roadtrip.poi.free')}</span>
+            ) : null}
+          </div>
         </div>
-      </div>
+      </Block>
       {/* Always there, quiet until the row is under the pointer: a button that only
           exists on hover is one a keyboard user has to find by faith. */}
       {onAdd ? (() => {
@@ -168,12 +200,13 @@ function ResultRow({ poi, onAdd }: { poi: CorridorPoi; onAdd?: () => void }): Re
 }
 
 /** One category's hits, so a mixed search reads as several short lists instead of one long one. */
-function ResultGroup({ category, pois, dayId, insertIndexFor, onAddPoi }: {
+function ResultGroup({ category, pois, dayId, insertIndexFor, onAddPoi, onFocusPoint }: {
   category: string
   pois: CorridorPoi[]
   dayId: number | null
   insertIndexFor: RoadtripCorridor['insertIndexFor']
   onAddPoi: RoadtripCorridorPanelProps['onAddPoi']
+  onFocusPoint: RoadtripCorridorPanelProps['onFocusPoint']
 }): React.ReactElement {
   const { t } = useTranslation()
   const meta = CATEGORY_META[category]
@@ -232,6 +265,7 @@ function ResultGroup({ category, pois, dayId, insertIndexFor, onAddPoi }: {
             poi={poi}
             // Added where it will be driven past, not at the end of the day.
             onAdd={onAddPoi ? () => onAddPoi(poi, dayId, insertIndexFor(poi)) : undefined}
+            onFocus={onFocusPoint ? () => onFocusPoint(poi.lat, poi.lng) : undefined}
           />
         ))}
       </ul>
@@ -253,10 +287,20 @@ function ResultGroup({ category, pois, dayId, insertIndexFor, onAddPoi }: {
  * header rather than among the filters — it is the question's subject, not one of its
  * conditions.
  */
-export default function RoadtripCorridorPanel({ corridor, routes, onAddPoi, tripId, canImport }: RoadtripCorridorPanelProps): React.ReactElement {
+export default function RoadtripCorridorPanel({
+  corridor, routes, onAddPoi, onFocusPoint, onAddManual, manualStopTargetFor, tripId, canImport,
+}: RoadtripCorridorPanelProps): React.ReactElement {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   const { search } = corridor
+  /**
+   * Whether the manual dialog is up.
+   *
+   * Local, and the dialog is mounted rather than merely hidden: it is a way of adding
+   * one stop, not a setting, and unmounting it on close is what stops a half-typed
+   * search from being there the next time somebody opens it.
+   */
+  const [manualOpen, setManualOpen] = useState(false)
 
   const dayOptions = routes.days.map(d => ({
     value: String(d.dayId),
@@ -371,26 +415,51 @@ export default function RoadtripCorridorPanel({ corridor, routes, onAddPoi, trip
           </div>
         </div>
 
-        {/* One word, so it can be read at the size a primary action deserves. The panel
-            it sits in is headed "along the route" and every control above it narrows the
-            same search; repeating that on the button only made it small.
+        {/* One word each, so both can be read at the size an action deserves. The panel
+            they sit in is headed "along the route" and every control above them narrows
+            the same search; repeating that on a button only made it small.
 
-            Its height is the controls' height, not a size of its own. At 38px it stood a
-            head above the segmented rows it follows and read as a second panel rather
-            than as the end of this one. */}
-        <button
-          type="button"
-          onClick={search.search}
-          disabled={!canSearch}
-          className="flex h-[32px] w-full items-center justify-center gap-2 rounded-lg bg-accent text-body font-semibold text-accent-text transition-opacity disabled:opacity-50"
-        >
-          {search.loading
-            ? <RotateCw size={15} className="animate-spin" aria-hidden />
-            : <Search size={15} strokeWidth={2} aria-hidden />}
-          {search.loading
-            ? t('roadtrip.poi.searching', { done: search.progress.done, total: search.progress.total })
-            : t('roadtrip.poi.search')}
-        </button>
+            Their height is the controls' height, not a size of their own. At 38px the
+            search stood a head above the segmented rows it follows and read as a second
+            panel rather than as the end of this one.
+
+            Two halves of one row, because the search finds most of what is out there and
+            not all of it: a good share of the chargers standing at a junction are in
+            nobody's OpenStreetMap extract. The second button is the way to those, and it
+            sits beside the search rather than under it so neither is the afterthought. */}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={search.search}
+            disabled={!canSearch}
+            className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg bg-accent text-body font-semibold text-accent-text transition-opacity disabled:opacity-50"
+          >
+            {search.loading
+              ? <RotateCw size={15} className="shrink-0 animate-spin" aria-hidden />
+              : <Search size={15} strokeWidth={2} className="shrink-0" aria-hidden />}
+            {/* The label grows into "Searching 3 of 12" while a run is on. Sharing the
+                row it has to shorten rather than push its neighbour off the panel, and
+                the panel is resizable down to a width where that matters. */}
+            <span className="min-w-0 truncate">
+              {search.loading
+                ? t('roadtrip.poi.searching', { done: search.progress.done, total: search.progress.total })
+                : t('roadtrip.poi.search')}
+            </span>
+          </button>
+          {/* The day is part of the offer: with no drive on the trip at all there is
+              nowhere for a stop to go, and a dialog that can only be cancelled is worse
+              than a button that waited. */}
+          {onAddPoi && onAddManual && corridor.day ? (
+            <button
+              type="button"
+              onClick={() => setManualOpen(true)}
+              className="flex h-[32px] min-w-0 flex-1 items-center justify-center gap-2 rounded-lg border border-edge bg-surface-card text-body font-semibold text-content transition-colors hover:bg-surface-hover disabled:opacity-50"
+            >
+              <Plus size={15} strokeWidth={2.2} className="shrink-0" aria-hidden />
+              <span className="min-w-0 truncate">{t('roadtrip.poi.addManual')}</span>
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {/* How the run is getting on — a row of its own while it lasts, with the share
@@ -439,6 +508,25 @@ export default function RoadtripCorridorPanel({ corridor, routes, onAddPoi, trip
             appears once there is something to narrow. */}
         {search.results.length > 0 ? (
           <div className="flex-shrink-0 border-b border-edge-faint p-3">
+            {/* What was found, and the way back out of it. A search that turned up the
+                wrong thing left its hits here and its pins on the map with no way to
+                dismiss them: the only way out was switching to the day plan and back.
+                Here rather than beside the search button, because throwing an answer
+                away is only ever meaningful once there is one. */}
+            <div className="mb-2 flex items-center gap-2">
+              <span className={EYEBROW} style={{ fontSize: FS.label }}>
+                {t('roadtrip.poi.found', { count: search.results.length })}
+              </span>
+              <button
+                type="button"
+                onClick={corridor.clear}
+                className="ms-auto inline-flex h-[22px] shrink-0 items-center gap-1 rounded-lg px-1.5 font-medium text-content-muted transition-colors hover:bg-surface-hover hover:text-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                style={{ fontSize: FS.control }}
+              >
+                <X size={12} strokeWidth={2.2} aria-hidden />
+                {t('roadtrip.poi.clearResults')}
+              </button>
+            </div>
             <div className="relative">
               <Search size={14} strokeWidth={1.9} className="pointer-events-none absolute start-3 top-1/2 -translate-y-1/2 text-content-faint" aria-hidden />
               <input
@@ -593,12 +681,25 @@ export default function RoadtripCorridorPanel({ corridor, routes, onAddPoi, trip
                   dayId={corridor.day?.dayId ?? null}
                   insertIndexFor={corridor.insertIndexFor}
                   onAddPoi={onAddPoi}
+                  onFocusPoint={onFocusPoint}
                 />
               ))}
             </>
           )}
         </div>
       </div>
+
+      {manualOpen && onAddManual ? (
+        <RoadtripManualStopModal
+          routes={routes}
+          dayId={corridor.day?.dayId ?? null}
+          targetFor={manualStopTargetFor}
+          onClose={() => setManualOpen(false)}
+          // Closed before the handover: what opens next is the stop popup, and two
+          // dialogs over each other is not a choice anybody made.
+          onSubmit={(place, target) => { setManualOpen(false); onAddManual(place, target) }}
+        />
+      ) : null}
     </div>
   )
 }

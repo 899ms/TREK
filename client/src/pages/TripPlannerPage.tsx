@@ -277,6 +277,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
     setRoadtripStopFill,
     saveRoadtripLimit, roadtripSettingsLoading, storedAssignments,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, resetDayBoundaries,
+    manualStopTargetFor, addManualRoadtripStop,
     routeAlternatives, askRouteAlternatives, refuel, askRefuel, acceptRefuel, chooseRouteAlternative, alternativeOverlays, alternativeFocusPoints, mapFocusPoints, roadtripMapVias, focusRoadtripPoint, dayBoundaryControls,
     stayDraft, setStayDraft, editRoadtripStay, setRoadtripStay, roadtripEndDay, roadtripStay,
     highlightedAlternative, setHighlightedAlternative,
@@ -730,6 +731,9 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                         corridor={roadtripCorridor}
                         routes={roadtripRoutes}
                         onAddPoi={can('place_edit', trip) ? handlePoiClick : undefined}
+                        onAddManual={can('place_edit', trip) ? addManualRoadtripStop : undefined}
+                        manualStopTargetFor={manualStopTargetFor}
+                        onFocusPoint={focusRoadtripPoint}
                       />
                       {/* Under the search, because the limits are read while looking at
                           what the drive is doing rather than set up front. */}

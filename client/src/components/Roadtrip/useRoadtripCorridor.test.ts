@@ -3,8 +3,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { CorridorPoi, CorridorSearch } from './useCorridorPois'
 import type { RoadtripDay, RoadtripRoutes } from './useRoadtripRoutes'
 
-const { useCorridorPois } = vi.hoisted(() => ({ useCorridorPois: vi.fn() }))
+const { useCorridorPois, stored } = vi.hoisted(() => ({
+  useCorridorPois: vi.fn(),
+  // The stored road trip preferences, read through the same selector the app uses so
+  // `useVehicleRange` does its own folding of the four vehicle states.
+  stored: { settings: {} as { roadtrip_vehicle?: string } },
+}))
 vi.mock('./useCorridorPois', () => ({ useCorridorPois }))
+vi.mock('../../hooks/useRoadtripSettings', () => ({
+  useRoadtripSettings: (select: (settings: typeof stored.settings) => unknown) => select(stored.settings),
+}))
 
 import { useRoadtripCorridor } from './useRoadtripCorridor'
 
@@ -54,6 +62,7 @@ function searchWith(results: CorridorPoi[]): CorridorSearch {
 
 beforeEach(() => {
   useCorridorPois.mockReset()
+  stored.settings = {}
 })
 
 describe('useRoadtripCorridor', () => {
@@ -158,6 +167,85 @@ describe('useRoadtripCorridor', () => {
 
     // Stop 0 sits at the start of the drive, so only the hit within 50 km survives.
     expect(result.current.visible.map(p => p.osm_id)).toEqual(['near'])
+  })
+
+  it('FE-ROADTRIP-CORRIDORSTATE-030: clearing drops the hits and every narrowing set on them', () => {
+    // Nothing could do this before: a search that turned up the wrong thing kept its
+    // list and its pins, and the way out was switching to the day plan and back.
+    const state = searchWith([poi({ osm_id: 'a', name: 'Aral' })])
+    useCorridorPois.mockReturnValue(state)
+    const { result } = renderHook(() => useRoadtripCorridor(routes([day()])))
+
+    act(() => {
+      result.current.setNameFilter('aral')
+      result.current.setSection({ dayId: 1, kind: 'stop', index: 0 })
+      result.current.setSocketFilter('ccs')
+      result.current.setMinKw(150)
+    })
+    act(() => { result.current.clear() })
+
+    expect(state.clear).toHaveBeenCalledTimes(1)
+    expect(result.current.nameFilter).toBe('')
+    expect(result.current.section).toBeNull()
+    expect(result.current.socketFilter).toBe('')
+    expect(result.current.minKw).toBe(0)
+    // The question stays: clearing the categories too would make asking the same thing
+    // again a handful of clicks.
+    expect(result.current.categories).toEqual(['fuel'])
+  })
+
+  it('FE-ROADTRIP-CORRIDORSTATE-031: an electric car looks for chargers instead of pumps', () => {
+    useCorridorPois.mockReturnValue(searchWith([]))
+    stored.settings = { roadtrip_vehicle: 'electric' }
+
+    const { result } = renderHook(() => useRoadtripCorridor(routes([day()]), 42))
+
+    expect(result.current.categories).toEqual(['charging'])
+  })
+
+  it('FE-ROADTRIP-CORRIDORSTATE-032: every other vehicle state keeps the fuel it always had', () => {
+    // Four states are stored: electric, combustion, an empty string written by the
+    // dialog, and no answer at all. `useVehicleRange` folds the last two into null, and
+    // moving the unset case would change the panel for every traveller who never opened
+    // the driving settings.
+    useCorridorPois.mockReturnValue(searchWith([]))
+    for (const roadtrip_vehicle of ['combustion', '', undefined]) {
+      stored.settings = roadtrip_vehicle === undefined ? {} : { roadtrip_vehicle }
+      const { result, unmount } = renderHook(() => useRoadtripCorridor(routes([day()]), 42))
+      expect(result.current.categories).toEqual(['fuel'])
+      unmount()
+    }
+  })
+
+  it('FE-ROADTRIP-CORRIDORSTATE-033: a kind the traveller picked is never overruled by the preference', () => {
+    // The preference is loaded per trip and lands a moment after the panel does. A
+    // category somebody switched off coming back by itself makes the picker unusable.
+    useCorridorPois.mockReturnValue(searchWith([]))
+    const { result, rerender } = renderHook(() => useRoadtripCorridor(routes([day()]), 42))
+
+    act(() => { result.current.toggleCategory('rest_area') })
+    stored.settings = { roadtrip_vehicle: 'electric' }
+    rerender()
+
+    expect(result.current.categories).toEqual(['fuel', 'rest_area'])
+  })
+
+  it('FE-ROADTRIP-CORRIDORSTATE-034: a preference arriving over a search does not empty it', () => {
+    // `useCorridorPois` drops its results whenever the categories change, so a late
+    // preference must not reach either a run in flight or a list already answered.
+    useCorridorPois.mockReturnValue({ ...searchWith([]), loading: true })
+    const running = renderHook(() => useRoadtripCorridor(routes([day()]), 42))
+    stored.settings = { roadtrip_vehicle: 'electric' }
+    running.rerender()
+    expect(running.result.current.categories).toEqual(['fuel'])
+    running.unmount()
+
+    stored.settings = {}
+    useCorridorPois.mockReturnValue(searchWith([poi({ osm_id: 'a', name: 'Aral' })]))
+    const answered = renderHook(() => useRoadtripCorridor(routes([day()]), 42))
+    stored.settings = { roadtrip_vehicle: 'electric' }
+    answered.rerender()
+    expect(answered.result.current.categories).toEqual(['fuel'])
   })
 
   it('FE-ROADTRIP-CORRIDORSTATE-021: an anchor belonging to another day narrows nothing', () => {
