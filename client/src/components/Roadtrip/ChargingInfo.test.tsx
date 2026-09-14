@@ -70,6 +70,12 @@ describe('Charging information', () => {
     // request is still out, so a plain findAllByText settles on that one alone and the
     // count would pass for the wrong reason.
     await waitFor(() => expect(screen.getAllByText('No reliable data available')).toHaveLength(2))
-    expect(screen.queryByText(/\d+\/\d+/)).not.toBeInTheDocument()
+    // Anchored at the start on purpose. The attribution line ends in the source's
+    // updatedAt run through toLocaleString(), and tests/setup.ts only forces en-US on
+    // toLocaleDateString, so that timestamp is "14.9.2026" on a German machine and
+    // "9/14/2026" on the CI runner. An unanchored \d+/\d+ matches the second one and
+    // the test fails on Linux for a date, not for a count. Both places that print a
+    // count start with it, so anchoring keeps what the case is actually about.
+    expect(screen.queryByText(/^\d+\/\d+/)).not.toBeInTheDocument()
   })
 })
