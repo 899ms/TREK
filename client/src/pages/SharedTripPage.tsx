@@ -19,9 +19,7 @@ import { createElement, useEffect, useRef } from 'react';
 import { renderIconMarkup } from '../utils/iconMarkup';
 import { MapContainer, Marker, Polyline, TileLayer, Tooltip, useMap } from 'react-leaflet';
 import MarkerClusterGroup from 'react-leaflet-cluster';
-// leaflet.markercluster's own sheets travel with the planner's MapView, which this
-// page never mounts: without them the bubbles keep the library's default styling
-// and spiderfy's legs are invisible.
+// MapView brings these sheets for the planner, and this page never mounts it.
 import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import { CLUSTER_OPTIONS, createClusterIcon } from '../components/Map/markerCluster';
@@ -461,10 +459,7 @@ export default function SharedTripPage() {
                     interactive={false}
                   />
                 )}
-                {/* Clustered like the planner's map (#2343). A shared link draws the
-                    whole trip at once on a 300px-tall map, where a stop a few blocks
-                    from the next one is the same few pixels: unclustered, the pins
-                    cover each other and the ones underneath cannot be tapped. */}
+                {/* Clustered like the planner's map, so nearby stops stay tappable (#2343). */}
                 <MarkerClusterGroup {...CLUSTER_OPTIONS} iconCreateFunction={createClusterIcon}>
                   {mapPlaces.map((p: any) => (
                     <Marker key={p.id} position={[p.lat, p.lng]} icon={createMarkerIcon(p, dayOrderMap[p.id] ?? null)}>

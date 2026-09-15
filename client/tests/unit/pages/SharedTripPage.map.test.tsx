@@ -1,17 +1,9 @@
 /**
- * The share page's map is the planner's map (#2343).
- *
- * A shared link is the only view a guest ever gets — no account, no zoom habits,
- * often a phone — and it draws the whole trip at once on a 300px-tall canvas.
- * Unclustered, three dozen pins pile onto each other there and the ones
- * underneath can be neither read nor tapped, while the planner shows the same
- * trip as a handful of tidy bubbles.
- *
- * The data hooks and the Leaflet components are stubbed: what is under test is
- * the page's own wiring — that every stop reaches a cluster group built from the
- * shared option block — not Leaflet's rendering, which jsdom cannot do anyway.
+ * The share page clusters its markers like the planner (#2343). The data hook and
+ * Leaflet are stubbed: under test is the page's wiring, not Leaflet's rendering.
  */
 import React from 'react';
+import L from 'leaflet';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, within } from '../../helpers/render';
 import { CLUSTER_OPTIONS, createClusterIcon } from '../../../src/components/Map/markerCluster';
@@ -92,7 +84,7 @@ beforeEach(() => {
 });
 
 describe('the map on a public share page', () => {
-  it('SHAREMAP-001: every stop is handed to a cluster group, not the raw map', () => {
+  it('FE-PAGE-SHARED-MAP-001: every stop is handed to a cluster group, not the raw map', () => {
     mocks.hook = hookState(
       payload([place(11, 'The Bund', 31.24, 121.49), place(12, 'Peace Hotel', 31.2397, 121.4903)]),
     );
@@ -104,7 +96,7 @@ describe('the map on a public share page', () => {
     expect(within(screen.getByTestId('map')).getAllByTestId('marker')).toHaveLength(2);
   });
 
-  it('SHAREMAP-002: the group is built from the shared options, so both maps cluster alike', () => {
+  it('FE-PAGE-SHARED-MAP-002: the group is built from the shared options, so both maps cluster alike', () => {
     mocks.hook = hookState(payload([place(11, 'The Bund', 31.24, 121.49)]));
     render(<SharedTripPage />);
 
@@ -116,18 +108,18 @@ describe('the map on a public share page', () => {
     expect(typeof props.iconCreateFunction).toBe('function');
   });
 
-  it('SHAREMAP-004: the bubble shows the count, in the size bucket that count earns', () => {
+  it('FE-PAGE-SHARED-MAP-003: the bubble shows the count, in the size bucket that count earns', () => {
     const small = createClusterIcon({ getChildCount: () => 7 });
     const medium = createClusterIcon({ getChildCount: () => 30 });
     const large = createClusterIcon({ getChildCount: () => 60 });
 
     expect(small.options.className).toBe('marker-cluster-wrapper');
     expect(small.options.html).toContain('<span>7</span>');
-    expect([small, medium, large].map((icon) => icon.options.iconSize?.x)).toEqual([36, 42, 48]);
+    expect([small, medium, large].map((icon) => icon.options.iconSize)).toEqual([L.point(36, 36), L.point(42, 42), L.point(48, 48)]);
     expect(small.options.html).toContain('width:36px;height:36px');
   });
 
-  it('SHAREMAP-003: a place without coordinates is left out of the map, as before', () => {
+  it('FE-PAGE-SHARED-MAP-004: a place without coordinates is left out of the map, as before', () => {
     mocks.hook = hookState(
       payload([place(11, 'The Bund', 31.24, 121.49), { id: 12, name: 'Geocoding failed' } as never]),
     );

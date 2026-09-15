@@ -1,12 +1,8 @@
 import L from 'leaflet'
 
 /**
- * The cluster group every place map is drawn with.
- *
- * The planner and the public share page draw the same trip, so they have to
- * cluster it the same way: a shared link that opens on three dozen overlapping
- * pins while the planner shows four tidy bubbles is one trip told two different
- * ways. Both maps build their group from this block and this factory (#2343).
+ * The cluster group the planner and the public share page both draw places with,
+ * so a shared link clusters a trip the way the planner does (#2343).
  */
 export const CLUSTER_OPTIONS = {
   chunkedLoading: true,
@@ -26,13 +22,7 @@ export interface ClusterLike {
   getChildCount: () => number
 }
 
-/**
- * A count bubble, sized by what it stands for.
- *
- * Markup rather than a component because Leaflet owns this element:
- * `L.divIcon`'s html lands in the marker pane, outside React's tree — which is
- * also why its styling lives in index.css (`.marker-cluster-custom`).
- */
+/** A count bubble sized by its count, styled by `.marker-cluster-custom` in index.css. */
 export function createClusterIcon(cluster: ClusterLike) {
   const count = cluster.getChildCount()
   const size = count < 10 ? 36 : count < 50 ? 42 : 48
