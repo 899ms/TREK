@@ -1453,7 +1453,7 @@ describe('SharedTripPage', () => {
 
   // ── #2345: the header has to clip the decoration it bleeds ──────────────
 
-  describe('FE-PAGE-SHARED-040: the header clips the circles it bleeds (#2345)', () => {
+  describe('FE-PAGE-SHARED-042: the header clips the circles it bleeds (#2345)', () => {
     it('does not let them widen the page', async () => {
       await open('overflow-token', payload({}));
 
