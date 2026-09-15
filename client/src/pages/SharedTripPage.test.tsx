@@ -1483,4 +1483,19 @@ describe('SharedTripPage', () => {
       expect(document.querySelector('a[href^="javascript:"]')).toBeNull();
     });
   });
+
+  // ── #2345: the header has to clip the decoration it bleeds ──────────────
+
+  describe('FE-PAGE-SHARED-042: the header clips the circles it bleeds (#2345)', () => {
+    it('does not let them widen the page', async () => {
+      await open('overflow-token', payload({}));
+
+      // Both circles sit outside the header on purpose, so the page only stays
+      // as wide as the viewport if the header itself is the clip. The header is
+      // the first gradient panel on the page and carries the trip title.
+      const header = document.querySelector<HTMLElement>('div[style*="linear-gradient(135deg"]');
+      expect(header?.textContent).toContain('Shared Paris Trip');
+      expect(header?.style.overflow).toBe('hidden');
+    });
+  });
 });

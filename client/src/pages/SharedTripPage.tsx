@@ -205,6 +205,9 @@ export default function SharedTripPage() {
           padding: '32px 20px 28px',
           textAlign: 'center',
           position: 'relative',
+          // The decoration circles bleed past this box on purpose; without the clip
+          // they widened the page by 60px on a phone (#2345).
+          overflow: 'hidden',
         }}
       >
         {/* Cover image background */}
