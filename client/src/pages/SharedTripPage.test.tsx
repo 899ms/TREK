@@ -24,6 +24,13 @@ vi.mock('react-leaflet', () => ({
   }),
 }));
 
+// The real cluster group needs the map context the stubbed MapContainer lacks (#2343).
+vi.mock('react-leaflet-cluster', () => ({
+  default: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="marker-cluster-group">{children}</div>
+  ),
+}));
+
 // The basemap is a MapLibre style now, and the real component reaches for
 // maplibre-gl through a dynamic import. The page test only cares that it is the
 // thing being rendered.
