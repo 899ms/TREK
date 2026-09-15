@@ -16,6 +16,7 @@ import { KNOWN_COUNTRIES } from './known-countries';
 import { cityFromAddress } from './city-from-address';
 import { transferEndpointIds } from './transfer-endpoints';
 import type { FlightEndpointRow } from './transfer-endpoints';
+import { countryVisitDates } from './visit-dates';
 import { haversineKm } from '../common/geo';
 
 /**
@@ -262,21 +263,16 @@ export class AtlasService {
       }
     }
 
-    const countries = [...countrySet.values()].map((c) => {
-      const countryTrips = trips.filter((t) => c.tripIds.has(t.id));
-      const dates = countryTrips
-        .map((t) => t.start_date)
-        .filter(Boolean)
-        .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-      return {
-        code: c.code,
-        placeCount: c.places.length,
-        tripCount: c.tripIds.size,
-        firstVisit: dates[0] || null,
-        lastVisit: dates[dates.length - 1] || null,
-        status: c.status,
-      };
-    });
+    // The dates are filled in at the end, once a manual mark or a booking has had its
+    // say on the status: they come only from the trips that match that final status.
+    const countries = [...countrySet.values()].map((c) => ({
+      code: c.code,
+      placeCount: c.places.length,
+      tripCount: c.tripIds.size,
+      firstVisit: null as string | null,
+      lastVisit: null as string | null,
+      status: c.status,
+    }));
 
     const citySet = new Set<string>();
     for (const place of places) {
@@ -367,14 +363,17 @@ export class AtlasService {
 
     // Collapse to one entry per coordinate before resolving countries —
     // getCountryFromCoords is a point-in-polygon scan and used to run once per point.
-    const endpointStatus = new Map<string, { lat: number; lng: number; status: VisitStatus }>();
+    const endpointStatus = new Map<string, { lat: number; lng: number; status: VisitStatus; tripIds: Set<number> }>();
     for (const e of endpoints) {
       const status = tripStatus.get(e.trip_id) ?? 'idea';
       const key = `${e.lat},${e.lng}`;
       const seen = endpointStatus.get(key);
-      if (seen) seen.status = strongerVisitStatus(seen.status, status);
-      else endpointStatus.set(key, { lat: e.lat, lng: e.lng, status });
+      if (seen) {
+        seen.status = strongerVisitStatus(seen.status, status);
+        seen.tripIds.add(e.trip_id);
+      } else endpointStatus.set(key, { lat: e.lat, lng: e.lng, status, tripIds: new Set([e.trip_id]) });
     }
+    const bookingTripIds = new Map<string, Set<number>>();
     for (const e of endpointStatus.values()) {
       const code = getCountryFromCoords(e.lat, e.lng);
       if (!code || hidden.has(code)) continue;
@@ -382,6 +381,20 @@ export class AtlasService {
       if (existing) existing.status = strongerVisitStatus(existing.status, e.status);
       else
         countries.push({ code, placeCount: 0, tripCount: 0, firstVisit: null, lastVisit: null, status: e.status });
+      const ids = bookingTripIds.get(code) ?? new Set<number>();
+      for (const id of e.tripIds) ids.add(id);
+      bookingTripIds.set(code, ids);
+    }
+
+    // A booking can be what makes a country with places visited, so its trip dates the
+    // country as well. A country reached by bookings alone has no trip in its tooltip
+    // and stays without dates.
+    for (const c of countries) {
+      const fromPlaces = countrySet.get(c.code);
+      if (!fromPlaces) continue;
+      const fromBookings = bookingTripIds.get(c.code);
+      const dated = trips.filter((t) => fromPlaces.tripIds.has(t.id) || fromBookings?.has(t.id));
+      Object.assign(c, countryVisitDates(dated, c.status, now));
     }
 
     // Everything below counts actual visits only. countries[] still carries planned and

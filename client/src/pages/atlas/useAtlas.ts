@@ -9,7 +9,7 @@ import { isVectorStyle } from '../../utils/tileUrl'
 import apiClient, { mapsApi, pluginsApi, type PluginAtlasLayer } from '../../api/client'
 import L from 'leaflet'
 import type { GeoJsonFeatureCollection } from '../../types'
-import { A2_TO_A3, countryStatus, findBucketDuplicate, isBucketDuplicateError, isCountryVisible, normalizeRegionName, regionCacheEvictions, withCountryMarkedVisited, wishlistA3Codes, countryColor, REGION_CACHE_MAX, bucketTooltipWidth, bucketTooltipPlacement, bucketTooltipNeedsScroll, type AtlasData, type AtlasPlaceHit, type CountryDetail, type BucketItem } from './atlasModel'
+import { A2_TO_A3, countryStatus, visitMonth, findBucketDuplicate, isBucketDuplicateError, isCountryVisible, normalizeRegionName, regionCacheEvictions, withCountryMarkedVisited, wishlistA3Codes, countryColor, REGION_CACHE_MAX, bucketTooltipWidth, bucketTooltipPlacement, bucketTooltipNeedsScroll, type AtlasData, type AtlasPlaceHit, type CountryDetail, type BucketItem } from './atlasModel'
 import { continentForCountry, escapeHtml, type VisitStatus } from '@trek/shared'
 import { useGlassGlare } from '../../components/Atlas/useGlassGlare'
 import { dawarichApi } from '../../api/dawarich'
@@ -560,7 +560,7 @@ export function useAtlas() {
         if (c) {
           country_layer_by_a2_ref.current[c.code] = layer
           const name = resolveName(c.code)
-          const formatDate = (d) => { if (!d) return '—'; const dt = new Date(d); return dt.toLocaleDateString(getLocaleForLanguage(language), { month: 'short', year: 'numeric' }) }
+          const formatDate = (d) => { const month = visitMonth(d); return month ? month.toLocaleDateString(getLocaleForLanguage(language), { month: 'short', year: 'numeric' }) : '—' }
           // "First trip / Last trip" is simply wrong for a country you haven't reached yet —
           // a planned one gets a single departure date instead.
           const planned = countryStatus(c) !== 'visited'
