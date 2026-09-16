@@ -1,12 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, within } from '../../../helpers/render'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
+import { resetAllStores, seedStore } from '../../../helpers/store'
+import { useTripStore } from '../../../../src/store/tripStore'
 import MRoadtripTab from '../../../../src/mobile/screens/trip/roadtrip/MRoadtripTab'
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import type { Day, Place } from '../../../../src/types'
 import type { RoadtripDay, RoadtripRoutes, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-034
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-044
+//
+// The stage bar pictures the place its day ends at. It reads that place out of the trip
+// store rather than the planner, the unfiltered list, so the picture tests seed the store.
 
 // The preference store is a zustand slice keyed by user and trip; the tab only ever
 // reads two flags out of it, so the hook is the smaller seam.
@@ -17,6 +22,15 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../../../../src/hooks/useRoadtripSettings', () => ({
   useRoadtripSettings: (select: (p: Record<string, unknown>) => unknown) => select(mocks.prefs),
+}))
+
+// The picture asks the photo service for any place without an image of its own. Stubbed to
+// know nothing and fetch nothing, so no test of the bar ever reaches for the network.
+vi.mock('../../../../src/services/photoService', () => ({
+  getCached: () => null,
+  isLoading: () => false,
+  fetchPhoto: vi.fn(),
+  onThumbReady: () => () => {},
 }))
 
 // The swipe itself is the plan tab's, tested there; this keeps the real hook and only
@@ -148,6 +162,7 @@ function today(date: string): Partial<TripPlanner> {
 
 describe('MRoadtripTab', () => {
   beforeEach(() => {
+    resetAllStores()
     mocks.prefs = {}
   })
 
@@ -246,16 +261,18 @@ describe('MRoadtripTab', () => {
       expect(screen.queryByText('mobileTrip.rtPlanOnDesktop')).toBeNull()
     })
 
-    it('FE-MOB-RTTAB-010: paints the day tint only once the day colours are on', () => {
-      const plain = renderTab()
-      expect(plain.container.querySelector('span.h-2.w-2.rounded-full')).toBeNull()
-      plain.unmount()
-
+    it('FE-MOB-RTTAB-010: draws no day colour dot in the head card, even with the day colours on', () => {
+      // The colour keys the day's line on the map, which lies under the list on this half,
+      // so a dot here had nothing on screen to explain it.
       mocks.prefs = { roadtrip_day_colors: true }
-      const tinted = renderTab()
-      const dot = tinted.container.querySelector('span.h-2.w-2.rounded-full') as HTMLElement
-      // dayColor(2).line, the second of the eight, see dayColors.ts.
-      expect(dot).toHaveStyle({ background: '#ff9f0a' })
+      renderTab()
+
+      const card = screen.getByText('mobileTrip.rtStart').closest('section') as HTMLElement
+      // The dot was the card's only inline paint (this stage carries no day warning).
+      expect(card.querySelectorAll('[style]')).toHaveLength(0)
+      expect(card.querySelector('[aria-hidden="true"]')).toBeNull()
+      // The date is text and nothing else, with no swatch leading or trailing it.
+      expect(screen.getByText(/May 2/).children).toHaveLength(0)
     })
 
     it('FE-MOB-RTTAB-011: dashes the two figures for a stage the routing could not time', () => {
@@ -322,6 +339,66 @@ describe('MRoadtripTab', () => {
       // The figure is the very clock the first row carries.
       const firstRow = screen.getByText('Hamburg Speicherstadt').closest('[role=button]') as HTMLElement
       expect(within(firstRow).getByText('10:00')).toBeInTheDocument()
+    })
+
+    it('FE-MOB-RTTAB-042: carries the day\'s facts on the date line as badges, above the clocks', () => {
+      renderTab()
+
+      const date = screen.getByText(/May 2/)
+      const line = date.parentElement as HTMLElement
+      // The date takes the start and the badges pack to the end, and the line may wrap.
+      expect(date.className).toContain('me-auto')
+      expect(line.className).toContain('flex-wrap')
+      const drive = within(line).getByText('roadtrip.leg.driveText:412 km,5 h').closest('.rounded-full') as HTMLElement
+      const stops = within(line).getByText('roadtrip.day.stopCount:2').closest('.rounded-full') as HTMLElement
+      expect(drive).not.toBeNull()
+      expect(stops).not.toBeNull()
+      expect(drive).not.toBe(stops)
+      // The two share one wrapper beside the date, so they wrap under it as a pair and a long
+      // drive never leaves the count alone on the next line, away from the drive.
+      const pair = drive.parentElement as HTMLElement
+      expect(stops.parentElement).toBe(pair)
+      expect(pair.parentElement).toBe(line)
+      expect(pair.className).toContain('flex-wrap')
+      expect(pair.className).toContain('max-w-full')
+      // The distance keeps its unit's case; the count is a word, in caps like the stage bar's.
+      expect(drive.className).not.toContain('uppercase')
+      expect(stops.className).toContain('uppercase')
+      // The clocks are the band under the line, not part of it.
+      expect(within(line).queryByText('mobileTrip.rtStart')).toBeNull()
+      const clocks = screen.getByText('mobileTrip.rtStart')
+      expect(line.compareDocumentPosition(clocks) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('FE-MOB-RTTAB-043: puts the partial total on the date line in a badge that may wrap', () => {
+      renderTab(planner({ roadtripRoutes: routes({ days: [stage({ distance: 0 })] }) }))
+
+      const line = screen.getByText(/May 2/).parentElement as HTMLElement
+      const badge = within(line).getByText('roadtrip.summary.partial')
+      // The sentence breaks inside its badge rather than pushing past the card, and the
+      // badge stops at the line's width and grows with the text instead of clipping it.
+      expect(badge.className).toContain('rounded-full')
+      expect(badge.className).toContain('whitespace-normal')
+      expect(badge.className).toContain('max-w-full')
+      expect(badge.className).not.toMatch(/(^|\s)h-\[18px\]/)
+      expect(badge.className).not.toContain('uppercase')
+      // The stop count beside it is a figure, and stays on one line.
+      expect(within(line).getByText('roadtrip.day.stopCount:2').className).toContain('whitespace-nowrap')
+    })
+
+    it('FE-MOB-RTTAB-044: sets the clocks smaller and draws no divider band, so the card stays a header', () => {
+      renderTab()
+
+      for (const [label, clock] of [['mobileTrip.rtStart', '08:30'], ['roadtrip.stay.arrive', '12:40']] as const) {
+        const value = within(screen.getByText(label).parentElement as HTMLElement).getByText(clock)
+        expect(value.className).toContain('text-[1.5rem]')
+        expect(value.className).not.toContain('text-[1.875rem]')
+      }
+      const card = screen.getByText('mobileTrip.rtStart').closest('section') as HTMLElement
+      expect(card.querySelector('[class*="border-t"]')).toBeNull()
+      const padding = card.className.split(' ')
+      expect(padding).toContain('py-3')
+      expect(padding).not.toContain('py-3.5')
     })
   })
 
@@ -430,16 +507,26 @@ describe('MRoadtripTab', () => {
       expect(screen.queryByText('roadtrip.window.stop')).toBeNull()
     })
 
-    it('FE-MOB-RTTAB-023: names the last stop of the day, its count, that stop\'s own arrival and the distance', () => {
+    it('FE-MOB-RTTAB-023: names the last stop of the day, and badges its count, that stop\'s own arrival and the distance', () => {
       renderTab(planner(), mapShell())
 
-      const bar = screen.getByRole('button', { name: /Kyoto Station/ })
+      // The badges run their texts together in a computed name, so the bar spells it out.
+      const bar = screen.getByRole('button', { name: 'Kyoto Station, roadtrip.day.stopCount:2, 12:40, 412 km' })
       expect(within(bar).getByText('Kyoto Station')).toBeInTheDocument()
+      // One badge per figure, and no middle dot left between them.
+      const badges = ['roadtrip.day.stopCount:2', '12:40', '412 km'].map(text => within(bar).getByText(text).closest('.rounded-full'))
+      expect(badges).not.toContain(null)
+      expect(new Set(badges).size).toBe(3)
+      expect(bar.textContent).not.toContain('·')
       // 12:40 is when Kyoto Station is reached. The bar used to print 22:00, the automatic
       // day end after it, which is where the window closed and not a clock of the stop named.
-      expect(within(bar).getByText('roadtrip.day.stopCount:2 · 12:40')).toBeInTheDocument()
       expect(within(bar).queryByText(/22:00/)).toBeNull()
-      expect(within(bar).getByText('412 km')).toBeInTheDocument()
+      // Words in caps, the unit in its own case. And neutral: the whole bar is the button,
+      // and a filled pill inside it would read as a second one.
+      expect(within(bar).getByText('roadtrip.day.stopCount:2').className).toContain('uppercase')
+      const distance = within(bar).getByText('412 km')
+      expect(distance.className).not.toContain('uppercase')
+      expect(distance.className).not.toContain('bg-m-act')
     })
 
     it('FE-MOB-RTTAB-024: drops the arrival from the bar when the day has none, and the pending distance with it', () => {
@@ -449,7 +536,9 @@ describe('MRoadtripTab', () => {
       } as unknown as Partial<RoadtripDay>)
       renderTab(planner({ roadtripRoutes: routes({ days: [untimed] }) }), mapShell())
 
-      const bar = screen.getByRole('button', { name: /roadtrip.leg.pending/ })
+      // The name leaves the missing clock out too, rather than reading an empty part or a
+      // placeholder between the count and the distance.
+      const bar = screen.getByRole('button', { name: 'Kyoto Station, roadtrip.day.stopCount:2, roadtrip.leg.pending' })
       expect(within(bar).getByText('roadtrip.day.stopCount:2')).toBeInTheDocument()
       expect(within(bar).getByText('roadtrip.leg.pending')).toBeInTheDocument()
     })
@@ -500,7 +589,8 @@ describe('MRoadtripTab', () => {
       const { shell } = renderTab(planner({ roadtripRoutes: routes({ days: [spilledOnly] }) }), mapShell())
 
       const bar = screen.getByRole('button', { name: /Fuji Viewpoint/ })
-      expect(within(bar).getByText('roadtrip.day.stopCount:1 · 00:40')).toBeInTheDocument()
+      expect(within(bar).getByText('roadtrip.day.stopCount:1')).toBeInTheDocument()
+      expect(within(bar).getByText('00:40')).toBeInTheDocument()
       fireEvent.click(bar)
       expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 1, assignmentId: 501 })
     })
@@ -513,6 +603,102 @@ describe('MRoadtripTab', () => {
       // Not a dead button: with no stage there is nothing for a tap to open, so the
       // whole-drive line is a plain block. The search bar above it stays a button.
       expect(screen.getByText('roadtrip.title').closest('button')).toBeNull()
+    })
+
+    it('FE-MOB-RTTAB-035: pictures the place the day ends at, from the trip store and not the filtered day lists', () => {
+      seedStore(useTripStore, { places: [PLACES[0], { ...PLACES[1], image_url: 'https://img.test/kyoto.jpg' }] })
+      // planner.places is the list the phone takes hidden service stops out of, so the
+      // picture must not depend on it: a day can end at a hidden campsite.
+      renderTab(planner({ places: [] }), mapShell())
+
+      const bar = screen.getByRole('button', { name: /Kyoto Station/ })
+      const img = bar.querySelector('img') as HTMLImageElement
+      expect(img).toHaveAttribute('src', 'https://img.test/kyoto.jpg')
+      // Out of the name: the photo's alt text is the title a second time.
+      expect(img.closest('[aria-hidden="true"]')).not.toBeNull()
+      expect(bar).toHaveAccessibleName('Kyoto Station, roadtrip.day.stopCount:2, 12:40, 412 km')
+      expect(bar.querySelector('.lucide-map-pin')).toBeNull()
+    })
+
+    it('FE-MOB-RTTAB-036: shows a neutral pin when no place row stands behind the stop', () => {
+      seedStore(useTripStore, { places: [] })
+      renderTab(planner(), mapShell())
+
+      const bar = screen.getByRole('button', { name: /Kyoto Station/ })
+      expect(bar.querySelector('img')).toBeNull()
+      expect(bar.firstElementChild?.querySelector('.lucide-map-pin')).not.toBeNull()
+    })
+
+    it('FE-MOB-RTTAB-037: a place without a photo is pictured by its category', () => {
+      seedStore(useTripStore, { places: [{ ...PLACES[1], category_id: 5 }] })
+      const categories = [{ id: 5, name: 'Station', color: '#123456', icon: 'Train' }]
+      renderTab(planner({ categories } as unknown as Partial<TripPlanner>), mapShell())
+
+      const ring = screen.getByRole('button', { name: /Kyoto Station/ }).firstElementChild as HTMLElement
+      expect(ring.querySelector('img')).toBeNull()
+      expect(ring.firstElementChild).toHaveStyle({ backgroundColor: '#123456' })
+    })
+
+    it('FE-MOB-RTTAB-038: rings the picture in the day colour only once the day colours are on', () => {
+      const plain = renderTab(planner(), mapShell())
+      const plainRing = screen.getByRole('button', { name: /Kyoto Station/ }).firstElementChild as HTMLElement
+      expect(plainRing).toHaveAttribute('aria-hidden', 'true')
+      expect(plainRing.style.borderColor).toBe('')
+      plain.unmount()
+
+      mocks.prefs = { roadtrip_day_colors: true }
+      renderTab(planner(), mapShell())
+      const ring = screen.getByRole('button', { name: /Kyoto Station/ }).firstElementChild as HTMLElement
+      // dayColor(2).line, the second of the eight, see dayColors.ts.
+      expect(ring).toHaveStyle({ borderColor: '#ff9f0a' })
+    })
+
+    it('FE-MOB-RTTAB-039: a new stage never keeps the picture of the one before', () => {
+      seedStore(useTripStore, { places: [PLACES[0], { ...PLACES[1], image_url: 'https://img.test/kyoto.jpg' }] })
+      const shell = mapShell()
+      const view = renderTab(planner(), shell)
+      expect(screen.getByRole('button', { name: /Kyoto Station/ }).querySelector('img')).not.toBeNull()
+
+      // The next stage ends at Fuji Viewpoint, which has no photo of its own. The avatar
+      // keeps the photo it was first handed until it remounts, which is what its key is for.
+      const fujiOnly = stage({
+        stops: [stage().stops[0]],
+        legs: [],
+        legVias: [],
+        dryPoints: [],
+        driveWarnings: [],
+        schedule: { entries: [{ arrival: '00:40', departure: '01:25', anchored: false, dayOffset: 0 }], warnings: [] },
+      } as unknown as Partial<RoadtripDay>)
+      view.rerender(<MRoadtripTab planner={planner({ roadtripRoutes: routes({ days: [fujiOnly] }) })} shell={shell} tab="roadtrip" />)
+
+      const bar = screen.getByRole('button', { name: /Fuji Viewpoint/ })
+      expect(bar.querySelector('img')).toBeNull()
+    })
+
+    it('FE-MOB-RTTAB-040: the head card and the stage bar agree on when the day arrives', () => {
+      const list = renderTab()
+      const arrive = screen.getByText('roadtrip.stay.arrive').parentElement as HTMLElement
+      expect(within(arrive).getByText('12:40')).toBeInTheDocument()
+      list.unmount()
+
+      renderTab(planner(), mapShell())
+      const bar = screen.getByRole('button', { name: /Kyoto Station/ })
+      // Same clock, and it keeps its digit order in an RTL locale like the head card's.
+      expect(within(bar).getByText('12:40')).toHaveAttribute('dir', 'ltr')
+    })
+
+    it('FE-MOB-RTTAB-041: the whole-drive bar badges a measured total and leaves a total of nothing out', () => {
+      const measured = renderTab(planner({ selectedDayId: null }), mapShell())
+      const total = screen.getByText('980 km')
+      expect(total.className).toContain('rounded-full')
+      expect(total.className).not.toContain('uppercase')
+      measured.unmount()
+
+      renderTab(planner({ selectedDayId: null, roadtripRoutes: routes({ totalDistance: 0 }) }), mapShell())
+      // Nothing routed yet is not a drive of 0 m.
+      expect(screen.getByText('roadtrip.title')).toBeInTheDocument()
+      expect(screen.queryByText('0 m')).toBeNull()
+      expect(screen.getByText('roadtrip.title').parentElement?.querySelector('.rounded-full')).toBeNull()
     })
   })
 

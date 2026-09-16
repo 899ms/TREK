@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { destinationCount, roadtripRows, stageClocks, stageEnd, stageOf, upNextStop } from '../../../../components/Roadtrip/roadtripRowModel'
 import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
+import { useTripStore } from '../../../../store/tripStore'
 import { isEffectivelyOffline, onNetworkModeChange } from '../../../../sync/networkMode'
 import type { RoadtripDay } from '@trek/shared/roadtrip'
 import type { MTripShellApi, TripPlanner } from '../MTripShell'
 import type { RoadtripRow, StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import type { Category, Place } from '../../../../types'
 
 /** Minutes since midnight, local time. */
 const nowMinutes = (): number => {
@@ -21,8 +23,12 @@ export interface MRoadtripController {
   rows: RoadtripRow[]
   /** The head card's two figures, both taken from the arrival column the rows print. See stageClocks. */
   clocks: ReturnType<typeof stageClocks>
-  /** The stop the bar over the map names and opens, with the clock it shows. See stageEnd. */
+  /** The stop the bar over the map names, pictures and opens, with the clock it shows. See stageEnd. */
   end: StopRow | null
+  /** The place row behind `end`, for the picture the bar leads with. Null without one. */
+  endPlace: Place | null
+  /** Its category, whose icon and colour stand in for a place that has no photo. */
+  endCategory: Category | null
   stops: number
   /** True while the routing round is still working through the trip's days. */
   loading: boolean
@@ -64,6 +70,21 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
   const clocks = useMemo(() => stageClocks(rows), [rows])
   const end = useMemo(() => stageEnd(rows), [rows])
 
+  // The place behind the end comes from the whole trip store, not planner.places: with
+  // service stops hidden from the day lists the phone filters them out of that list, while
+  // the stage still draws them, and a day that ends at a hidden campsite still ends there.
+  // The stop sheet and the stage pins read the same list for the same reason.
+  const tripPlaces = useTripStore(s => s.places)
+  const endPlace = useMemo(
+    () => (end ? tripPlaces.find(p => p.id === end.stop.placeId) ?? null : null),
+    [end, tripPlaces],
+  )
+  const categories = planner.categories
+  const endCategory = useMemo(
+    () => (endPlace?.category_id == null ? null : categories.find(c => c.id === endPlace.category_id) ?? null),
+    [endPlace, categories],
+  )
+
   // "Today" is the stage's own date, not the selected day's index: a trip can be
   // planned for next year, and a countdown on a day in March is noise.
   const isToday = useMemo(() => {
@@ -77,6 +98,8 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
     rows,
     clocks,
     end,
+    endPlace,
+    endCategory,
     stops: stage ? destinationCount(stage) : 0,
     loading: roadtripRoutes.loading,
     empty: !roadtripRoutes.loading && roadtripRoutes.days.length === 0,

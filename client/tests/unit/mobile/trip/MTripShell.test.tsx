@@ -4,7 +4,7 @@ import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import type { Day, PackingItem, TodoItem } from '../../../../src/types'
 
-// FE-MOB-SHELL-001 to FE-MOB-SHELL-064
+// FE-MOB-SHELL-001 to FE-MOB-SHELL-066
 
 const mocks = vi.hoisted(() => ({ planner: {} as TripPlanner }))
 
@@ -739,7 +739,10 @@ describe('MTripShell', () => {
         roadtripRoutes: { days: [stage()], totalDistance: 240000 },
       } as unknown as Partial<TripPlanner>)
       // The stage beats the total: 123 km is today's drive, 240 km is the whole trip.
-      expect(screen.getByRole('button', { name: 'Sat 2 · 123 km' })).toBeInTheDocument()
+      const header = screen.getByRole('button', { name: 'Sat 2, 123 km' })
+      // Two badges rather than one line joined with a dot.
+      expect(within(header).getByText('Sat 2')).not.toBe(within(header).getByText('123 km'))
+      expect(header.textContent).not.toContain('·')
     })
 
     it('FE-MOB-SHELL-062: with the day filter off it reads the whole drive', () => {
@@ -749,7 +752,11 @@ describe('MTripShell', () => {
         selectedDayId: null,
         roadtripRoutes: { days: [stage()], totalDistance: 240000 },
       } as unknown as Partial<TripPlanner>)
-      expect(screen.getByRole('button', { name: '240 km' })).toBeInTheDocument()
+      const header = screen.getByRole('button', { name: '240 km' })
+      // The total alone: without a stage there is no day to badge.
+      const badges = header.querySelectorAll('span.rounded-full')
+      expect(badges).toHaveLength(1)
+      expect(badges[0]).toHaveTextContent('240 km')
     })
 
     it('FE-MOB-SHELL-063: before anything has routed it falls back to the addon name, and the plan tab never shows it', () => {
@@ -769,7 +776,39 @@ describe('MTripShell', () => {
         selectedDayId: 99,
         roadtripRoutes: { days: [stage({ dayId: 99, dayNumber: 4, distance: 50000 })], totalDistance: 240000 },
       } as unknown as Partial<TripPlanner>)
-      expect(screen.getByRole('button', { name: 'planner.dayN:4 · 50 km' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'planner.dayN:4, 50 km' })).toBeInTheDocument()
+    })
+
+    it('FE-MOB-SHELL-065: a stage the round has not measured yet shows its day badge alone', () => {
+      renderShell({
+        TRIP_TABS: RT_TABS,
+        activeTab: 'roadtrip',
+        roadtripRoutes: { days: [stage({ distance: 0 })], totalDistance: 240000 },
+      } as unknown as Partial<TripPlanner>)
+      // Not "Sat 2 · 0 m", and not the whole trip's 240 km standing in for the day either.
+      // The active day chip below shares the name, so the header is the one with the sliders.
+      const header = screen.getAllByRole('button', { name: 'Sat 2' })
+        .find(button => button.querySelector('.lucide-sliders-horizontal')) as HTMLElement
+      expect(header).toBeDefined()
+      expect(within(header).queryByText('0 m')).toBeNull()
+      expect(within(header).queryByText('240 km')).toBeNull()
+    })
+
+    it('FE-MOB-SHELL-066: the header figures are badges, the day in caps and the distance in its own case', () => {
+      renderShell({
+        TRIP_TABS: RT_TABS,
+        activeTab: 'roadtrip',
+        roadtripRoutes: { days: [stage()], totalDistance: 240000 },
+      } as unknown as Partial<TripPlanner>)
+      const header = screen.getByRole('button', { name: 'Sat 2, 123 km' })
+      const badges = Array.from(header.children).filter(el => el.tagName === 'SPAN')
+      expect(badges.map(b => b.textContent)).toEqual(['Sat 2', '123 km'])
+      for (const badge of badges) expect(badge.className).toContain('rounded-full')
+      expect(badges[0].className).toContain('uppercase')
+      // m and M are different units, so the distance keeps its case.
+      expect(badges[1].className).not.toContain('uppercase')
+      // Neutral, both: the active day chip right below is already the filled pill.
+      expect(badges[0].className).not.toContain('bg-m-act')
     })
   })
 })

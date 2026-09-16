@@ -5,7 +5,10 @@ import { showStopOnMap, useMRoadtrip } from './useMRoadtrip'
 import { useMRtCorridor } from './useMRtCorridor'
 import MRtCorridorBar from './MRtCorridorBar'
 import { RtAutoRow, RtDryRow, RtLegRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
+import { badgeLabel, distanceBadge } from './stageBadges'
+import MBadge from '../../../components/MBadge'
 import MDancingTrek from '../../../components/MDancingTrek'
+import PlaceAvatar from '../../../../components/shared/PlaceAvatar'
 import { dayColor } from '../../../../components/Roadtrip/dayColors'
 import { formatDurationShort } from '../../../../components/Roadtrip/roadtripModel'
 import { getNavigationTargets } from '../../../../components/Planner/placeNavigation'
@@ -36,7 +39,6 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   const rt = useMRoadtrip(planner)
   const corridor = useMRtCorridor(planner, shell)
   const unit = useSettingsStore(s => s.settings.distance_unit)
-  const dayColorsOn = useRoadtripSettings(s => s.roadtrip_day_colors, planner.tripId)
   const chrome: RowChrome = { t, unit }
 
   // The same gesture the day timeline uses, called rather than rebuilt: 370 lines of
@@ -58,7 +60,6 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   })
 
   const stage = rt.stage
-  const tint = stage && dayColorsOn ? dayColor(stage.dayNumber) : null
 
   const openStop = (row: StopRow) => {
     shell.openSheet('rtstop', { dayId: row.stop.ownerDayId, assignmentId: row.stop.assignmentId })
@@ -113,27 +114,53 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
           <EmptyStage planner={planner} loading={rt.loading} />
         ) : (
           <>
-            {/* Head card: when the stage starts and when it reaches its last place. Both
-                clocks are ones the chain below repeats, read off the same arrival column
-                (see stageClocks), so a first stop pinned at 10:00 heads the card at 10:00
-                and not at the end of its stay. They carry dir=ltr for the same reason the
-                rows do: a clock reads the same way round in an RTL locale. */}
-            <section className="rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-4 py-3.5">
-              <div className="flex items-center justify-between">
-                <span className="font-geist text-[0.625rem] font-bold uppercase tracking-[.09em] text-m-muted">
+            {/* Head card: a header over the chain rather than a third of it. The day's
+                facts ride on the date line as badges instead of in a band of their own
+                under the clocks, and they move under the date together when a long
+                locale or the sentence for a partial total does not fit beside it.
+
+                The two clocks stay the largest figures on the screen: when the stage
+                starts and when it reaches its last place. Both are ones the chain below
+                repeats, read off the same arrival column (see stageClocks), so a first
+                stop pinned at 10:00 heads the card at 10:00 and not at the end of its
+                stay. They carry dir=ltr for the same reason the rows do: a clock reads
+                the same way round in an RTL locale.
+
+                No day colour here. It keys the day's line on the map, and on this half
+                the map lies under the list, so a dot in the card had nothing on screen
+                to explain it and read as a status light. The stage bar's picture ring
+                carries the colour on the half where the line is visible. */}
+            <section className="rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+                <span className="me-auto whitespace-nowrap font-geist text-[0.625rem] font-bold uppercase tracking-[.09em] text-m-muted">
                   {stageDateLabel(planner, stage.dayId) ?? t('roadtrip.day', { number: stage.dayNumber })}
                 </span>
-                {tint && (
-                  // theme-lint-disable: the day colours are map paint, see dayColors.ts.
-                  <span className="h-2 w-2 rounded-full" style={{ background: tint.line, boxShadow: `0 0 0 2px ${tint.casing}` }} aria-hidden="true" />
-                )}
+                {/* The two badges wrap as a pair. Loose in the line, a long drive would keep
+                    the date and the drive on one line and drop the count alone onto the next,
+                    at the opposite edge from the badge it belongs with. */}
+                <span className="flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-1">
+                  {/* The drive badge alone may break inside itself. A badge keeps its text on
+                      one line, which is right for a figure, but the partial sentence runs to
+                      nearly fifty characters in some locales and would push past the card on
+                      a narrow phone, so this one stops at the row's width and lets its height
+                      follow the text. The stop count is a figure and keeps to one line. */}
+                  <MBadge caps={false} wrap>
+                    {stage.distance > 0
+                      ? t('roadtrip.leg.driveText', {
+                        distance: formatDistance(stage.distance / 1000, unit),
+                        time: formatDurationShort(stage.duration),
+                      })
+                      : t('roadtrip.summary.partial')}
+                  </MBadge>
+                  <MBadge>{t('roadtrip.day.stopCount', { count: rt.stops })}</MBadge>
+                </span>
               </div>
               <div className="mt-2 flex items-end justify-between gap-3">
                 <span className="min-w-0">
                   <span className="block font-geist text-[0.5625rem] font-bold uppercase tracking-[.08em] text-m-faint">
                     {t('mobileTrip.rtStart')}
                   </span>
-                  <span dir="ltr" className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
+                  <span dir="ltr" className="mt-0.5 block text-[1.5rem] font-extrabold leading-none tabular-nums text-m-ink">
                     {rt.clocks.start ?? '-'}
                   </span>
                 </span>
@@ -141,22 +168,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                   <span className="block font-geist text-[0.5625rem] font-bold uppercase tracking-[.08em] text-m-faint">
                     {t('roadtrip.stay.arrive')}
                   </span>
-                  <span dir="ltr" className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
+                  <span dir="ltr" className="mt-0.5 block text-[1.5rem] font-extrabold leading-none tabular-nums text-m-ink">
                     {rt.clocks.arrive ?? '-'}
                   </span>
-                </span>
-              </div>
-              <div className="mt-2.5 flex items-center gap-2 border-t border-[color:var(--m-rowbr)] pt-2.5">
-                <span className="font-geist text-[0.71875rem] font-semibold tabular-nums text-m-muted">
-                  {stage.distance > 0
-                    ? t('roadtrip.leg.driveText', {
-                      distance: formatDistance(stage.distance / 1000, unit),
-                      time: formatDurationShort(stage.duration),
-                    })
-                    : t('roadtrip.summary.partial')}
-                </span>
-                <span className="ms-auto whitespace-nowrap rounded-full bg-[color:var(--m-ic)] px-2 py-[2px] font-geist text-[0.59375rem] font-bold text-m-muted">
-                  {t('roadtrip.day.stopCount', { count: rt.stops })}
                 </span>
               </div>
               {stage.dayWarning && (
@@ -224,8 +238,20 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
  *
  * It reads as a place, so a tap opens that place's stop, the same sheet its row in the
  * chain opens. It used to switch to the chain instead, which broke the promise its name
- * makes; the header's list switch is the way back to the chain. Name, clock and tap all
- * come off one row (see stageEnd), so the bar can never name one stop and open another.
+ * makes; the header's list switch is the way back to the chain. Name, picture, clock and
+ * tap all come off one row (see stageEnd), so the bar can never name one stop and open
+ * another.
+ *
+ * It leads with a picture of that place rather than a coloured dot, because a place is
+ * recognised by how it looks long before its name is read. The facts beside it are badges
+ * rather than one line joined with dots: each one is a figure on its own, and a pill edge
+ * separates them at a glance where a middle dot has to be found first. Every badge is
+ * neutral. The whole bar is one button, and a filled pill inside it would read as a
+ * second control that does something else.
+ *
+ * Its height is a contract: 38px picture, a 39px text column, 10px padding and the border
+ * make the 61px the map area lifts its round buttons over (--m-stage-lift in MMapArea).
+ * Growing the picture or a badge moves those buttons into the bar's top edge.
  */
 function StageBar({ planner, rt, onOpen }: {
   planner: MTripTabPanelProps['planner']
@@ -238,45 +264,70 @@ function StageBar({ planner, rt, onOpen }: {
   const stage = rt.stage
 
   if (!stage) {
-    // No stage means the day filter is off, which on the map is the whole drive.
+    // No stage means the day filter is off, which on the map is the whole drive. Its total
+    // is left out while nothing is measured, rather than printed as a drive of 0 m.
+    const total = distanceBadge(planner.roadtripRoutes.totalDistance, unit)
     return (
       <div className="flex items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[14px] py-[11px] shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]">
         <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold text-m-ink">{t('roadtrip.title')}</span>
-        <span className="whitespace-nowrap font-geist text-[0.6875rem] font-semibold tabular-nums text-m-muted">
-          {formatDistance(planner.roadtripRoutes.totalDistance / 1000, unit)}
-        </span>
+        {total && <MBadge size="sm" caps={false}>{total}</MBadge>}
       </div>
     )
   }
 
   const tint = dayColorsOn ? dayColor(stage.dayNumber) : null
   const end = rt.end
+  const name = end?.stop.name ?? t('roadtrip.stop.none')
+  const stopCount = t('roadtrip.day.stopCount', { count: rt.stops })
+  const distance = distanceBadge(stage.distance, unit)
+  const pending = t('roadtrip.leg.pending')
 
   const inner = (
     <>
-      {tint && (
+      {/* Hidden from the name, which the title already carries: the photo's alt text is the
+          place name a second time. The day colour rings the picture when the day colours
+          are on, because the ring is what ties this bar to its own line on the map. */}
+      <span
+        aria-hidden="true"
+        className="flex h-[38px] w-[38px] flex-none items-center justify-center overflow-hidden rounded-full border-2 border-[color:var(--m-avbr)] bg-[color:var(--m-ic)] text-m-muted"
         // theme-lint-disable: map paint, see dayColors.ts.
-        <span className="h-[9px] w-[9px] flex-none rounded-full" style={{ background: tint.line, boxShadow: `0 0 0 2px ${tint.casing}` }} aria-hidden="true" />
-      )}
+        style={tint ? { borderColor: tint.line } : undefined}
+      >
+        {/* Keyed by place: the avatar takes its photo from the first place it is handed and
+            keeps it while a new one is still loading or has none, so without a remount a
+            swipe to the next day would still picture the previous day's destination. */}
+        {rt.endPlace ? (
+          <PlaceAvatar key={rt.endPlace.id} place={rt.endPlace} category={rt.endCategory} size={34} />
+        ) : (
+          <MapPin size={16} strokeWidth={2} />
+        )}
+      </span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[0.8125rem] font-semibold text-m-ink">
-          {end?.stop.name ?? t('roadtrip.stop.none')}
-        </span>
-        <span className="mt-px block font-geist text-[0.6875rem] tabular-nums text-m-muted">
-          {[t('roadtrip.day.stopCount', { count: rt.stops }), end?.time].filter(Boolean).join(' · ')}
+        <span className="block truncate text-[0.8125rem] font-semibold leading-[18px] text-m-ink">{name}</span>
+        <span className="mt-[3px] flex min-w-0 items-center gap-[5px] overflow-hidden">
+          <MBadge>{stopCount}</MBadge>
+          {/* dir=ltr for the reason the rows carry it: a clock reads the same way round in an RTL locale. */}
+          {end?.time && <MBadge caps={false}><span dir="ltr">{end.time}</span></MBadge>}
         </span>
       </span>
-      <span className="whitespace-nowrap font-geist text-[0.6875rem] font-semibold tabular-nums text-m-muted">
-        {stage.distance > 0 ? formatDistance(stage.distance / 1000, unit) : t('roadtrip.leg.pending')}
-      </span>
+      {distance ? <MBadge size="sm" caps={false}>{distance}</MBadge> : <MBadge size="sm">{pending}</MBadge>}
     </>
   )
-  const box = 'flex w-full items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[14px] py-[11px] text-left shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]'
+  const box = 'flex w-full items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[11px] py-[10px] text-left shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]'
 
   // A stage without a single stop has nothing for a tap to open, so a plain block rather
   // than a dead button, the rule the whole-drive line above follows too.
   if (!end) return <div className={box}>{inner}</div>
-  return <button type="button" onClick={() => onOpen(end)} className={box}>{inner}</button>
+  return (
+    <button
+      type="button"
+      onClick={() => onOpen(end)}
+      aria-label={badgeLabel([name, stopCount, end.time, distance ?? pending])}
+      className={box}
+    >
+      {inner}
+    </button>
+  )
 }
 
 /**

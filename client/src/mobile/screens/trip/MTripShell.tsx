@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import { useTripPlanner } from '../../../pages/tripPlanner/useTripPlanner'
 import { pickDockTabs } from './dockTabs'
+import MBadge from '../../components/MBadge'
 import MIconBtn from '../../components/MIconBtn'
 import MPlanTimeline from './plan/MPlanTimeline'
 import MMapArea from './map/MMapArea'
@@ -15,9 +16,9 @@ import MTripSheets from './sheets/MTripSheets'
 import MTripLoadingSplash from './MTripLoadingSplash'
 import { usePluginDayTints, dayTintBackground } from '../../../components/Plugins/PluginDaySchedule'
 import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
+import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
 import type { CorridorReach } from '../../../components/Roadtrip/corridorSearchModel'
 import { useSettingsStore } from '../../../store/settingsStore'
-import { formatDistance } from '../../../utils/units'
 import type { Day } from '../../../types'
 
 /**
@@ -401,18 +402,21 @@ export default function MTripShell({
   const todoOpenCount = todoItems.filter(i => !i.checked).length
 
   // The stage header: the day on screen and what it costs, or the whole drive while
-  // the day filter is off. Falls back to the addon's own name before anything has
-  // routed, so the pill never reads as an empty figure.
+  // the day filter is off. A figure nothing has measured yet is left out rather than
+  // printed as 0 m, and with neither figure the pill falls back to the addon's own name,
+  // so it never reads as an empty one.
   const rtStage = stageOf(planner.roadtripRoutes.days, planner.selectedDayId)
   const rtStageDay = rtStage ? days.find(d => d.id === rtStage.dayId) : undefined
-  const rtHeaderLabel = rtStage
-    ? [
-      rtStageDay ? dayChipLabel(rtStageDay, language, t('planner.dayN', { n: rtStage.dayNumber })) : t('planner.dayN', { n: rtStage.dayNumber }),
-      formatDistance(rtStage.distance / 1000, distanceUnit),
-    ].join(' · ')
-    : planner.roadtripRoutes.totalDistance > 0
-      ? formatDistance(planner.roadtripRoutes.totalDistance / 1000, distanceUnit)
-      : t('roadtrip.title')
+  let rtHeaderDay: string | null = null
+  if (rtStage) {
+    const dayN = t('planner.dayN', { n: rtStage.dayNumber })
+    rtHeaderDay = rtStageDay ? dayChipLabel(rtStageDay, language, dayN) : dayN
+  }
+  const rtHeaderDistance = distanceBadge(
+    rtStage ? rtStage.distance : planner.roadtripRoutes.totalDistance,
+    distanceUnit,
+  )
+  const rtHeaderLabel = badgeLabel([rtHeaderDay, rtHeaderDistance])
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
@@ -637,17 +641,30 @@ export default function MTripShell({
         {/* The stage's own header: the day it shows, and a way into the figures
             behind it. A button rather than the plugin tabs' inert pill, because it
             is the only entry to the driving settings, and the right slot belongs to
-            the list ⇄ map switch, same as in the plan tab. */}
+            the list ⇄ map switch, same as in the plan tab.
+
+            The day and the distance are badges rather than one line joined with a
+            dot, so each reads as a figure of its own. Both stay neutral: the active
+            day chip right below is already the filled pill with the same label, and
+            a second one here would compete with it. The button names itself, because
+            a screen reader runs the texts of pills side by side together. */}
         {trTab === 'roadtrip' && (
           <button
             type="button"
             onClick={() => openSheet('rtinfo')}
-            className="absolute left-[52px] right-[52px] top-1/2 mx-auto flex h-[34px] w-fit max-w-full -translate-y-1/2 items-center gap-[6px] rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-[13px] backdrop-blur-[24px] backdrop-saturate-[1.7]"
+            aria-label={rtHeaderLabel || undefined}
+            className="absolute left-[52px] right-[52px] top-1/2 mx-auto flex h-[34px] w-fit max-w-full -translate-y-1/2 items-center gap-[5px] rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-[10px] backdrop-blur-[24px] backdrop-saturate-[1.7]"
           >
             <Route size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
-            <span className="min-w-0 truncate text-[0.8125rem] font-semibold tabular-nums text-m-ink">
-              {rtHeaderLabel}
-            </span>
+            {rtHeaderLabel ? (
+              <>
+                {rtHeaderDay && <MBadge size="sm">{rtHeaderDay}</MBadge>}
+                {/* Unit symbols keep their case: m and M are different units. */}
+                {rtHeaderDistance && <MBadge size="sm" caps={false}>{rtHeaderDistance}</MBadge>}
+              </>
+            ) : (
+              <span className="min-w-0 truncate text-[0.8125rem] font-semibold text-m-ink">{t('roadtrip.title')}</span>
+            )}
             <SlidersHorizontal size={13} strokeWidth={2} className="flex-none text-m-faint" aria-hidden="true" />
           </button>
         )}
