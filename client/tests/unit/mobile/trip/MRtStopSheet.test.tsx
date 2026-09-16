@@ -4,13 +4,17 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { Place } from '../../../../src/types'
 import type { RoadtripDay, RoadtripStop } from '@trek/shared/roadtrip'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
-import { resetAllStores } from '../../../helpers/store'
+import { useTripStore } from '../../../../src/store/tripStore'
+import { resetAllStores, seedStore } from '../../../helpers/store'
 import { fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-RTSTOP-001 to FE-MOB-RTSTOP-027
+// FE-MOB-RTSTOP-001 to FE-MOB-RTSTOP-034
 //
 // The sheet renders inside the real TranslationProvider, so the copy is asserted
 // in English. `planner.t` from the fixture is never consulted here.
+//
+// The place rows come from the trip store, not from the planner: the sheet reads the
+// unfiltered list, so renderSheet seeds the store and the planner keeps its empty one.
 
 // The charging panel polls a repo of its own every minute; stubbed so the sheet's
 // wiring can be asserted without a live availability lookup in the background.
@@ -93,7 +97,6 @@ const PLACES = [
 function makePlanner(overrides: Record<string, unknown> = {}) {
   return buildPlanner({
     tripId: 4,
-    places: PLACES,
     dailyTimesActive: true,
     setRoadtripEndDay: vi.fn(async () => undefined),
     roadtripRoutes: { days: [DAY_A, DAY_B] },
@@ -108,7 +111,12 @@ function makeShell(overrides: Record<string, unknown> = {}) {
   } as unknown as Partial<MTripShellApi>)
 }
 
-function renderSheet(plannerOverrides: Record<string, unknown> = {}, shellOverrides: Record<string, unknown> = {}) {
+function renderSheet(
+  plannerOverrides: Record<string, unknown> = {},
+  shellOverrides: Record<string, unknown> = {},
+  storePlaces: Place[] = PLACES,
+) {
+  seedStore(useTripStore, { places: storePlaces })
   const planner = makePlanner(plannerOverrides)
   const shell = makeShell(shellOverrides)
   render(<MRtStopSheet planner={planner} shell={shell} />)
@@ -183,7 +191,7 @@ describe('MRtStopSheet', () => {
   })
 
   it('FE-MOB-RTSTOP-009: offers the map apps built from the stop itself when no place row matches', () => {
-    renderSheet({ places: [] })
+    renderSheet({}, {}, [])
     fireEvent.click(screen.getByRole('button', { name: 'Navigation' }))
     expect(screen.getByRole('menu')).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Google Maps' })).toBeInTheDocument()
@@ -192,9 +200,11 @@ describe('MRtStopSheet', () => {
 
   it('FE-MOB-RTSTOP-010: has no delete, no reorder and no stop-kind control at all', () => {
     renderSheet()
-    // Close, navigation, stay, show-on-map, plus the end-day switch, which is a switch.
-    expect(screen.getAllByRole('button')).toHaveLength(4)
+    // Close, edit, navigation, stay, show-on-map, plus the end-day switch, which is a switch.
+    // Edit is a hand-over to the place editor, not a control of this sheet (RTSTOP-030).
+    expect(screen.getAllByRole('button')).toHaveLength(5)
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Navigation' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Stay/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show on map' })).toBeInTheDocument()
@@ -310,7 +320,7 @@ describe('MRtStopSheet', () => {
   it('FE-MOB-RTSTOP-022: one map app means no picker, the tap opens it and names it on the tile', () => {
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
     // Name only: no coordinates and no address, so only the OSM search link survives.
-    renderSheet({ places: [{ id: 203, name: 'Bremen Marktplatz', lat: null, lng: null, address: null }] })
+    renderSheet({}, {}, [{ id: 203, name: 'Bremen Marktplatz', lat: null, lng: null, address: null }] as unknown as Place[])
     const tile = screen.getByRole('button', { name: /^Navigation/ })
     expect(tile).toHaveTextContent('OpenStreetMap')
     fireEvent.click(tile)
@@ -324,7 +334,7 @@ describe('MRtStopSheet', () => {
   })
 
   it('FE-MOB-RTSTOP-023: no reachable map app at all drops the tile instead of leaving a dead one', () => {
-    renderSheet({ places: [{ id: 203, name: '', lat: null, lng: null, address: null }] })
+    renderSheet({}, {}, [{ id: 203, name: '', lat: null, lng: null, address: null }] as unknown as Place[])
     expect(screen.queryByRole('button', { name: /Navigation/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Stay/ })).toBeInTheDocument()
   })
@@ -357,5 +367,91 @@ describe('MRtStopSheet', () => {
   it('FE-MOB-RTSTOP-027: no availability panel on a stop that is not a charger', () => {
     renderSheet({}, { sheet: { id: 'rtstop', payload: { dayId: 11, assignmentId: 102 } } })
     expect(screen.queryByTestId('charging-info')).not.toBeInTheDocument()
+  })
+
+  // jsdom has no layout, so the two header tests pin the class contract rather than pixels.
+  it('FE-MOB-RTSTOP-028: the header centres the name on the disc instead of hanging it from the top', () => {
+    renderSheet()
+    const heading = screen.getByRole('heading', { name: 'Bremen Marktplatz' })
+    const header = heading.parentElement
+    expect(header).toHaveClass('items-center')
+    expect(header).not.toHaveClass('items-start')
+    // Disc, name and buttons are one row, so they share that one cross-axis alignment.
+    expect(heading.previousElementSibling).toHaveTextContent('2')
+    const buttons = heading.nextElementSibling
+    expect(buttons).toHaveClass('items-center')
+    expect(buttons).toContainElement(screen.getByRole('button', { name: 'Close' }))
+    expect(buttons).toContainElement(screen.getByRole('button', { name: 'Edit' }))
+  })
+
+  it('FE-MOB-RTSTOP-029: a service stop with a long name centres the same way and wraps rather than truncating', () => {
+    const longName = 'Aral Tankstelle an der Autobahnausfahrt Hamburg Dammtor Nord'
+    renderSheet(
+      { roadtripRoutes: { days: [{ ...DAY_A, stops: [HAMBURG, { ...ARAL, name: longName }, BREMEN] }, DAY_B] } },
+      { sheet: { id: 'rtstop', payload: { dayId: 11, assignmentId: 102 } } },
+    )
+    const heading = screen.getByRole('heading', { name: longName })
+    expect(heading.parentElement).toHaveClass('items-center')
+    expect(heading).toHaveClass('line-clamp-2')
+    expect(heading).not.toHaveClass('truncate')
+    expect(heading.previousElementSibling?.querySelector('svg')).not.toBeNull()
+  })
+
+  it('FE-MOB-RTSTOP-030: the pencil opens the place editor on this very visit and closes the sheet', () => {
+    const { planner, shell } = renderSheet()
+    const edit = screen.getByRole('button', { name: 'Edit' })
+    // Before the way out, so the close button keeps the corner it has on every sheet.
+    expect(edit.compareDocumentPosition(screen.getByRole('button', { name: 'Close' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    fireEvent.click(edit)
+    expect(planner.openPlaceEditor).toHaveBeenCalledTimes(1)
+    expect(planner.openPlaceEditor).toHaveBeenCalledWith(expect.objectContaining({ id: 203, address: 'Am Markt' }), 103)
+    expect(shell.closeSheet).toHaveBeenCalledTimes(1)
+    // The stop sheet does not hand over to a stay or a map on the way.
+    expect(shell.openSheet).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-RTSTOP-031: somebody who may not edit places gets no pencil at all', () => {
+    // Every right but place_edit, so it is that one right the pencil answers to.
+    const { planner } = renderSheet({ can: vi.fn((action: string) => action !== 'place_edit') })
+    // Absent rather than disabled, the same rule as every other write on this sheet.
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    // The night switch answers to day_edit and stays, so no other right took the pencil away.
+    expect(screen.getByRole('switch', { name: 'End the day here' })).toBeInTheDocument()
+    expect(planner.can).toHaveBeenCalledWith('place_edit', planner.trip)
+  })
+
+  it('FE-MOB-RTSTOP-032: a pump hidden from the day lists is still editable from the stage', () => {
+    // The planner's filtered list lacks the pump, the store still holds it.
+    const pump = { id: 202, name: 'Aral Dammtor', lat: 53.56, lng: 9.99, stop_type: 'fuel' } as unknown as Place
+    const { planner } = renderSheet(
+      { places: PLACES },
+      { sheet: { id: 'rtstop', payload: { dayId: 11, assignmentId: 102 } } },
+      [...PLACES, pump],
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
+    expect(planner.openPlaceEditor).toHaveBeenCalledWith(expect.objectContaining({ id: 202 }), 102)
+  })
+
+  it('FE-MOB-RTSTOP-033: a stop still being saved under its optimistic id offers no pencil yet', () => {
+    const saving = stop({ assignmentId: -5, placeId: 203, name: 'Bremen Marktplatz', ownerIndex: 0, dwellMinutes: 90 })
+    const day = {
+      ...DAY_A,
+      stops: [saving],
+      schedule: { entries: [{ arrival: '13:05', departure: '14:35', anchored: false, dayOffset: 0 }], warnings: [] },
+      driveWarnings: [],
+    } as unknown as RoadtripDay
+    const { planner } = renderSheet({ roadtripRoutes: { days: [day] } }, { sheet: { id: 'rtstop', payload: { dayId: 11, assignmentId: -5 } } })
+    expect(screen.getByRole('dialog', { name: 'Bremen Marktplatz' })).toBeInTheDocument()
+    // Neither the temporary id nor a null the planner would resolve back to that same row.
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(planner.openPlaceEditor).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-RTSTOP-034: a stop whose place row is not in the trip store offers no pencil', () => {
+    // The editor needs the whole row; the stop's name and position are enough for directions only.
+    renderSheet({}, {}, [])
+    expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Navigation' })).toBeInTheDocument()
   })
 })

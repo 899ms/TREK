@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode, type Ref } from 'react'
 import {
-  AlertTriangle, Clock, Footprints, Fuel, Hourglass, MapPin, Moon, Navigation, X,
+  AlertTriangle, Clock, Footprints, Fuel, Hourglass, MapPin, Moon, Navigation, Pencil, X,
 } from 'lucide-react'
 import MSheet from '../../../components/MSheet'
 import MIconBtn from '../../../components/MIconBtn'
@@ -9,6 +9,7 @@ import MToggle from '../../../components/MToggle'
 import type { MTripSheetsProps } from '../MTripShell'
 import { useTranslation } from '../../../../i18n'
 import { useSettingsStore } from '../../../../store/settingsStore'
+import { useTripStore } from '../../../../store/tripStore'
 import ChargingInfo from '../../../../components/Roadtrip/ChargingInfo'
 import { formatDurationShort } from '../../../../components/Roadtrip/roadtripModel'
 import { roadtripRows, stageOf, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
@@ -34,6 +35,13 @@ import type { RoadtripDay, ScheduleWarning } from '@trek/shared/roadtrip'
  * confirmation, simply absent, because a dead control on a phone is a promise the screen
  * cannot keep. What is left are the three things a passenger does decide on the road:
  * navigate there, stay longer, stop for the night here.
+ *
+ * Editing the place is the one way out of that rule, and it is a hand-over rather than a
+ * control of this sheet: the pencil opens the place editor the plan tab opens, with this
+ * very visit in context, and this sheet closes behind it. The time somebody fixed for a
+ * stop is that editor's start time (the chain anchors on the visit's own start time), so
+ * a time control here would be a second writer for one number. A booked night can also
+ * be held by its check-in, which belongs to the booking and not to the place.
  */
 
 interface RtStopSheetPayload {
@@ -132,6 +140,7 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
   const timeFormat = useSettingsStore(s => s.settings.time_format) || '24h'
   const unitSetting = useSettingsStore(s => s.settings.distance_unit)
   const unit: DistanceUnit = unitSetting === 'imperial' ? 'imperial' : 'metric'
+  const tripPlaces = useTripStore(s => s.places)
 
   const days = planner.roadtripRoutes.days
   const live = useMemo(
@@ -155,7 +164,10 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
   useEffect(() => { setPending(null) }, [payload.assignmentId])
 
   const stop = located?.row.stop ?? null
-  const place = planner.places.find(p => p.id === stop?.placeId) ?? null
+  // From the whole trip store, not planner.places: with service stops hidden from the day
+  // lists the phone filters them out of that list, while the stage still draws them, and
+  // both the pencil and the directions have to reach the row the chain drew.
+  const place = tripPlaces.find(p => p.id === stop?.placeId) ?? null
 
   /**
    * Addressed by stop, not by selection.
@@ -210,9 +222,20 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
   }
 
   const stayMinutes = stop.dwellMinutes
-  const canEditStay = planner.can('place_edit', planner.trip)
+  const canEditPlace = planner.can('place_edit', planner.trip)
   const editStay = () => {
     shell.openSheet('rtstay', { placeId: stop.placeId, minutes: stayMinutes })
+  }
+
+  // A negative id is the optimistic row of a stop still being saved. The editor would
+  // write the time against an id the server never issued, and handing it null instead is
+  // no way round that: the planner then falls back to the place's only visit, which can be
+  // that same row. So the pencil waits until the stop carries the id the server gave it.
+  const canOpenEditor = canEditPlace && place != null && stop.assignmentId > 0
+  const editPlace = () => {
+    if (!place) return
+    planner.openPlaceEditor(place, stop.assignmentId)
+    shell.closeSheet()
   }
 
   const toggleEndDay = async (next: boolean) => {
@@ -239,9 +262,12 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
 
   return (
     <MSheet open={open && !!live} onClose={shell.closeSheet} variant="bottom" material="opaque" ariaLabel={stop.name}>
-      {/* ── Header: the disc the chain draws, the name, the way out ── */}
+      {/* ── Header: the disc the chain draws, the name, the way to the editor and the way out ── */}
       <div className="flex-none px-[18px] pt-4">
-        <div className="flex items-start gap-3">
+        {/* Centred, not top-aligned: one line of the name is shorter than the 34px disc, so
+            hung from the top it sat high beside it. A name that wraps to its two lines grows
+            the row, and the disc and the buttons centre on both, as they do in the chain row. */}
+        <div className="flex items-center gap-3">
           {row.service ? (
             kind && KindIcon ? (
               <span
@@ -267,9 +293,16 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
           <h2 className="min-w-0 flex-1 line-clamp-2 text-[1.0625rem] font-bold leading-tight text-m-ink">
             {stop.name}
           </h2>
-          <MIconBtn variant="neutral" size={34} onClick={shell.closeSheet} ariaLabel={t('common.close')}>
-            <X size={15} strokeWidth={2.2} />
-          </MIconBtn>
+          <div className="flex flex-none items-center gap-2">
+            {canOpenEditor && (
+              <MIconBtn variant="neutral" size={34} onClick={editPlace} ariaLabel={t('common.edit')}>
+                <Pencil size={15} strokeWidth={2.2} />
+              </MIconBtn>
+            )}
+            <MIconBtn variant="neutral" size={34} onClick={shell.closeSheet} ariaLabel={t('common.close')}>
+              <X size={15} strokeWidth={2.2} />
+            </MIconBtn>
+          </div>
         </div>
       </div>
 
@@ -347,7 +380,7 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
             icon={<Clock size={16} strokeWidth={2} />}
             label={t('roadtrip.stop.stayShort')}
             value={stayMinutes ? formatDurationShort(stayMinutes * 60) : t('roadtrip.stay.none')}
-            onClick={canEditStay ? editStay : undefined}
+            onClick={canEditPlace ? editStay : undefined}
           />
         </div>
         {navOpen && (

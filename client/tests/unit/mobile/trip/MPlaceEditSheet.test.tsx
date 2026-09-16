@@ -10,7 +10,7 @@ import { server } from '../../../helpers/msw/server'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-PLEDIT-001 to FE-MOB-PLEDIT-024, plus FE-MOB-PLEDIT-033 to -035
+// FE-MOB-PLEDIT-001 to FE-MOB-PLEDIT-040, plus the 009b, 025b and 029b variants
 // planner.t echoes the key, so every label/placeholder is asserted as its key.
 
 const CATEGORIES = [
@@ -93,7 +93,9 @@ describe('MPlaceEditSheet', () => {
       id: 7, day_id: 2, place_id: 42, order_index: 0,
       place: { ...EDITED, place_time: '14:00', end_time: '15:00' },
     } as unknown as Assignment
-    setup({ editingPlace: EDITED, editingAssignmentId: 7, assignments: { '2': [assignment] } })
+    // A visit the plan tab lists is in both of the planner's lists.
+    const visits = { '2': [assignment] }
+    setup({ editingPlace: EDITED, editingAssignmentId: 7, assignments: visits, storedAssignments: visits })
     expect(screen.getByText('places.startTime')).toBeInTheDocument()
     const times = screen.getAllByDisplayValue(/^1[45]:00$/)
     expect(times.map(el => (el as HTMLInputElement).value)).toEqual(['14:00', '15:00'])
@@ -293,7 +295,8 @@ describe('MPlaceEditSheet', () => {
 
   it('FE-MOB-PLEDIT-024: blocks the save while the end time is not after the start', () => {
     const assignment = { id: 7, day_id: 2, place_id: 42, order_index: 0, place: EDITED } as unknown as Assignment
-    setup({ editingPlace: EDITED, editingAssignmentId: 7, assignments: { '2': [assignment] } })
+    const visits = { '2': [assignment] }
+    setup({ editingPlace: EDITED, editingAssignmentId: 7, assignments: visits, storedAssignments: visits })
     const [start, end] = screen.getAllByDisplayValue(/^0[89]:[0-3]0$/) as HTMLInputElement[]
     expect(submit()).not.toBeDisabled()
     fireEvent.change(end, { target: { value: '07:00' } })
@@ -464,6 +467,80 @@ describe('MPlaceEditSheet', () => {
 
       await waitFor(() => expect(handleSavePlace).toHaveBeenCalled())
       expect(onOpenExpense).not.toHaveBeenCalled()
+    })
+  })
+
+  // ── A visit the day lists hide (the road trip stop sheet opens the editor on them) ──
+
+  describe('a visit the day lists hide', () => {
+    /**
+     * A booked night: the phone's filtered `assignments` never carries it, the stored
+     * map does. Its own times differ from the pool place's (08:00 to 09:30), so a
+     * lookup in the wrong list shows up as the wrong clock.
+     */
+    const NIGHT = {
+      id: 7, day_id: 2, place_id: 42, order_index: 0, accommodation_id: 9, notes: 'Late check-in',
+      place: { ...EDITED, place_time: '10:00', end_time: '11:00' },
+    } as unknown as Assignment
+
+    const openOnNight = (overrides: Partial<TripPlanner> = {}) => setup({
+      editingPlace: EDITED,
+      editingAssignmentId: 7,
+      assignments: {},
+      storedAssignments: { '2': [NIGHT] },
+      ...overrides,
+    })
+
+    it('FE-MOB-PLEDIT-036: reads the times and the day note off the stored visit', () => {
+      openOnNight()
+      const times = screen.getAllByDisplayValue(/^1[01]:00$/) as HTMLInputElement[]
+      expect(times.map(el => el.value)).toEqual(['10:00', '11:00'])
+      expect(screen.getByPlaceholderText('places.assignmentNotesPlaceholder')).toHaveValue('Late check-in')
+    })
+
+    it('FE-MOB-PLEDIT-037: saving it untouched keeps the pinned time and sends no note', async () => {
+      const { planner } = openOnNight()
+      fireEvent.click(submit())
+      await waitFor(() => expect(planner.handleSavePlace).toHaveBeenCalledTimes(1))
+      const payload = vi.mocked(planner.handleSavePlace).mock.calls[0][0]
+      expect(payload).toMatchObject({ place_time: '10:00', end_time: '11:00' })
+      expect(payload).not.toHaveProperty('assignment_notes')
+    })
+
+    it('FE-MOB-PLEDIT-038: an edited day note on it travels with the save', async () => {
+      const { planner } = openOnNight()
+      fireEvent.change(screen.getByPlaceholderText('places.assignmentNotesPlaceholder'), { target: { value: 'Key box at the door' } })
+      fireEvent.click(submit())
+      await waitFor(() => expect(planner.handleSavePlace).toHaveBeenCalledTimes(1))
+      expect(planner.handleSavePlace).toHaveBeenCalledWith(expect.objectContaining({ assignment_notes: 'Key box at the door' }))
+    })
+
+    it('FE-MOB-PLEDIT-039: clearing Start on it sends the empty time that unpins the stop', async () => {
+      const { planner } = openOnNight()
+      const [start] = screen.getAllByDisplayValue('10:00')
+      fireEvent.change(start, { target: { value: '' } })
+      fireEvent.click(submit())
+      await waitFor(() => expect(planner.handleSavePlace).toHaveBeenCalledTimes(1))
+      expect(planner.handleSavePlace).toHaveBeenCalledWith(expect.objectContaining({ place_time: '', end_time: '11:00' }))
+    })
+
+    it('FE-MOB-PLEDIT-040: the overlap warning names what the day lists show, never a hidden stop', () => {
+      const listed = {
+        id: 8, day_id: 2, place_id: 50, order_index: 1,
+        place: { id: 50, name: 'Kaminarimon', place_time: '10:30', end_time: '11:30' },
+      } as unknown as Assignment
+      const hiddenPump = {
+        id: 9, day_id: 2, place_id: 51, order_index: 2,
+        place: { id: 51, name: 'ENEOS Asakusa', stop_type: 'fuel', place_time: '10:15', end_time: '10:45' },
+      } as unknown as Assignment
+      openOnNight({
+        assignments: { '2': [listed] },
+        storedAssignments: { '2': [NIGHT, listed, hiddenPump] },
+      })
+      // The night itself is hidden too, and still gets warned: the warning reads its day off it.
+      const warning = screen.getByText(/places\.timeCollision/)
+      expect(warning).toHaveTextContent('Kaminarimon')
+      expect(warning).not.toHaveTextContent('ENEOS')
     })
   })
 })

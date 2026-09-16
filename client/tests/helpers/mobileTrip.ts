@@ -58,6 +58,9 @@ export function buildPlanner(overrides: Partial<TripPlanner> = {}): TripPlanner 
     days: [],
     places: [],
     assignments: [],
+    // The unfiltered map the store holds. The place editor looks the visit it was
+    // opened on up here, so every sheet test that edits a place needs the shape.
+    storedAssignments: {},
     packingItems: [],
     todoItems: [],
     categories: [],

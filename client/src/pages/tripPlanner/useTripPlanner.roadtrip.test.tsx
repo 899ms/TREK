@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-096
+// FE-TP-ROAD-001 to FE-TP-ROAD-097
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -2087,5 +2087,40 @@ describe('useTripPlanner road trip: the phone feed', () => {
     // Without the day it lands in the unplanned pool, which the stage does not show.
     expect(result.current.showPlaceForm).toBe(true)
     expect(result.current.placeFormDayId).toBe(5)
+  })
+
+  it('FE-TP-ROAD-097: a service stop opened for editing on the phone gets the place form with its own visit', async () => {
+    // The stop sheet's pencil relies on this. The desk popup it would otherwise open has
+    // no start time, and for a service stop the start time is the only way to pin or
+    // unpin its arrival (a booked night can also be held by the booking's check-in).
+    const fuelStop = buildPlace({ id: 102, name: 'Tankstelle', stop_type: 'fuel', lat: 60.39, lng: 5.32 })
+    seedTrip({
+      places: [fuelStop],
+      days: [buildDay({ id: 5, day_number: 1 })],
+      assignments: { '5': [buildAssignment({ id: 12, day_id: 5, order_index: 0, place: fuelStop })] },
+    })
+    // The STORED mode is on, set here rather than trusted to the suite's beforeEach: with
+    // it off the form branch would be taken anyway and this test would prove nothing.
+    sessionStorage.setItem('trip-roadtrip-42', '1')
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const phone = await renderPhone()
+    act(() => { phone.result.current.openPlaceEditor(fuelStop, 12) })
+
+    expect(phone.result.current.roadtripMode).toBe(false)
+    expect(phone.result.current.stopDraft).toBeNull()
+    expect(phone.result.current.showPlaceForm).toBe(true)
+    expect(phone.result.current.editingPlace?.id).toBe(102)
+    expect(phone.result.current.editingAssignmentId).toBe(12)
+    phone.unmount()
+
+    // The very same trip at desk width opens the stop popup, so what kept the phone on
+    // the form is the width alone.
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth })
+    const desk = await renderRoadtrip()
+    act(() => { desk.result.current.openPlaceEditor(fuelStop, 12) })
+
+    expect(desk.result.current.stopDraft).toMatchObject({ dayId: 5, editing: { placeId: 102, stopType: 'fuel' } })
+    expect(desk.result.current.showPlaceForm).toBe(false)
   })
 })
