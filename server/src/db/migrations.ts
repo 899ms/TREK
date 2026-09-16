@@ -4927,7 +4927,12 @@ function runMigrations(db: Database.Database): void {
      * already there instead of writing a duplicate beside it.
      */
     () => {
-      db.exec('ALTER TABLE journey_entries ADD COLUMN source_assignment_id INTEGER');
+      const hasColumn = db
+        .prepare("SELECT 1 FROM pragma_table_info('journey_entries') WHERE name = 'source_assignment_id'")
+        .get();
+      if (!hasColumn) db.exec('ALTER TABLE journey_entries ADD COLUMN source_assignment_id INTEGER');
+      // `source_assignment_id IS NULL` keeps the replay from re-resolving a row that
+      // has since followed its stop to another day.
       db.exec(`
         UPDATE journey_entries
            SET source_assignment_id = (
@@ -4938,7 +4943,7 @@ function runMigrations(db: Database.Database): void {
               ORDER BY d.day_number ASC, d.date ASC, da.order_index ASC, da.id ASC
               LIMIT 1
            )
-         WHERE source_place_id IS NOT NULL
+         WHERE source_place_id IS NOT NULL AND source_assignment_id IS NULL
       `);
       db.exec(
         'CREATE INDEX IF NOT EXISTS idx_journey_entries_source_assignment ON journey_entries(source_place_id, source_assignment_id)',
