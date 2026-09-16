@@ -59,10 +59,11 @@ function holdFocus(prev: HeldFocus, points: readonly [number, number][], dayId: 
  * day-order badges, dashed day route, transport overlays per booking, POI
  * explore markers and long-press → add place. Only the floating chrome is
  * mobile: the POI bar spans the full width below the day-chip rail, and the round
- * controls share the band just above the dock: the map's own base-layer switcher
+ * controls share one band above the dock: the map's own base-layer switcher
  * with the compass beside it on the left, the map's built-in three-state locate
  * button on the right, all riding the --bottom-nav-h contract the map already reads
- * so they cannot drift apart.
+ * so they cannot drift apart. The map credit sits under that band, alone in the
+ * bottom right corner.
  *
  * On the plan tab, marker data honours the shared places category filter (#1541)
  * because planner.mapPlaces is derived from tripStore's placesCategoryFilter, the
@@ -178,18 +179,29 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
     // `isolate` keeps the map's internal z-indexes (Leaflet panes, the z-1000
     // locate button) inside this layer so they can never paint over the plan
     // timeline (z-10) or the browse/tab overlays (z-30) above it.
-    // The dock is 62px tall at safe-bottom + 12, so a 74px --bottom-nav-h puts
-    // the round controls (which add their own 12px) a dock's gap above it —
-    // close enough to the thumb to reach one-handed, clear of the dock itself.
-    // The stage bar takes the band the round controls normally sit in, so on that
-    // tab they move up by its height plus its own gap. The lift is its OWN variable
-    // folded into the class rather than an inline --bottom-nav-h: the compass band
-    // below is identified by being the one element that sets that name inline, and a
-    // second one would make that ambiguous.
+    //
+    // --m-map-floor is the top edge of whatever the map ends at: the dock, 62px tall at
+    // safe-bottom + 12, or on the road trip tab the stage bar, which takes the band the
+    // round controls would otherwise sit in and is what --m-stage-lift adds. The map
+    // credit (the little (i)) takes the bottom right corner a gap above that floor:
+    // beside the locate button it read as a stray control in the middle of the band.
+    // The round controls float one credit row higher (a 30px button plus an 8px gap) and
+    // add their own 12px on top of that, still close enough to the thumb to reach
+    // one-handed. The whole band moves rather than the one control over the corner, so
+    // the compass and the locate button stay on one line, and everything that reads
+    // --bottom-nav-h (the compass, both engines' locate button and base-layer switcher,
+    // the overview stack) follows on its own. Where the credit lands is written once, in
+    // mobile.css under `m-credit-corner`, where the GL containers and the Leaflet (i)
+    // both read it.
+    //
+    // The metrics are classes rather than an inline --bottom-nav-h, and the lift is its
+    // OWN variable folded into them: the compass band below is identified by being the
+    // one element that sets that name inline, and a second one would make that ambiguous.
     <div
-      className="absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--bottom-nav-h:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))]"
+      className="m-credit-corner absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))] [--bottom-nav-h:calc(var(--m-map-floor)+38px)]"
       // 76px is the stage bar's own height plus the gap it keeps on both sides, so the
-      // round controls land one gap above it instead of on its top edge.
+      // credit lands one gap above the bar instead of on its top edge, and the round
+      // controls one credit row above that.
       style={{ ['--m-stage-lift' as string]: onStage && mapActive ? '76px' : '0px' }}
     >
       <MapViewAuto

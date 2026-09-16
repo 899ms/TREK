@@ -5,7 +5,10 @@ import { useTranslation } from '../../i18n'
 interface MapAttributionToggleProps {
   open: boolean
   onToggle: () => void
-  /** Same band as the locate button, so the two sit on one line. */
+  /**
+   * Where the (i) sits on a map that defines no credit corner: the locate button's band,
+   * so the two share a line.
+   */
   bottomOffset: string
 }
 
@@ -34,9 +37,13 @@ export default function MapAttributionToggle({ open, onToggle, bottomOffset }: M
       aria-expanded={open}
       style={{
         position: 'absolute',
-        bottom: bottomOffset,
-        // Clear of the locate button at right: 12 plus its 42, with a gap.
-        right: 62,
+        // A map that gives the credit a corner of its own (the phone trip map, see
+        // `m-credit-corner` in mobile.css) places the (i) through these two variables, the
+        // same two its GL engines are placed by. Every other map defines neither, so the
+        // fallbacks keep the button where it always was: in the locate button's band,
+        // clear of that button at right: 12 plus its 42, with a gap.
+        bottom: `var(--m-credit-bottom, ${bottomOffset})`,
+        right: 'var(--m-credit-right, 62px)',
         zIndex: 1000,
         width: 30,
         height: 30,

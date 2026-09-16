@@ -988,6 +988,32 @@ describe('MapView live location', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Follow my location' }))
     expect(geoMock.cycleMode).toHaveBeenCalled()
   })
+
+  it('FE-COMP-MAPVIEW-077: the credit (i) is a phone control, and it opens the credit through a class on the wrapper', () => {
+    const desktop = render(<MapView />)
+    expect(screen.queryByRole('button', { name: 'Map credits' })).toBeNull()
+    desktop.unmount()
+
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 420 })
+    const { container } = render(<MapView />)
+    const toggle = screen.getByRole('button', { name: 'Map credits' })
+    const wrapper = container.querySelector('div.w-full.h-full.relative') as HTMLElement
+    // Starts closed: on a phone the map is the screen, and the credit is one tap away.
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(wrapper.classList.contains('m-attrib-open')).toBe(false)
+    // The locate button's band is only the fallback; a credit corner around the map wins.
+    expect(toggle.style.bottom).toBe('var(--m-credit-bottom, calc(var(--bottom-nav-h, 84px) + 12px))')
+
+    // A class on the wrapper rather than markup in Leaflet's own container, which Leaflet
+    // rewrites whenever a layer with an attribution comes or goes.
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('true')
+    expect(wrapper.classList.contains('m-attrib-open')).toBe(true)
+
+    fireEvent.click(toggle)
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(wrapper.classList.contains('m-attrib-open')).toBe(false)
+  })
 })
 
 describe('MapView bounds fitting', () => {

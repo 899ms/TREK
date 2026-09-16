@@ -355,7 +355,9 @@
  * tucking it away only on the first drag. On a phone, where the map IS the screen,
  * the first thing anybody sees is then a two-line grey ribbon over the bottom of
  * it. MapViewGL now starts it collapsed; what is left here is where the little
- * button sits, which is beside the locate control rather than underneath it.
+ * button sits on a phone map without a credit row, which is beside the locate
+ * control rather than underneath it. The trip map gives it the corner instead
+ * (`.m-credit-corner` below).
  *
  * Nothing is dropped: one tap opens the full credit, and it is still a link. */
 .m-root .maplibregl-ctrl-bottom-right,
@@ -364,10 +366,10 @@
   right: 46px;
 }
 
-/* Leaflet has no collapsed mode at all, so it is given one: hidden until the (i) beside
- * the locate button is tapped (`MapAttributionToggle`, which puts `m-attrib-open` on the
- * map's wrapper). Nothing is lost: one tap shows the whole credit, every link in it
- * included, which is the same bargain the GL engines strike on a narrow map. */
+/* Leaflet has no collapsed mode at all, so it is given one: hidden until its (i) is tapped
+ * (`MapAttributionToggle`, which puts `m-attrib-open` on the map's wrapper). Nothing is
+ * lost: one tap shows the whole credit, every link in it included, which is the same
+ * bargain the GL engines strike on a narrow map. */
 .m-root .leaflet-control-attribution { display: none; }
 
 /* The control column, not just the block inside it: Leaflet sizes that column to the
@@ -390,6 +392,59 @@
   box-shadow: 0 10px 28px -12px rgba(0, 0, 0, .45);
 }
 .m-root .m-attrib-open .leaflet-control-attribution a { color: var(--m-ink); }
+
+/* On the trip map the credit has the bottom right corner to itself.
+ *
+ * Beside the locate button it read as a stray control in the middle of the band. MMapArea
+ * marks its layer `m-credit-corner`, defines `--m-map-floor` (the top of the dock, or of the
+ * stage bar on the road trip tab) and floats the round controls one credit row above that
+ * floor, so the corner under them is free. Both engines read the same two numbers from
+ * here: the GL control containers through the rules below, the Leaflet (i) through the
+ * variables it falls back from. Other phone maps have no such row and define neither, so
+ * their credit stays beside their locate button. */
+.m-root .m-credit-corner {
+  /* The locate button's own margin, so the right column lines up on one edge. */
+  --m-credit-right: 12px;
+  --m-credit-bottom: calc(var(--m-map-floor) + 12px);
+}
+
+/* The compact GL control keeps a 10px margin of its own, so its container sits that far
+   inside the spot the button is meant to land on. */
+.m-root .m-credit-corner .maplibregl-ctrl-bottom-right,
+.m-root .m-credit-corner .mapboxgl-ctrl-bottom-right {
+  bottom: calc(var(--m-credit-bottom) - 10px);
+  right: calc(var(--m-credit-right) - 10px);
+}
+
+/* ...and the (i) stays in that corner while the credit is open. Both GL engines pin their
+   button to the top of the control, so a credit that wraps carries it up the column, into
+   the locate button that now sits right above this corner: at two lines (20px each) the
+   top of the button slides under it, at three the whole button does, and the tap meant to
+   close the credit lands on the locate button instead. Held at the bottom it stays where
+   the thumb just was, and the text unfolds to its left and upward like the Leaflet credit
+   below. Collapsed, the control is exactly the button's height, so nothing moves until it
+   opens. */
+.m-root .m-credit-corner .maplibregl-ctrl-bottom-right .maplibregl-ctrl-attrib-button,
+.m-root .m-credit-corner .mapboxgl-ctrl-bottom-right .mapboxgl-ctrl-attrib-button {
+  top: auto;
+  bottom: 0;
+}
+
+/* The Mapbox wordmark is a credit too, so it shares the row rather than rising with the
+   band into the switcher and the compass. 6px rather than 10: the logo hangs 4px below its
+   own control box. MapLibre draws no wordmark here, so for it this moves an empty corner. */
+.m-root .m-credit-corner .maplibregl-ctrl-bottom-left,
+.m-root .m-credit-corner .mapboxgl-ctrl-bottom-left {
+  bottom: calc(var(--m-credit-bottom) - 6px);
+}
+
+/* The open Leaflet credit stays in the row, to the left of the (i), which is where the GL
+   engines unfold theirs. Above the (i) is the locate button now. 36px is the (i) plus a
+   gap; both offsets are relative, like the ones they override. */
+.m-root .m-credit-corner .m-attrib-open .leaflet-control-attribution {
+  right: calc(var(--m-credit-right) + 36px);
+  bottom: var(--m-credit-bottom);
+}
 
 /* Text fields carry the row's background, not their own.
  *

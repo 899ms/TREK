@@ -11,7 +11,7 @@ import { useTripStore } from '../../../../src/store/tripStore'
 import { seedStore } from '../../../helpers/store'
 import type { Place } from '../../../../src/types'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-025
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-027
 //
 // The stage's pins come out of the trip store rather than the planner's map list, so the
 // stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
@@ -163,21 +163,25 @@ describe('MMapArea', () => {
     expect(compassBand(container)?.className).not.toContain('left-3')
   })
 
-  it('FE-MOB-MAPAREA-003: the map layer floats those controls a dock gap above the dock', () => {
+  it('FE-MOB-MAPAREA-003: the map layer floats those controls one credit row above the dock', () => {
     const { container } = renderArea()
+    const layer = container.firstElementChild as HTMLElement
 
-    // The dock is 62px tall at safe-bottom + 12; the controls add their own 12.
-    expect((container.firstElementChild as HTMLElement).className)
-      .toContain('[--bottom-nav-h:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))]')
+    // The floor is the dock's top edge: 62px tall at safe-bottom + 12, raised by the stage lift.
+    expect(layer.className)
+      .toContain('[--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))]')
+    // The band sits one credit row (a 30px button plus an 8px gap) above that floor, so the
+    // corner under it is the credit's; the controls add their own 12 on top.
+    expect(layer.className).toContain('[--bottom-nav-h:calc(var(--m-map-floor)+38px)]')
     // No lift off the stage: the plan tab has no bar in that band.
-    expect((container.firstElementChild as HTMLElement).style.getPropertyValue('--m-stage-lift')).toBe('0px')
+    expect(layer.style.getPropertyValue('--m-stage-lift')).toBe('0px')
   })
 
-  it('FE-MOB-MAPAREA-013: on the stage the controls clear the stage bar by one gap', () => {
+  it('FE-MOB-MAPAREA-013: on the stage the map floor clears the stage bar by one gap', () => {
     const { container } = renderArea({ trTab: 'roadtrip', mapFront: true })
 
-    // The bar is 61px tall and keeps a gap on both sides, so the round controls land
-    // above it rather than on its top edge.
+    // The bar is 61px tall and keeps a gap on both sides, so the floor rises above it rather
+    // than stopping on its top edge, and the credit and the round controls rise with it.
     expect((container.firstElementChild as HTMLElement).style.getPropertyValue('--m-stage-lift')).toBe('76px')
   })
 
@@ -489,5 +493,37 @@ describe('MMapArea', () => {
     const shown: [number, number][] = [[53.87, 10.69]]
     rerender(<MMapArea planner={{ ...planner, selectedDayId: 2, mapFocusPoints: shown }} shell={shell} />)
     expect(mocks.props.focusPoints).toBe(shown)
+  })
+
+  it('FE-MOB-MAPAREA-026: the map layer is the credit corner on both tabs, and on the stage it rides the lift', () => {
+    const plan = renderArea()
+    const planLayer = plan.container.firstElementChild as HTMLElement
+    // mobile.css places the credit off this class, in both GL engines and in Leaflet.
+    expect(planLayer.classList.contains('m-credit-corner')).toBe(true)
+    plan.unmount()
+
+    const { container } = renderArea({ trTab: 'roadtrip', mapFront: true })
+    const stageLayer = container.firstElementChild as HTMLElement
+    expect(stageLayer.classList.contains('m-credit-corner')).toBe(true)
+    // The floor takes the same 76px the band does, so the credit lands a gap above the
+    // stage bar rather than on it.
+    expect(stageLayer.style.getPropertyValue('--m-stage-lift')).toBe('76px')
+  })
+
+  it('FE-MOB-MAPAREA-027: the layer sets only the lift inline, so the compass stays the one inline --bottom-nav-h', () => {
+    for (const shellOver of [{ trTab: 'plan' }, { trTab: 'roadtrip', mapFront: true }] as Partial<MTripShellApi>[]) {
+      const { container, unmount } = renderArea(shellOver)
+      const inline = (container.firstElementChild as HTMLElement).getAttribute('style') ?? ''
+
+      // The floor and the band are classes: a second element naming --bottom-nav-h inline
+      // would leave nothing to tell the compass band apart by.
+      expect(inline).toContain('--m-stage-lift')
+      expect(inline).not.toContain('--bottom-nav-h')
+      expect(inline).not.toContain('--m-map-floor')
+      expect(inline).not.toContain('--m-credit')
+      expect(container.querySelectorAll('[style*="--bottom-nav-h"]')).toHaveLength(1)
+      expect(compassBand(container)).not.toBeNull()
+      unmount()
+    }
   })
 })
