@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Geplant wird am Desktop. TREK berechnet die Fahrt, sobald ein Tag zwei Orte hat.',
   'mobileTrip.rtSearchOffline': 'Braucht eine Verbindung: Die Suche liest die Strecke, die vor dir liegt.',
   'mobileTrip.rtBehind': '{time} hinter dem Plan',
+  'mobileTrip.rtStart': 'Start',
   'mobileTrip.rtStayScope':
     'Der Aufenthalt gehört zum Ort und zählt deshalb an jedem Tag, an dem dieser Stopp geplant ist.',
   'mobileTrip.rtStayLess': '{count} Minuten weniger',

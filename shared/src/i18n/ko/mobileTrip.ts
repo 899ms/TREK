@@ -52,6 +52,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': '계획은 데스크톱에서 세웁니다. 하루에 장소가 두 곳 생기면 TREK이 주행을 계산합니다.',
   'mobileTrip.rtSearchOffline': '연결이 필요합니다: 이 검색은 앞으로 갈 경로를 읽습니다.',
   'mobileTrip.rtBehind': '계획보다 {time} 늦음',
+  'mobileTrip.rtStart': '시작',
   'mobileTrip.rtStayScope': '체류 시간은 장소에 속하므로, 이 경유지가 들어간 모든 날짜에 적용됩니다.',
   'mobileTrip.rtStayLess': '{count}분 줄이기',
   'mobileTrip.rtStayMore': '{count}분 늘리기',

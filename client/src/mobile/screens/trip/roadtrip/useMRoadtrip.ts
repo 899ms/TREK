@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { destinationCount, roadtripRows, stageOf, upNextStop } from '../../../../components/Roadtrip/roadtripRowModel'
+import { destinationCount, roadtripRows, stageClocks, stageOf, upNextStop } from '../../../../components/Roadtrip/roadtripRowModel'
 import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
 import { isEffectivelyOffline, onNetworkModeChange } from '../../../../sync/networkMode'
@@ -19,6 +19,8 @@ const TICK_MS = 30_000
 export interface MRoadtripController {
   stage: RoadtripDay | null
   rows: RoadtripRow[]
+  /** The head card's two figures, both taken from the arrival column the rows print. See stageClocks. */
+  clocks: ReturnType<typeof stageClocks>
   stops: number
   /** True while the routing round is still working through the trip's days. */
   loading: boolean
@@ -57,6 +59,7 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
   )
 
   const rows = useMemo(() => (stage ? roadtripRows(stage) : []), [stage])
+  const clocks = useMemo(() => stageClocks(rows), [rows])
 
   // "Today" is the stage's own date, not the selected day's index: a trip can be
   // planned for next year, and a countdown on a day in March is noise.
@@ -69,6 +72,7 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
   return {
     stage,
     rows,
+    clocks,
     stops: stage ? destinationCount(stage) : 0,
     loading: roadtripRoutes.loading,
     empty: !roadtripRoutes.loading && roadtripRoutes.days.length === 0,

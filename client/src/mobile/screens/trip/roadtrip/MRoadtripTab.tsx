@@ -113,8 +113,11 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
           <EmptyStage planner={planner} loading={rt.loading} />
         ) : (
           <>
-            {/* Head card: the two figures a morning is planned around, at 30px, which is
-                what makes them readable at arm's length in a phone cradle. */}
+            {/* Head card: when the stage starts and when it reaches its last place. Both
+                clocks are ones the chain below repeats, read off the same arrival column
+                (see stageClocks), so a first stop pinned at 10:00 heads the card at 10:00
+                and not at the end of its stay. They carry dir=ltr for the same reason the
+                rows do: a clock reads the same way round in an RTL locale. */}
             <section className="rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-4 py-3.5">
               <div className="flex items-center justify-between">
                 <span className="font-geist text-[0.625rem] font-bold uppercase tracking-[.09em] text-m-muted">
@@ -128,18 +131,18 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
               <div className="mt-2 flex items-end justify-between gap-3">
                 <span className="min-w-0">
                   <span className="block font-geist text-[0.5625rem] font-bold uppercase tracking-[.08em] text-m-faint">
-                    {t('roadtrip.stay.leave')}
+                    {t('mobileTrip.rtStart')}
                   </span>
-                  <span className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
-                    {firstDeparture(rt.rows) ?? '-'}
+                  <span dir="ltr" className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
+                    {rt.clocks.start ?? '-'}
                   </span>
                 </span>
                 <span className="min-w-0 text-right">
                   <span className="block font-geist text-[0.5625rem] font-bold uppercase tracking-[.08em] text-m-faint">
                     {t('roadtrip.stay.arrive')}
                   </span>
-                  <span className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
-                    {lastArrival(rt.rows) ?? '-'}
+                  <span dir="ltr" className="block text-[1.875rem] font-extrabold leading-none tabular-nums text-m-ink">
+                    {rt.clocks.arrive ?? '-'}
                   </span>
                 </span>
               </div>
@@ -369,27 +372,6 @@ function EmptyStage({ planner, loading }: { planner: MTripTabPanelProps['planner
 }
 
 /* ── small helpers ────────────────────────────────────────────────────────── */
-
-/**
- * When the day starts moving, which is when you LEAVE the first stop, not when you
- * arrive at it. The two differ by the stay, and on a morning that begins at a hotel
- * they differ by the whole night.
- */
-function firstDeparture(rows: ReturnType<typeof useMRoadtrip>['rows']): string | null {
-  for (const row of rows) {
-    if (row.kind !== 'stop') continue
-    return row.departure ?? row.time
-  }
-  return null
-}
-
-function lastArrival(rows: ReturnType<typeof useMRoadtrip>['rows']): string | null {
-  for (let i = rows.length - 1; i >= 0; i--) {
-    const row = rows[i]
-    if (row.kind === 'stop' && row.time) return row.time
-  }
-  return null
-}
 
 function lastArrivalOf(stage: { schedule: { entries: { arrival: string | null }[] } }): string | null {
   for (let i = stage.schedule.entries.length - 1; i >= 0; i--) {

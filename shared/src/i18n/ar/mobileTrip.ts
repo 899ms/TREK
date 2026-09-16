@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'يتم التخطيط على سطح المكتب. يحسب TREK القيادة بمجرد أن يضم اليوم مكانين.',
   'mobileTrip.rtSearchOffline': 'يلزم اتصال بالإنترنت: يقرأ البحث المسار الذي أمامك.',
   'mobileTrip.rtBehind': '{time} تأخرًا عن الخطة',
+  'mobileTrip.rtStart': 'البداية',
   'mobileTrip.rtStayScope': 'مدة التوقف تخص المكان نفسه، لذا تُحتسب في كل يوم تكون فيه هذه المحطة ضمن الخطة.',
   'mobileTrip.rtStayLess': '{count} دقيقة أقل',
   'mobileTrip.rtStayMore': '{count} دقيقة أكثر',

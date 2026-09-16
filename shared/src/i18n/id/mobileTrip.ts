@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'Perencanaan dilakukan di desktop. TREK menghitung perjalanannya begitu satu hari punya dua tempat.',
   'mobileTrip.rtSearchOffline': 'Perlu koneksi: pencarian membaca rute di depan.',
   'mobileTrip.rtBehind': 'terlambat {time} dari rencana',
+  'mobileTrip.rtStart': 'Mulai',
   'mobileTrip.rtStayScope':
     'Lama singgah melekat pada tempatnya, jadi ia terhitung di setiap hari perhentian ini direncanakan.',
   'mobileTrip.rtStayLess': '{count} menit lebih singkat',

@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Planowanie odbywa się na komputerze. TREK wylicza przejazd, gdy dzień ma dwa miejsca.',
   'mobileTrip.rtSearchOffline': 'Wymaga połączenia: wyszukiwanie czyta trasę przed tobą.',
   'mobileTrip.rtBehind': '{time} opóźnienia względem planu',
+  'mobileTrip.rtStart': 'Początek',
   'mobileTrip.rtStayScope':
     'Pobyt jest przypisany do miejsca, więc liczy się w każdym dniu, w którym zaplanowano ten przystanek.',
   'mobileTrip.rtStayLess': '{count} minut mniej',

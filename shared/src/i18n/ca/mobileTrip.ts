@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'La planificació es fa a l’escriptori. TREK calcula el trajecte quan un dia té dos llocs.',
   'mobileTrip.rtSearchOffline': 'Cal connexió: la cerca llegeix la ruta que tens per endavant.',
   'mobileTrip.rtBehind': '{time} de retard sobre el pla',
+  'mobileTrip.rtStart': 'Inici',
   'mobileTrip.rtStayScope':
     'L’estada pertany al lloc, així que compta tots els dies en què aquesta parada està planificada.',
   'mobileTrip.rtStayLess': '{count} minuts menys',

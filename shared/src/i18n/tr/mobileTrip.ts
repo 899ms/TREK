@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Planlama masaüstünde yapılır. Bir günde iki yer olduğunda TREK sürüşü hesaplar.',
   'mobileTrip.rtSearchOffline': 'Bağlantı gerekir: arama, ileride kalan rotayı okur.',
   'mobileTrip.rtBehind': 'plandan {time} geride',
+  'mobileTrip.rtStart': 'Başlangıç',
   'mobileTrip.rtStayScope': 'Bu süre yere aittir, bu yüzden bu durağın planlandığı her gün için geçerlidir.',
   'mobileTrip.rtStayLess': '{count} dakika daha az',
   'mobileTrip.rtStayMore': '{count} dakika daha fazla',

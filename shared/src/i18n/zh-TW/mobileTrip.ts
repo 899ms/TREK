@@ -52,6 +52,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': '規劃在電腦上進行。當一天有兩個地點時，TREK 就會算出車程。',
   'mobileTrip.rtSearchOffline': '需要連線：搜尋會讀取前方的路線。',
   'mobileTrip.rtBehind': '比計畫晚 {time}',
+  'mobileTrip.rtStart': '開始',
   'mobileTrip.rtStayScope': '停留時間屬於該地點，因此這個停靠點排在哪一天，就會計入那一天。',
   'mobileTrip.rtStayLess': '少 {count} 分鐘',
   'mobileTrip.rtStayMore': '多 {count} 分鐘',

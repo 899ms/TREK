@@ -158,6 +158,46 @@ export function destinationCount(day: RoadtripDay): number {
 }
 
 /**
+ * The two clocks a stage is headed with: when it starts, and when you reach its last place.
+ *
+ * Both are read off the clock the rows print on the right, which is an arrival all the way
+ * down (the desktop rail keeps the same rule and spells a departure out in words where it
+ * needs one). So each figure is one the chain below repeats, and the start is the first
+ * stop's ARRIVAL rather than the moment you leave it. A first stop is a place you get to,
+ * often at a time somebody pinned, and heading the card with its departure hid that
+ * appointment behind its own stay: a stop pinned at 10:00 with an hour and a half there
+ * read as leaving at 11:30, a clock no row shows.
+ *
+ * A resume point is a start, because the morning after an automatic night begins there. A
+ * day end point is not an arrival: it marks where the window closed, not a place. A spill
+ * band is passed over, because the departure it carries belongs to the day before.
+ *
+ * Stops without a clock are skipped at both ends instead of dashing the figure. That only
+ * happens while a leg between them and the timed stops has no route yet, and a partly timed
+ * day still has a first and a last clock worth reading, even when both are the same stop's.
+ *
+ * First and last mean row order, not the earliest and the latest clock, because the column
+ * is not guaranteed to run forwards. A pin the drive cannot make keeps its own clock, so it
+ * can read earlier than the stop above it. And when a daily window cannot be kept, each
+ * stored day is timed on its own without being split, so a card can open on an evening stay
+ * and end on a pin the next morning. The figures follow the rows in both cases, so they
+ * never name a clock the chain does not.
+ */
+export function stageClocks(rows: readonly RoadtripRow[]): { start: string | null; arrive: string | null } {
+  let start: string | null = null
+  let arrive: string | null = null
+  for (const row of rows) {
+    if (row.kind === 'stop' && row.time) {
+      start ??= row.time
+      arrive = row.time
+    } else if (row.kind === 'auto' && row.phase === 'resume' && row.time) {
+      start ??= row.time
+    }
+  }
+  return { start, arrive }
+}
+
+/**
  * The next destination the plan still owes you, measured against the clock.
  *
  * Only for today: a countdown on a day in March is noise. `minutesUntil` goes

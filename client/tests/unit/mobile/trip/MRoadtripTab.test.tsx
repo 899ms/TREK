@@ -6,7 +6,7 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { Day, Place } from '../../../../src/types'
 import type { RoadtripDay, RoadtripRoutes, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-031
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-032
 
 // The preference store is a zustand slice keyed by user and trip; the tab only ever
 // reads two flags out of it, so the hook is the smaller seam.
@@ -156,15 +156,20 @@ describe('MRoadtripTab', () => {
   })
 
   describe('list half', () => {
-    it('FE-MOB-RTTAB-001: heads the stage with its departure, its arrival, the day total and the stop count', () => {
+    it('FE-MOB-RTTAB-001: heads the stage with its start, its arrival, the day total and the stop count', () => {
       renderTab()
 
-      // Die ABFAHRT des ersten Stopps (09:15), nicht seine Ankunft (08:30): die beiden
-      // trennt der Aufenthalt, und an einem Morgen im Hotel die ganze Nacht.
-      const leave = screen.getByText('roadtrip.stay.leave').parentElement as HTMLElement
-      expect(within(leave).getByText('09:15')).toBeInTheDocument()
+      // The start is the first stop's ARRIVAL (08:30), the clock its row prints, not its
+      // departure (09:15). Nor is it the spill band's 23:10: that one belongs to the day before.
+      const start = screen.getByText('mobileTrip.rtStart').parentElement as HTMLElement
+      expect(within(start).getByText('08:30')).toBeInTheDocument()
+      expect(within(start).queryByText('09:15')).toBeNull()
+      expect(within(start).queryByText('23:10')).toBeNull()
       const arrive = screen.getByText('roadtrip.stay.arrive').parentElement as HTMLElement
       expect(within(arrive).getByText('12:40')).toBeInTheDocument()
+      // Both clocks keep their digit order in an RTL locale, like the ones on the rows.
+      expect(within(start).getByText('08:30')).toHaveAttribute('dir', 'ltr')
+      expect(within(arrive).getByText('12:40')).toHaveAttribute('dir', 'ltr')
 
       expect(screen.getByText('roadtrip.leg.driveText:412 km,5 h')).toBeInTheDocument()
       expect(screen.getByText('roadtrip.day.stopCount:2')).toBeInTheDocument()
@@ -229,7 +234,7 @@ describe('MRoadtripTab', () => {
 
       expect(screen.getByText('roadtrip.empty.title')).toBeInTheDocument()
       expect(screen.getByText('mobileTrip.rtPlanOnDesktop')).toBeInTheDocument()
-      expect(screen.queryByText('roadtrip.stay.leave')).toBeNull()
+      expect(screen.queryByText('mobileTrip.rtStart')).toBeNull()
       expect(screen.queryByText(/roadtrip\.day\.stopCount/)).toBeNull()
     })
 
@@ -259,8 +264,8 @@ describe('MRoadtripTab', () => {
       } as unknown as Partial<RoadtripDay>)
       renderTab(planner({ roadtripRoutes: routes({ days: [untimed] }) }))
 
-      const leave = screen.getByText('roadtrip.stay.leave').parentElement as HTMLElement
-      expect(within(leave).getByText('-')).toBeInTheDocument()
+      const start = screen.getByText('mobileTrip.rtStart').parentElement as HTMLElement
+      expect(within(start).getByText('-')).toBeInTheDocument()
       const arrive = screen.getByText('roadtrip.stay.arrive').parentElement as HTMLElement
       expect(within(arrive).getByText('-')).toBeInTheDocument()
       // The chain itself still stands, it just carries no clocks.
@@ -272,6 +277,51 @@ describe('MRoadtripTab', () => {
 
       expect(screen.getByText('roadtrip.summary.partial')).toBeInTheDocument()
       expect(screen.queryByText(/roadtrip\.leg\.driveText:412/)).toBeNull()
+    })
+
+    it('FE-MOB-RTTAB-032: heads the card with the clock the first row prints, not the end of its stay', () => {
+      // The reported stage: Hamburg Speicherstadt pinned at 10:00 with an hour and a half
+      // there, Sanssouci reached at 19:33. The card used to read LEAVE 11:30, a clock no row
+      // shows, which hid the pinned appointment behind its own stay.
+      const reported = stage({
+        spills: [],
+        stops: [
+          {
+            assignmentId: 601, ownerDayId: 2, ownerIndex: 0, placeId: 201, name: 'Hamburg Speicherstadt',
+            lat: 53.54, lng: 9.99, time: '10:00', dwellMinutes: 90,
+            legMode: null, incomingLegMode: null, stopType: null,
+          },
+          {
+            assignmentId: 602, ownerDayId: 2, ownerIndex: 1, placeId: 202, name: 'Sanssouci Palace',
+            lat: 52.4, lng: 13.04, time: null, dwellMinutes: 120,
+            legMode: null, incomingLegMode: null, stopType: null,
+          },
+        ],
+        legs: [seg('290 km', '3 h')],
+        legVias: [[]],
+        schedule: {
+          entries: [
+            { arrival: '10:00', departure: '11:30', anchored: true, dayOffset: 0 },
+            { arrival: '19:33', departure: '21:33', anchored: false, dayOffset: 0 },
+          ],
+          warnings: [],
+        },
+        dryPoints: [],
+        driveWarnings: [],
+      } as unknown as Partial<RoadtripDay>)
+      renderTab(planner({ roadtripRoutes: routes({ days: [reported] }) }))
+
+      const start = screen.getByText('mobileTrip.rtStart').parentElement as HTMLElement
+      expect(within(start).getByText('10:00')).toBeInTheDocument()
+      const arrive = screen.getByText('roadtrip.stay.arrive').parentElement as HTMLElement
+      expect(within(arrive).getByText('19:33')).toBeInTheDocument()
+      // Neither departure is printed anywhere on the screen, and the word for one is gone.
+      expect(screen.queryByText('11:30')).toBeNull()
+      expect(screen.queryByText('21:33')).toBeNull()
+      expect(screen.queryByText('roadtrip.stay.leave')).toBeNull()
+      // The figure is the very clock the first row carries.
+      const firstRow = screen.getByText('Hamburg Speicherstadt').closest('[role=button]') as HTMLElement
+      expect(within(firstRow).getByText('10:00')).toBeInTheDocument()
     })
   })
 
@@ -294,7 +344,7 @@ describe('MRoadtripTab', () => {
 
       // Same clock, same stage, a week further on: the countdown is about the date.
       expect(screen.queryByText('mobileTrip.upNext')).toBeNull()
-      expect(screen.getByText('roadtrip.stay.leave')).toBeInTheDocument()
+      expect(screen.getByText('mobileTrip.rtStart')).toBeInTheDocument()
     })
 
     it('FE-MOB-RTTAB-015: shows no countdown once the last stop is behind you', () => {
@@ -370,7 +420,7 @@ describe('MRoadtripTab', () => {
       const { container } = renderTab(planner(), mapShell())
 
       expect((container.firstChild as HTMLElement).className).toContain('pointer-events-none')
-      expect(screen.queryByText('roadtrip.stay.leave')).toBeNull()
+      expect(screen.queryByText('mobileTrip.rtStart')).toBeNull()
       expect(screen.queryByText('Shell Ebina')).toBeNull()
       expect(screen.queryByText('roadtrip.refuel.dry')).toBeNull()
       expect(screen.queryByText('roadtrip.window.stop')).toBeNull()

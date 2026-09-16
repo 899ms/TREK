@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'La planification se fait sur ordinateur. TREK calcule le trajet dès qu’un jour compte deux lieux.',
   'mobileTrip.rtSearchOffline': 'Connexion nécessaire : la recherche lit l’itinéraire à venir.',
   'mobileTrip.rtBehind': '{time} de retard sur le programme',
+  'mobileTrip.rtStart': 'Début',
   'mobileTrip.rtStayScope':
     'La durée sur place appartient au lieu : elle compte donc pour chaque jour où cet arrêt est prévu.',
   'mobileTrip.rtStayLess': '{count} minutes de moins',

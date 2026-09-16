@@ -3,6 +3,7 @@ import {
   destinationCount,
   pickWarning,
   roadtripRows,
+  stageClocks,
   stageOf,
   upNextStop,
   type RoadtripRow,
@@ -11,7 +12,7 @@ import {
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
 import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-028
+// FE-RTROW-001 to FE-RTROW-033
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -327,5 +328,68 @@ describe('upNextStop', () => {
     // Die Tankstelle um 10:00 laege vorne, genannt wird trotzdem das Ziel um 11:00.
     const d = timedDay(['09:00', '10:00', '11:00'], [stop('A'), stop('Aral', { stopType: 'fuel' }), stop('B')])
     expect(upNextStop(d, 9 * 60 + 30, true)?.row.stop.name).toBe('B')
+  })
+})
+
+describe('stageClocks', () => {
+  it('FE-RTROW-029: starts at the first stop arrival and arrives at the last one, neither departure', () => {
+    // The reported stage: a pin at 10:00 with an hour and a half there headed the card as
+    // 11:30, a clock no row prints. The last stop leaves at 21:33, which is not an arrival either.
+    const d = day([stop('Hamburg Speicherstadt', { dwellMinutes: 90, time: '10:00' }), stop('Sanssouci', { dwellMinutes: 120 })], {
+      schedule: {
+        entries: [entry('10:00', { departure: '11:30', anchored: true }), entry('19:33', { departure: '21:33' })],
+        warnings: [],
+      },
+    })
+    const clocks = stageClocks(roadtripRows(d))
+    expect(clocks).toEqual({ start: '10:00', arrive: '19:33' })
+    expect(Object.values(clocks)).not.toContain('11:30')
+    expect(Object.values(clocks)).not.toContain('21:33')
+  })
+
+  it('FE-RTROW-030: a morning after an automatic night starts at the resume point, and a day end point arrives nowhere', () => {
+    const d = day([night('start'), stop('Fulda'), stop('Kassel'), night('end')], {
+      schedule: { entries: [entry('08:00'), entry('09:10', { departure: '10:00' }), entry('12:40'), entry('22:00')], warnings: [] },
+    })
+    expect(stageClocks(roadtripRows(d))).toEqual({ start: '08:00', arrive: '12:40' })
+  })
+
+  it('FE-RTROW-031: a spill band departure belongs to the day before and does not start this one', () => {
+    const d = day([stop('A'), stop('B')], {
+      spills: [{ at: 0, count: 1, fromDayNumber: 1, departure: '23:10', leg: undefined, fromStop: undefined, line: [] }],
+      schedule: { entries: [entry('00:40'), entry('02:00')], warnings: [] },
+    })
+    expect(stageClocks(roadtripRows(d))).toEqual({ start: '00:40', arrive: '02:00' })
+  })
+
+  it('FE-RTROW-032: untimed stops are skipped at both ends, deliberately, and a day with no clock at all gives nulls', () => {
+    // Skipping rather than dashing is a choice: a day whose first leg has no route yet still
+    // has one clock worth heading the card with, even when start and arrival are that one.
+    const partly = timedDay([null, '11:00', null], [stop('A'), stop('B'), stop('C')])
+    expect(stageClocks(roadtripRows(partly))).toEqual({ start: '11:00', arrive: '11:00' })
+
+    const untimed = timedDay([null, null], [stop('A'), stop('B')])
+    expect(stageClocks(roadtripRows(untimed))).toEqual({ start: null, arrive: null })
+    expect(stageClocks([])).toEqual({ start: null, arrive: null })
+
+    // A petrol stop is a place you drive to, so its arrival counts like any other.
+    const fuelFirst = timedDay(['07:50', '09:00'], [stop('Aral', { stopType: 'fuel' }), stop('B')])
+    expect(stageClocks(roadtripRows(fuelFirst))).toEqual({ start: '07:50', arrive: '09:00' })
+  })
+
+  it('FE-RTROW-033: follows the row order rather than the clock, for a missed pin and for an unsplit card past midnight', () => {
+    // A pin the drive cannot make keeps its own clock, so the last row can read earlier
+    // than the one above it. The arrival is still that last row's clock, not the latest one.
+    const missed = timedDay(
+      ['11:00', '10:00'],
+      [stop('Harbour', { dwellMinutes: 60, time: '11:00' }), stop('Ferry', { time: '10:00' })],
+    )
+    expect(stageClocks(roadtripRows(missed))).toEqual({ start: '11:00', arrive: '10:00' })
+
+    // When a daily window cannot be kept, each stored day is timed on its own and never
+    // split: an evening stay can then head a card that ends on a pin the next morning. The
+    // figures still name the first and the last clock the chain prints.
+    const unsplit = timedDay(['18:30', '10:00'], [stop('Hotel', { dwellMinutes: 900 }), stop('Museum')])
+    expect(stageClocks(roadtripRows(unsplit))).toEqual({ start: '18:30', arrive: '10:00' })
   })
 })

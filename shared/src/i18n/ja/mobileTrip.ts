@@ -52,6 +52,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': '計画はデスクトップで行います。1日に場所が2か所そろうと、TREKが走行を計算します。',
   'mobileTrip.rtSearchOffline': '接続が必要です：この検索は先のルートを読み取ります。',
   'mobileTrip.rtBehind': '予定より {time} 遅れ',
+  'mobileTrip.rtStart': '開始',
   'mobileTrip.rtStayScope': '滞在時間は場所に紐づくため、この立ち寄り先を予定しているすべての日に適用されます。',
   'mobileTrip.rtStayLess': '{count} 分減らす',
   'mobileTrip.rtStayMore': '{count} 分増やす',

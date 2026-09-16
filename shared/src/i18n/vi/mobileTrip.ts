@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'Việc lên kế hoạch diễn ra trên máy tính. TREK tính chặng lái xe ngay khi một ngày có hai địa điểm.',
   'mobileTrip.rtSearchOffline': 'Cần có kết nối: việc tìm kiếm đọc lộ trình phía trước.',
   'mobileTrip.rtBehind': 'chậm {time} so với kế hoạch',
+  'mobileTrip.rtStart': 'Bắt đầu',
   'mobileTrip.rtStayScope':
     'Thời gian dừng thuộc về địa điểm, nên nó được tính vào mọi ngày có điểm dừng này trong kế hoạch.',
   'mobileTrip.rtStayLess': 'ít hơn {count} phút',

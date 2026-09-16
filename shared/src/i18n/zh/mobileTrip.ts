@@ -52,6 +52,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': '规划在桌面端进行。一天里有了两个地点，TREK 就会算出这段车程。',
   'mobileTrip.rtSearchOffline': '需要联网：搜索会读取前方的路线。',
   'mobileTrip.rtBehind': '比计划晚 {time}',
+  'mobileTrip.rtStart': '开始',
   'mobileTrip.rtStayScope': '停留时间属于这个地点，因此在安排了该停靠点的每一天都会生效。',
   'mobileTrip.rtStayLess': '减少 {count} 分钟',
   'mobileTrip.rtStayMore': '增加 {count} 分钟',

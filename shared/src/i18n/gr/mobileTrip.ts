@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'Ο σχεδιασμός γίνεται στον υπολογιστή. Το TREK υπολογίζει τη διαδρομή μόλις μια ημέρα έχει δύο μέρη.',
   'mobileTrip.rtSearchOffline': 'Χρειάζεται σύνδεση: η αναζήτηση διαβάζει τη διαδρομή που ακολουθεί.',
   'mobileTrip.rtBehind': '{time} πίσω από το πρόγραμμα',
+  'mobileTrip.rtStart': 'Έναρξη',
   'mobileTrip.rtStayScope':
     'Η διάρκεια της στάσης ανήκει στο μέρος, οπότε μετράει σε κάθε ημέρα που είναι προγραμματισμένη αυτή η στάση.',
   'mobileTrip.rtStayLess': '{count} λεπτά λιγότερα',

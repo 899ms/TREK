@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Plánování probíhá na počítači. Jakmile má den dvě místa, TREK jízdu spočítá.',
   'mobileTrip.rtSearchOffline': 'Vyžaduje připojení: hledání čte trasu před vámi.',
   'mobileTrip.rtBehind': 'o {time} za plánem',
+  'mobileTrip.rtStart': 'Začátek',
   'mobileTrip.rtStayScope':
     'Doba zastávky patří k místu, takže platí pro každý den, na který je tato zastávka naplánovaná.',
   'mobileTrip.rtStayLess': 'o {count} minut méně',

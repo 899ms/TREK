@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'A tervezés asztali gépen történik. Amint egy napon két hely szerepel, a TREK kiszámolja az útvonalat.',
   'mobileTrip.rtSearchOffline': 'Internetkapcsolat kell hozzá: a keresés az előtted lévő útvonalat olvassa be.',
   'mobileTrip.rtBehind': '{time} késés a tervhez képest',
+  'mobileTrip.rtStart': 'Kezdés',
   'mobileTrip.rtStayScope':
     'Az itt töltött idő a helyhez tartozik, ezért minden olyan napon számít, amelyre ez a megálló be van tervezve.',
   'mobileTrip.rtStayLess': '{count} perccel kevesebb',

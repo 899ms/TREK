@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Planeringen sker på datorn. TREK räknar ut körningen så snart en dag har två platser.',
   'mobileTrip.rtSearchOffline': 'Kräver anslutning: sökningen läser rutten som ligger framför dig.',
   'mobileTrip.rtBehind': '{time} efter planen',
+  'mobileTrip.rtStart': 'Start',
   'mobileTrip.rtStayScope': 'Vistelsen hör till platsen och räknas därför varje dag som det här stoppet är inplanerat.',
   'mobileTrip.rtStayLess': '{count} minuter mindre',
   'mobileTrip.rtStayMore': '{count} minuter mer',

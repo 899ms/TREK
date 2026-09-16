@@ -53,6 +53,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtPlanOnDesktop': 'Planning happens on the desktop. TREK works out the drive once a day has two places.',
   'mobileTrip.rtSearchOffline': 'Needs a connection: the search reads the route ahead.',
   'mobileTrip.rtBehind': '{time} behind plan',
+  'mobileTrip.rtStart': 'Start',
   'mobileTrip.rtStayScope': 'The stay belongs to the place, so it counts on every day this stop is planned.',
   'mobileTrip.rtStayLess': '{count} minutes less',
   'mobileTrip.rtStayMore': '{count} minutes more',

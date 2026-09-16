@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'O planejamento acontece no computador. O TREK calcula o trajeto assim que um dia tem dois locais.',
   'mobileTrip.rtSearchOffline': 'Precisa de conexão: a busca lê a rota à frente.',
   'mobileTrip.rtBehind': '{time} de atraso em relação ao plano',
+  'mobileTrip.rtStart': 'Início',
   'mobileTrip.rtStayScope':
     'A estadia pertence ao local, então ela vale em todos os dias em que esta parada está planejada.',
   'mobileTrip.rtStayLess': '{count} minutos a menos',

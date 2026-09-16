@@ -54,6 +54,7 @@ const mobileTrip: TranslationStrings = {
     'Планирование происходит на компьютере. TREK рассчитает маршрут, как только в дне окажется два места.',
   'mobileTrip.rtSearchOffline': 'Нужна сеть: поиск считывает маршрут впереди.',
   'mobileTrip.rtBehind': 'на {time} позже плана',
+  'mobileTrip.rtStart': 'Начало',
   'mobileTrip.rtStayScope':
     'Стоянка привязана к месту, поэтому она учитывается в каждый день, на который запланирована эта остановка.',
   'mobileTrip.rtStayLess': 'на {count} минут меньше',
