@@ -34,6 +34,7 @@ function alternativeLabelIcon(label: string, note: string, background: string, a
   })
 }
 import L from 'leaflet'
+import MapAttributionToggle from './MapAttributionToggle'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import { mapsApi } from '../../api/client'
@@ -978,6 +979,16 @@ export const MapView = memo(function MapView({
     ? 'calc(var(--bottom-nav-h, 84px) + 20px + var(--day-panel-h, 0px) + 12px)'
     : 'calc(var(--bottom-nav-h, 84px) + 12px)'
 
+  /**
+   * Whether the credit is showing, on a phone where it starts as the (i).
+   *
+   * Held here rather than pushed into Leaflet's own container: Leaflet rewrites that
+   * container's markup from scratch whenever a layer with an attribution is added or
+   * removed, so anything injected into it dies on the next basemap switch. A class on
+   * the wrapper survives that, and the CSS lives with the rest of the mobile chrome.
+   */
+  const [attribOpen, setAttribOpen] = useState(false)
+
   const baseLayer = useSettingsStore(s => s.settings.map_base_layer) || 'default'
   const updateSetting = useSettingsStore(s => s.updateSetting)
   const isSatellite = baseLayer === 'satellite'
@@ -996,7 +1007,7 @@ export const MapView = memo(function MapView({
 
   return (
     <>
-    <div className="w-full h-full relative">
+    <div className={`w-full h-full relative${isMobile && attribOpen ? ' m-attrib-open' : ''}`}>
     <MapContainer
       // The datum is in the element's identity, because react-leaflet builds the
       // map once and Leaflet cannot change a CRS afterwards. Settings can arrive
@@ -1215,6 +1226,15 @@ export const MapView = memo(function MapView({
       onClick={cycleTrackingMode}
       bottomOffset={locationButtonBottom as unknown as number}
     />}
+    {/* The credit as the little (i), which is what both GL engines do on a narrow map
+        and Leaflet has no mode for. */}
+    {isMobile && (
+      <MapAttributionToggle
+        open={attribOpen}
+        onToggle={() => setAttribOpen(v => !v)}
+        bottomOffset={locationButtonBottom}
+      />
+    )}
     {/* 20px off the sidebar, not 12: the pill is round and frosted, so at the
         smaller gap its shadow ran into the sidebar edge and the two read as one
         surface. */}

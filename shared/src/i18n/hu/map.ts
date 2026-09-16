@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Teljes utazás megjelenítése',
   'map.overview.hide': 'Teljes utazás elrejtése',
   'map.overview.total': 'Teljes távolság',
+  'map.attribution': 'Térkép forrásai',
 };
 export default map;

@@ -343,9 +343,53 @@
  * MapLibre both, because a phone meets either depending on the screen. */
 .m-root .leaflet-control-attribution,
 .m-root .maplibregl-ctrl-bottom-left,
-.m-root .maplibregl-ctrl-bottom-right {
+.m-root .mapboxgl-ctrl-bottom-left,
+.m-root .maplibregl-ctrl-bottom-right,
+.m-root .mapboxgl-ctrl-bottom-right {
   bottom: var(--bottom-nav-h);
 }
+
+/* ...and it is a round (i) rather than a band across the picture.
+ *
+ * Both GL engines collapse their attribution below 640px and then open it anyway,
+ * tucking it away only on the first drag. On a phone, where the map IS the screen,
+ * the first thing anybody sees is then a two-line grey ribbon over the bottom of
+ * it. MapViewGL now starts it collapsed; what is left here is where the little
+ * button sits, which is beside the locate control rather than underneath it.
+ *
+ * Nothing is dropped: one tap opens the full credit, and it is still a link. */
+.m-root .maplibregl-ctrl-bottom-right,
+.m-root .mapboxgl-ctrl-bottom-right {
+  bottom: calc(var(--bottom-nav-h) + 2px);
+  right: 46px;
+}
+
+/* Leaflet has no collapsed mode at all, so it is given one: hidden until the (i) beside
+ * the locate button is tapped (`MapAttributionToggle`, which puts `m-attrib-open` on the
+ * map's wrapper). Nothing is lost: one tap shows the whole credit, every link in it
+ * included, which is the same bargain the GL engines strike on a narrow map. */
+.m-root .leaflet-control-attribution { display: none; }
+
+/* The control column, not just the block inside it: Leaflet sizes that column to the
+   credit on one line, so capping only the child leaves the text overflowing its own
+   box instead of wrapping. */
+.m-root .m-attrib-open .leaflet-bottom.leaflet-right { max-width: 78vw; }
+
+.m-root .m-attrib-open .leaflet-control-attribution {
+  display: block;
+  /* Above the (i) rather than beside it, so the block never lands under a thumb
+     reaching for the locate button. */
+  right: 12px;
+  bottom: calc(var(--bottom-nav-h) + 52px);
+  padding: 4px 9px;
+  border-radius: 11px;
+  font-size: 10px;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--m-card) 92%, transparent);
+  color: var(--m-muted);
+  box-shadow: 0 10px 28px -12px rgba(0, 0, 0, .45);
+}
+.m-root .m-attrib-open .leaflet-control-attribution a { color: var(--m-ink); }
 
 /* Text fields carry the row's background, not their own.
  *

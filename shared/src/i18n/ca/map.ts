@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Mostra tot el viatge',
   'map.overview.hide': 'Amaga tot el viatge',
   'map.overview.total': 'Distància total',
+  'map.attribution': 'Crèdits del mapa',
 };
 export default map;

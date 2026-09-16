@@ -47,5 +47,24 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.upNext': 'Volgende',
   'mobileTrip.viewDetails': 'Details bekijken',
   'mobileTrip.transportsEmpty': 'Nog geen transport',
+  'mobileTrip.rtInfoTitle': 'Rijgegevens',
+  'mobileTrip.rtDesktopNote':
+    'Deze waarden stel je in op de desktop. Daar kun je ook routevarianten vergelijken en een dag een geïmporteerde track laten volgen.',
+  'mobileTrip.rtPlanOnDesktop': 'Plannen doe je op de desktop. TREK berekent de rit zodra een dag twee plaatsen heeft.',
+  'mobileTrip.rtSearchOffline': 'Vereist een verbinding: de zoekopdracht leest de route die voor je ligt.',
+  'mobileTrip.rtBehind': '{time} achter op schema',
+  'mobileTrip.rtStayScope': 'Het verblijf hoort bij de plaats en telt dus op elke dag waarop deze stop gepland staat.',
+  'mobileTrip.rtStayLess': '{count} minuten minder',
+  'mobileTrip.rtStayMore': '{count} minuten meer',
+  'mobileTrip.rtNightDesktopOnly':
+    'Een overnachting op deze plaats voeg je toe in de desktopplanner. Hier kun je die alleen verwijderen.',
+  'mobileTrip.rtReach': 'Hoe ver',
+  'mobileTrip.rtReachAhead': '{distance} vooruit',
+  'mobileTrip.rtFromNext': 'Vanaf je volgende stop',
+  'mobileTrip.rtFromStart': 'Vanaf het begin van de etappe',
+  'mobileTrip.rtNoneAhead': 'Niets op de weg die voor je ligt. Probeer de hele etappe.',
+  'mobileTrip.rtNoneOnStage': 'Niets van dat soort langs deze etappe.',
+  'mobileTrip.rtTruncated':
+    '{count} stukken hadden meer dan in één antwoord past. Kies minder soorten om de rest te zien.',
 };
 export default mobileTrip;

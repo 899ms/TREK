@@ -2066,3 +2066,48 @@ describe('MapViewGL', () => {
     expect(glMap.setLayoutProperty).toHaveBeenCalledWith('trip-satellite-raster', 'visibility', 'none')
   })
 })
+describe('MapViewGL attribution', () => {
+  const flushFrames = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 40)) })
+
+  /** The compact control as maplibre leaves it on a narrow map: collapsed class, open. */
+  function compactAttribution(container: HTMLElement): HTMLElement {
+    const el = document.createElement('details')
+    el.className = 'maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show'
+    el.setAttribute('open', '')
+    // Inside the map container itself, where maplibre puts its controls.
+    container.querySelectorAll('div')[1]?.appendChild(el)
+    return el
+  }
+
+  it('FE-COMP-MAPVIEWGL-077: the credit starts as the little button, not as a ribbon', async () => {
+    const { container } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    const attrib = compactAttribution(container)
+
+    const idle = glMap.once.mock.calls.find(c => c[0] === 'idle')?.[1] as (() => void) | undefined
+    expect(idle).toBeDefined()
+    act(() => { idle!() })
+
+    // Both engines open theirs on a phone and only tuck it away on the first drag, so
+    // the first thing on a screen the map fills is a two-line band across the bottom.
+    expect(attrib.classList.contains('maplibregl-compact-show')).toBe(false)
+    expect(attrib.hasAttribute('open')).toBe(false)
+    // Still there, still one tap away: nothing about the credit is removed.
+    expect(attrib.classList.contains('maplibregl-ctrl-attrib')).toBe(true)
+  })
+
+  it('FE-COMP-MAPVIEWGL-078: a map wide enough to show the credit in full is left alone', async () => {
+    const { container } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    const el = document.createElement('details')
+    // No `compact-show`, which is what a map over 640px reports.
+    el.className = 'maplibregl-ctrl maplibregl-ctrl-attrib'
+    el.setAttribute('open', '')
+    container.querySelectorAll('div')[1]?.appendChild(el)
+
+    const idle = glMap.once.mock.calls.find(c => c[0] === 'idle')?.[1] as (() => void) | undefined
+    act(() => { idle!() })
+
+    expect(el.hasAttribute('open')).toBe(true)
+  })
+})

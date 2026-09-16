@@ -30,6 +30,9 @@ const hit = (id: string, lat: number, lng: number, category = 'fuel') => ({
   source: 'openstreetmap',
 })
 
+/** Long enough to tile into a handful of boxes, so a cap and a window can bite. */
+const LONG: LatLng[] = Array.from({ length: 12 }, (_, i) => ({ lat: 53.55 - i * 0.05, lng: 9.99 - i * 0.2 }))
+
 const answer = (...items: ReturnType<typeof hit>[]) => ({ pois: items, sources: ['openstreetmap'], failedSources: [], truncated: false, clamped: false })
 
 beforeEach(() => {
@@ -191,5 +194,71 @@ describe('useCorridorPois', () => {
 
     unmount()
     expect(seen!.aborted).toBe(true)
+  })
+  it('FE-ROADTRIP-CORRIDOR-013: a window cuts the boxes, not the line the hits are measured on', async () => {
+    const full = renderHook(() => useCorridorPois(LONG, ['fuel'], 10))
+    act(() => { full.result.current.search() })
+    await waitFor(() => expect(full.result.current.loading).toBe(false))
+    const whole = pois.mock.calls.length
+    const spine = full.result.current.spine.length
+
+    pois.mockClear()
+    const part = renderHook(() => useCorridorPois(LONG, ['fuel'], 10))
+    act(() => { part.result.current.search({ fromKm: 0, toKm: 20 }) })
+    await waitFor(() => expect(part.result.current.loading).toBe(false))
+
+    // Fewer requests, which is the whole point of asking about a stretch...
+    expect(pois.mock.calls.length).toBeLessThan(whole)
+    // ...and the same spine, which is what keeps `alongKm` meaning the same thing. A
+    // cut spine would renumber every hit and every stop the moment the reach moved.
+    expect(part.result.current.spine.length).toBe(spine)
+  })
+
+  it('FE-ROADTRIP-CORRIDOR-014: the window belongs to the search, so the last answer survives the next question', async () => {
+    pois.mockResolvedValue(answer(hit('a', 53.5, 9.81)))
+    const { result } = renderHook(() => useCorridorPois(LINE, ['fuel'], 10))
+
+    act(() => { result.current.search({ fromKm: 0, toKm: 20 }) })
+    await waitFor(() => expect(result.current.results.length).toBeGreaterThan(0))
+
+    // Re-rendering with a different reach in mind must not empty the list: only
+    // asking again does. The window is an argument, never a dependency.
+    expect(result.current.results.map(r => r.osm_id)).toEqual(['a'])
+  })
+
+  it('FE-ROADTRIP-CORRIDOR-015: a budget caps the boxes and says the tail was left out', async () => {
+    const { result } = renderHook(() =>
+      useCorridorPois(LONG, ['fuel'], 10, { budget: { maxTiles: 2, maxRetries: null, deadlineMs: null } }))
+    act(() => { result.current.search() })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(pois.mock.calls.length).toBe(2)
+    expect(result.current.capped).toBe(true)
+  })
+
+  it('FE-ROADTRIP-CORRIDOR-016: a capped retry pass reports the boxes it did not ask again', async () => {
+    pois.mockRejectedValue(new Error('mirror down'))
+    const { result } = renderHook(() =>
+      useCorridorPois(LONG, ['fuel'], 10, { budget: { maxTiles: 4, maxRetries: 1, deadlineMs: null } }))
+    act(() => { result.current.search() })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // Four boxes, four failures, one retried: the three never asked again are still
+    // failures, because "we did not look" is the honest reading either way.
+    expect(pois.mock.calls.length).toBe(5)
+    expect(result.current.failedAreas).toBe(4)
+    expect(result.current.error).toBe(true)
+  })
+
+  it('FE-ROADTRIP-CORRIDOR-017: a deadline stops starting boxes and files the rest as unsearched', async () => {
+    // Every box answers, slowly. The deadline is what ends the run, not the answers.
+    pois.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(answer()), 40)))
+    const { result } = renderHook(() =>
+      useCorridorPois(LONG, ['fuel'], 10, { budget: { maxTiles: 16, maxRetries: 0, deadlineMs: 1 } }))
+    act(() => { result.current.search() })
+    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 4000 })
+
+    expect(result.current.failedAreas).toBeGreaterThan(0)
+    expect(pois.mock.calls.length).toBeLessThan(result.current.progress.total + 1)
   })
 })

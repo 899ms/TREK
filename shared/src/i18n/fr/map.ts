@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Afficher tout le voyage',
   'map.overview.hide': 'Masquer tout le voyage',
   'map.overview.total': 'Distance totale',
+  'map.attribution': 'Crédits de la carte',
 };
 export default map;

@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Tampilkan seluruh perjalanan',
   'map.overview.hide': 'Sembunyikan seluruh perjalanan',
   'map.overview.total': 'Jarak total',
+  'map.attribution': 'Kredit peta',
 };
 export default map;

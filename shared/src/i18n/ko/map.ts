@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': '전체 여행 보기',
   'map.overview.hide': '전체 여행 숨기기',
   'map.overview.total': '총 거리',
+  'map.attribution': '지도 출처',
 };
 export default map;

@@ -1,0 +1,331 @@
+import { describe, expect, it } from 'vitest'
+import {
+  destinationCount,
+  pickWarning,
+  roadtripRows,
+  stageOf,
+  upNextStop,
+  type RoadtripRow,
+  type StopRow,
+} from './roadtripRowModel'
+import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
+import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
+
+// FE-RTROW-001 to FE-RTROW-028
+
+function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
+  return {
+    assignmentId: name.length,
+    ownerDayId: 7,
+    ownerIndex: 0,
+    placeId: 100,
+    name,
+    lat: 48.1,
+    lng: 11.2,
+    time: null,
+    dwellMinutes: null,
+    legMode: null,
+    incomingLegMode: null,
+    stopType: null,
+    ...over,
+  }
+}
+
+function entry(arrival: string | null, over: Partial<ScheduleEntry> = {}): ScheduleEntry {
+  return { arrival, departure: arrival, anchored: false, dayOffset: 0, ...over }
+}
+
+function seg(index: number): RouteSegment {
+  return {
+    mid: [48, 11],
+    from: [48, 11],
+    to: [49, 12],
+    distance: 1000 * (index + 1),
+    duration: 600,
+    walkingText: '2 h',
+    drivingText: '10 min',
+    distanceText: `${index + 1} km`,
+  }
+}
+
+function day(stops: RoadtripStop[], over: Partial<RoadtripDay> = {}): RoadtripDay {
+  return {
+    dayId: 7,
+    dayNumber: 1,
+    date: '2026-06-01',
+    title: null,
+    stops,
+    legs: stops.slice(0, -1).map((_, i) => seg(i)),
+    schedule: { entries: stops.map(() => entry(null)), warnings: [] },
+    legVias: [],
+    geometry: [],
+    distance: 0,
+    duration: 0,
+    driveWarnings: [],
+    dayWarning: null,
+    ...over,
+  }
+}
+
+const night = (phase: 'start' | 'end' = 'end') =>
+  stop('Nacht', { automaticNight: { phase, fromDayNumber: 1 }, dwellMinutes: 480 })
+
+const stopRows = (rows: RoadtripRow[]) => rows.filter((r): r is StopRow => r.kind === 'stop')
+
+/** Ziel, Tankstelle, Ziel, automatische Nacht, Ziel. */
+const mixedDay = () =>
+  day([stop('Bremen'), stop('Aral', { stopType: 'fuel' }), stop('Kassel'), night(), stop('Fulda')])
+
+describe('roadtripRows numbering', () => {
+  it('FE-RTROW-001: only destinations take a number, a service stop and a night do not advance it', () => {
+    // Nummerierung ueber den Array-Index machte aus Kassel die drei und aus Fulda die fuenf.
+    const numbers = stopRows(roadtripRows(mixedDay())).map((r) => [r.stop.name, r.number])
+    expect(numbers).toEqual([
+      ['Bremen', 1],
+      ['Aral', null],
+      ['Kassel', 2],
+      ['Fulda', 3],
+    ])
+  })
+
+  it('FE-RTROW-002: the service stop is a stop row, the automatic night is not', () => {
+    const rows = roadtripRows(mixedDay())
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'leg', 'stop', 'leg', 'stop', 'leg', 'auto', 'leg', 'stop'])
+    expect(stopRows(rows).map((r) => r.stop.name)).not.toContain('Nacht')
+  })
+
+  it('FE-RTROW-003: the automatic night carries no dwell and takes its time from the schedule', () => {
+    // Die Nacht traegt dwellMinutes 480, aber keine Zeile, die eine Aufenthaltsdauer zeigen koennte.
+    const rows = roadtripRows(
+      day([stop('Kassel'), night(), stop('Fulda')], {
+        schedule: { entries: [entry('18:00'), entry('22:30'), entry('09:15')], warnings: [] },
+      }),
+    )
+    expect(rows.find((r) => r.kind === 'auto')).toEqual({ kind: 'auto', phase: 'end', time: '22:30' })
+    expect(JSON.stringify(rows)).not.toContain('480')
+  })
+
+  it('FE-RTROW-004: a night that starts a day resumes it, anything else ends it', () => {
+    expect(roadtripRows(day([night('start'), stop('Fulda')])).find((r) => r.kind === 'auto')).toMatchObject({
+      phase: 'resume',
+    })
+    expect(roadtripRows(day([night('end'), stop('Fulda')])).find((r) => r.kind === 'auto')).toMatchObject({
+      phase: 'end',
+    })
+  })
+
+  it('FE-RTROW-005: exactly one leg between two stops and none after the last', () => {
+    const rows = roadtripRows(day([stop('A'), stop('B'), stop('C')]))
+    expect(rows.filter((r) => r.kind === 'leg')).toEqual([
+      { kind: 'leg', index: 0, seg: seg(0), mode: null },
+      { kind: 'leg', index: 1, seg: seg(1), mode: null },
+    ])
+    expect(rows[rows.length - 1].kind).toBe('stop')
+  })
+
+  it('FE-RTROW-006: a leg is driven in the next stop incoming mode, else in this one own', () => {
+    const rows = roadtripRows(
+      day([
+        stop('A', { legMode: 'car' }),
+        stop('B', { incomingLegMode: 'ferry', legMode: 'train' }),
+        stop('C'),
+        stop('D'),
+      ]),
+    )
+    const modes = rows.flatMap((r) => (r.kind === 'leg' ? [r.mode] : []))
+    expect(modes).toEqual(['ferry', 'train', null])
+  })
+})
+
+describe('roadtripRows dry points and spills', () => {
+  it('FE-RTROW-007: a dry point makes one row, directly after the leg it falls on', () => {
+    const rows = roadtripRows(
+      day([stop('A'), stop('B'), stop('C')], {
+        dryPoints: [{ legIndex: 1, intoLegKm: 42, sinceKm: 610, drivenMeters: 42000, lat: 48, lng: 11 }],
+      }),
+    )
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'leg', 'stop', 'leg', 'dry', 'stop'])
+    expect(rows[4]).toEqual({ kind: 'dry', legIndex: 1, intoLegKm: 42, sinceKm: 610 })
+  })
+
+  it('FE-RTROW-008: a dry point past the last leg is not drawn', () => {
+    // Nach dem letzten Stopp gibt es kein Bein, an dem die Warnung haengen koennte.
+    const rows = roadtripRows(
+      day([stop('A'), stop('B')], {
+        dryPoints: [{ legIndex: 1, intoLegKm: 5, sinceKm: 600, drivenMeters: 5000, lat: 48, lng: 11 }],
+      }),
+    )
+    expect(rows.some((r) => r.kind === 'dry')).toBe(false)
+  })
+
+  it('FE-RTROW-009: a spill sits before the stop it hangs on, with the day it came from', () => {
+    const rows = roadtripRows(
+      day([stop('A'), stop('B')], {
+        spills: [
+          { at: 1, count: 1, fromDayNumber: 3, departure: '23:40', leg: undefined, fromStop: undefined, line: [] },
+        ],
+      }),
+    )
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'leg', 'spill', 'stop'])
+    expect(rows[2]).toEqual({ kind: 'spill', fromDayNumber: 3, departs: '23:40', stops: [] })
+  })
+})
+
+describe('roadtripRows stop detail', () => {
+  it('FE-RTROW-010: the clock and the pin come from the schedule entry', () => {
+    const rows = stopRows(
+      roadtripRows(
+        day([stop('A'), stop('B'), stop('C')], {
+          schedule: {
+            entries: [entry('08:00'), entry('09:40', { departure: '10:10', anchored: true }), entry(null)],
+            warnings: [],
+          },
+        }),
+      ),
+    )
+    expect(rows.map((r) => [r.time, r.pinned])).toEqual([
+      ['08:00', false],
+      ['09:40', true],
+      [null, false],
+    ])
+    expect(rows[1].entry?.departure).toBe('10:10')
+  })
+
+  it('FE-RTROW-011: a stop shows only its own findings, and only the strongest of them', () => {
+    const rows = stopRows(
+      roadtripRows(
+        day([stop('A'), stop('B')], {
+          driveWarnings: [
+            { index: 0, code: 'overnight' },
+            { index: 1, code: 'leg', overMinutes: 20 },
+            { index: 1, code: 'late', minutes: 15 },
+          ],
+        }),
+      ),
+    )
+    expect(rows[0].warning).toEqual({ index: 0, code: 'overnight' })
+    expect(rows[1].warning).toEqual({ index: 1, code: 'late', minutes: 15 })
+  })
+
+  it('FE-RTROW-012: dwell and the walk in from the road pass through, absent means null', () => {
+    const rows = stopRows(roadtripRows(day([stop('A', { dwellMinutes: 90, offRoadMeters: 240 }), stop('B')])))
+    expect([rows[0].dwellMinutes, rows[0].offRoadMeters]).toEqual([90, 240])
+    expect([rows[1].dwellMinutes, rows[1].offRoadMeters]).toEqual([null, null])
+  })
+})
+
+describe('pickWarning', () => {
+  it('FE-RTROW-013: late beats range beats leg beats overnight', () => {
+    const all: ScheduleWarning[] = [
+      { index: 0, code: 'overnight' },
+      { index: 0, code: 'leg', overMinutes: 30 },
+      { index: 0, code: 'range', sinceKm: 700 },
+      { index: 0, code: 'late', minutes: 20 },
+    ]
+    expect(pickWarning(all)?.code).toBe('late')
+    expect(pickWarning(all.slice(0, 3))?.code).toBe('range')
+    expect(pickWarning(all.slice(0, 2))?.code).toBe('leg')
+    expect(pickWarning(all.slice(0, 1))?.code).toBe('overnight')
+  })
+
+  it('FE-RTROW-028: the order the findings arrive in does not decide', () => {
+    // Sonst haengt die Marke davon ab, in welcher Reihenfolge deriveDriveWarnings sie anhaengt.
+    const all: ScheduleWarning[] = [
+      { index: 0, code: 'late', minutes: 20 },
+      { index: 0, code: 'range', sinceKm: 700 },
+      { index: 0, code: 'overnight' },
+    ]
+    expect(pickWarning(all)?.code).toBe('late')
+    expect(pickWarning([...all].reverse())?.code).toBe('late')
+  })
+
+  it('FE-RTROW-014: nothing to report is null, not a placeholder', () => {
+    expect(pickWarning([])).toBeNull()
+  })
+})
+
+describe('stageOf', () => {
+  const days = [day([stop('A')], { dayId: 11, dayNumber: 1 }), day([stop('B')], { dayId: 22, dayNumber: 2 })]
+
+  it('FE-RTROW-015: finds the day by its id, not by its position', () => {
+    expect(stageOf(days, 22)?.dayNumber).toBe(2)
+  })
+
+  it('FE-RTROW-016: no selection and an id that is gone both give null', () => {
+    expect(stageOf(days, null)).toBeNull()
+    expect(stageOf(days, 999)).toBeNull()
+    expect(stageOf([], 11)).toBeNull()
+  })
+})
+
+describe('destinationCount', () => {
+  it('FE-RTROW-017: agrees with the highest number the rows handed out', () => {
+    const d = mixedDay()
+    const highest = stopRows(roadtripRows(d)).reduce((max, r) => Math.max(max, r.number ?? 0), 0)
+    expect(destinationCount(d)).toBe(3)
+    expect(destinationCount(d)).toBe(highest)
+  })
+
+  it('FE-RTROW-018: a day of nothing but services and nights counts none', () => {
+    expect(destinationCount(day([stop('Aral', { stopType: 'fuel' }), night()]))).toBe(0)
+  })
+})
+
+const timedDay = (arrivals: (string | null)[], stops: RoadtripStop[]) =>
+  day(stops, { schedule: { entries: arrivals.map((a) => entry(a)), warnings: [] } })
+
+describe('upNextStop', () => {
+  const threeStops = () =>
+    timedDay(['09:00', '11:00', '13:00'], [stop('A'), stop('Aral', { stopType: 'fuel' }), stop('C')])
+
+  it('FE-RTROW-019: says nothing on a day that is not today, and nothing without a day', () => {
+    expect(upNextStop(threeStops(), 10 * 60, false)).toBeNull()
+    expect(upNextStop(null, 10 * 60, true)).toBeNull()
+  })
+
+  it('FE-RTROW-020: passes over the petrol stop and names the next destination', () => {
+    // Die Tankstelle um 11:00 liegt vor dem Ziel um 13:00 und ist trotzdem nie das naechste.
+    const next = upNextStop(threeStops(), 10 * 60, true)
+    expect(next?.row.stop.name).toBe('C')
+    expect(next?.minutesUntil).toBe(180)
+  })
+
+  it('FE-RTROW-021: a stop without a readable time is passed over', () => {
+    const d = timedDay([null, 'irgendwann', '13:00'], [stop('A'), stop('B'), stop('C')])
+    expect(upNextStop(d, 8 * 60, true)?.row.stop.name).toBe('C')
+  })
+
+  it('FE-RTROW-022: a stop due this very minute is still ahead', () => {
+    expect(upNextStop(threeStops(), 13 * 60, true)?.minutesUntil).toBe(0)
+  })
+
+  it('FE-RTROW-023: a stop whose time has just passed comes back as a delay', () => {
+    // Es gibt keine Positionsquelle, also ist "der Plan sagte 13:00, es ist 13:20"
+    // die staerkste ehrliche Aussage. Sie kommt als negatives minutesUntil.
+    expect(upNextStop(threeStops(), 13 * 60 + 20, true)?.minutesUntil).toBe(-20)
+  })
+
+  it('FE-RTROW-024: an hour past the last stop the day is over and nothing is next', () => {
+    expect(upNextStop(threeStops(), 14 * 60 + 1, true)).toBeNull()
+  })
+
+  it('FE-RTROW-025: a delay is only ever reported for the last stop, never a passed one', () => {
+    // 09:00 ist lange vorbei, 13:00 auch, gemeldet wird der Verzug auf den letzten.
+    const late = upNextStop(threeStops(), 13 * 60 + 30, true)
+    expect(late?.row.stop.name).toBe('C')
+    expect(late?.minutesUntil).toBe(-30)
+  })
+
+  it('FE-RTROW-026: another day, no day and a day without any clock name nothing', () => {
+    expect(upNextStop(timedDay(['09:00'], [stop('A')]), 12 * 60, false)).toBeNull()
+    expect(upNextStop(null, 12 * 60, true)).toBeNull()
+    expect(upNextStop(timedDay([null], [stop('A')]), 12 * 60, true)).toBeNull()
+    expect(upNextStop(timedDay(['nachmittags'], [stop('A')]), 12 * 60, true)).toBeNull()
+  })
+
+  it('FE-RTROW-027: a service stop is never the one named, even when it is next in line', () => {
+    // Die Tankstelle um 10:00 laege vorne, genannt wird trotzdem das Ziel um 11:00.
+    const d = timedDay(['09:00', '10:00', '11:00'], [stop('A'), stop('Aral', { stopType: 'fuel' }), stop('B')])
+    expect(upNextStop(d, 9 * 60 + 30, true)?.row.stop.name).toBe('B')
+  })
+})

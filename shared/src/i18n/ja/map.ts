@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': '旅程全体を表示',
   'map.overview.hide': '旅程全体を非表示',
   'map.overview.total': '合計距離',
+  'map.attribution': '地図のクレジット',
 };
 export default map;

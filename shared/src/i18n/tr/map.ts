@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Tüm geziyi göster',
   'map.overview.hide': 'Tüm geziyi gizle',
   'map.overview.total': 'Toplam mesafe',
+  'map.attribution': 'Harita kaynakları',
 };
 export default map;

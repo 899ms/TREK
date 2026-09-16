@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'عرض الرحلة كاملة',
   'map.overview.hide': 'إخفاء الرحلة كاملة',
   'map.overview.total': 'المسافة الإجمالية',
+  'map.attribution': 'مصادر الخريطة',
 };
 export default map;

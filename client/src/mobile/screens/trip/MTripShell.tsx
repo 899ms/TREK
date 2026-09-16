@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { findFocusDayId } from '../../../components/Planner/today'
 import {
-  CalendarDays, ChevronDown, ChevronLeft, Download, FileDown, List, Map as MapIcon, MoreHorizontal, PackageCheck,
-  Plane, Plus, Rows3, Ticket, TrainFront, Trash2, Upload, Wallet,
+  CalendarDays, ChevronDown, ChevronLeft, Download, FileDown, List, Map as MapIcon, MoreHorizontal,
+  Plane, Plus, Rows3, Route, SlidersHorizontal, Trash2, Upload,
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 import { useTripPlanner } from '../../../pages/tripPlanner/useTripPlanner'
+import { pickDockTabs } from './dockTabs'
 import MIconBtn from '../../components/MIconBtn'
 import MPlanTimeline from './plan/MPlanTimeline'
 import MMapArea from './map/MMapArea'
@@ -14,6 +14,10 @@ import MTripTabPanel from './tabs/MTripTabPanel'
 import MTripSheets from './sheets/MTripSheets'
 import MTripLoadingSplash from './MTripLoadingSplash'
 import { usePluginDayTints, dayTintBackground } from '../../../components/Plugins/PluginDaySchedule'
+import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
+import type { CorridorReach } from '../../../components/Roadtrip/corridorSearchModel'
+import { useSettingsStore } from '../../../store/settingsStore'
+import { formatDistance } from '../../../utils/units'
 import type { Day } from '../../../types'
 
 /**
@@ -34,6 +38,8 @@ export type TripPlanner = ReturnType<typeof useTripPlanner>
 
 export type MTripView = 'plan' | 'map'
 export type MTripMode = 'go' | 'edit' | 'browse'
+/** The road trip tab's own two halves: the chain, or the same map showing the stage. */
+export type MRtView = 'list' | 'map'
 export type MTripListsTab = 'packing' | 'todo'
 export type MTripCollabTab = 'chat' | 'notes' | 'links' | 'polls'
 
@@ -60,6 +66,27 @@ export interface MTripSheetState {
 export interface MTripShellApi {
   /** 'plan' = list chrome, 'map' = fullscreen map. Plan tab only. */
   view: MTripView
+  /** The road trip tab's own list ⇄ map switch, independent of `view`. */
+  rtView: MRtView
+  /**
+   * True whenever the map is the front layer, in either tab.
+   *
+   * The map is one instance shared by the plan tab and the road trip tab, so
+   * everything floating over it (POI pill, compass, pills) keys off this rather
+   * than off `view`, which only ever meant the plan tab.
+   */
+  mapFront: boolean
+  /** Road trip tab: chain ⇄ map, on the same instance, without moving the camera. */
+  toggleRtView: () => void
+  /**
+   * How much of the stage the corridor search asks about.
+   *
+   * Shell state rather than sheet state, because two surfaces ask the same question:
+   * the bar over the stage says what the next search will cover, and the sheet is where
+   * it is chosen. Kept here they cannot disagree, and it survives the sheet closing.
+   */
+  rtReach: CorridorReach
+  setRtReach: (value: CorridorReach) => void
   /** Travel/Plan/Places segment: go | edit | browse. */
   mode: MTripMode
   /** Legacy tab ids: plan · transports · buchungen · listen · finanzplan · dateien · collab · plugin:* */
@@ -150,14 +177,8 @@ interface MTripShellProps {
   Sheets?: ComponentType<MTripSheetsProps>
 }
 
-/** The 5 dock tabs in demo order; files/collab/plugins live in the Mehr sheet. */
-const DOCK_TABS: { id: string; icon: LucideIcon }[] = [
-  { id: 'plan', icon: MapIcon },
-  { id: 'transports', icon: TrainFront },
-  { id: 'buchungen', icon: Ticket },
-  { id: 'finanzplan', icon: Wallet },
-  { id: 'listen', icon: PackageCheck },
-]
+/** The two tabs that share the map instance. Everything else is a full overlay. */
+const MAP_TABS = new Set(['plan', 'roadtrip'])
 
 function dayChipLabel(day: Day, language: string, fallback: string): string {
   if (day.date) {
@@ -182,8 +203,14 @@ export default function MTripShell({
   // Per-day colours from the dayTintProvider plugin hook — the mobile counterpart
   // of the desktop day-card wash, carried on the day chips. Empty without a plugin.
   const dayTints = usePluginDayTints(tripId)
+  const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
 
   const [view, setView] = useState<MTripView>('plan')
+  // Its own state rather than a share of `view`: the two tabs carry different
+  // things on the same map, and forcing one into the other's half is the kind of
+  // coupling nobody can predict from the outside.
+  const [rtView, setRtView] = useState<MRtView>('list')
+  const [rtReach, setRtReach] = useState<CorridorReach>('ahead')
   const [mode, setMode] = useState<MTripMode>('go')
   const [browseFromEdit, setBrowseFromEdit] = useState(false)
   const [sheet, setSheet] = useState<MTripSheetState | null>(null)
@@ -318,6 +345,24 @@ export default function MTripShell({
     }
   }
 
+  /**
+   * The road trip tab's own list ⇄ map switch.
+   *
+   * Deliberately quieter than `toggleView`: no reframe on the way in and no day
+   * restore on the way out. The stage is always one day, the chain and the map show
+   * the same one, and the camera belongs to whoever looked at it last. What does
+   * reframe is a stage change, through the day chips, which both halves share.
+   */
+  const toggleRtView = () => {
+    setRtView(prev => {
+      const next = prev === 'list' ? 'map' : 'list'
+      if (next === 'map') planner.autoShowRoute()
+      return next
+    })
+  }
+
+  const mapFront = (trTab === 'plan' && view === 'map') || (trTab === 'roadtrip' && rtView === 'map')
+
   const setListsTab = (tab: MTripListsTab) => {
     setListsTabState(tab)
     sessionStorage.setItem(`trip-lists-subtab-${tripId}`, tab)
@@ -327,7 +372,7 @@ export default function MTripShell({
   const closeSheet = () => setSheet(null)
 
   const shell: MTripShellApi = {
-    view, mode, trTab, setTrTab, setTravelMode, toggleView, browseFromEdit,
+    view, rtView, mapFront, toggleRtView, rtReach, setRtReach, mode, trTab, setTrTab, setTravelMode, toggleView, browseFromEdit,
     sheet, openSheet, closeSheet,
     listsTab, setListsTab, collabTab, setCollabTab,
     transportsCompact, bookingsCompact,
@@ -341,7 +386,7 @@ export default function MTripShell({
   if (!trip) return null
 
   const enabledTabIds = new Set(planner.TRIP_TABS.map(tab => tab.id))
-  const dockTabs = DOCK_TABS.filter(d => enabledTabIds.has(d.id))
+  const dockTabs = pickDockTabs(enabledTabIds)
   const tabLabel = (id: string) => planner.TRIP_TABS.find(tab => tab.id === id)?.label ?? id
 
   const onDayChipTap = (dayId: number) => {
@@ -355,25 +400,59 @@ export default function MTripShell({
   const packedCount = packingItems.filter(i => i.checked).length
   const todoOpenCount = todoItems.filter(i => !i.checked).length
 
+  // The stage header: the day on screen and what it costs, or the whole drive while
+  // the day filter is off. Falls back to the addon's own name before anything has
+  // routed, so the pill never reads as an empty figure.
+  const rtStage = stageOf(planner.roadtripRoutes.days, planner.selectedDayId)
+  const rtStageDay = rtStage ? days.find(d => d.id === rtStage.dayId) : undefined
+  const rtHeaderLabel = rtStage
+    ? [
+      rtStageDay ? dayChipLabel(rtStageDay, language, t('planner.dayN', { n: rtStage.dayNumber })) : t('planner.dayN', { n: rtStage.dayNumber }),
+      formatDistance(rtStage.distance / 1000, distanceUnit),
+    ].join(' · ')
+    : planner.roadtripRoutes.totalDistance > 0
+      ? formatDistance(planner.roadtripRoutes.totalDistance / 1000, distanceUnit)
+      : t('roadtrip.title')
+
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-[color:var(--m-bg)] bg-[image:var(--m-scr)] text-m-ink">
       {/* ── Content layers ─────────────────────────────────────────────── */}
-      {trTab === 'plan' && (
+      {/*
+        One expression for both map tabs, and it has to stay one: written as two
+        (`{trTab === 'plan' && <MapArea/>}{trTab === 'roadtrip' && <MapArea/>}`)
+        React sees two positions and remounts the map on every tab switch, which
+        tears down the WebGL context and reloads every tile. The symptom is a flash
+        on the device, not a failing test.
+      */}
+      {MAP_TABS.has(trTab) && (
         <div className="absolute inset-0">
           <MapArea planner={planner} shell={shell} />
-          {view === 'plan' && mode !== 'browse' && (
+          {trTab === 'plan' && view === 'plan' && mode !== 'browse' && (
             <div className="absolute inset-0 z-10 bg-[color:var(--m-bg)] bg-[image:var(--m-scr)]">
               <PlanTimeline planner={planner} shell={shell} />
             </div>
           )}
-          {mode === 'browse' && (
+          {trTab === 'plan' && mode === 'browse' && (
             <div className="absolute inset-0 z-30 bg-[color:var(--m-bg)] bg-[image:var(--m-scr)]">
               <PlacesBrowser planner={planner} shell={shell} />
             </div>
           )}
+          {/*
+            The stage lives at z-20, below the day chips at z-25, which is the whole
+            of the stage picker: the chips belong to the shell and were only ever
+            hidden because non-plan panels cover them at z-30.
+          */}
+          {trTab === 'roadtrip' && rtView === 'list' && (
+            <div className="absolute inset-0 z-20 bg-[color:var(--m-bg)] bg-[image:var(--m-scr)]">
+              <TabPanel planner={planner} shell={shell} tab={trTab} />
+            </div>
+          )}
+          {trTab === 'roadtrip' && rtView === 'map' && (
+            <TabPanel planner={planner} shell={shell} tab={trTab} />
+          )}
         </div>
       )}
-      {trTab !== 'plan' && (
+      {!MAP_TABS.has(trTab) && (
         <div className="absolute inset-0 z-30 bg-[color:var(--m-bg)] bg-[image:var(--m-scr)]">
           <TabPanel planner={planner} shell={shell} tab={trTab} />
         </div>
@@ -411,10 +490,11 @@ export default function MTripShell({
             })}
           </div>
           {/* Drop the day filter and show the whole trip (#2257). Map only: the
-              plan timeline is single-day, so there is nothing to widen there.
-              Stays mounted while a day is active rather than appearing on
-              selection, which would shove the rail sideways under the thumb. */}
-          {view === 'map' && (
+              plan timeline and the road trip chain are both single-day, so there is
+              nothing to widen there. Stays mounted while a day is active rather than
+              appearing on selection, which would shove the rail sideways under the
+              thumb. On the road trip map it means the whole drive in its day colours. */}
+          {mapFront && (
             <button
               type="button"
               onClick={toggleAllDays}
@@ -554,6 +634,24 @@ export default function MTripShell({
           </GlassSegment>
         )}
 
+        {/* The stage's own header: the day it shows, and a way into the figures
+            behind it. A button rather than the plugin tabs' inert pill, because it
+            is the only entry to the driving settings, and the right slot belongs to
+            the list ⇄ map switch, same as in the plan tab. */}
+        {trTab === 'roadtrip' && (
+          <button
+            type="button"
+            onClick={() => openSheet('rtinfo')}
+            className="absolute left-[52px] right-[52px] top-1/2 mx-auto flex h-[34px] w-fit max-w-full -translate-y-1/2 items-center gap-[6px] rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] px-[13px] backdrop-blur-[24px] backdrop-saturate-[1.7]"
+          >
+            <Route size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
+            <span className="min-w-0 truncate text-[0.8125rem] font-semibold tabular-nums text-m-ink">
+              {rtHeaderLabel}
+            </span>
+            <SlidersHorizontal size={13} strokeWidth={2} className="flex-none text-m-faint" aria-hidden="true" />
+          </button>
+        )}
+
         {trTab === 'dateien' && (
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-[7px]">
             <PrimaryPill icon={<Upload size={13} strokeWidth={2.2} />} label={t('common.upload')} onClick={() => setUploadFilesSignal(s => s + 1)} />
@@ -581,13 +679,16 @@ export default function MTripShell({
           )
         })()}
 
-        {trTab === 'plan' ? (
+        {/* Same slot, same markup, same icons in both map tabs, so the switch does
+            not move or change shape when the tab does. The two views stay separate
+            states: coupling them would drag one tab into the other's half. */}
+        {MAP_TABS.has(trTab) ? (
           <MIconBtn
-            ariaLabel={view === 'plan' ? t('mobileTrip.mapView') : t('mobileTrip.listView')}
-            onClick={toggleView}
+            ariaLabel={mapFront ? t('mobileTrip.listView') : t('mobileTrip.mapView')}
+            onClick={trTab === 'roadtrip' ? toggleRtView : toggleView}
             className="backdrop-blur-[24px] backdrop-saturate-[1.7]"
           >
-            {view === 'plan' ? <MapIcon size={18} strokeWidth={2} /> : <List size={18} strokeWidth={2} />}
+            {mapFront ? <List size={18} strokeWidth={2} /> : <MapIcon size={18} strokeWidth={2} />}
           </MIconBtn>
         ) : (
           <span className="w-[38px] flex-none" />

@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Показать всю поездку',
   'map.overview.hide': 'Скрыть всю поездку',
   'map.overview.total': 'Общее расстояние',
+  'map.attribution': 'Источники карты',
 };
 export default map;

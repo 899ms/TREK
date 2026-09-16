@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useCorridorPois, type CorridorPoi, type CorridorSearch } from './useCorridorPois'
+import type { CorridorBudget } from './corridorSearchModel'
 import { sectionAnchors, insertIndexForAlong } from './roadtripModel'
 import type { SectionAnchor } from './roadtripModel'
 import { projectOntoRoute, type LatLng } from './corridor'
@@ -74,7 +75,16 @@ export interface RoadtripCorridor {
  * answer if you cannot see which one is on your side of the road — so the results have to
  * live above both the panel and the map rather than inside the panel.
  */
-export function useRoadtripCorridor(routes: RoadtripRoutes, tripId?: number | string | null): RoadtripCorridor {
+export function useRoadtripCorridor(
+  routes: RoadtripRoutes,
+  tripId?: number | string | null,
+  /**
+   * What one search may cost. Absent is the desktop's ceiling; the phone hands down a
+   * smaller one. Not a window: which stretch of the day to ask about is decided per
+   * search, by whoever presses the button, and travels as an argument to `search`.
+   */
+  options?: { budget?: CorridorBudget },
+): RoadtripCorridor {
   const [dayId, setDayId] = useState<string>('')
   const [categories, setCategories] = useState<string[]>(['fuel'])
   const [widthKm, setWidthKm] = useState<number>(5)
@@ -109,7 +119,7 @@ export function useRoadtripCorridor(routes: RoadtripRoutes, tripId?: number | st
     return day.stops.map(s => ({ lat: s.lat, lng: s.lng }))
   }, [day])
 
-  const search = useCorridorPois(line, categories, widthKm)
+  const search = useCorridorPois(line, categories, widthKm, options)
 
   /**
    * Whether what the panel looks for has been decided yet.

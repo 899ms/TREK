@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Visa hela resan',
   'map.overview.hide': 'Dölj hela resan',
   'map.overview.total': 'Total sträcka',
+  'map.attribution': 'Kartkällor',
 };
 export default map;
