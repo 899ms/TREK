@@ -163,6 +163,12 @@ export interface NominatimOptions {
  * The abort signal is constructed after the throttle wait on purpose: building it
  * first would spend up to 1.1s of the caller's budget queueing rather than
  * fetching, which for the 2.5s identity lookup is nearly half of it.
+ *
+ * The base is `NOMINATIM_URL` where an operator set one and the public service
+ * otherwise, read live rather than frozen at import so a test (and a restart-free
+ * change) is seen on the next call. Neither the cursor nor the User-Agent asks
+ * which one it got: the spacing is what keeps an operator's installs inside the
+ * policy, and that holds for a gateway in front of the public service too.
  */
 export async function nominatimFetch(
   path: 'search' | 'reverse' | 'lookup',

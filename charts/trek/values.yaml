@@ -78,6 +78,11 @@ env:
   # Max MCP API requests per user per minute. Defaults to 300.
   # MCP_MAX_SESSION_PER_USER: "20"
   # Max concurrent MCP sessions per user. Defaults to 20.
+  # NOMINATIM_URL: ""
+  # Custom Nominatim base URL for every geocoding call the server makes (place search, reverse lookup, Atlas region
+  # fill). When set it REPLACES the public OpenStreetMap service, with no fallback, so the instance behind it needs
+  # the coverage you expect and has to speak the Nominatim API. TREK keeps its ~1 request per second spacing either
+  # way. Defaults to https://nominatim.openstreetmap.org.
   # OVERPASS_URL: ""
   # Custom Overpass endpoint(s) for the map POI "explore" search, comma-separated. When set, REPLACES the bundled
   # public mirrors — point it at an internal/self-hosted Overpass instance when the public mirrors are unreachable

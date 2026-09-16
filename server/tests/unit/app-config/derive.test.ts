@@ -214,10 +214,17 @@ describe('derivePlugins', () => {
 });
 
 describe('deriveIntegrations', () => {
-  it('pins unsplash trim, transit base strip + default, overpass timeout', () => {
+  it('pins unsplash trim, transit base strip + default, nominatim trim + default, overpass timeout', () => {
     expect(deriveIntegrations({ UNSPLASH_ACCESS_KEY: ' key ' }).unsplashAccessKey).toBe('key');
     expect(deriveIntegrations({}).transitApiBase).toBe('https://api.transitous.org');
     expect(deriveIntegrations({ TRANSIT_API_URL: 'https://t.example//' }).transitApiBase).toBe('https://t.example');
+    expect(deriveIntegrations({}).nominatimUrl).toBe('https://nominatim.openstreetmap.org');
+    // Padded and whitespace-only both come back from a compose file or a ConfigMap,
+    // and the schema already called the second one unset.
+    expect(deriveIntegrations({ NOMINATIM_URL: ' http://nominatim:8080/geo// ' }).nominatimUrl).toBe(
+      'http://nominatim:8080/geo',
+    );
+    expect(deriveIntegrations({ NOMINATIM_URL: '   ' }).nominatimUrl).toBe('https://nominatim.openstreetmap.org');
     // Against the constant, not a literal: the client budget is derived from the timeout
     // the query itself carries, and pinning the number here is how the two drifted apart.
     expect(deriveIntegrations({}).overpassTimeoutMs).toBe(OVERPASS_TIMEOUT_DEFAULT_MS);
