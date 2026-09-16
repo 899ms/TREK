@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import MDancingTrek from '../../mobile/components/MDancingTrek'
 import type { RefuelSearch } from './useRefuelSearch'
-import type { RefuelCandidate } from './refuelSuggestion'
+import { REFUEL_EMPTY_KEY, REFUEL_WORDS, refuelBandState, type RefuelCandidate } from './refuelSuggestion'
 import type { DryPoint } from './roadtripModel'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { Tooltip } from '../shared/Tooltip'
@@ -445,9 +445,10 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
   const { vehicleKind } = useVehicleRange()
   const electric = vehicleKind === 'electric'
   const DryIcon = electric ? Zap : Fuel
-  const key = `${dayId}:${dry.legIndex}`
-  const open = refuel.openFor === key
-  const settled = open && !refuel.loading && refuel.outcome
+  const words = REFUEL_WORDS[electric ? 'electric' : 'fuel']
+  // Which control, which sentence and which offers: decided in refuelSuggestion so the
+  // phone band reads the same answer instead of keeping its own copy of the conditions.
+  const band = refuelBandState(refuel, dayId, dry.legIndex)
 
   return (
     <div className="min-w-0">
@@ -490,7 +491,7 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                 className="truncate font-geist font-semibold uppercase tracking-[0.16em] text-danger"
                 style={{ fontSize: FS.label }}
               >
-                {t(electric ? 'roadtrip.refuel.dryElectric' : 'roadtrip.refuel.dry')}
+                {t(words.dry)}
               </div>
               {/* How far INTO this leg, where a drive band keeps its figures. Not the
                   range that was crossed: that is the traveller's own setting, says
@@ -513,7 +514,7 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                 found nothing leaves a button rather than a dead end — the place search
                 is a shared public service that does time out, and "it did not answer"
                 with no way to retry reads as broken rather than as busy. */}
-            {open && (refuel.loading || refuel.results.length) ? (
+            {band.control === 'close' ? (
               <Tooltip label={t('common.close')}>
                 <button
                   type="button"
@@ -525,18 +526,14 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                 </button>
               </Tooltip>
             ) : (
-              <Tooltip label={settled && refuel.outcome !== 'found'
-                ? t('roadtrip.refuel.again')
-                : t(electric ? 'roadtrip.refuel.findElectric' : 'roadtrip.refuel.find')}>
+              <Tooltip label={t(band.control === 'again' ? 'roadtrip.refuel.again' : words.find)}>
                 <button
                   type="button"
                   onClick={onAsk}
-                  aria-label={settled && refuel.outcome !== 'found'
-                    ? t('roadtrip.refuel.again')
-                    : t(electric ? 'roadtrip.refuel.findElectric' : 'roadtrip.refuel.find')}
+                  aria-label={t(band.control === 'again' ? 'roadtrip.refuel.again' : words.find)}
                   className="group/fuel grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg text-danger transition-colors hover:bg-danger-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  {settled && refuel.outcome !== 'found'
+                  {band.control === 'again'
                     ? <RotateCcw size={13} strokeWidth={2} aria-hidden />
                     : (
                       /* The glow stops under the pointer: a lamp that keeps blinking
@@ -553,12 +550,11 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
             )}
           </div>
 
-          {open && refuel.loading ? (
+          {band.loading ? (
             <span className="text-content-muted" style={{ fontSize: FS.meta }}>{t('roadtrip.refuel.looking')}</span>
           ) : null}
 
-          {settled ? (
-            refuel.results.length ? (
+          {band.offers.length ? (
               <ul className="flex flex-col gap-1">
                 {/* Three at most. This is an offer beside a plan, not a list to browse;
                     the corridor panel is where somebody goes to see all of them.
@@ -569,7 +565,7 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                     not enough to tell them apart — measured on a real day the top three
                     came back as "Vattenfall InCharge" three times over, identical but for
                     a number nobody could see the meaning of. */}
-                {refuel.results.slice(0, 3).map(poi => {
+                {band.offers.map(poi => {
                   const kind = STOP_KIND_BY_KEY[poi.category]
                   const KindIcon = kind?.Icon ?? Fuel
                   return (
@@ -632,11 +628,11 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                           </span>
                         </span>
                         {onAccept ? (
-                          <Tooltip label={t(electric ? 'roadtrip.refuel.addElectric' : 'roadtrip.refuel.add', { name: poi.name })}>
+                          <Tooltip label={t(words.add, { name: poi.name })}>
                             <button
                               type="button"
                               onClick={() => onAccept(poi)}
-                              aria-label={t(electric ? 'roadtrip.refuel.addElectric' : 'roadtrip.refuel.add', { name: poi.name })}
+                              aria-label={t(words.add, { name: poi.name })}
                               className="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg bg-surface-secondary text-content-secondary transition-colors hover:bg-accent hover:text-accent-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                             >
                               <Plus size={13} strokeWidth={2.2} aria-hidden />
@@ -648,18 +644,15 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                   )
                 })}
               </ul>
-            ) : (
-              /* Three different sentences for three different facts. "Nothing on this
-                 stretch" after a request that failed or was cut short states something
-                 that was never checked, which is worse than saying nothing. */
-              <span className="text-content-muted" style={{ fontSize: FS.meta }}>
-                {refuel.outcome === 'none'
-                  ? t('roadtrip.refuel.none')
-                  : refuel.outcome === 'incomplete'
-                    ? t('roadtrip.refuel.incomplete')
-                    : t('roadtrip.refuel.failed')}
-              </span>
-            )
+          ) : null}
+
+          {/* Three different sentences for three different facts. "Nothing on this
+              stretch" after a request that failed or was cut short states something
+              that was never checked, which is worse than saying nothing. */}
+          {band.empty ? (
+            <span className="text-content-muted" style={{ fontSize: FS.meta }}>
+              {t(REFUEL_EMPTY_KEY[band.empty])}
+            </span>
           ) : null}
       </div>
     </div>

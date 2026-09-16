@@ -9,7 +9,7 @@ import type { TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-030
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-037
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -222,11 +222,12 @@ describe('RtDryRow', () => {
   const props = { intoLegKm: 82, chrome, electric: false, offline: false, refuel: idle, dayId: 7, legIndex: 1 }
 
   it('FE-MOB-RTROW-018: names the fuel wording and the distance into the leg for a combustion car', () => {
-    render(<RtDryRow {...props} onSearch={vi.fn()} />)
+    const { container } = render(<RtDryRow {...props} onSearch={vi.fn()} />)
 
     expect(screen.getByText('roadtrip.refuel.dry')).toBeInTheDocument()
     expect(screen.getByText('roadtrip.refuel.after:82 km')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'roadtrip.refuel.find' })).toBeInTheDocument()
+    expect(container.querySelector('svg.trek--transport')).not.toBeNull()
   })
 
   it('FE-MOB-RTROW-019: swaps to the charging wording for an electric car', () => {
@@ -252,18 +253,23 @@ describe('RtDryRow', () => {
     const button = screen.getByRole('button', { name: 'roadtrip.refuel.find' })
     expect(button).toBeDisabled()
     expect(screen.getByText('mobileTrip.rtSearchOffline')).toBeInTheDocument()
+    // The lamp stops glowing: a lamp that glows invites a press that cannot work.
+    expect(button.querySelector('svg.lucide-fuel')).not.toBeNull()
+    expect(button.querySelector('.trek-lowfuel')).toBeNull()
 
     fireEvent.click(button)
     expect(onSearch).not.toHaveBeenCalled()
   })
 
   it('FE-MOB-RTROW-022: drops the button entirely without write permission, offline line included', () => {
-    render(<RtDryRow {...props} offline />)
+    const { container } = render(<RtDryRow {...props} offline />)
 
     expect(screen.queryByRole('button')).toBeNull()
     expect(screen.queryByText('mobileTrip.rtSearchOffline')).toBeNull()
-    // The warning itself stays: it is information, not an action.
+    // The warning itself stays: it is information, not an action. The reserve lamp too,
+    // as a mark rather than a control.
     expect(screen.getByText('roadtrip.refuel.dry')).toBeInTheDocument()
+    expect(container.querySelector('.trek-lowfuel')).not.toBeNull()
   })
   const offer = (over: Record<string, unknown> = {}) => ({
     osm_id: 'n1', name: 'Shell Ebina', lat: 35.44, lng: 139.39, category: 'fuel',
@@ -338,6 +344,110 @@ describe('RtDryRow', () => {
     // A request that failed never checked the stretch, so it must not read as empty.
     expect(screen.getByText('roadtrip.refuel.failed')).toBeInTheDocument()
     expect(screen.queryByText('roadtrip.refuel.none')).toBeNull()
+  })
+
+  it('FE-MOB-RTROW-032: the mascot rides the skateboard, sad, in the band colour and on an opaque ground', () => {
+    const { container } = render(<RtDryRow {...props} onSearch={vi.fn()} />)
+
+    const mascot = container.querySelector('svg.trek--transport') as SVGElement
+    // Expression eyes, not the default open ones, bent down rather than up.
+    expect(mascot.querySelectorAll('.trek-eye')).toHaveLength(0)
+    const eyes = mascot.querySelectorAll('.trek-body g[stroke] path')
+    expect(eyes).toHaveLength(2)
+    const [, startY, controlY] = /^M[\d.]+ ([\d.]+) Q[\d.]+ ([\d.]+)/.exec(eyes[0].getAttribute('d') ?? '') ?? []
+    expect(Number(controlY)).toBeGreaterThan(Number(startY))
+
+    // Renamed on the mascot's own span, against an opaque surface so the cut out eyes
+    // do not show the body through them.
+    const wrapper = mascot.parentElement as HTMLElement
+    expect(wrapper.style.getPropertyValue('--m-ink')).toBe('var(--m-st-danger)')
+    expect(wrapper.style.getPropertyValue('--m-bg')).toContain('--m-sheetop')
+    // And never on the band, where the offers read --m-ink and have to stay ink.
+    expect((container.firstElementChild as HTMLElement).style.getPropertyValue('--m-ink')).toBe('')
+  })
+
+  it('FE-MOB-RTROW-033: the reserve lamp is the button, with its words in the label only', () => {
+    const fuel = render(<RtDryRow {...props} onSearch={vi.fn()} />)
+
+    const lamp = screen.getByRole('button', { name: 'roadtrip.refuel.find' })
+    expect(lamp.querySelector('svg.lucide-fuel.trek-lowfuel')).not.toBeNull()
+    // Not the black pill it replaced, and no visible label beside the mascot and title.
+    expect(lamp.className).not.toContain('bg-m-act')
+    expect(screen.queryByText('roadtrip.refuel.find')).toBeNull()
+    fuel.unmount()
+
+    render(<RtDryRow {...props} electric onSearch={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'roadtrip.refuel.findElectric' }).querySelector('svg.lucide-zap')).not.toBeNull()
+  })
+
+  it('FE-MOB-RTROW-034: while the search runs or offers show, the lamp steps aside for a close', () => {
+    // The map draws the offers, and the band is where somebody lets those pins go.
+    const close = vi.fn()
+    const running = render(<RtDryRow {...props} refuel={answering({ loading: true, close })} onSearch={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: 'roadtrip.refuel.find' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'common.close' }))
+    expect(close).toHaveBeenCalledTimes(1)
+    running.unmount()
+
+    const found = render(<RtDryRow {...props} refuel={answering({ outcome: 'found', results: [offer()], close })} onSearch={vi.fn()} />)
+    expect(screen.getByText('Shell Ebina')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'roadtrip.refuel.find' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'common.close' }))
+    expect(close).toHaveBeenCalledTimes(2)
+    found.unmount()
+
+    // Offline the close still works, because closing is local, and with no dead control
+    // in the slot the sentence explaining one stands down.
+    render(<RtDryRow {...props} offline refuel={answering({ outcome: 'found', results: [offer()], close })} onSearch={vi.fn()} />)
+    const closeOffline = screen.getByRole('button', { name: 'common.close' })
+    expect(closeOffline).toBeEnabled()
+    expect(screen.queryByText('mobileTrip.rtSearchOffline')).toBeNull()
+    fireEvent.click(closeOffline)
+    expect(close).toHaveBeenCalledTimes(3)
+  })
+
+  it('FE-MOB-RTROW-035: an empty answer leaves a retry rather than a dead end, and offline it waits', () => {
+    const onSearch = vi.fn()
+    const failed = render(<RtDryRow {...props} refuel={answering({ outcome: 'failed' })} onSearch={onSearch} />)
+
+    expect(screen.queryByRole('button', { name: 'roadtrip.refuel.find' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'roadtrip.refuel.again' }))
+    expect(onSearch).toHaveBeenCalledTimes(1)
+    failed.unmount()
+
+    const none = render(<RtDryRow {...props} refuel={answering({ outcome: 'none' })} onSearch={onSearch} />)
+    expect(screen.getByRole('button', { name: 'roadtrip.refuel.again' })).toBeInTheDocument()
+    none.unmount()
+
+    render(<RtDryRow {...props} offline refuel={answering({ outcome: 'failed' })} onSearch={onSearch} />)
+    const again = screen.getByRole('button', { name: 'roadtrip.refuel.again' })
+    expect(again).toBeDisabled()
+    fireEvent.click(again)
+    expect(onSearch).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-MOB-RTROW-036: lists three offers at most, however many came back', () => {
+    const results = ['n1', 'n2', 'n3', 'n4'].map((id, i) => offer({ osm_id: id, name: `Station ${i + 1}` }))
+    const { container } = render(<RtDryRow {...props} refuel={answering({ outcome: 'found', results })} onSearch={vi.fn()} />)
+
+    expect(container.querySelectorAll('li')).toHaveLength(3)
+    expect(screen.queryByText('Station 4')).toBeNull()
+  })
+
+  it('FE-MOB-RTROW-037: the battery wording carries through to taking an offer', () => {
+    render(
+      <RtDryRow
+        {...props}
+        electric
+        refuel={answering({ outcome: 'found', results: [offer()] })}
+        onSearch={vi.fn()}
+        onAccept={vi.fn()}
+      />,
+    )
+
+    expect(screen.getByRole('button', { name: 'roadtrip.refuel.addElectric:Shell Ebina' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'roadtrip.refuel.add:Shell Ebina' })).toBeNull()
   })
 })
 

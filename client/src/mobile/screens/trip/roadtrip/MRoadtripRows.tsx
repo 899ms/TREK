@@ -1,11 +1,13 @@
-import { AlertTriangle, Bike, CarFront, Footprints, Fuel, Hourglass, Moon, Pin, Plus, Search, Sunrise, Zap } from 'lucide-react'
-import type { ReactNode } from 'react'
+import { AlertTriangle, Bike, CarFront, Footprints, Fuel, Hourglass, Moon, Pin, Plus, RotateCcw, Sunrise, X, Zap } from 'lucide-react'
+import type { CSSProperties, ReactNode } from 'react'
+import MDancingTrek from '../../../components/MDancingTrek'
+import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
 import type { StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import type { RefuelSearch } from '../../../../components/Roadtrip/useRefuelSearch'
-import type { RefuelCandidate } from '../../../../components/Roadtrip/refuelSuggestion'
+import { REFUEL_EMPTY_KEY, REFUEL_WORDS, refuelBandState, type RefuelCandidate } from '../../../../components/Roadtrip/refuelSuggestion'
 import type { DistanceUnit, RouteSegment, ScheduleWarning } from '@trek/shared/roadtrip'
 import type { TranslationFn } from '../../../../types'
 
@@ -169,11 +171,51 @@ export function RtLegRow({ seg, mode, chrome }: {
 }
 
 /**
- * The one loud row of the chain: the tank runs out here.
+ * The ground the dry band stands on, where the mascot is.
  *
- * Full width and a 44px button, where the desktop has a 22px reserve light. This is
- * the single situation on a drive that forces an action, so it gets the only shout
- * on the screen.
+ * Opaque on purpose: the mascot cuts its eyes and wheel hubs out in `--m-bg`, and
+ * `--m-card` is 55% alpha in both themes, so on the card's own ground the red body would
+ * show through the eyes. `--m-sheetop` is the phone's opaque surface. Mixed against that
+ * rather than against `--m-bg`, because the mascot's span renames `--m-bg` to this value
+ * and a variable defined in terms of itself is invalid, which would drop the cutouts.
+ */
+const DRY_GROUND = 'color-mix(in srgb, var(--m-st-danger) 11%, var(--m-sheetop))'
+
+/**
+ * The lamp's circle: a soft wash of the band's own colour rather than the black action
+ * fill. The lamp is a warning light that happens to be pressable, and the 44px circle is
+ * what tells a thumb so without turning it into the loudest thing on the screen.
+ */
+const DANGER_SOFT: CSSProperties = {
+  background: 'color-mix(in srgb, var(--m-st-danger) 14%, transparent)',
+  color: 'var(--m-st-danger)',
+}
+
+/**
+ * Where the tank runs out on this leg, and the reserve lamp that goes looking.
+ *
+ * The desktop band's design, sized for a thumb: the mascot on its skateboard and not
+ * enjoying it, a small uppercase warning, and the lamp itself as the button. Not a pill
+ * with the words on it, because a labelled pill beside a mascot and a title leaves the
+ * title almost no room: the band's content box is only about
+ * 299px wide at 375px and 284px at 360px, and a label like "Cerca un punt de recàrrega"
+ * is a long way into that. So the lamp is the button, as on the desktop, and its words
+ * live in the label a screen reader announces.
+ *
+ * 44px where the desktop lamp is 22px, because it is aimed with a thumb. The title clamps
+ * to two lines instead of truncating, because a warning that loses its end says nothing
+ * ("Qui il serbatoio si esaurisce" does not fit on one). Offline the lamp stops glowing,
+ * because a lamp that glows invites a press that cannot work. Somebody who may not edit
+ * the day still sees the lamp, as a plain mark: the empty tank is information, not an
+ * action.
+ *
+ * While a search runs or its offers show, the lamp steps aside for a close, and an empty
+ * answer leaves a retry in its place. The close matters because the map draws the offers,
+ * and without it nothing in the band could clear those pins short of accepting one. It
+ * stays while offline too, and the offline sentence stands down with it: closing is local,
+ * so there is no dead control left to explain. Which control shows, which offers and which
+ * empty sentence is decided in `refuelBandState`, the same place the desktop band reads
+ * it from.
  */
 export function RtDryRow({ intoLegKm, chrome, electric, onSearch, offline, refuel, dayId, legIndex, onAccept }: {
   intoLegKm: number
@@ -188,56 +230,79 @@ export function RtDryRow({ intoLegKm, chrome, electric, onSearch, offline, refue
   onAccept?: (poi: RefuelCandidate) => void
 }) {
   const { t, unit } = chrome
-  // One search is open at a time and it names the dry point it belongs to, so a band
-  // three legs down the chain does not light up for a question asked about this one.
-  const open = refuel.openFor === `${dayId}:${legIndex}`
-  const settled = open && !refuel.loading && refuel.outcome
+  const band = refuelBandState(refuel, dayId, legIndex)
+  const words = REFUEL_WORDS[electric ? 'electric' : 'fuel']
+  const Lamp = electric ? Zap : Fuel
   return (
     <div
-      className="my-2 -mx-1 flex flex-col gap-[7px] rounded-[16px] border px-3 py-2.5"
+      className="-mx-1 my-2 flex flex-col gap-2 rounded-[16px] border px-3 py-2.5"
       style={{
-        borderColor: 'color-mix(in srgb, var(--m-st-danger) 30%, transparent)',
-        background: 'linear-gradient(180deg, color-mix(in srgb, var(--m-st-danger) 12%, var(--m-card)) 0%, var(--m-card) 100%)',
+        borderColor: 'color-mix(in srgb, var(--m-st-danger) 22%, transparent)',
+        // Flat through the padding and the 44px header row, so the ground behind the
+        // mascot's eyes is the one they are cut in, and only the answers below fade out.
+        backgroundImage: `linear-gradient(180deg, ${DRY_GROUND} 0px, ${DRY_GROUND} 54px, var(--m-card) 100%)`,
+        boxShadow: 'inset 0 1px 0 color-mix(in srgb, var(--m-st-danger) 20%, transparent)',
       }}
     >
-      <span className="flex items-center gap-[7px]" style={{ color: 'var(--m-st-danger)' }}>
-        {electric ? <Zap size={16} strokeWidth={2} aria-hidden="true" /> : <Fuel size={16} strokeWidth={2} aria-hidden="true" />}
-        <span className="text-[0.8125rem] font-bold">
-          {electric ? t('roadtrip.refuel.dryElectric') : t('roadtrip.refuel.dry')}
+      <div className="flex min-h-[44px] items-center gap-2.5">
+        {/* Renamed on this span only, never on the band: the offers below are drawn in
+            --m-ink too, and they have to stay ink. Not a tap target either, because
+            nothing in the chain but a destination row reacts to a tap. */}
+        <span
+          className="pointer-events-none flex flex-none"
+          style={{ '--m-ink': 'var(--m-st-danger)', '--m-bg': DRY_GROUND } as CSSProperties}
+        >
+          {/* Out of fuel is a thing that happens to the drive, so it is the mascot with
+              the vehicle, and it is not enjoying it. */}
+          <MDancingTrek scene="transport" mood="sad" size={34} />
         </span>
-      </span>
-      <span className="font-geist text-[0.71875rem] text-m-muted">
-        {t('roadtrip.refuel.after', { distance: formatDistance(Math.round(intoLegKm), unit) })}
-      </span>
-      {onSearch && (
-        <>
+        <span className="min-w-0 flex-1">
+          <span className="line-clamp-2 font-geist text-[0.625rem] font-bold uppercase leading-[1.35] tracking-[.09em] text-[color:var(--m-st-danger)]">
+            {t(words.dry)}
+          </span>
+          <span className="mt-[2px] block font-geist text-[0.71875rem] tabular-nums text-m-muted">
+            {t('roadtrip.refuel.after', { distance: formatDistance(Math.round(intoLegKm), unit) })}
+          </span>
+        </span>
+        {band.control === 'close' ? (
+          <MIconBtn variant="neutral" size={44} onClick={refuel.close} ariaLabel={t('common.close')}>
+            <X size={16} strokeWidth={2.2} aria-hidden="true" />
+          </MIconBtn>
+        ) : onSearch ? (
           <button
             type="button"
             onClick={onSearch}
             disabled={offline}
-            className="flex h-11 w-full items-center justify-center gap-[7px] rounded-full bg-m-act text-[0.8125rem] font-semibold text-m-actfg disabled:bg-[color:var(--m-ic)] disabled:text-m-faint"
+            aria-label={t(band.control === 'again' ? 'roadtrip.refuel.again' : words.find)}
+            style={offline ? undefined : DANGER_SOFT}
+            className={`grid h-11 w-11 flex-none place-items-center rounded-full ${offline ? 'bg-[color:var(--m-ic)] text-m-faint' : ''}`}
           >
-            <Search size={15} strokeWidth={2.2} aria-hidden="true" />
-            {electric ? t('roadtrip.refuel.findElectric') : t('roadtrip.refuel.find')}
+            {band.control === 'again'
+              ? <RotateCcw size={17} strokeWidth={2.2} aria-hidden="true" />
+              : <Lamp size={18} strokeWidth={2} className={offline ? undefined : 'trek-lowfuel'} aria-hidden="true" />}
           </button>
-          {/* Blunt rather than greyed out: the button keeps its shape and says why. */}
-          {offline && (
-            <span className="font-geist text-[0.6875rem] leading-[1.4] text-m-faint">{t('mobileTrip.rtSearchOffline')}</span>
-          )}
-        </>
+        ) : (
+          <span className="grid h-11 w-11 flex-none place-items-center text-[color:var(--m-st-danger)]" aria-hidden="true">
+            <Lamp size={18} strokeWidth={2} className="trek-lowfuel" />
+          </span>
+        )}
+      </div>
+
+      {/* Blunt rather than silent: the lamp keeps its place and this says why it is out. */}
+      {onSearch && offline && band.control !== 'close' && (
+        <span className="font-geist text-[0.6875rem] leading-[1.4] text-m-faint">{t('mobileTrip.rtSearchOffline')}</span>
       )}
 
-      {open && refuel.loading && (
+      {band.loading && (
         <span className="font-geist text-[0.71875rem] text-m-muted">{t('roadtrip.refuel.looking')}</span>
       )}
 
       {/* The answer, in the band that asked. The desktop puts it in the rail row for the
           same reason: a station offered somewhere other than where the tank runs out is
-          an offer somebody has to go and find. Three at most: this is an offer beside a
-          plan, and the search sheet above is where all of them live. */}
-      {settled && (refuel.results.length ? (
+          an offer somebody has to go and find. */}
+      {band.offers.length > 0 && (
         <ul className="flex flex-col gap-[6px]">
-          {refuel.results.slice(0, 3).map(poi => (
+          {band.offers.map(poi => (
             <RefuelOffer
               key={poi.osm_id}
               poi={poi}
@@ -247,17 +312,13 @@ export function RtDryRow({ intoLegKm, chrome, electric, onSearch, offline, refue
             />
           ))}
         </ul>
-      ) : (
-        /* Three sentences for three different facts. "Nothing on this stretch" after a
-           request that failed states something that was never checked. */
-        <span className="font-geist text-[0.71875rem] leading-[1.4] text-m-muted">
-          {refuel.outcome === 'none'
-            ? t('roadtrip.refuel.none')
-            : refuel.outcome === 'incomplete'
-              ? t('roadtrip.refuel.incomplete')
-              : t('roadtrip.refuel.failed')}
-        </span>
-      ))}
+      )}
+
+      {/* Three sentences for three different facts. "Nothing on this stretch" after a
+          request that failed states something that was never checked. */}
+      {band.empty && (
+        <span className="font-geist text-[0.71875rem] leading-[1.4] text-m-muted">{t(REFUEL_EMPTY_KEY[band.empty])}</span>
+      )}
     </div>
   )
 }
@@ -303,7 +364,7 @@ function RefuelOffer({ poi, chrome, electric, onAccept }: {
         <button
           type="button"
           onClick={onAccept}
-          aria-label={t(electric ? 'roadtrip.refuel.addElectric' : 'roadtrip.refuel.add', { name: poi.name })}
+          aria-label={t(REFUEL_WORDS[electric ? 'electric' : 'fuel'].add, { name: poi.name })}
           className="grid h-[38px] w-[38px] flex-none place-items-center rounded-full bg-[color:var(--m-ic)] text-m-ink"
         >
           <Plus size={16} strokeWidth={2.2} aria-hidden="true" />
