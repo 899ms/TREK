@@ -63,7 +63,7 @@ import { crsForBasemap } from './gcj02Crs'
 import { isGcj02Basemap, resolveBasemap } from '../../utils/tileUrl'
 import VectorBasemap from './VectorBasemap'
 import { useSettingsStore } from '../../store/settingsStore'
-import { MapLayerSwitcher } from './MapLayerSwitcher'
+import { MapLayerSwitcher, MAP_LAYER_SWITCHER_INSET } from './MapLayerSwitcher'
 import { computeMapViewport, TILE_SIZE_RASTER, type ViewportPadding } from '../../utils/mapViewport'
 
 function categoryIconSvg(iconName: string | null | undefined, size: number): string {
@@ -1242,7 +1242,7 @@ export const MapView = memo(function MapView({
         top of the map, which read as the control moving house rather than as room being
         made: the inspector is a centred card at most 800 wide, so the corner it would
         have been clearing is one the card never reaches. */}
-    <div style={{ position: 'absolute', left: leftWidth + 20, bottom: switcherBottom, zIndex: 1000, pointerEvents: 'none' }}>
+    <div style={{ position: 'absolute', left: leftWidth + MAP_LAYER_SWITCHER_INSET, bottom: switcherBottom, zIndex: 1000, pointerEvents: 'none' }}>
       <MapLayerSwitcher active={baseLayer} onToggle={toggleBaseLayer} />
     </div>
     </div>

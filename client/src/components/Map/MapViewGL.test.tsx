@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render } from '../../../tests/helpers/render'
-import { act, waitFor } from '@testing-library/react'
+import { act, fireEvent, waitFor } from '@testing-library/react'
 import { resetAllStores } from '../../../tests/helpers/store'
 import { buildPlace } from '../../../tests/helpers/factories'
 import { server } from '../../../tests/helpers/msw/server'
@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAuthStore } from '../../store/authStore'
 import maplibregl from 'maplibre-gl'
 import { DEFAULT_MAP_ZOOM } from '../../constants/mapDefaults'
+import { MAP_LAYER_SWITCHER_INSET } from './MapLayerSwitcher'
 import type { GeoPosition, TrackingMode } from '../../hooks/useGeolocation'
 import type { PluginMapLayer, PluginMapLayerFeature, PluginMapMarker } from '../../api/client'
 import type { Poi } from './poiCategories'
@@ -254,6 +255,12 @@ beforeEach(() => {
   glMap.getCanvas.mockImplementation(() => document.createElement('canvas'))
   glMap.getBearing.mockReturnValue(0)
   glMap.queryTerrainElevation.mockReturnValue(null)
+  // A busy style, a refused source and a custom layer list are each set by one test
+  // for the case it covers. Put back here, or every test after it would silently run
+  // against a map that never settles.
+  glMap.isStyleLoaded.mockReturnValue(true)
+  glMap.getStyle.mockReturnValue({ layers: [] })
+  glMap.addSource.mockImplementation(() => undefined)
   glMarkers.clear()
   // clearAllMocks() wipes call history but keeps implementations, so anything a
   // test overrides with mockReturnValue has to be put back here.
@@ -2064,6 +2071,130 @@ describe('MapViewGL', () => {
     await flushFrames()
 
     expect(glMap.setLayoutProperty).toHaveBeenCalledWith('trip-satellite-raster', 'visibility', 'none')
+  })
+
+  // A map is busy (isStyleLoaded() false) for as long as tiles or a setData are in flight,
+  // which on a phone is most of the time and on the road trip stage was every tap. The
+  // imagery used to wait for a settled style that `styledata` never announced.
+
+  it('FE-COMP-MAPVIEWGL-079: a stored satellite choice is drawn even while the map is still busy', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // Right after `load` the basemap tiles and the overlay sources are still loading.
+    glMap.isStyleLoaded.mockReturnValue(false)
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+
+    expect(glMap.addSource).toHaveBeenCalledWith('trip-satellite', expect.objectContaining({ type: 'raster' }))
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster', type: 'raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-080: a tap on the switcher while a source update is in flight still shows the imagery', async () => {
+    loadOnAttach()
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+
+    const { getByRole } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
+
+    glMap.isStyleLoaded.mockReturnValue(false)
+    fireEvent.click(getByRole('button', { name: 'Switch to satellite view' }))
+    await flushFrames()
+
+    expect(useSettingsStore.getState().settings.map_base_layer).toBe('satellite')
+    expect(glMap.addSource).toHaveBeenCalledWith('trip-satellite', expect.objectContaining({ type: 'raster' }))
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-081: imagery that is already on the map flips visibility at once, busy or not', async () => {
+    loadOnAttach()
+    glMap.getSource.mockImplementation((id: string) => (id === 'trip-satellite' ? {} : null))
+    glMap.getLayer.mockImplementation((id: string) => (id === 'trip-satellite-raster' ? {} : null))
+
+    const { getByRole } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    glMap.setLayoutProperty.mockClear()
+
+    glMap.isStyleLoaded.mockReturnValue(false)
+    fireEvent.click(getByRole('button', { name: 'Switch to satellite view' }))
+    await flushFrames()
+
+    expect(glMap.setLayoutProperty).toHaveBeenCalledWith('trip-satellite-raster', 'visibility', 'visible')
+    // Flipping it is all a second tap takes: nothing is built a second time.
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
+    expect(glMap.addLayer).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'trip-satellite-raster' }), expect.anything())
+  })
+
+  it('FE-COMP-MAPVIEWGL-082: a style that is not in yet keeps the plain basemap until styledata brings it', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // What both engines do when the style document itself has not loaded.
+    let styleIn = false
+    glMap.addSource.mockImplementation((id: string) => {
+      if (id === 'trip-satellite' && !styleIn) throw new Error('Style is not done loading.')
+    })
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    expect(glMap.addLayer).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'trip-satellite-raster' }), expect.anything())
+
+    styleIn = true
+    const subscribed = glMap.on.mock.calls.filter(c => c[0] === 'styledata')
+    const styledata = subscribed[subscribed.length - 1]?.[1] as (() => void) | undefined
+    expect(styledata).toBeDefined()
+    act(() => { styledata!() })
+
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-083: the switcher sits the shared inset off the map edge, past any side panel', async () => {
+    const { getByRole, rerender } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    // Button, then its frosted shell, then the positioned wrapper.
+    const wrapper = () => getByRole('button', { name: 'Switch to satellite view' }).parentElement!.parentElement!
+
+    // The phone's compass is placed off the same inset, so the two cannot drift apart.
+    expect(wrapper().style.left).toBe(`${MAP_LAYER_SWITCHER_INSET}px`)
+
+    rerender(<MapViewGL places={[]} fitKey={1} leftWidth={240} />)
+    await flushFrames()
+    expect(wrapper().style.left).toBe(`${240 + MAP_LAYER_SWITCHER_INSET}px`)
+  })
+
+  it('FE-COMP-MAPVIEWGL-084: a source left behind without its layer still gets the layer', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // An earlier pass that got the source in and then failed on the layer.
+    glMap.getSource.mockImplementation((id: string) => (id === 'trip-satellite' ? {} : null))
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+
+    // Guarded on the source, the pass would have seen it and built nothing, for good.
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster', type: 'raster' }),
+      'trip-route',
+    )
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
   })
 })
 describe('MapViewGL attribution', () => {

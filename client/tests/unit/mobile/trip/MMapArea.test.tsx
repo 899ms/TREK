@@ -1,14 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen } from '../../../helpers/render'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
+import { buildPlace } from '../../../helpers/factories'
+import type { AccessSpur, RoadtripDay } from '@trek/shared/roadtrip'
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import type { CompassMap } from '../../../../src/components/Map/MapCompassPill'
+import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../src/components/Map/MapLayerSwitcher'
 import { useSettingsStore } from '../../../../src/store/settingsStore'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-014
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-018
 
 const mocks = vi.hoisted(() => ({
   poi: {} as Record<string, unknown>,
+  /** The traveller's road trip preferences, read per trip by the area. */
+  prefs: {} as Record<string, unknown>,
   /** Handed to onMapReady, standing in for a GL map that can rotate. */
   glMap: null as CompassMap | null,
   /** Last props the area handed the renderer, so its callbacks can be fired. */
@@ -26,6 +31,10 @@ vi.mock('../../../../src/components/Map/MapViewAuto', () => ({
 
 vi.mock('../../../../src/components/Map/usePoiExplore', () => ({
   usePoiExplore: () => mocks.poi,
+}))
+
+vi.mock('../../../../src/hooks/useRoadtripSettings', () => ({
+  useRoadtripSettings: (select: (p: Record<string, unknown>) => unknown) => select(mocks.prefs),
 }))
 
 import MMapArea from '../../../../src/mobile/screens/trip/map/MMapArea'
@@ -50,8 +59,52 @@ function renderArea(shellOver: Partial<MTripShellApi> = {}, plannerOver: Partial
 const compassBand = (container: HTMLElement) =>
   container.querySelector('[style*="--bottom-nav-h"]') as HTMLElement | null
 
+/** One stage of a drive: two stops on day 1, one of them reached down a short spur. */
+function stageDay(): RoadtripDay {
+  return {
+    dayId: 3, dayNumber: 1, date: '2026-05-01', title: null,
+    stops: [
+      {
+        assignmentId: 31, ownerDayId: 3, ownerIndex: 0, placeId: 11, name: 'Hamburg',
+        lat: 53.55, lng: 9.99, time: null, dwellMinutes: null,
+        legMode: null, incomingLegMode: null, stopType: null,
+      },
+      {
+        assignmentId: 32, ownerDayId: 3, ownerIndex: 1, placeId: 12, name: 'Lübeck',
+        lat: 53.87, lng: 10.69, time: null, dwellMinutes: null,
+        legMode: null, incomingLegMode: null, stopType: null,
+      },
+    ],
+    legs: [], legVias: [[]], geometry: [], distance: 0, duration: 0,
+    schedule: { entries: [], warnings: [] }, driveWarnings: [], dayWarning: null,
+  } as unknown as RoadtripDay
+}
+
+/** The planner carrying that stage, plus a place from another day the stage leaves off. */
+function stagePlanner(selectedDayId: number | null): TripPlanner {
+  const base = buildPlanner()
+  const spur: AccessSpur = { line: [[53.87, 10.69], [53.871, 10.692]], meters: 180, stopKey: '53.87000,10.69000,,' }
+  return buildPlanner({
+    selectedDayId,
+    mapPlaces: [buildPlace({ id: 11 }), buildPlace({ id: 12 }), buildPlace({ id: 99 })],
+    // Every planned place, which is what the all days view draws.
+    roadtripMapPlaces: [buildPlace({ id: 11 }), buildPlace({ id: 12 })],
+    roadtripRoutes: {
+      ...base.roadtripRoutes,
+      days: [stageDay()],
+      lines: [[[53.55, 9.99], [53.87, 10.69]]],
+      lineDays: [1],
+      accessLines: [spur],
+    },
+  } as unknown as Partial<TripPlanner>)
+}
+
+/** What the area handed the renderer that a fresh copy would make it draw again. */
+const DRAWN = ['places', 'route', 'routeColors', 'accessLines', 'focusPoints'] as const
+
 beforeEach(() => {
   mocks.glMap = COMPASS
+  mocks.prefs = {}
   mocks.poi = {
     active: new Set<string>(), pois: [], loadingKeys: new Set<string>(), errorKeys: new Set<string>(),
     moved: false, toggle: vi.fn(), searchArea: vi.fn(), onViewportChange: vi.fn(),
@@ -73,7 +126,10 @@ describe('MMapArea', () => {
     // LocationButton hard-codes `right: 12` off the same variable, so matching
     // the offset here is what keeps the two round controls on one line.
     expect(compassBand(container)?.style.bottom).toBe('calc(var(--bottom-nav-h, 84px) + 12px)')
-    expect(compassBand(container)?.className).toContain('left-3')
+    // Beside the base-layer switcher both engines draw in the corner: its inset, its
+    // size and one gap. In the corner itself it lay under the switcher's frosted shell.
+    expect(compassBand(container)?.style.left).toBe(`${MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE + 8}px`)
+    expect(compassBand(container)?.className).not.toContain('left-3')
   })
 
   it('FE-MOB-MAPAREA-003: the map layer floats those controls a dock gap above the dock', () => {
@@ -189,5 +245,84 @@ describe('MMapArea', () => {
     // The stage's own points, which is an array either way: going array → undefined →
     // array is two dependency changes, and the second throws away the traveller's pan.
     expect(Array.isArray(mocks.props.focusPoints)).toBe(true)
+  })
+
+  it('FE-MOB-MAPAREA-015: the compass never takes the base-layer switcher\'s slot, on either tab', () => {
+    for (const shellOver of [{ trTab: 'plan' }, { trTab: 'roadtrip', mapFront: true }] as Partial<MTripShellApi>[]) {
+      const { container, unmount } = renderArea(shellOver)
+
+      expect(parseFloat(compassBand(container)?.style.left ?? '0'))
+        .toBeGreaterThanOrEqual(MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE)
+      // With the renderer mocked, the compass is still the one element in this layer
+      // that sets --bottom-nav-h inline; its left offset joined the same style object.
+      expect(container.querySelectorAll('[style*="--bottom-nav-h"]')).toHaveLength(1)
+      unmount()
+    }
+  })
+
+  it('FE-MOB-MAPAREA-016: a re-render with nothing new on the stage hands the map the same drawing', () => {
+    const planner = stagePlanner(3)
+    const shell = buildShell({ view: 'map', mapFront: true, trTab: 'roadtrip' })
+    const { rerender } = render(<MMapArea planner={planner} shell={shell} />)
+    const first = { ...mocks.props }
+
+    // The stage really is what is drawn, so the identities below are about something.
+    expect((first.places as Array<{ id: number }>).map(p => p.id)).toEqual([11, 12])
+    expect(first.route).toHaveLength(1)
+    expect(first.accessLines).toHaveLength(1)
+    expect(first.focusPoints).toEqual([[53.55, 9.99], [53.87, 10.69]])
+
+    // The shell re-renders on every store write, a satellite tap included. Fresh arrays
+    // here would refit the camera over the traveller's pan and set the map's sources
+    // again, which is also what kept the style too busy to draw the imagery.
+    rerender(<MMapArea planner={planner} shell={shell} />)
+
+    for (const key of DRAWN) expect(mocks.props[key]).toBe(first[key])
+  })
+
+  it('FE-MOB-MAPAREA-017: the all days view keeps its day colours between renders too', () => {
+    mocks.prefs = { roadtrip_day_colors: true }
+    const planner = stagePlanner(null)
+    const shell = buildShell({ view: 'map', mapFront: true, trTab: 'roadtrip' })
+    const { rerender } = render(<MMapArea planner={planner} shell={shell} />)
+    const first = { ...mocks.props }
+
+    // One colour per line, worked out per call, so without the memo a new array each time.
+    expect(first.routeColors).toHaveLength(1)
+    // Still an array with no stage, which FE-MOB-MAPAREA-012 depends on.
+    expect(Array.isArray(first.focusPoints)).toBe(true)
+
+    rerender(<MMapArea planner={planner} shell={shell} />)
+
+    for (const key of DRAWN) expect(mocks.props[key]).toBe(first[key])
+  })
+
+  it('FE-MOB-MAPAREA-018: what is kept still follows the stage, the day colours and the places', () => {
+    const planner = stagePlanner(3)
+    const shell = buildShell({ view: 'map', mapFront: true, trTab: 'roadtrip' })
+    const { rerender } = render(<MMapArea planner={planner} shell={shell} />)
+    expect(mocks.props.routeColors).toBeUndefined()
+
+    // Kept on its inputs, not frozen: each one below has to reach the map, or a memo
+    // missing it would leave the traveller looking at a stage they already left.
+    mocks.prefs = { roadtrip_day_colors: true }
+    rerender(<MMapArea planner={planner} shell={shell} />)
+    expect(mocks.props.routeColors).toHaveLength(1)
+
+    const renamed = buildPlace({ id: 12, name: 'Travemünde' })
+    const edited = { ...planner, mapPlaces: [planner.mapPlaces[0], renamed, planner.mapPlaces[2]] }
+    rerender(<MMapArea planner={edited} shell={shell} />)
+    expect(mocks.props.places).toContain(renamed)
+
+    const allDays = { ...edited, selectedDayId: null }
+    rerender(<MMapArea planner={allDays} shell={shell} />)
+    expect(mocks.props.places).toBe(allDays.roadtripMapPlaces)
+    expect(mocks.props.focusPoints).toEqual([])
+
+    // Off the tab the stage hands nothing through, so the plan tab frames itself again.
+    rerender(<MMapArea planner={allDays} shell={{ ...shell, trTab: 'plan' }} />)
+    expect(mocks.props.accessLines).toBeUndefined()
+    expect(mocks.props.focusPoints).toBeUndefined()
+    expect(mocks.props.places).toBe(allDays.mapPlaces)
   })
 })

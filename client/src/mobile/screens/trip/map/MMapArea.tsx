@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { MapViewAuto } from '../../../../components/Map/MapViewAuto'
 import { MapCompassPill, type CompassMap } from '../../../../components/Map/MapCompassPill'
+import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../components/Map/MapLayerSwitcher'
 import { TripRouteOverviewPill, TripRouteOverviewPanel } from '../../../../components/Map/TripRouteOverview'
 import { DawarichTrailPill } from '../../../../components/Map/DawarichTrailPill'
 import PoiCategoryPill from '../../../../components/Map/PoiCategoryPill'
@@ -17,6 +18,13 @@ import type { Poi } from '../../../../components/Map/poiCategories'
 const NO_POIS: Poi[] = []
 
 /**
+ * The compass stands one gap to the right of the base-layer switcher both engines draw
+ * in the bottom left corner. Worked out from the switcher's own numbers rather than
+ * written down as 70, so moving or resizing the switcher carries the compass along.
+ */
+const COMPASS_LEFT = MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE + 8
+
+/**
  * Fullscreen map layer of the mobile trip screen (plan tab). Stays mounted for
  * the whole plan-tab lifetime — the plan timeline / places browser overlays
  * simply cover it — so tiles, markers and the GL engine stay warm across view
@@ -26,10 +34,11 @@ const NO_POIS: Poi[] = []
  * setting) with the full desktop feature set: clusters, photo/icon markers,
  * day-order badges, dashed day route, transport overlays per booking, POI
  * explore markers and long-press → add place. Only the floating chrome is
- * mobile: the POI bar spans the full width below the day-chip rail, and the two
- * round controls share the band just above the dock — the compass on the left,
- * the map's built-in three-state locate button on the right, both riding the
- * --bottom-nav-h contract the map already reads so they cannot drift apart.
+ * mobile: the POI bar spans the full width below the day-chip rail, and the round
+ * controls share the band just above the dock: the map's own base-layer switcher
+ * with the compass beside it on the left, the map's built-in three-state locate
+ * button on the right, all riding the --bottom-nav-h contract the map already reads
+ * so they cannot drift apart.
  *
  * Marker data honours the shared places category filter (#1541) because
  * planner.mapPlaces is derived from tripStore's placesCategoryFilter — the
@@ -53,17 +62,30 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   // through unconditionally while that tab is open, list half included: `focusPoints`
   // going array → undefined → array is two dependency changes to React, and the
   // second one would throw away whatever the traveller had panned to.
-  const stage = onStage ? stageOf(planner.roadtripRoutes.days, planner.selectedDayId) : null
-  const stageMap = onStage
-    ? stageMapData(planner.roadtripRoutes, stage, !!dayColorsOn)
-    : null
+  //
+  // Memoised on what the stage is made of rather than rebuilt per render: the shell
+  // re-renders on every store write, a settings toggle included, and a fresh
+  // `focusPoints` array reframes the camera while fresh lines and places set their
+  // GeoJSON sources again. On the stage that also kept the GL style busy, which is how
+  // the satellite switch came to miss every tap there.
+  const stage = useMemo(
+    () => onStage ? stageOf(planner.roadtripRoutes.days, planner.selectedDayId) : null,
+    [onStage, planner.roadtripRoutes.days, planner.selectedDayId],
+  )
+  const stageMap = useMemo(
+    () => onStage ? stageMapData(planner.roadtripRoutes, stage, !!dayColorsOn) : null,
+    [onStage, planner.roadtripRoutes, stage, dayColorsOn],
+  )
 
   // Only what the stage carries, so a trip's other 200 pins stay off a screen that
   // is answering one question. Without a stage (the all-days view) every planned
   // place comes back, which is what the drive looks like end to end.
-  const stagePlaces = stageMap && stage
-    ? planner.mapPlaces.filter(p => stageMap.placeIds.has(p.id))
-    : planner.roadtripMapPlaces
+  const stagePlaces = useMemo(
+    () => stageMap && stage
+      ? planner.mapPlaces.filter(p => stageMap.placeIds.has(p.id))
+      : planner.roadtripMapPlaces,
+    [stageMap, stage, planner.mapPlaces, planner.roadtripMapPlaces],
+  )
 
   /**
    * The pins, and they are not the same question on the two tabs.
@@ -169,23 +191,24 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
         </div>
       )}
 
-      {/* Compass — GL maps only (Leaflet can't rotate). Bottom-left, mirroring
-          the locate button's own `right: 12` off the same --bottom-nav-h, so the
-          two round controls always sit on one line. Leaflet has no compass but
-          puts its base-layer switcher in the same corner, so the band reads the
-          same either way. */}
+      {/* Compass, GL maps only (Leaflet cannot rotate). Both engines draw the base-layer
+          switcher in the bottom left corner, so the compass sits beside it rather than in
+          the corner: at `left-3` it started 8px left of the switcher and ran on under it,
+          reading as a second button showing through the frosted shell. Same
+          --bottom-nav-h band as the locate button's `right: 12`, so the round controls
+          still share one line. The left offset is inline because it is computed from the
+          switcher's own numbers. */}
       {mapActive && glMap && (
-        <div className="pointer-events-none absolute left-3 z-[25]" style={{ bottom: 'calc(var(--bottom-nav-h, 84px) + 12px)' }}>
+        <div className="pointer-events-none absolute z-[25]" style={{ left: COMPASS_LEFT, bottom: 'calc(var(--bottom-nav-h, 84px) + 12px)' }}>
           <MapCompassPill map={glMap} />
         </div>
       )}
 
       {/* Whole-trip overview (#1736): the stages stack above their toggle on the right,
-          clear of the round-controls band below it and of the compass and Leaflet's
-          base-layer switcher, which both sit in the bottom-LEFT corner. The offset is
-          Tailwind rather than inline because the compass band is identified by being
-          the one element with an inline --bottom-nav-h, and a second would make that
-          ambiguous. */}
+          clear of the round-controls band below it and of the base-layer switcher and
+          the compass, which both sit bottom left. The offset is Tailwind rather than
+          inline because the compass band is identified by being the one element with
+          an inline --bottom-nav-h, and a second would make that ambiguous. */}
       {mapActive && !onStage && (!planner.roadtripActive || planner.dawarichEnabled) && (
         <div className="pointer-events-none absolute left-3 right-3 z-[25] flex flex-col items-end gap-2 bottom-[calc(var(--bottom-nav-h,84px)+58px)]">
           {!planner.roadtripActive && planner.overviewActive && (

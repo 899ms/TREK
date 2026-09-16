@@ -9,7 +9,7 @@ import { renderIconMarkup } from '../../utils/iconMarkup'
 import type mapboxgl from 'mapbox-gl'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useTranslation } from '../../i18n/TranslationContext'
-import { MapLayerSwitcher, type BaseLayer } from './MapLayerSwitcher'
+import { MapLayerSwitcher, MAP_LAYER_SWITCHER_INSET, type BaseLayer } from './MapLayerSwitcher'
 import { useAuthStore } from '../../store/authStore'
 import { getCached, isLoading, fetchPhoto, onThumbReady, getAllThumbs } from '../../services/photoService'
 import { isCustomPlaceImage, photoCacheKey } from './placePhoto'
@@ -277,15 +277,30 @@ function addPlaceClusterLayers(map: any): void {
  * Puts the imagery on the map, or takes it off again.
  *
  * Built on demand rather than once at load: a style change drops every source the map
- * had, and a hot reload does the same. Guarded on its own absence, so the usual pass is
- * a no-op and only the visibility flips.
+ * had, and a hot reload does the same. Visibility comes first: a layer that is already
+ * there only needs flipping, so the usual pass is one call and a tap answers at once.
+ *
+ * Deliberately not gated on `isStyleLoaded()`. That reports false for as long as any
+ * source has tiles or a setData in flight (see useDawarichTrailGL), which on a phone is
+ * the usual state, and the only retry here is `styledata`, which fires on style edits
+ * and not when those finish. Behind that gate a stored choice met a busy map on load,
+ * and a tap on the road trip stage met the sources the same render had just set again,
+ * so the imagery was never drawn. The gate was also the wrong question: this only runs
+ * after `load`, and addSource and addLayer refuse only a style document that is not in
+ * yet. The catch covers that case, and `styledata` brings the pass back once it is in.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applySatellite(map: any, on: boolean): void {
   try {
-    if (!map.isStyleLoaded?.()) return
+    if (map.getLayer(SATELLITE_LAYER_ID)) {
+      map.setLayoutProperty(SATELLITE_LAYER_ID, 'visibility', on ? 'visible' : 'none')
+      return
+    }
+    if (!on) return // Nothing to build while it is switched off.
+    // The layer is what is missing, not necessarily the source: a pass that got the
+    // source in and then failed on the layer would otherwise leave a source that stops
+    // every later pass from ever building the layer.
     if (!map.getSource(SATELLITE_SOURCE_ID)) {
-      if (!on) return // Nothing to build while it is switched off.
       map.addSource(SATELLITE_SOURCE_ID, {
         type: 'raster',
         tiles: [SATELLITE_TILE_URL],
@@ -293,21 +308,18 @@ function applySatellite(map: any, on: boolean): void {
         maxzoom: SATELLITE_TILE_MAXZOOM,
         attribution: SATELLITE_TILE_ATTRIBUTION,
       })
-      // Under the first thing TREK draws, over everything the basemap style draws.
-      // Without the anchor the imagery lands on top and buries the route.
-      const layers = map.getStyle?.()?.layers ?? []
-      const firstOwn = layers.find((l: { id: string }) =>
-        OWN_LAYER_PREFIXES.some(prefix => l.id.startsWith(prefix)))
-      map.addLayer({
-        id: SATELLITE_LAYER_ID,
-        type: 'raster',
-        source: SATELLITE_SOURCE_ID,
-        paint: { 'raster-opacity': 1 },
-      }, firstOwn?.id)
     }
-    if (map.getLayer(SATELLITE_LAYER_ID)) {
-      map.setLayoutProperty(SATELLITE_LAYER_ID, 'visibility', on ? 'visible' : 'none')
-    }
+    // Under the first thing TREK draws, over everything the basemap style draws.
+    // Without the anchor the imagery lands on top and buries the route.
+    const layers = map.getStyle?.()?.layers ?? []
+    const firstOwn = layers.find((l: { id: string }) =>
+      OWN_LAYER_PREFIXES.some(prefix => l.id.startsWith(prefix)))
+    map.addLayer({
+      id: SATELLITE_LAYER_ID,
+      type: 'raster',
+      source: SATELLITE_SOURCE_ID,
+      paint: { 'raster-opacity': 1 },
+    }, firstOwn?.id)
   } catch { /* a style that refuses the layer keeps the plain basemap */ }
 }
 
@@ -2281,7 +2293,9 @@ export function MapViewGL({
 
   // Satellite, the same setting the Leaflet map reads, so switching it on one renderer
   // and reloading into the other keeps the choice. `styledata` is subscribed because a
-  // basemap change rebuilds the style from scratch and takes the imagery with it.
+  // basemap change rebuilds the style from scratch and takes the imagery with it. It is
+  // the retry for a style that is not in yet, never for a busy one: it fires on style
+  // edits, not when tiles arrive, which is why applySatellite does not wait for those.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
@@ -2331,7 +2345,7 @@ export function MapViewGL({
           card too, and used to send the pill to the top of the map for a corner it never
           covers. */}
       <div style={{
-        position: 'absolute', left: leftWidth + 20, zIndex: 1000, pointerEvents: 'none',
+        position: 'absolute', left: leftWidth + MAP_LAYER_SWITCHER_INSET, zIndex: 1000, pointerEvents: 'none',
         bottom: isMobile && hasDayDetail
           ? 'calc(var(--bottom-nav-h, 0px) + 20px + var(--day-panel-h, 0px) + 12px)'
           : 'calc(var(--bottom-nav-h, 0px) + 12px)',
