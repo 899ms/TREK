@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { AlertTriangle, MapPin, Navigation } from 'lucide-react'
 import { useMPlanDaySwipe } from '../plan/useMPlanDaySwipe'
-import { useMRoadtrip } from './useMRoadtrip'
+import { showStopOnMap, useMRoadtrip } from './useMRoadtrip'
 import { useMRtCorridor } from './useMRtCorridor'
 import MRtCorridorBar from './MRtCorridorBar'
 import { RtAutoRow, RtDryRow, RtLegRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
@@ -92,7 +92,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
           {/* `rt` is handed down rather than looked up again: useMRoadtrip owns a
               30s interval and a network subscription, and a second call would run a
               second pair of them for the same screen. */}
-          <StageBar planner={planner} shell={shell} rt={rt} />
+          <StageBar planner={planner} rt={rt} onOpen={openStop} />
         </div>
       </div>
     )
@@ -178,7 +178,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
               )}
             </section>
 
-            {rt.upNext && <UpNext planner={planner} shell={shell} rt={rt} onOpen={openStop} />}
+            {rt.upNext && <UpNext planner={planner} shell={shell} rt={rt} stageDayId={stage.dayId} onOpen={openStop} />}
 
             <section className="mt-2.5 overflow-hidden rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-3 pt-1">
               {rt.rows.map((row, i) => {
@@ -221,11 +221,16 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
  * One line rather than a sheet that can be dragged open. A drag sheet brings a panel
  * height the map fit has to account for and lifts the locate and style buttons with
  * it, which is a bigger change than this half of the screen needs to be useful.
+ *
+ * It reads as a place, so a tap opens that place's stop, the same sheet its row in the
+ * chain opens. It used to switch to the chain instead, which broke the promise its name
+ * makes; the header's list switch is the way back to the chain. Name, clock and tap all
+ * come off one row (see stageEnd), so the bar can never name one stop and open another.
  */
-function StageBar({ planner, shell, rt }: {
+function StageBar({ planner, rt, onOpen }: {
   planner: MTripTabPanelProps['planner']
-  shell: MTripTabPanelProps['shell']
   rt: ReturnType<typeof useMRoadtrip>
+  onOpen: (row: StopRow) => void
 }) {
   const { t } = planner
   const unit = useSettingsStore(s => s.settings.distance_unit)
@@ -245,32 +250,33 @@ function StageBar({ planner, shell, rt }: {
   }
 
   const tint = dayColorsOn ? dayColor(stage.dayNumber) : null
-  const named = stage.stops.filter(s => !s.automaticNight)
-  const last = named.length ? named[named.length - 1] : undefined
+  const end = rt.end
 
-  return (
-    <button
-      type="button"
-      onClick={shell.toggleRtView}
-      className="flex w-full items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[14px] py-[11px] text-left shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]"
-    >
+  const inner = (
+    <>
       {tint && (
         // theme-lint-disable: map paint, see dayColors.ts.
         <span className="h-[9px] w-[9px] flex-none rounded-full" style={{ background: tint.line, boxShadow: `0 0 0 2px ${tint.casing}` }} aria-hidden="true" />
       )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[0.8125rem] font-semibold text-m-ink">
-          {last?.name ?? t('roadtrip.stop.none')}
+          {end?.stop.name ?? t('roadtrip.stop.none')}
         </span>
         <span className="mt-px block font-geist text-[0.6875rem] tabular-nums text-m-muted">
-          {[t('roadtrip.day.stopCount', { count: rt.stops }), lastArrivalOf(stage)].filter(Boolean).join(' · ')}
+          {[t('roadtrip.day.stopCount', { count: rt.stops }), end?.time].filter(Boolean).join(' · ')}
         </span>
       </span>
       <span className="whitespace-nowrap font-geist text-[0.6875rem] font-semibold tabular-nums text-m-muted">
         {stage.distance > 0 ? formatDistance(stage.distance / 1000, unit) : t('roadtrip.leg.pending')}
       </span>
-    </button>
+    </>
   )
+  const box = 'flex w-full items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[14px] py-[11px] text-left shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]'
+
+  // A stage without a single stop has nothing for a tap to open, so a plain block rather
+  // than a dead button, the rule the whole-drive line above follows too.
+  if (!end) return <div className={box}>{inner}</div>
+  return <button type="button" onClick={() => onOpen(end)} className={box}>{inner}</button>
 }
 
 /**
@@ -281,10 +287,11 @@ function StageBar({ planner, shell, rt }: {
  * planned time stays put and the delta sits beside it, because the planned time is the
  * number you want to compare against.
  */
-function UpNext({ planner, shell, rt, onOpen }: {
+function UpNext({ planner, shell, rt, stageDayId, onOpen }: {
   planner: MTripTabPanelProps['planner']
   shell: MTripTabPanelProps['shell']
   rt: ReturnType<typeof useMRoadtrip>
+  stageDayId: number
   onOpen: (row: StopRow) => void
 }) {
   const { t } = planner
@@ -333,10 +340,8 @@ function UpNext({ planner, shell, rt, onOpen }: {
         </a>
         <button
           type="button"
-          onClick={() => {
-            planner.setSelectedPlaceId(next.row.stop.placeId)
-            if (shell.rtView === 'list') shell.toggleRtView()
-          }}
+          // Up next is a stop of the stage on screen, so the day stays put and only the camera moves.
+          onClick={() => showStopOnMap(planner, shell, next.row.stop, stageDayId)}
           aria-label={t('mobileTrip.showOnMap')}
           className="flex h-11 w-11 flex-none items-center justify-center rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-glass)] text-m-ink backdrop-blur-[24px] backdrop-saturate-[1.7]"
         >
@@ -372,14 +377,6 @@ function EmptyStage({ planner, loading }: { planner: MTripTabPanelProps['planner
 }
 
 /* ── small helpers ────────────────────────────────────────────────────────── */
-
-function lastArrivalOf(stage: { schedule: { entries: { arrival: string | null }[] } }): string | null {
-  for (let i = stage.schedule.entries.length - 1; i >= 0; i--) {
-    const a = stage.schedule.entries[i]?.arrival
-    if (a) return a
-  }
-  return null
-}
 
 function stageDateLabel(planner: MTripTabPanelProps['planner'], dayId: number): string | null {
   const day = planner.days.find(d => d.id === dayId)

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { MapViewAuto } from '../../../../components/Map/MapViewAuto'
 import { MapCompassPill, type CompassMap } from '../../../../components/Map/MapCompassPill'
 import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../components/Map/MapLayerSwitcher'
@@ -7,10 +7,11 @@ import { DawarichTrailPill } from '../../../../components/Map/DawarichTrailPill'
 import PoiCategoryPill from '../../../../components/Map/PoiCategoryPill'
 import { usePoiExplore } from '../../../../components/Map/usePoiExplore'
 import { useMergedMapPois } from '../../../../components/Map/useMergedMapPois'
-import { stageOf } from '../../../../components/Roadtrip/roadtripRowModel'
+import { firstStopOfPlace, stageOf } from '../../../../components/Roadtrip/roadtripRowModel'
 import { stageMapData } from '../../../../components/Roadtrip/stageMap'
 import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
+import { useTripStore } from '../../../../store/tripStore'
 import type { MMapAreaProps } from '../MTripShell'
 import type { Poi } from '../../../../components/Map/poiCategories'
 
@@ -23,6 +24,29 @@ const NO_POIS: Poi[] = []
  * written down as 70, so moving or resizing the switcher carries the compass along.
  */
 const COMPASS_LEFT = MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE + 8
+
+/** A camera focus the planner is holding, and the day that was on screen when it arrived. */
+interface HeldFocus {
+  points: readonly [number, number][]
+  dayId: number | null
+  live: boolean
+}
+
+/**
+ * Lets go of a pending focus once the day moves off the one it arrived with.
+ *
+ * The planner keeps a point it was asked to show until its next routing round, whatever
+ * day is picked in the meantime, and a pending focus wins over the stage's own frame. So
+ * after "show on map" every stage swiped to afterwards stayed on that one point instead of
+ * framing its drive. Coming back to the day does not bring the point back either: the
+ * traveller has moved on since, and the camera belongs to the stage they came back to. A
+ * new focus is a new array, held again from the day it arrives together with.
+ */
+function holdFocus(prev: HeldFocus, points: readonly [number, number][], dayId: number | null): HeldFocus {
+  if (prev.points !== points) return { points, dayId, live: true }
+  if (prev.live && prev.dayId !== dayId) return { points, dayId, live: false }
+  return prev
+}
 
 /**
  * Fullscreen map layer of the mobile trip screen (plan tab). Stays mounted for
@@ -40,9 +64,10 @@ const COMPASS_LEFT = MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE + 8
  * button on the right, all riding the --bottom-nav-h contract the map already reads
  * so they cannot drift apart.
  *
- * Marker data honours the shared places category filter (#1541) because
- * planner.mapPlaces is derived from tripStore's placesCategoryFilter — the
- * same set the places browser renders, so the two can't desync.
+ * On the plan tab, marker data honours the shared places category filter (#1541)
+ * because planner.mapPlaces is derived from tripStore's placesCategoryFilter, the
+ * same set the places browser renders, so the two can't desync. The road trip
+ * stage draws the stops of its chain instead, see `stagePlaces`.
  */
 export default function MMapArea({ planner, shell }: MMapAreaProps) {
   const poi = usePoiExplore()
@@ -51,6 +76,7 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
 
   const dayColorsOn = useRoadtripSettings(s => s.roadtrip_day_colors, planner.tripId)
+  const tripPlaces = useTripStore(s => s.places)
 
   // One instance, two tabs. `mapFront` is true whenever the map is the front layer
   // in either of them, so the floating chrome below keys off that rather than off
@@ -80,12 +106,55 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   // Only what the stage carries, so a trip's other 200 pins stay off a screen that
   // is answering one question. Without a stage (the all-days view) every planned
   // place comes back, which is what the drive looks like end to end.
+  //
+  // Out of the trip store rather than `planner.mapPlaces`, which is the plan tab's map.
+  // That list drops the pins of every day its declutter has put away, and this tab moves
+  // the day without touching the declutter (a swipe, or a chip tap while the plan tab sits
+  // on its list): after the all days switch and back, the next stage picked came up with
+  // most of its pins missing. It also runs the places browser's filters, where 'unplanned'
+  // hides every stop a drive has, and it lacks the service stops hidden from the day lists
+  // that the chain still draws. The category filter stays off the stage too, on purpose:
+  // the stage is one day's chain on a map, and a stop the chain lists with no pin under its
+  // line, hidden by a control on another tab, reads as a broken map rather than a filter.
   const stagePlaces = useMemo(
     () => stageMap && stage
-      ? planner.mapPlaces.filter(p => stageMap.placeIds.has(p.id))
+      ? tripPlaces.filter(p => p.lat != null && p.lng != null && stageMap.placeIds.has(p.id))
       : planner.roadtripMapPlaces,
-    [stageMap, stage, planner.mapPlaces, planner.roadtripMapPlaces],
+    [stageMap, stage, tripPlaces, planner.roadtripMapPlaces],
   )
+
+  // Computed during render rather than in an effect, so the frame handed over below is
+  // already the right one in the render a day change happens in. See holdFocus.
+  const [heldFocus, setHeldFocus] = useState<HeldFocus>(
+    () => ({ points: planner.mapFocusPoints, dayId: planner.selectedDayId, live: true }),
+  )
+  const focus = holdFocus(heldFocus, planner.mapFocusPoints, planner.selectedDayId)
+  if (focus !== heldFocus) setHeldFocus(focus)
+  const focusPending = focus.live && planner.mapFocusPoints.length > 0
+
+  /**
+   * A pin on the road trip tab opens its stop: the sheet the chain row opens, not the
+   * place inspector.
+   *
+   * The plan tab's marker click moves the planner's place selection, and the inspector
+   * opens off that selection, so a tap on a stop of the drive came up with the plan tab's
+   * card over the map and no word about the stop. Over a stage the stop is found on that
+   * card, over the whole drive on the first routed day that stops there (firstStopOfPlace).
+   * A pin no routed day stops at still gets the inspector: the road trip has nothing to
+   * say about it, and the place does.
+   *
+   * One handler for the life of the map, reading the latest values through a ref. Leaflet
+   * rebuilds every marker whenever this identity moves, and the shell re-renders on every
+   * store write and on every sheet it opens, this handler's own included.
+   */
+  const latest = useRef({ planner, shell, stage })
+  latest.current = { planner, shell, stage }
+  const openStagePin = useCallback((placeId?: number) => {
+    const { planner: now, shell: chrome, stage: card } = latest.current
+    const stop = placeId == null ? null : firstStopOfPlace(card ? [card] : now.roadtripRoutes.days, placeId)
+    if (stop) chrome.openSheet('rtstop', { dayId: stop.ownerDayId, assignmentId: stop.assignmentId })
+    else now.handleMarkerClick(placeId)
+  }, [])
 
   /**
    * The pins, and they are not the same question on the two tabs.
@@ -131,10 +200,11 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
         route={stageMap ? stageMap.lines : planner.overviewActive ? planner.tripOverview.lines : planner.route}
         routeColors={stageMap ? stageMap.lineColors : planner.overviewActive ? planner.tripOverview.lineColors : undefined}
         accessLines={stageMap ? stageMap.accessLines : undefined}
-        // A hit somebody tapped in the search sheet, or the stations the fuel search is
-        // offering, take the camera; with nothing pending the stage frames itself.
+        // A hit somebody tapped in the search sheet, a stop shown from its sheet, or the
+        // stations the fuel search is offering take the camera while their day is on
+        // screen; with nothing pending the stage frames itself.
         focusPoints={stageMap
-          ? (planner.mapFocusPoints.length ? planner.mapFocusPoints : stageMap.focusPoints)
+          ? (focusPending ? planner.mapFocusPoints : stageMap.focusPoints)
           : planner.overviewActive ? planner.tripOverview.focusPoints : undefined}
         routeVias={onStage ? planner.roadtripMapVias : planner.routeVias}
         showTransitRoutes={onStage ? false : planner.transitRoutesShown}
@@ -144,7 +214,7 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
         selectedDayId={planner.selectedDayId}
         routeSegments={onStage ? undefined : planner.overviewActive ? planner.tripOverview.segments : planner.routeSegments}
         selectedPlaceId={planner.selectedPlaceId}
-        onMarkerClick={planner.handleMarkerClick}
+        onMarkerClick={onStage ? openStagePin : planner.handleMarkerClick}
         // Tap on empty map = deselect, same contract as desktop.
         onMapClick={planner.handleMapClick}
         // The chip rail names a day at all times on mobile, so a place dropped on

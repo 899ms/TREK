@@ -18,6 +18,7 @@ import { getNavigationTargets, openNavigationTarget } from '../../../../componen
 import { NavigationMenu } from '../../../../components/shared/NavigationMenu'
 import { formatDistance } from '../../../../utils/units'
 import { Eyebrow, displayTime } from '../sheets/MTripSheetUi'
+import { showStopOnMap } from './useMRoadtrip'
 import type { DistanceUnit } from '../../../../types'
 import type { RoadtripDay, ScheduleWarning } from '@trek/shared/roadtrip'
 
@@ -252,9 +253,11 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
     }
   }
 
+  // The camera rather than the place selection, for the reason the end-day switch above
+  // stays off it: the place inspector would come up over the map. `day` is the card the
+  // stop is drawn on, so a stop reached after a night drive shows on the stage that has it.
   const showOnMap = () => {
-    if (shell.rtView === 'list') shell.toggleRtView()
-    planner.setSelectedPlaceId(stop.placeId)
+    showStopOnMap(planner, shell, stop, day.dayId)
     shell.closeSheet()
   }
 

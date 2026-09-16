@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { destinationCount, roadtripRows, stageClocks, stageOf, upNextStop } from '../../../../components/Roadtrip/roadtripRowModel'
+import { destinationCount, roadtripRows, stageClocks, stageEnd, stageOf, upNextStop } from '../../../../components/Roadtrip/roadtripRowModel'
 import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
 import { isEffectivelyOffline, onNetworkModeChange } from '../../../../sync/networkMode'
 import type { RoadtripDay } from '@trek/shared/roadtrip'
-import type { TripPlanner } from '../MTripShell'
-import type { RoadtripRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import type { MTripShellApi, TripPlanner } from '../MTripShell'
+import type { RoadtripRow, StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 
 /** Minutes since midnight, local time. */
 const nowMinutes = (): number => {
@@ -21,6 +21,8 @@ export interface MRoadtripController {
   rows: RoadtripRow[]
   /** The head card's two figures, both taken from the arrival column the rows print. See stageClocks. */
   clocks: ReturnType<typeof stageClocks>
+  /** The stop the bar over the map names and opens, with the clock it shows. See stageEnd. */
+  end: StopRow | null
   stops: number
   /** True while the routing round is still working through the trip's days. */
   loading: boolean
@@ -60,6 +62,7 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
 
   const rows = useMemo(() => (stage ? roadtripRows(stage) : []), [stage])
   const clocks = useMemo(() => stageClocks(rows), [rows])
+  const end = useMemo(() => stageEnd(rows), [rows])
 
   // "Today" is the stage's own date, not the selected day's index: a trip can be
   // planned for next year, and a countdown on a day in March is noise.
@@ -73,6 +76,7 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
     stage,
     rows,
     clocks,
+    end,
     stops: stage ? destinationCount(stage) : 0,
     loading: roadtripRoutes.loading,
     empty: !roadtripRoutes.loading && roadtripRoutes.days.length === 0,
@@ -81,6 +85,32 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
     upNext: upNextStop(stage, minutes, isToday),
     isToday,
   }
+}
+
+/**
+ * Brings one stop of the drive into view on the map half, from wherever it was asked for.
+ *
+ * Through the camera and never through the planner's place selection: the place inspector
+ * opens off that selection, so selecting the place came up with the plan tab's card over
+ * the very map this was meant to show. The corridor search shows its hits the same way.
+ *
+ * `cardDayId` is the card the stop is DRAWN on, which after a night drive is not the day it
+ * is stored on. When that card is not the stage on screen it becomes the stage first, so the
+ * line around the stop the camera lands on is the stage the bar is about. With skipFit, as
+ * the day swipe does it: on the stage the camera follows focus points, and here the focus
+ * is the stop. The map area lets a focus go once the day moves off the one it arrived with,
+ * so the day is picked first, in the same tap, and the focus arrives together with it
+ * instead of being let go by it (see MMapArea).
+ */
+export function showStopOnMap(
+  planner: TripPlanner,
+  shell: MTripShellApi,
+  stop: { lat: number; lng: number },
+  cardDayId: number,
+): void {
+  if (planner.selectedDayId !== cardDayId) planner.handleSelectDay(cardDayId, true)
+  planner.focusRoadtripPoint(stop.lat, stop.lng)
+  if (shell.rtView === 'list') shell.toggleRtView()
 }
 
 /** The trip's own distance unit, for every figure the stage prints. */

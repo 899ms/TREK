@@ -198,6 +198,48 @@ export function stageClocks(rows: readonly RoadtripRow[]): { start: string | nul
 }
 
 /**
+ * The stop a stage ends on: the last one the chain draws, a service stop included.
+ *
+ * The map half names it in its bar and opens it on a tap, so the name, the clock beside it
+ * and the sheet the tap brings up all come off this one row and cannot name three different
+ * things. The clock used to be read off the schedule on its own, which found the automatic
+ * day end whenever the window closed after the last stop: a station reached at 12:40 sat
+ * beside 22:00, the moment the day ran out rather than anything that happens there.
+ *
+ * Null for a stage without a single stop, one drawn with nothing but its night markers.
+ * There is nothing for a tap to open then, and the bar says so by not being a button.
+ */
+export function stageEnd(rows: readonly RoadtripRow[]): StopRow | null {
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const row = rows[i]
+    if (row.kind === 'stop') return row
+  }
+  return null
+}
+
+/**
+ * The stop a place's pin stands for on the road trip map: its first visit in the days given.
+ *
+ * A pin is drawn once per place, while a place can be several stops, like the hotel a loop
+ * day leaves in the morning and comes back to at night, or a town the drive passes on two
+ * days. Over a stage the caller hands in that one card, so a pin opens the visit on the
+ * stage being looked at, however many days before it stop at the same place. Over the
+ * whole drive it hands in every routed day, and the first visit in day order is the one a
+ * traveller reading the drive from its start reaches first.
+ *
+ * An automatic night can sit on a place's position, but nobody chose to stop there, so it
+ * never answers. Null when none of the days stops at the place, which is a pin the road
+ * trip cannot explain and the caller hands to the plan's own place inspector instead.
+ */
+export function firstStopOfPlace(days: readonly RoadtripDay[], placeId: number): RoadtripStop | null {
+  for (const day of days) {
+    const stop = day.stops.find(s => !s.automaticNight && s.placeId === placeId)
+    if (stop) return stop
+  }
+  return null
+}
+
+/**
  * The next destination the plan still owes you, measured against the clock.
  *
  * Only for today: a countdown on a day in March is noise. `minutesUntil` goes

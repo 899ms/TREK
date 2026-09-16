@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
   destinationCount,
+  firstStopOfPlace,
   pickWarning,
   roadtripRows,
   stageClocks,
+  stageEnd,
   stageOf,
   upNextStop,
   type RoadtripRow,
@@ -12,7 +14,7 @@ import {
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
 import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-033
+// FE-RTROW-001 to FE-RTROW-037
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -391,5 +393,53 @@ describe('stageClocks', () => {
     // figures still name the first and the last clock the chain prints.
     const unsplit = timedDay(['18:30', '10:00'], [stop('Hotel', { dwellMinutes: 900 }), stop('Museum')])
     expect(stageClocks(roadtripRows(unsplit))).toEqual({ start: '18:30', arrive: '10:00' })
+  })
+})
+
+describe('stageEnd', () => {
+  it('FE-RTROW-034: names the last stop the chain draws with its own arrival, not the automatic day end after it', () => {
+    // The reported bar: Kyoto Station reached at 12:40 sat beside 22:00, where the window closed.
+    const d = day([stop('Bremen'), stop('Aral', { stopType: 'fuel' }), stop('Kyoto Station'), night()], {
+      schedule: { entries: [entry('09:00'), entry('10:30'), entry('12:40'), entry('22:00')], warnings: [] },
+    })
+    const end = stageEnd(roadtripRows(d))
+    expect(end?.stop.name).toBe('Kyoto Station')
+    expect(end?.time).toBe('12:40')
+
+    // A service stop is still a stop the drive ends at, so it is the one named.
+    const fuelLast = timedDay(['09:00', '11:00'], [stop('A'), stop('Aral', { stopType: 'fuel' })])
+    expect(stageEnd(roadtripRows(fuelLast))?.stop.name).toBe('Aral')
+  })
+
+  it('FE-RTROW-035: a stage drawn with nothing but its night markers, and no rows at all, end nowhere', () => {
+    expect(stageEnd(roadtripRows(day([night('start'), night('end')])))).toBeNull()
+    expect(stageEnd([])).toBeNull()
+  })
+})
+
+describe('firstStopOfPlace', () => {
+  it('FE-RTROW-036: on one card, a place visited twice answers with its first visit and a night on it never does', () => {
+    // A loop day: out of the hotel in the morning, back to it at night.
+    const loop = day([
+      stop('Nacht', { placeId: 300, assignmentId: 90, automaticNight: { phase: 'start', fromDayNumber: 1 } }),
+      stop('Hotel', { placeId: 300, assignmentId: 1 }),
+      stop('Museum', { placeId: 301, assignmentId: 2 }),
+      stop('Hotel', { placeId: 300, assignmentId: 3 }),
+    ])
+    expect(firstStopOfPlace([loop], 300)?.assignmentId).toBe(1)
+    expect(firstStopOfPlace([loop], 301)?.assignmentId).toBe(2)
+  })
+
+  it('FE-RTROW-037: across days it keeps day order, a card handed alone ignores the days before it, and no stop gives null', () => {
+    const monday = day([stop('Town', { placeId: 301, assignmentId: 11 })], { dayId: 7 })
+    const tuesday = day([stop('Town', { placeId: 301, assignmentId: 21 }), stop('Lake', { placeId: 302, assignmentId: 22 })], { dayId: 8 })
+    expect(firstStopOfPlace([monday, tuesday], 301)?.assignmentId).toBe(11)
+    expect(firstStopOfPlace([tuesday], 301)?.assignmentId).toBe(21)
+    expect(firstStopOfPlace([monday, tuesday], 302)?.assignmentId).toBe(22)
+
+    expect(firstStopOfPlace([monday, tuesday], 999)).toBeNull()
+    expect(firstStopOfPlace([], 301)).toBeNull()
+    // Only an automatic night sits on this position, which is not a stop anybody chose.
+    expect(firstStopOfPlace([day([stop('Nacht', { placeId: 303, automaticNight: { phase: 'end', fromDayNumber: 1 } })])], 303)).toBeNull()
   })
 })

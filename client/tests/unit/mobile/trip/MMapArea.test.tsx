@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { render, screen } from '../../../helpers/render'
+import { act, render, screen } from '../../../helpers/render'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { buildPlace } from '../../../helpers/factories'
 import type { AccessSpur, RoadtripDay } from '@trek/shared/roadtrip'
@@ -7,8 +7,14 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { CompassMap } from '../../../../src/components/Map/MapCompassPill'
 import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../src/components/Map/MapLayerSwitcher'
 import { useSettingsStore } from '../../../../src/store/settingsStore'
+import { useTripStore } from '../../../../src/store/tripStore'
+import { seedStore } from '../../../helpers/store'
+import type { Place } from '../../../../src/types'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-018
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-025
+//
+// The stage's pins come out of the trip store rather than the planner's map list, so the
+// stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
 
 const mocks = vi.hoisted(() => ({
   poi: {} as Record<string, unknown>,
@@ -84,6 +90,7 @@ function stageDay(): RoadtripDay {
 function stagePlanner(selectedDayId: number | null): TripPlanner {
   const base = buildPlanner()
   const spur: AccessSpur = { line: [[53.87, 10.69], [53.871, 10.692]], meters: 180, stopKey: '53.87000,10.69000,,' }
+  seedStore(useTripStore, { places: [buildPlace({ id: 11 }), buildPlace({ id: 12 }), buildPlace({ id: 99 })] })
   return buildPlanner({
     selectedDayId,
     mapPlaces: [buildPlace({ id: 11 }), buildPlace({ id: 12 }), buildPlace({ id: 99 })],
@@ -99,6 +106,29 @@ function stagePlanner(selectedDayId: number | null): TripPlanner {
   } as unknown as Partial<TripPlanner>)
 }
 
+/**
+ * Two routed days. Lübeck is passed on the day before the stage, and the stage itself is a
+ * loop that leaves Hamburg in the morning and comes back to it at night.
+ */
+function drivePlanner(selectedDayId: number | null, over: Partial<TripPlanner> = {}): TripPlanner {
+  const base = stagePlanner(selectedDayId)
+  const stage = stageDay()
+  const [hamburg, luebeck] = stage.stops
+  const before = { ...stage, dayId: 2, dayNumber: 1, stops: [{ ...luebeck, assignmentId: 21, ownerDayId: 2, ownerIndex: 0 }] }
+  const loop = { ...stage, dayNumber: 2, stops: [hamburg, luebeck, { ...hamburg, assignmentId: 33, ownerIndex: 2 }] }
+  return {
+    ...base,
+    roadtripRoutes: { ...base.roadtripRoutes, days: [before, loop], lineDays: [2] },
+    ...over,
+  } as TripPlanner
+}
+
+/** The shell with the road trip map in front. */
+const stageShell = () => buildShell({ view: 'map', mapFront: true, trTab: 'roadtrip', rtView: 'map' })
+
+/** The pin handler the area last handed the renderer. */
+const tapPin = (placeId?: number) => (mocks.props.onMarkerClick as (id?: number) => void)(placeId)
+
 /** What the area handed the renderer that a fresh copy would make it draw again. */
 const DRAWN = ['places', 'route', 'routeColors', 'accessLines', 'focusPoints'] as const
 
@@ -110,6 +140,7 @@ beforeEach(() => {
     moved: false, toggle: vi.fn(), searchArea: vi.fn(), onViewportChange: vi.fn(),
   }
   useSettingsStore.setState(s => ({ settings: { ...s.settings, map_poi_pill_enabled: true } }))
+  seedStore(useTripStore, { places: [], placesFilter: 'all', placesCategoryFilter: new Set<string>() })
 })
 
 describe('MMapArea', () => {
@@ -309,12 +340,13 @@ describe('MMapArea', () => {
     rerender(<MMapArea planner={planner} shell={shell} />)
     expect(mocks.props.routeColors).toHaveLength(1)
 
+    // The store is where the stage reads its places from, and a store write re-renders the area.
     const renamed = buildPlace({ id: 12, name: 'Travemünde' })
-    const edited = { ...planner, mapPlaces: [planner.mapPlaces[0], renamed, planner.mapPlaces[2]] }
-    rerender(<MMapArea planner={edited} shell={shell} />)
+    const stored = useTripStore.getState().places
+    act(() => { useTripStore.setState({ places: [stored[0], renamed, stored[2]] }) })
     expect(mocks.props.places).toContain(renamed)
 
-    const allDays = { ...edited, selectedDayId: null }
+    const allDays = { ...planner, selectedDayId: null }
     rerender(<MMapArea planner={allDays} shell={shell} />)
     expect(mocks.props.places).toBe(allDays.roadtripMapPlaces)
     expect(mocks.props.focusPoints).toEqual([])
@@ -324,5 +356,138 @@ describe('MMapArea', () => {
     expect(mocks.props.accessLines).toBeUndefined()
     expect(mocks.props.focusPoints).toBeUndefined()
     expect(mocks.props.places).toBe(allDays.mapPlaces)
+  })
+
+  it('FE-MOB-MAPAREA-019: a pin on the stage opens its stop on this card, never the place inspector', () => {
+    const planner = drivePlanner(3)
+    const shell = stageShell()
+    render(<MMapArea planner={planner} shell={shell} />)
+
+    // Lübeck is also a stop the day before; the stage on screen is the one it opens on.
+    tapPin(12)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 3, assignmentId: 32 })
+    // Hamburg is left in the morning and come back to at night: the pin opens the first visit.
+    tapPin(11)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 3, assignmentId: 31 })
+
+    // The planner's selection is what the place inspector opens off, so it is never moved.
+    expect(planner.handleMarkerClick).not.toHaveBeenCalled()
+    expect(planner.setSelectedPlaceId).not.toHaveBeenCalled()
+    expect(planner.selectAssignment).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-MAPAREA-020: over the whole drive a pin opens its first routed visit, and a place no day stops at gets the inspector', () => {
+    const planner = drivePlanner(null)
+    const shell = stageShell()
+    render(<MMapArea planner={planner} shell={shell} />)
+
+    tapPin(12)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 2, assignmentId: 21 })
+    tapPin(11)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 3, assignmentId: 31 })
+
+    tapPin(99)
+    expect(planner.handleMarkerClick).toHaveBeenCalledWith(99)
+    expect(shell.openSheet).toHaveBeenCalledTimes(2)
+  })
+
+  it('FE-MOB-MAPAREA-021: a picked day with no stage to show searches the whole drive, and falls back the same way', () => {
+    // A quiet day the routing round has no card for.
+    const quiet = drivePlanner(7)
+    const shell = stageShell()
+    const { unmount } = render(<MMapArea planner={quiet} shell={shell} />)
+    tapPin(12)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 2, assignmentId: 21 })
+    tapPin(99)
+    expect(quiet.handleMarkerClick).toHaveBeenCalledWith(99)
+    unmount()
+
+    // Still routing: a day is picked, nothing has come back yet, and the inspector is all there is.
+    const base = drivePlanner(3)
+    const routing = { ...base, roadtripRoutes: { ...base.roadtripRoutes, days: [], loading: true } } as TripPlanner
+    const waiting = stageShell()
+    render(<MMapArea planner={routing} shell={waiting} />)
+    tapPin(11)
+    expect(routing.handleMarkerClick).toHaveBeenCalledWith(11)
+    expect(waiting.openSheet).not.toHaveBeenCalled()
+    // A handler called without a place clears the way the planner's own does.
+    tapPin(undefined)
+    expect(routing.handleMarkerClick).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('FE-MOB-MAPAREA-022: the plan tab keeps the planner\'s own marker door, map tap and selection', () => {
+    const planner = drivePlanner(3, { selectedPlaceId: 12 })
+    const shell = buildShell({ view: 'map', mapFront: true, trTab: 'plan' })
+    render(<MMapArea planner={planner} shell={shell} />)
+
+    expect(mocks.props.onMarkerClick).toBe(planner.handleMarkerClick)
+    expect(mocks.props.onMapClick).toBe(planner.handleMapClick)
+    expect(mocks.props.selectedPlaceId).toBe(12)
+
+    tapPin(12)
+    expect(planner.handleMarkerClick).toHaveBeenCalledWith(12)
+    expect(shell.openSheet).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-MAPAREA-023: the stage\'s pin handler keeps its identity across renders and reads the latest stage', () => {
+    const planner = drivePlanner(3)
+    const shell = stageShell()
+    const { rerender } = render(<MMapArea planner={planner} shell={shell} />)
+    const first = mocks.props.onMarkerClick
+
+    // New planner and shell objects, the way the shell hands them over on every store write.
+    // Leaflet rebuilds every marker when this identity moves.
+    rerender(<MMapArea planner={{ ...planner }} shell={stageShell()} />)
+    expect(mocks.props.onMarkerClick).toBe(first)
+
+    // Swiped to the day before: the same handler now answers for that stage and that shell.
+    const next = stageShell()
+    rerender(<MMapArea planner={{ ...planner, selectedDayId: 2 }} shell={next} />)
+    expect(mocks.props.onMarkerClick).toBe(first)
+    tapPin(12)
+    expect(next.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 2, assignmentId: 21 })
+    expect(shell.openSheet).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-MAPAREA-024: stage pins are the stops of its chain, whatever the plan tab\'s declutter and filters hide', () => {
+    // A pump hidden from the day lists, and a category filter set in the places browser.
+    const pump = buildPlace({ id: 12, stop_type: 'fuel', category_id: 3 } as Partial<Place>)
+    seedStore(useTripStore, { placesFilter: 'unplanned', placesCategoryFilter: new Set(['9']) })
+    const planner = stagePlanner(3)
+    seedStore(useTripStore, { places: [buildPlace({ id: 11, category_id: 4 }), pump, buildPlace({ id: 99 })] })
+    // The plan tab's list after "all days" twice and a chip tap: its declutter still names
+    // the day before, so it carries none of this stage's places.
+    const decluttered = { ...planner, mapPlaces: [buildPlace({ id: 99 })] } as TripPlanner
+    render(<MMapArea planner={decluttered} shell={stageShell()} />)
+
+    expect((mocks.props.places as Place[]).map(p => p.id)).toEqual([11, 12])
+
+    // A place without a position has nowhere to stand, on the stage as anywhere else.
+    act(() => {
+      useTripStore.setState({ places: [buildPlace({ id: 11 }), { ...pump, lat: null, lng: null } as unknown as Place] })
+    })
+    expect((mocks.props.places as Place[]).map(p => p.id)).toEqual([11])
+  })
+
+  it('FE-MOB-MAPAREA-025: a shown point holds the camera on its own day only, and a day change hands the frame back', () => {
+    const planner = drivePlanner(3)
+    const shell = stageShell()
+    const point: [number, number][] = [[50, 8]]
+    const { rerender } = render(<MMapArea planner={{ ...planner, mapFocusPoints: point }} shell={shell} />)
+    expect(mocks.props.focusPoints).toBe(point)
+
+    // The planner keeps the point until its next routing round. The swipe frames its stage anyway.
+    rerender(<MMapArea planner={{ ...planner, selectedDayId: 2, mapFocusPoints: point }} shell={shell} />)
+    expect(mocks.props.focusPoints).toEqual([[53.87, 10.69]])
+
+    // Coming back does not bring the old point back: the camera belongs to the stage now.
+    rerender(<MMapArea planner={{ ...planner, selectedDayId: 3, mapFocusPoints: point }} shell={shell} />)
+    expect(mocks.props.focusPoints).not.toBe(point)
+    expect(mocks.props.focusPoints).toEqual(expect.arrayContaining([[53.55, 9.99], [53.87, 10.69]]))
+
+    // A new point arriving together with its day, as Show on map from another card does, is held.
+    const shown: [number, number][] = [[53.87, 10.69]]
+    rerender(<MMapArea planner={{ ...planner, selectedDayId: 2, mapFocusPoints: shown }} shell={shell} />)
+    expect(mocks.props.focusPoints).toBe(shown)
   })
 })

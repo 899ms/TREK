@@ -6,7 +6,7 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { Day, Place } from '../../../../src/types'
 import type { RoadtripDay, RoadtripRoutes, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-032
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-034
 
 // The preference store is a zustand slice keyed by user and trip; the tab only ever
 // reads two flags out of it, so the hook is the smaller seam.
@@ -363,15 +363,19 @@ describe('MRoadtripTab', () => {
       expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 1, assignmentId: 501 })
     })
 
-    it('FE-MOB-RTTAB-017: sends the next stop to the map half and switches to it', () => {
+    it('FE-MOB-RTTAB-017: shows the next stop on the map half by moving the camera, not the place selection', () => {
       const date = freezeAt(7, 0)
       const p = planner(today(date))
       const { shell } = renderTab(p)
 
       fireEvent.click(screen.getByLabelText('mobileTrip.showOnMap'))
 
-      expect(p.setSelectedPlaceId).toHaveBeenCalledWith(101)
+      expect(p.focusRoadtripPoint).toHaveBeenCalledWith(35.36, 138.73)
       expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
+      // The place inspector opens off the selection and would come up over the stage.
+      expect(p.setSelectedPlaceId).not.toHaveBeenCalled()
+      // Up next is always a stop of the stage on screen, so the day stays where it is.
+      expect(p.handleSelectDay).not.toHaveBeenCalled()
     })
 
     it('FE-MOB-RTTAB-018: leaves the navigate link dead when the stop has no place row behind it', () => {
@@ -426,12 +430,15 @@ describe('MRoadtripTab', () => {
       expect(screen.queryByText('roadtrip.window.stop')).toBeNull()
     })
 
-    it('FE-MOB-RTTAB-023: names the last stop of the day, its count, its arrival and its distance', () => {
+    it('FE-MOB-RTTAB-023: names the last stop of the day, its count, that stop\'s own arrival and the distance', () => {
       renderTab(planner(), mapShell())
 
       const bar = screen.getByRole('button', { name: /Kyoto Station/ })
       expect(within(bar).getByText('Kyoto Station')).toBeInTheDocument()
-      expect(within(bar).getByText('roadtrip.day.stopCount:2 · 22:00')).toBeInTheDocument()
+      // 12:40 is when Kyoto Station is reached. The bar used to print 22:00, the automatic
+      // day end after it, which is where the window closed and not a clock of the stop named.
+      expect(within(bar).getByText('roadtrip.day.stopCount:2 · 12:40')).toBeInTheDocument()
+      expect(within(bar).queryByText(/22:00/)).toBeNull()
       expect(within(bar).getByText('412 km')).toBeInTheDocument()
     })
 
@@ -447,12 +454,55 @@ describe('MRoadtripTab', () => {
       expect(within(bar).getByText('roadtrip.leg.pending')).toBeInTheDocument()
     })
 
-    it('FE-MOB-RTTAB-025: switches back to the chain from the bar', () => {
+    it('FE-MOB-RTTAB-025: opens the stop the bar names, the sheet its row in the chain opens', () => {
       const { shell } = renderTab(planner(), mapShell())
 
       fireEvent.click(screen.getByRole('button', { name: /Kyoto Station/ }))
 
-      expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
+      expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 2, assignmentId: 503 })
+      // The bar reads as a place; the header's list switch is the way back to the chain.
+      expect(shell.toggleRtView).not.toHaveBeenCalled()
+    })
+
+    it('FE-MOB-RTTAB-033: a stage drawn with nothing but its night marker names no stop and is not a button', () => {
+      const nightOnly = stage({
+        stops: [stage().stops[3]],
+        legs: [],
+        legVias: [],
+        spills: [],
+        dryPoints: [],
+        driveWarnings: [],
+        schedule: { entries: [{ arrival: '22:00', departure: null, anchored: false, dayOffset: 0 }], warnings: [] },
+      } as unknown as Partial<RoadtripDay>)
+      const { shell } = renderTab(planner({ roadtripRoutes: routes({ days: [nightOnly] }) }), mapShell())
+
+      const title = screen.getByText('roadtrip.stop.none')
+      // Nothing for a tap to open, so a plain block rather than a dead button, and the night
+      // marker's clock is not a stop's arrival either.
+      expect(title.closest('button')).toBeNull()
+      expect(screen.getByText('roadtrip.day.stopCount:0')).toBeInTheDocument()
+      expect(screen.queryByText(/22:00/)).toBeNull()
+      fireEvent.click(title)
+      expect(shell.openSheet).not.toHaveBeenCalled()
+      expect(shell.toggleRtView).not.toHaveBeenCalled()
+    })
+
+    it('FE-MOB-RTTAB-034: a stage that ends on a stop reached after midnight opens it on the day it is stored on', () => {
+      // Only the spilled stop is left on the card: it is drawn here and stored on day 1.
+      const spilledOnly = stage({
+        stops: [stage().stops[0]],
+        legs: [],
+        legVias: [],
+        dryPoints: [],
+        driveWarnings: [],
+        schedule: { entries: [{ arrival: '00:40', departure: '01:25', anchored: false, dayOffset: 0 }], warnings: [] },
+      } as unknown as Partial<RoadtripDay>)
+      const { shell } = renderTab(planner({ roadtripRoutes: routes({ days: [spilledOnly] }) }), mapShell())
+
+      const bar = screen.getByRole('button', { name: /Fuji Viewpoint/ })
+      expect(within(bar).getByText('roadtrip.day.stopCount:1 · 00:40')).toBeInTheDocument()
+      fireEvent.click(bar)
+      expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 1, assignmentId: 501 })
     })
 
     it('FE-MOB-RTTAB-026: falls back to the whole drive when no day is picked, and offers nothing to tap', () => {

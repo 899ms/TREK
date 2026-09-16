@@ -8,7 +8,7 @@ import { useTripStore } from '../../../../src/store/tripStore'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-RTSTOP-001 to FE-MOB-RTSTOP-034
+// FE-MOB-RTSTOP-001 to FE-MOB-RTSTOP-035
 //
 // The sheet renders inside the real TranslationProvider, so the copy is asserted
 // in English. `planner.t` from the fixture is never consulted here.
@@ -247,12 +247,16 @@ describe('MRtStopSheet', () => {
     expect(screen.queryByText('End the day here')).not.toBeInTheDocument()
   })
 
-  it('FE-MOB-RTSTOP-015: showing the stop on the map flips the stage over and selects it', () => {
-    const { planner, shell } = renderSheet({}, { rtView: 'list' })
+  it('FE-MOB-RTSTOP-015: showing the stop on the map flips the stage over and brings the stop into view', () => {
+    const { planner, shell } = renderSheet({ selectedDayId: 11 }, { rtView: 'list' })
     fireEvent.click(screen.getByRole('button', { name: 'Show on map' }))
     expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
-    expect(planner.setSelectedPlaceId).toHaveBeenCalledWith(203)
+    expect(planner.focusRoadtripPoint).toHaveBeenCalledWith(BREMEN.lat, BREMEN.lng)
     expect(shell.closeSheet).toHaveBeenCalledTimes(1)
+    // Not the place selection: the place inspector opens off it and would cover the map.
+    expect(planner.setSelectedPlaceId).not.toHaveBeenCalled()
+    // Already the stage on screen, so the day stays put.
+    expect(planner.handleSelectDay).not.toHaveBeenCalled()
   })
 
   it('FE-MOB-RTSTOP-016: leaves the stage alone when the map is already the front layer', () => {
@@ -453,5 +457,25 @@ describe('MRtStopSheet', () => {
     renderSheet({}, {}, [])
     expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Navigation' })).toBeInTheDocument()
+  })
+
+  it('FE-MOB-RTSTOP-035: a stop drawn on another card makes that card the stage before the camera moves', () => {
+    // Kassel is stored on day 11 and drawn on day 12 after a night drive, while day 11 is on screen.
+    const { planner, shell } = renderSheet(
+      { selectedDayId: 11 },
+      { rtView: 'map', sheet: { id: 'rtstop', payload: { dayId: 11, assignmentId: 104 } } },
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Show on map' }))
+
+    // The card, not the stored day, and without a refit of its own: the stop is the frame.
+    expect(planner.handleSelectDay).toHaveBeenCalledWith(12, true)
+    expect(planner.focusRoadtripPoint).toHaveBeenCalledWith(KASSEL.lat, KASSEL.lng)
+    // The day first, so the map holds the point to the day it arrives with.
+    const selectDay = vi.mocked(planner.handleSelectDay).mock.invocationCallOrder[0]
+    const focus = vi.mocked(planner.focusRoadtripPoint).mock.invocationCallOrder[0]
+    expect(selectDay).toBeLessThan(focus)
+    expect(shell.toggleRtView).not.toHaveBeenCalled()
+    expect(shell.closeSheet).toHaveBeenCalledTimes(1)
+    expect(planner.setSelectedPlaceId).not.toHaveBeenCalled()
   })
 })
