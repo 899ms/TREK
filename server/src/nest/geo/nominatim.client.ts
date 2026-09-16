@@ -1,4 +1,5 @@
 import { UA } from '../maps/maps.helpers';
+import { readEnv } from '../../app-config';
 
 /**
  * The one Nominatim client.
@@ -21,7 +22,6 @@ import { UA } from '../maps/maps.helpers';
  * header, not the weaker one.
  */
 
-const BASE = 'https://nominatim.openstreetmap.org';
 const MIN_INTERVAL_MS = 1100;
 
 let lastCall = 0;
@@ -171,7 +171,7 @@ export async function nominatimFetch(
 ): Promise<Response> {
   await throttle(opts.lane ?? 'interactive');
   const signal = opts.signal ?? (opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined);
-  return fetch(`${BASE}/${path}?${params.toString()}`, {
+  return fetch(`${readEnv().integrations.nominatimUrl}/${path}?${params.toString()}`, {
     headers: { 'User-Agent': UA },
     ...(signal ? { signal } : {}),
   });

@@ -265,6 +265,7 @@ export function deriveIntegrations(raw: RawEnv) {
   return {
     unsplashAccessKey: raw.UNSPLASH_ACCESS_KEY?.trim(),
     transitApiBase: stripTrailingSlashes(raw.TRANSIT_API_URL || 'https://api.transitous.org'),
+    nominatimUrl: stripTrailingSlashes(raw.NOMINATIM_URL || 'https://nominatim.openstreetmap.org'),
     overpassUrl: raw.OVERPASS_URL,
     // Longer than the `[timeout:20]` the query itself carries, or we abort an answer the
     // mirror was still allowed to be working on. See OVERPASS_QUERY_TIMEOUT_S.

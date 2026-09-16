@@ -108,6 +108,7 @@ export const envSchema = z.object({
   // Integrations
   UNSPLASH_ACCESS_KEY: anyString,
   TRANSIT_API_URL: url,
+  NOMINATIM_URL: url,
   // OVERPASS_URL accepts a comma-separated endpoint list and silently drops
   // non-http(s) entries today — left unvalidated to keep that behavior.
   OVERPASS_URL: anyString,

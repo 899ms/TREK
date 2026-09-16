@@ -28,6 +28,7 @@ import { UA } from '../../../src/nest/maps/maps.helpers';
 const fetchMock = vi.fn();
 
 beforeEach(() => {
+  vi.stubEnv('NOMINATIM_URL', undefined);
   vi.useFakeTimers();
   // tests/setup.ts zeroes this for every other suite. This one is about the
   // throttle, so it runs against the interval the real service publishes.
@@ -43,6 +44,7 @@ afterEach(() => {
   setGeoThrottleInterval(0);
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 /** Runs `fn`, draining fake timers until it settles. */
@@ -53,6 +55,26 @@ async function drain<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 describe('nominatimFetch', () => {
+  it('uses the public endpoint for an empty override', async () => {
+    vi.stubEnv('NOMINATIM_URL', '');
+    await drain(() => nominatimFetch('search', new URLSearchParams({ q: 'Berlin' })));
+    expect(fetchMock.mock.calls[0][0]).toBe('https://nominatim.openstreetmap.org/search?q=Berlin');
+  });
+
+  it.each(['search', 'reverse', 'lookup'] as const)('routes %s to the configured path prefix', async (path) => {
+    vi.stubEnv('NOMINATIM_URL', 'http://nominatim:8080/geocoding///');
+    const params = new URLSearchParams({ q: 'New York & Berlin' });
+    await drain(() => nominatimFetch(path, params));
+    expect(fetchMock.mock.calls[0][0]).toBe(`http://nominatim:8080/geocoding/${path}?q=New+York+%26+Berlin`);
+    expect(fetchMock.mock.calls[0][1].headers['User-Agent']).toBe(UA);
+  });
+
+  it('supports an HTTPS override without a trailing slash', async () => {
+    vi.stubEnv('NOMINATIM_URL', 'https://geo.example.com');
+    await drain(() => nominatimFetch('lookup', new URLSearchParams({ osm_ids: 'N1' })));
+    expect(fetchMock.mock.calls[0][0]).toBe('https://geo.example.com/lookup?osm_ids=N1');
+  });
+
   it('GEO-001: identifies the instance on every request', async () => {
     await drain(() => nominatimFetch('search', new URLSearchParams({ q: 'Berlin' })));
 
