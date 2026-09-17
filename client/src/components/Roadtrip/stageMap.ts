@@ -59,8 +59,13 @@ export function stageMapData(
   // was the longest thing on screen. The desktop has the same connection, but it has it
   // beside every other day, which is the view the setting exists for; here that view is
   // the "all days" one, a tap away on the same map.
-  const keep: number[] = []
-  routes.lineDays.forEach((n, i) => { if (n === stage.dayNumber && !routes.lineJoins?.[i]) keep.push(i) })
+  const ofDay: number[] = []
+  routes.lineDays.forEach((n, i) => { if (n === stage.dayNumber) ofDay.push(i) })
+  const own = ofDay.filter(i => !routes.lineJoins?.[i])
+  // A day that is nothing but driving — no stop of its own, night to night — has only the
+  // connection to show. Dropping it there would leave the map blank on the very day the
+  // line IS the day, so the filter gives way rather than emptying the screen.
+  const keep = own.length ? own : ofDay
   const placeIds = stagePlaceIds(stage)
 
   return {

@@ -135,6 +135,14 @@ describe('stageMapData with a stage', () => {
     expect(stageMapData(withJoin, stage, true).lines).toEqual([LINES[1]])
   })
 
+  it('FE-RTSTAGE-020: a day that is nothing but driving keeps its connection rather than going blank', () => {
+    // Night to night, no stop of its own: the connection is the only line the day has, and
+    // the line IS the day. Better a map that shows the drive than an empty one.
+    const onlyJoin = routes({ lineDays: [1, 2, 3, 3], lineJoins: [false, true, false, false] })
+
+    expect(stageMapData(onlyJoin, stage, true).lines).toEqual([LINES[1]])
+  })
+
   it('FE-RTSTAGE-017: the colours still line up once a join has been dropped', () => {
     const data = stageMapData(routes({ lineJoins: [false, false, true, false] }), stage, true)
 

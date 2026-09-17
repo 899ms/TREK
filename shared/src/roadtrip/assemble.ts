@@ -149,7 +149,12 @@ export function assembleRoadtrip({
       if (leg.line.length > 1) {
         lines.push(leg.line);
         lineDays.push(chain.dayNumber);
-        lineJoins.push(false);
+        // A day that opens on an automatic night opens where the last one stopped, and its
+        // first leg is the drive on from there. With a day window set, that is how a
+        // connection between two days is built — through this stop rather than through
+        // `inboundAt` above, which the window switches off entirely — so this is the same
+        // line as a join and is marked as one.
+        lineJoins.push(chain.stops[i]?.automaticNight?.phase === 'start');
       }
       segments.push(leg.seg);
     }
