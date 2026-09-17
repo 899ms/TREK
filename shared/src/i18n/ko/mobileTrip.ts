@@ -64,6 +64,8 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': '구간 시작부터',
   'mobileTrip.rtNoneAhead': '앞쪽 도로에는 아무것도 없습니다. 구간 전체로 찾아보세요.',
   'mobileTrip.rtNoneOnStage': '이 구간에는 그런 곳이 없습니다.',
-  'mobileTrip.rtTruncated': '{count}개 구간은 한 번의 답에 담기지 않았습니다. 종류를 줄이면 나머지도 볼 수 있습니다.',
+  'mobileTrip.rtTruncated.one': '1개 구간은 한 번의 답에 담기지 않았습니다. 종류를 줄이면 나머지도 볼 수 있습니다.',
+  'mobileTrip.rtTruncated.other':
+    '{count}개 구간은 한 번의 답에 담기지 않았습니다. 종류를 줄이면 나머지도 볼 수 있습니다.',
 };
 export default mobileTrip;

@@ -64,6 +64,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': '区間の始まりから',
   'mobileTrip.rtNoneAhead': 'この先の道沿いには何もありません。区間全体で試してください。',
   'mobileTrip.rtNoneOnStage': 'この区間沿いにはそうした場所はありません。',
-  'mobileTrip.rtTruncated': '{count} 区間は1回の答えに収まりきりませんでした。種類を減らすと残りも見られます。',
+  'mobileTrip.rtTruncated.one': '1 区間は1回の答えに収まりきりませんでした。種類を減らすと残りも見られます。',
+  'mobileTrip.rtTruncated.other': '{count} 区間は1回の答えに収まりきりませんでした。種類を減らすと残りも見られます。',
 };
 export default mobileTrip;

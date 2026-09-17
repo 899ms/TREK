@@ -65,7 +65,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Etabın başından itibaren',
   'mobileTrip.rtNoneAhead': 'İleride yol üzerinde bir şey yok. Tüm etabı deneyin.',
   'mobileTrip.rtNoneOnStage': 'Bu etap boyunca bu türden bir şey yok.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    '1 kesimde tek bir yanıta sığandan fazlası vardı. Geri kalanı görmek için daha az tür seçin.',
+  'mobileTrip.rtTruncated.other':
     '{count} kesimde tek bir yanıta sığandan fazlası vardı. Geri kalanı görmek için daha az tür seçin.',
 };
 export default mobileTrip;

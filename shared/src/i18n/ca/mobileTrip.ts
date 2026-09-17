@@ -67,7 +67,8 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Des de l’inici de l’etapa',
   'mobileTrip.rtNoneAhead': 'No hi ha res a la carretera que tens al davant. Prova tota l’etapa.',
   'mobileTrip.rtNoneOnStage': 'No hi ha res d’aquest tipus al llarg d’aquesta etapa.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one': '1 tram tenia més del que cap en una resposta. Tria menys tipus per veure la resta.',
+  'mobileTrip.rtTruncated.other':
     '{count} trams tenien més del que cap en una resposta. Tria menys tipus per veure la resta.',
 };
 

@@ -65,7 +65,8 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'From the start of the stage',
   'mobileTrip.rtNoneAhead': 'Nothing on the road ahead. Try the whole stage.',
   'mobileTrip.rtNoneOnStage': 'Nothing of that kind along this stage.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one': '1 stretch had more than fits in one answer. Pick fewer kinds to see the rest.',
+  'mobileTrip.rtTruncated.other':
     '{count} stretches had more than fits in one answer. Pick fewer kinds to see the rest.',
 };
 export default mobileTrip;

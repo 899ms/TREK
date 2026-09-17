@@ -65,7 +65,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Från etappens början',
   'mobileTrip.rtNoneAhead': 'Inget på vägen framför dig. Prova hela etappen.',
   'mobileTrip.rtNoneOnStage': 'Inget sådant längs den här etappen.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    '1 sträcka hade mer än vad som får plats i ett svar. Välj färre sorter för att se resten.',
+  'mobileTrip.rtTruncated.other':
     '{count} sträckor hade mer än vad som får plats i ett svar. Välj färre sorter för att se resten.',
 };
 export default mobileTrip;
