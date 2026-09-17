@@ -105,12 +105,22 @@ describe('clockOf / timeRange', () => {
   })
 
   it('FE-DAWARICH-SUGMODEL-006: a range when both ends read, the arrival alone when the end does not', () => {
-    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00')).toBe('10:15 – 12:40')
-    expect(timeRange('2026-09-10T10:15:00+02:00', 'nonsense')).toBe('10:15')
+    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00', false)).toBe('10:15 – 12:40')
+    expect(timeRange('2026-09-10T10:15:00+02:00', 'nonsense', false)).toBe('10:15')
   })
 
   it('FE-DAWARICH-SUGMODEL-007: no arrival, no range', () => {
-    expect(timeRange('nonsense', '2026-09-10T12:40:00+02:00')).toBe('')
+    expect(timeRange('nonsense', '2026-09-10T12:40:00+02:00', false)).toBe('')
+  })
+
+  it('FE-DAWARICH-SUGMODEL-012: a twelve-hour clock gets twelve-hour times, both ends of the range', () => {
+    // These were cut out of the timestamp and printed as they stood, so a traveller on a
+    // 12-hour clock read every Dawarich time in 24-hour while the rest of the app obeyed
+    // the setting.
+    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00', true)).toBe('10:15 AM – 12:40 PM')
+    expect(timeRange('2026-09-10T14:05:00+02:00', '2026-09-10T23:00:00+02:00', true)).toBe('2:05 PM – 11:00 PM')
+    // Midnight is 12 AM, not 0 AM, and noon is 12 PM.
+    expect(timeRange('2026-09-10T00:30:00+02:00', '2026-09-10T12:00:00+02:00', true)).toBe('12:30 AM – 12:00 PM')
   })
 })
 

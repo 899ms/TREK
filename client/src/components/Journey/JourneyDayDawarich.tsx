@@ -4,7 +4,8 @@ import type { DawarichSuggestion, DawarichSuggestionTarget } from '@trek/shared'
 import { useTranslation } from '../../i18n'
 import DawarichIcon from '../shared/DawarichIcon'
 import { SuggestionRow } from '../Dawarich/DawarichSuggestionsPanel'
-import { clockOf } from '../Dawarich/dawarichSuggestionModel'
+import { timeRange } from '../Dawarich/dawarichSuggestionModel'
+import { useSettingsStore } from '../../store/settingsStore'
 
 /**
  * The stays Dawarich recorded on ONE day of the journal, folded into that day.
@@ -36,15 +37,15 @@ export default function JourneyDayDawarich({
   onDismiss: (suggestion: DawarichSuggestion) => void
 }): React.ReactElement | null {
   const { t } = useTranslation()
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
   const [open, setOpen] = useState(false)
 
   if (suggestions.length === 0) return null
 
   // From the first arrival to the last departure: what part of the day this covers, in
-  // one line, so the row says something even while it is shut.
-  const from = clockOf(suggestions[0]!.startedAt)
-  const to = clockOf(suggestions[suggestions.length - 1]!.endedAt)
-  const span = from && to ? `${from} – ${to}` : from
+  // one line, so the row says something even while it is shut. Through the same formatter
+  // the rows use, so the summary and the stays under it cannot disagree about the clock.
+  const span = timeRange(suggestions[0]!.startedAt, suggestions[suggestions.length - 1]!.endedAt, is12h)
 
   return (
     <div className="rounded-2xl border border-edge bg-surface-secondary overflow-hidden">

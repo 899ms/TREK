@@ -4,6 +4,7 @@ import type { DawarichAccept, DawarichSuggestion, DawarichSuggestionTarget } fro
 import { useTranslation } from '../../i18n'
 import { useDawarichSuggestions } from '../../hooks/useDawarichSuggestions'
 import { useTripStore } from '../../store/tripStore'
+import { useSettingsStore } from '../../store/settingsStore'
 import { useIsPhone } from '../../mobile/useIsPhone'
 import { relativeTime } from '../../utils/relativeTime'
 import { Tooltip } from '../shared/Tooltip'
@@ -309,6 +310,9 @@ export function SuggestionRow({
   onRestore?: () => void
 }): React.ReactElement {
   const { t, locale } = useTranslation()
+  // The traveller's own clock: these times used to come straight out of the timestamp, so
+  // a 12-hour setting got 24-hour times here and nowhere else.
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
 
   return (
     <div className="flex items-stretch gap-[6px] px-3 py-[5px]">
@@ -355,7 +359,7 @@ export function SuggestionRow({
           {showDate && (
             <Badge icon={CalendarDays}>{formatDayHeading(suggestion.localDate, locale)}</Badge>
           )}
-          <Badge icon={Clock}>{timeRange(suggestion.startedAt, suggestion.endedAt)}</Badge>
+          <Badge icon={Clock}>{timeRange(suggestion.startedAt, suggestion.endedAt, is12h)}</Badge>
           <Badge icon={Hourglass}>{formatDuration(suggestion.durationMinutes, t)}</Badge>
 
           {suggestion.state === 'accepted' && (
