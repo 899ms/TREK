@@ -71,21 +71,33 @@ function JourneyDetailPageDesktop() {
     query,
   )
   const dayGroups = groupByDate(timelineEntries)
-  // A stay falls on the day it happened, and that is often a day the journal has no entry
-  // on yet — which is the whole point of offering it. Those days join the timeline so the
-  // stay can be reached; without them the only way to a quiet day's stays would be to
-  // write an entry on it first. Not while a search is running: a day whose entries the
-  // query filtered out is not a day the reader is looking at.
-  const suggestionDates = canEditEntries && !query ? [...dawarichByDate.keys()] : []
-  const sortedDates = [...new Set([...dayGroups.keys(), ...suggestionDates])]
-    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
-
   const tripDateMin = current.trips.length
     ? current.trips.reduce((min: string, t: any) => t.start_date && (!min || t.start_date < min) ? t.start_date : min, '')
     : null
   const tripDateMax = current.trips.length
     ? current.trips.reduce((max: string, t: any) => t.end_date && (!max || t.end_date > max) ? t.end_date : max, '')
     : null
+
+  // A stay falls on the day it happened, and that is often a day the journal has no entry
+  // on yet, which is the whole point of offering it. Those days join the timeline so the
+  // stay can be reached; without them the only way to a quiet day's stays would be to
+  // write an entry on it first.
+  //
+  // Bounded by this journal's own span, because the hook reads every open stay the account
+  // has: unbounded, a week in May grew a day section for every day Dawarich recorded
+  // anywhere, all year. The span is the entries it already holds together with the dates of
+  // the trips it links, so a journal that is still empty but linked to a trip still offers
+  // that trip's days. With no span at all there is nothing to place a stay against.
+  // Not while a search is running either: a day whose entries the query filtered out is not
+  // a day the reader is looking at.
+  const spanDates = [...dayGroups.keys(), tripDateMin, tripDateMax]
+    .filter((d): d is string => !!d)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  const suggestionDates = canEditEntries && !query && spanDates.length
+    ? [...dawarichByDate.keys()].filter(d => d >= spanDates[0] && d <= spanDates[spanDates.length - 1])
+    : []
+  const sortedDates = [...new Set([...dayGroups.keys(), ...suggestionDates])]
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
   const lifecycle = computeJourneyLifecycle(current.status, tripDateMin || null, tripDateMax || null)
 
   const showMobileCombined = isMobile && view === 'timeline'

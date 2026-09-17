@@ -1223,6 +1223,22 @@ export function useTripPlanner() {
    */
   const [stayDraft, setStayDraft] = useState<{ placeId: number; name: string; minutes: number | null; arrival: string | null } | null>(null)
 
+  /**
+   * Whether the day ends at this stop, from BOTH the things that can end it.
+   *
+   * A stop carries an `end_day` flag, and a day can also be closed by a manual boundary
+   * filed against that stop (`to_assignment_id === null`). `setRoadtripEndDay` already
+   * knows about both and clears whichever is set, so a surface reading only the flag shows
+   * a day end as off, and the tap meant to switch it on deletes the boundary instead. The
+   * question is asked here once rather than answered again per surface.
+   */
+  const roadtripEndsDayAt = useCallback(
+    (stop: RoadtripStop): boolean =>
+      !!stop.endDay
+      || dayBoundaries.boundaries.some(b => b.to_assignment_id === null && b.from_assignment_id === stop.assignmentId),
+    [dayBoundaries.boundaries],
+  );
+
   const setRoadtripEndDay = useCallback(async (stop: RoadtripStop) => {
     if (!dailyTimesActive || !can('day_edit', trip)) return
     try {
@@ -2396,7 +2412,7 @@ export function useTripPlanner() {
   )
   const endDayStop = selectedRoadtripStops.length === 1 ? selectedRoadtripStops[0] : undefined
   const roadtripEndDay = roadtripActive && dailyTimesActive && can('day_edit', trip) && endDayStop && endDayStop.assignmentId > 0
-    ? { active: !!endDayStop.endDay || dayBoundaries.boundaries.some(b => b.to_assignment_id === null && b.from_assignment_id === endDayStop.assignmentId), onToggle: () => setRoadtripEndDay(endDayStop) }
+    ? { active: roadtripEndsDayAt(endDayStop), onToggle: () => setRoadtripEndDay(endDayStop) }
     : undefined
   const roadtripStay = roadtripActive && selectedPlace
     ? { minutes: endDayStop ? endDayStop.dwellMinutes : selectedPlace.duration_minutes ?? null, onEdit: can('place_edit', trip) ? () => editRoadtripStay({ placeId: selectedPlace.id, name: selectedPlace.name, minutes: selectedPlace.duration_minutes ?? null, arrival: null }) : undefined }
@@ -2459,6 +2475,7 @@ export function useTripPlanner() {
     stopDraft, setStopDraft, saveStopDraft, saveStopDraftAsNight, stopDraftToForm, stopDraftDuplicate, reorderRoadtripStop,
     setRoadtripStopKind,
     setRoadtripStopFill,
+    roadtripEndsDayAt,
     roadtripSettingsLoading: !roadtripPreferencesState.ready && !roadtripPreferencesState.failed,
     saveRoadtripLimit: roadtripPreferencesState.ready && can('day_edit', trip) ? saveRoadtripLimit : undefined,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, dayBoundaryControls, resetDayBoundaries,

@@ -179,7 +179,11 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
    * the stage sheet calls the stop-addressed writer directly.
    */
   const canEndDay = stop != null && planner.dailyTimesActive && planner.can('day_edit', planner.trip)
-  const endDayTruth = !!stop?.endDay
+  // Both things that can end a day, not just the flag: a manual boundary filed against
+  // this stop closes the day too, and reading only the flag showed the switch as off for a
+  // stop that already ends it. Worse, the tap meant to switch it on then ran through the
+  // writer's boundary branch and deleted that day end.
+  const endDayTruth = stop != null && planner.roadtripEndsDayAt(stop)
   // The optimistic value is released the moment the planner's own answer moves off what
   // it was taken from, so a landed write shows the real state rather than a copy of it.
   const endDayActive = pending && pending.from === endDayTruth ? pending.to : endDayTruth
@@ -225,7 +229,17 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
   const stayMinutes = stop.dwellMinutes
   const canEditPlace = planner.can('place_edit', planner.trip)
   const editStay = () => {
-    shell.openSheet('rtstay', { placeId: stop.placeId, minutes: stayMinutes })
+    // The row this sheet is on rides along, because the stay sheet comes back here when it
+    // saves and 'rtstop' is located by day and assignment. Without them it reopened on a
+    // payload it could not resolve, drew nothing, and left shell.sheet pointing at a sheet
+    // that is not on screen, which is what the day swipe reads to decide it is blocked.
+    shell.openSheet('rtstay', {
+      placeId: stop.placeId,
+      minutes: stayMinutes,
+      name: stop.name,
+      dayId: located.day.dayId,
+      assignmentId: stop.assignmentId,
+    })
   }
 
   // A negative id is the optimistic row of a stop still being saved. The editor would

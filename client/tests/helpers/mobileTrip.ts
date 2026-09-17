@@ -169,6 +169,9 @@ export function buildPlanner(overrides: Partial<TripPlanner> = {}): TripPlanner 
     routeProfile: 'driving',
     setRouteProfile: vi.fn(),
     routeVias: [],
+    // Whether the day ends at a stop, from the flag and from a manual boundary alike. The
+    // helper answers from the flag; a case about boundaries overrides it.
+    roadtripEndsDayAt: (stop: { endDay?: boolean } | null | undefined) => !!stop?.endDay,
     fitKey: 0,
     setFitKey: vi.fn(),
 

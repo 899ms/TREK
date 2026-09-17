@@ -215,10 +215,29 @@ describe('MRtStopSheet', () => {
     expect(screen.queryByText('Set how full this stop fills')).not.toBeInTheDocument()
   })
 
-  it('FE-MOB-RTSTOP-011: the stay tile hands the stop over to the stay sheet', () => {
+  it('FE-MOB-RTSTOP-011: the stay tile hands the stop over to the stay sheet, row and all', () => {
     const { shell } = renderSheet()
     fireEvent.click(screen.getByRole('button', { name: /^Stay/ }))
-    expect(shell.openSheet).toHaveBeenCalledWith('rtstay', { placeId: 203, minutes: 90 })
+    // The day and the assignment ride along because the stay sheet comes back here when it
+    // saves, and this sheet is located by those two rather than by the place. Without them
+    // it reopened on a payload it could not resolve and left an invisible sheet standing.
+    expect(shell.openSheet).toHaveBeenCalledWith('rtstay', {
+      placeId: 203,
+      minutes: 90,
+      name: 'Bremen Marktplatz',
+      dayId: 11,
+      assignmentId: 103,
+    })
+  })
+
+  it('FE-MOB-RTSTOP-036: a day ended by a manual boundary reads as ended, not as off', () => {
+    // Two things can end a day: the stop's own flag and a manual boundary filed against it.
+    // Reading only the flag showed the switch as off for a stop that already ends the day,
+    // and the tap meant to switch it on ran through the writer's boundary branch and
+    // deleted that day end instead.
+    renderSheet({ roadtripEndsDayAt: () => true })
+
+    expect(screen.getByRole('switch', { name: 'End the day here' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('FE-MOB-RTSTOP-012: ending the day here calls the stop-addressed writer with that very stop', async () => {

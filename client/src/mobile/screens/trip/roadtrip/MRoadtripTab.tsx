@@ -13,6 +13,7 @@ import { formatDurationShort } from '../../../../components/Roadtrip/roadtripMod
 import { getNavigationTargets } from '../../../../components/Planner/placeNavigation'
 import { useSettingsStore } from '../../../../store/settingsStore'
 import { formatDistance } from '../../../../utils/units'
+import { formatClockTime } from '../../../../utils/formatters'
 import { isRtlLanguage } from '../../../../i18n'
 import type { MTripTabPanelProps } from '../MTripShell'
 import { legReroutable, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
@@ -40,7 +41,8 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   // the map read one controller, so a leg shows pressed for exactly the picker on the map.
   const alts = useMRtAlternatives(planner, shell)
   const unit = useSettingsStore(s => s.settings.distance_unit)
-  const chrome: RowChrome = { t, unit }
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  const chrome: RowChrome = { t, unit, is12h }
 
   // The same gesture the day timeline uses, called rather than rebuilt: 370 lines of
   // worked-out conflict avoidance, down to the dead 24px gutter that stops iOS from
@@ -176,7 +178,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                     {t('mobileTrip.rtStart')}
                   </span>
                   <span dir="ltr" className="mt-0.5 block text-[1.5rem] font-extrabold leading-none tabular-nums text-m-ink">
-                    {rt.clocks.start ?? '-'}
+                    {rt.clocks.start ? formatClockTime(rt.clocks.start, is12h) : '-'}
                   </span>
                 </span>
                 <span className="min-w-0 text-right">
@@ -184,7 +186,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                     {t('roadtrip.stay.arrive')}
                   </span>
                   <span dir="ltr" className="mt-0.5 block text-[1.5rem] font-extrabold leading-none tabular-nums text-m-ink">
-                    {rt.clocks.arrive ?? '-'}
+                    {rt.clocks.arrive ? formatClockTime(rt.clocks.arrive, is12h) : '-'}
                   </span>
                 </span>
               </div>
@@ -291,6 +293,7 @@ function UpNext({ planner, shell, rt, stageDayId, onOpen }: {
   onOpen: (row: StopRow) => void
 }) {
   const { t } = planner
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
   const next = rt.upNext
   if (!next) return null
   const late = next.minutesUntil < 0
@@ -320,7 +323,7 @@ function UpNext({ planner, shell, rt, stageDayId, onOpen }: {
         </span>
         <span className="mt-1.5 block truncate text-[1.125rem] font-bold text-m-ink">{next.row.stop.name}</span>
         {next.row.time && (
-          <span className="mt-[2px] block font-geist text-[0.75rem] tabular-nums text-m-muted">{next.row.time}</span>
+          <span className="mt-[2px] block font-geist text-[0.75rem] tabular-nums text-m-muted">{formatClockTime(next.row.time, is12h)}</span>
         )}
       </button>
       <div className="mt-3 flex gap-2">
@@ -332,7 +335,7 @@ function UpNext({ planner, shell, rt, stageDayId, onOpen }: {
           className={`flex h-11 flex-1 items-center justify-center gap-[7px] rounded-full bg-m-act text-[0.8125rem] font-semibold text-m-actfg shadow-[0_10px_24px_-10px_rgba(0,0,0,.45)] ${targets.length ? '' : 'pointer-events-none opacity-40'}`}
         >
           <Navigation size={15} strokeWidth={2.2} aria-hidden="true" />
-          {t('places.navigate')}
+          {targets.length === 1 ? targets[0].label : t('inspector.navigation')}
         </a>
         <button
           type="button"

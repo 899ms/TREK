@@ -5,6 +5,7 @@ import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
+import { formatClockTime } from '../../../../utils/formatters'
 import type { StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import type { RefuelSearch } from '../../../../components/Roadtrip/useRefuelSearch'
 import { REFUEL_EMPTY_KEY, REFUEL_WORDS, refuelBandState, type RefuelCandidate } from '../../../../components/Roadtrip/refuelSuggestion'
@@ -29,6 +30,15 @@ import type { TranslationFn } from '../../../../types'
 export interface RowChrome {
   t: TranslationFn
   unit: DistanceUnit
+  /**
+   * Whether this reader is on a twelve hour clock.
+   *
+   * The model hands every clock over as `HH:MM`, which is the shape the schedule computes
+   * in, and printing that straight to the screen ignored the setting the desktop rail, the
+   * day timeline and this tab's own sheets all honour. It rides in the chrome rather than
+   * being read per row: the chain draws dozens of rows and they must not disagree.
+   */
+  is12h: boolean
 }
 
 /**
@@ -151,7 +161,7 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
         // dir=ltr so a clock reads the same way round in an RTL locale.
         <span dir="ltr" className={`flex items-center gap-[3px] whitespace-nowrap text-[0.8125rem] tabular-nums ${row.pinned ? 'font-semibold text-m-ink' : 'font-medium text-m-faint'}`}>
           {row.pinned && <Pin size={9} strokeWidth={2.4} className="flex-none text-m-faint" aria-label={t('roadtrip.stop.pinned')} />}
-          {row.time}
+          {formatClockTime(row.time, chrome.is12h)}
         </span>
       )}
     </div>
@@ -470,7 +480,7 @@ export function RtAutoRow({ phase, time, chrome }: {
       <span className="text-[0.75rem] font-semibold text-m-muted">
         {phase === 'end' ? t('roadtrip.window.stop') : t('roadtrip.window.resume')}
       </span>
-      {time && <span className="ms-auto text-[0.8125rem] font-semibold tabular-nums text-m-ink">{time}</span>}
+      {time && <span className="ms-auto text-[0.8125rem] font-semibold tabular-nums text-m-ink">{formatClockTime(time, chrome.is12h)}</span>}
     </div>
   )
 }

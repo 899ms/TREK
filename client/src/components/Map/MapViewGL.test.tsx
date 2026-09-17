@@ -2037,6 +2037,28 @@ describe('MapViewGL', () => {
     )
   })
 
+  it('FE-COMP-MAPVIEWGL-100: the imagery goes under the offered roads too, not just under the route', async () => {
+    // The roads offered for a leg are added before the route source so they sit beneath the
+    // current route, which also puts them before the first `trip-` layer. Anchoring the
+    // imagery on that first `trip-` layer therefore painted it straight over them, and an
+    // offered road on a satellite basemap could not be seen at all.
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({
+      layers: [{ id: 'background' }, { id: 'road' }, { id: 'route-alt-hit' }, { id: 'route-alt-line' }, { id: 'trip-route' }],
+    })
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster', type: 'raster' }),
+      'route-alt-hit',
+    )
+  })
+
   it('FE-COMP-MAPVIEWGL-075: with the default basemap no imagery is fetched at all', async () => {
     loadOnAttach()
     useSettingsStore.setState({
