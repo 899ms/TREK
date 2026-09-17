@@ -1074,6 +1074,50 @@ describe('MapView bounds fitting', () => {
     rerender(<MapView places={places} fitKey={2} />)
     expect(mapMock.fitBounds).not.toHaveBeenCalled()
   })
+
+  it('FE-COMP-MAPVIEW-078: a caller padding frames the focus points instead of the phone margin, and the day fit keeps its own', () => {
+    // A phone shell lays a chip rail over the top of the map and a bar plus the dock over
+    // the bottom. The flat margin put the ends of a framed leg under either of them.
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 420 })
+    const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+    const chrome = { top: 120, right: 16, bottom: 290, left: 16 }
+    const { rerender } = render(<MapView places={[]} fitKey={1} />)
+    expect(mapMock.fitBounds).not.toHaveBeenCalled()
+
+    rerender(<MapView places={[]} fitKey={1} focusPoints={leg} fitPadding={chrome} />)
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(1)
+    expect(mapMock.fitBounds.mock.calls[0][1]).toMatchObject({ paddingTopLeft: [16, 120], paddingBottomRight: [16, 290] })
+
+    // Picking a day is not the caller's frame, so that fit keeps the phone margin.
+    const places = [buildMapPlace({ id: 1, lat: 48, lng: 2 }), buildMapPlace({ id: 2, lat: 48.2, lng: 2.2 })]
+    rerender(<MapView places={places} fitKey={2} focusPoints={leg} fitPadding={chrome} />)
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(2)
+    expect(mapMock.fitBounds.mock.calls[1][1]).toMatchObject({ paddingTopLeft: [40, 20], paddingBottomRight: [40, 20] })
+
+    // And without one, the focus fit falls back to that margin too.
+    const stage: [number, number][] = [[47, 1], [47.5, 1.5]]
+    rerender(<MapView places={places} fitKey={2} focusPoints={stage} />)
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(3)
+    expect(mapMock.fitBounds.mock.calls[2][1]).toMatchObject({ paddingTopLeft: [40, 20], paddingBottomRight: [40, 20] })
+  })
+
+  it('FE-COMP-MAPVIEW-079: the caller padding is read by value, so only new numbers refit the points on screen', () => {
+    const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+    const { rerender } = render(
+      <MapView places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />,
+    )
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(1)
+
+    // A parent that builds the object inline hands a new one on every render. The camera
+    // belongs to the traveller between fits, so that alone must not take it back.
+    rerender(<MapView places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />)
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(1)
+
+    // New numbers mean the chrome moved, so the same points are framed again around it.
+    rerender(<MapView places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 98, left: 16 }} />)
+    expect(mapMock.fitBounds).toHaveBeenCalledTimes(2)
+    expect(mapMock.fitBounds.mock.calls[1][1]).toMatchObject({ paddingTopLeft: [16, 120], paddingBottomRight: [16, 98] })
+  })
 })
 
 describe('MapView photo thumbnails', () => {

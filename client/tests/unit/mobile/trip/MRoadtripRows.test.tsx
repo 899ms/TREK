@@ -9,7 +9,7 @@ import type { TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-037
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-040
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -178,7 +178,7 @@ describe('RtStopRow', () => {
 })
 
 describe('RtLegRow', () => {
-  it('FE-MOB-RTROW-014: is not a control, no button, no role, nothing focusable', () => {
+  it('FE-MOB-RTROW-014: without a way to ask for other roads the leg is not a control, no button, no role, nothing focusable', () => {
     const { container } = render(<RtLegRow seg={SEG} mode="driving" chrome={chrome} />)
 
     expect(screen.queryByRole('button')).toBeNull()
@@ -211,6 +211,53 @@ describe('RtLegRow', () => {
 
     const plugin = render(<RtLegRow seg={SEG} mode="plugin:rail" chrome={chrome} />)
     expect(plugin.container.querySelector('.lucide-zap')).not.toBeNull()
+  })
+
+  it('FE-MOB-RTROW-038: other ways are one round button beside the pill, and the pill stays text', () => {
+    const onAlternatives = vi.fn()
+    const { container } = render(<RtLegRow seg={SEG} mode="driving" chrome={chrome} onAlternatives={onAlternatives} />)
+
+    const buttons = screen.getAllByRole('button')
+    expect(buttons).toHaveLength(1)
+    const ask = screen.getByRole('button', { name: 'roadtrip.alt.ask' })
+    expect(ask.querySelector('.lucide-shuffle')).not.toBeNull()
+    // A separate 40px target: a tap that stops a scroll on the pill asks the router nothing.
+    expect(ask.className).toContain('h-10')
+    expect(ask.className).toContain('w-10')
+    const drive = screen.getByText('roadtrip.leg.driveText:210 km,2 h 40 min')
+    expect(ask.contains(drive)).toBe(false)
+    expect(drive.closest('[role]')).toBeNull()
+    fireEvent.click(drive)
+    expect(onAlternatives).not.toHaveBeenCalled()
+
+    fireEvent.click(ask)
+    expect(onAlternatives).toHaveBeenCalledTimes(1)
+    expect(container.querySelectorAll('[tabindex]')).toHaveLength(0)
+  })
+
+  it('FE-MOB-RTROW-039: shows pressed while its leg is open, in full ink rather than a filled button', () => {
+    const closed = render(<RtLegRow seg={SEG} mode="driving" chrome={chrome} onAlternatives={vi.fn()} />)
+    const idle = screen.getByRole('button', { name: 'roadtrip.alt.ask' })
+    expect(idle).toHaveAttribute('aria-pressed', 'false')
+    expect(idle.className).toContain('text-m-muted')
+    closed.unmount()
+
+    render(<RtLegRow seg={SEG} mode="driving" chrome={chrome} onAlternatives={vi.fn()} alternativesOpen />)
+    const open = screen.getByRole('button', { name: 'roadtrip.alt.ask' })
+    expect(open).toHaveAttribute('aria-pressed', 'true')
+    expect(open.className).toContain('text-m-ink')
+    // A filled chip in a column of quiet rows reads as a button pressed and stuck.
+    expect(open.className).not.toContain('bg-m-act')
+  })
+
+  it('FE-MOB-RTROW-040: offline the button keeps its place but does nothing', () => {
+    const onAlternatives = vi.fn()
+    render(<RtLegRow seg={SEG} mode="driving" chrome={chrome} onAlternatives={onAlternatives} alternativesDisabled />)
+
+    const ask = screen.getByRole('button', { name: 'roadtrip.alt.ask' })
+    expect(ask).toBeDisabled()
+    fireEvent.click(ask)
+    expect(onAlternatives).not.toHaveBeenCalled()
   })
 })
 

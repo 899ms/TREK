@@ -7,8 +7,9 @@ import MRoadtripTab from '../../../../src/mobile/screens/trip/roadtrip/MRoadtrip
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import type { Day, Place } from '../../../../src/types'
 import type { RoadtripDay, RoadtripRoutes, RouteSegment } from '@trek/shared/roadtrip'
+import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-044
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-050
 //
 // The stage bar pictures the place its day ends at. It reads that place out of the trip
 // store rather than the planner, the unfiltered list, so the picture tests seed the store.
@@ -742,6 +743,122 @@ describe('MRoadtripTab', () => {
       expect(screen.queryByText('roadtrip.poi.title')).toBeNull()
       const scroller = container.querySelector('[class*="overflow-y-auto"]') as HTMLElement
       expect(scroller.className).toContain('pt-[calc(var(--m-safe-top,12px)+102px)]')
+    })
+  })
+
+  describe('other ways of driving a leg', () => {
+    const askButtons = () => screen.queryAllByRole('button', { name: 'roadtrip.alt.ask' })
+
+    /** The planner with a picker open on one leg, still asking the router. */
+    function withPicker(open: Partial<LegAlternatives>, over: Partial<TripPlanner> = {}): TripPlanner {
+      const base = buildPlanner()
+      return planner({
+        routeAlternatives: { ...base.routeAlternatives, open: { dayId: 2, index: 0, routes: [], loading: true, error: false, ...open } },
+        ...over,
+      })
+    }
+
+    it('FE-MOB-RTTAB-045: offers the question on the legs the desk rail offers it on, and only to an editor', () => {
+      const full = renderTab()
+      // Two routed legs between real stops. The third runs into the automatic day end,
+      // which is the shell's own marker and not a road anyone can reshape.
+      expect(askButtons()).toHaveLength(2)
+      const kyotoLeg = screen.getByText('roadtrip.leg.driveText:210 km,2 h 40 min').closest('.grid') as HTMLElement
+      expect(within(kyotoLeg).getByRole('button', { name: 'roadtrip.alt.ask' })).toBeInTheDocument()
+      full.unmount()
+
+      // Routed or not, that last leg stays a line of text: the fixture leaves it unrouted
+      // too, so a routed one pins that the day end, not the missing route, is the reason.
+      const intoNight = renderTab(planner({
+        roadtripRoutes: routes({ days: [stage({ legs: [seg('62 km', '1 h'), seg('210 km', '2 h 40 min'), seg('12 km', '10 min')] })] }),
+      }))
+      expect(askButtons()).toHaveLength(2)
+      const nightLeg = screen.getByText('roadtrip.leg.driveText:12 km,10 min').closest('.grid') as HTMLElement
+      expect(within(nightLeg).queryByRole('button')).toBeNull()
+      intoNight.unmount()
+
+      // A leg the routing has not answered for has nothing to weigh an offer against.
+      const unrouted = renderTab(planner({ roadtripRoutes: routes({ days: [stage({ legs: [seg('62 km', '1 h'), undefined, undefined] })] }) }))
+      expect(askButtons()).toHaveLength(1)
+      // Both unanswered legs are drawn, only neither of them asks.
+      expect(screen.getAllByText('roadtrip.leg.pending')).toHaveLength(2)
+      unrouted.unmount()
+
+      renderTab(planner({ can: vi.fn(() => false) }))
+      expect(askButtons()).toHaveLength(0)
+    })
+
+    it('FE-MOB-RTTAB-046: asks with the card\'s day, clears the old pick and the fuel search, and goes to the map', () => {
+      const p = planner()
+      const { shell } = renderTab(p)
+
+      fireEvent.click(askButtons()[0])
+
+      expect(p.setHighlightedAlternative).toHaveBeenCalledWith(null)
+      expect(p.refuel.close).toHaveBeenCalledTimes(1)
+      // Day 2, the card: the leg's first stop is stored on day 1, and the planner works
+      // that out from the card itself, the way the desk rail asks.
+      expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, 0)
+      expect(p.askRouteAlternatives).not.toHaveBeenCalledWith(1, expect.anything())
+      expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-RTTAB-047: the leg with the picker open shows pressed, and tapping it goes back to the answer without asking again', () => {
+      const p = withPicker({ index: 0 })
+      const { shell } = renderTab(p)
+
+      const [open, other] = askButtons()
+      expect(open).toHaveAttribute('aria-pressed', 'true')
+      expect(other).toHaveAttribute('aria-pressed', 'false')
+
+      fireEvent.click(open)
+
+      // The planner toggles an open leg shut, and the traveller came back for its answer.
+      expect(p.askRouteAlternatives).not.toHaveBeenCalled()
+      expect(p.routeAlternatives.close).not.toHaveBeenCalled()
+      expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-RTTAB-048: on the map the picker takes the stage bar\'s slot and the search bar steps away', () => {
+      const shell = buildShell({ rtView: 'map' })
+      const open = renderTab(withPicker({}), shell)
+
+      const bar = screen.getByRole('region', { name: 'roadtrip.alt.title' })
+      expect(within(bar).getByText('roadtrip.alt.loading')).toBeInTheDocument()
+      // In the very wrapper the stage bar sits in, just above the dock.
+      expect((bar.parentElement as HTMLElement).className).toContain('bottom-[calc(var(--bottom-nav-h,84px)+4px)]')
+      expect(screen.queryByRole('button', { name: /Kyoto Station/ })).toBeNull()
+      expect(screen.queryByText('roadtrip.poi.title')).toBeNull()
+      open.unmount()
+
+      renderTab(planner(), shell)
+      expect(screen.queryByRole('region', { name: 'roadtrip.alt.title' })).toBeNull()
+      expect(screen.getByRole('button', { name: /Kyoto Station/ })).toBeInTheDocument()
+      expect(screen.getByText('roadtrip.poi.title')).toBeInTheDocument()
+    })
+
+    it('FE-MOB-RTTAB-049: offline the leg buttons stay where they are and do nothing', () => {
+      const base = buildPlanner()
+      const p = planner({ roadtripVias: { ...base.roadtripVias, editable: false } })
+      renderTab(p)
+
+      expect(askButtons()).toHaveLength(2)
+      for (const button of askButtons()) expect(button).toBeDisabled()
+      fireEvent.click(askButtons()[0])
+      expect(p.askRouteAlternatives).not.toHaveBeenCalled()
+    })
+
+    it('FE-MOB-RTTAB-050: a picker left open on another stage is closed, and one on this stage survives the list', () => {
+      const elsewhere = withPicker({ dayId: 1 })
+      const first = renderTab(elsewhere)
+      expect(elsewhere.routeAlternatives.close).toHaveBeenCalledTimes(1)
+      first.unmount()
+
+      // The chain is a look back at the stage, not a way out of the question.
+      const here = withPicker({ dayId: 2, index: 1 })
+      renderTab(here)
+      expect(here.routeAlternatives.close).not.toHaveBeenCalled()
+      expect(askButtons()[1]).toHaveAttribute('aria-pressed', 'true')
     })
   })
 

@@ -4,9 +4,8 @@ import { useTranslation } from '../../i18n/TranslationContext'
 import { Tooltip } from '../shared/Tooltip'
 import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
-import { formatDurationShort } from './roadtripModel'
 import type { LegAlternatives } from './useRouteAlternatives'
-import type { AlternativeOverlay } from './alternativeOverlays'
+import { alternativesPhase, alternativeSubline, type AlternativeOverlay } from './alternativeOverlays'
 
 interface RoadtripAlternativesBarProps {
   open: LegAlternatives | null
@@ -35,6 +34,7 @@ export default function RoadtripAlternativesBar({
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   if (!open) return null
+  const phase = alternativesPhase(open, overlays)
 
   return (
     <div className="pointer-events-auto flex max-w-[min(92vw,640px)] flex-col gap-2 rounded-2xl border border-edge-faint bg-surface-elevated px-3 py-2.5 shadow-modal backdrop-blur">
@@ -53,14 +53,14 @@ export default function RoadtripAlternativesBar({
         </button>
       </div>
 
-      {open.loading ? (
+      {phase === 'loading' ? (
         <p className="text-caption text-content-muted">{t('roadtrip.alt.loading')}</p>
-      ) : open.error ? (
+      ) : phase === 'failed' ? (
         <p className="flex items-start gap-1.5 text-caption text-warning">
           <AlertTriangle size={12} className="mt-0.5 shrink-0" aria-hidden />
           {t('roadtrip.alt.failed')}
         </p>
-      ) : overlays.length < 2 ? (
+      ) : phase === 'onlyOne' ? (
         // One route back means there is genuinely only one sensible way to drive it.
         <p className="text-caption text-content-muted">{t('roadtrip.alt.onlyOne')}</p>
       ) : (
@@ -88,9 +88,7 @@ export default function RoadtripAlternativesBar({
                   {formatDistance(alt.distance / 1000, distanceUnit)}
                 </span>
                 <span className="text-caption tabular-nums text-content-muted">
-                  {alt.note
-                    ? alt.note
-                    : t('roadtrip.alt.slower', { time: formatDurationShort(alt.slowerThanQuickest) })}
+                  {alternativeSubline(alt, time => t('roadtrip.alt.slower', { time }))}
                 </span>
               </span>
               {/* Only where the drive time on the map came from the other engine. The

@@ -236,6 +236,20 @@ export function buildPlanner(overrides: Partial<TripPlanner> = {}): TripPlanner 
     },
     askRefuel: vi.fn(),
     acceptRefuel: vi.fn(),
+    // Other ways of driving a leg, with no picker open. The road trip tab and the map area
+    // read the picker on every render, so the closed shape belongs in the base.
+    routeAlternatives: { open: null, ask: vi.fn(), close: vi.fn() },
+    askRouteAlternatives: vi.fn(),
+    chooseRouteAlternative: vi.fn(async () => undefined),
+    alternativeOverlays: [],
+    alternativeFocusPoints: [],
+    highlightedAlternative: null,
+    setHighlightedAlternative: vi.fn(),
+    // The drive's vias, online and empty. `editable` is what the leg buttons read.
+    roadtripVias: {
+      byDay: {}, trackByDay: {}, stale: false, editable: true,
+      add: vi.fn(), addMany: vi.fn(), move: vi.fn(), remove: vi.fn(), reanchor: vi.fn(),
+    },
     mapFocusPoints: [],
     focusRoadtripPoint: vi.fn(),
     handlePoiClick: vi.fn(),

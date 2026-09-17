@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '../../../helpers/render'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { buildPlace } from '../../../helpers/factories'
@@ -10,8 +10,11 @@ import { useSettingsStore } from '../../../../src/store/settingsStore'
 import { useTripStore } from '../../../../src/store/tripStore'
 import { seedStore } from '../../../helpers/store'
 import type { Place } from '../../../../src/types'
+import type { AlternativeOverlay } from '../../../../src/components/Roadtrip/alternativeOverlays'
+import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
+import { RT_ALT_BAR_LIFT } from '../../../../src/mobile/screens/trip/roadtrip/useMRtAlternatives'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-027
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-032
 //
 // The stage's pins come out of the trip store rather than the planner's map list, so the
 // stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
@@ -131,6 +134,37 @@ const tapPin = (placeId?: number) => (mocks.props.onMarkerClick as (id?: number)
 
 /** What the area handed the renderer that a fresh copy would make it draw again. */
 const DRAWN = ['places', 'route', 'routeColors', 'accessLines', 'focusPoints'] as const
+
+/** A picker open on leg 0 of day 3, with or without roads back yet. */
+function withPicker(overlays: AlternativeOverlay[], over: Partial<TripPlanner> = {}): Partial<TripPlanner> {
+  const base = buildPlanner()
+  const open: LegAlternatives = { dayId: 3, index: 0, routes: [], loading: overlays.length === 0, error: false }
+  return {
+    routeAlternatives: { ...base.routeAlternatives, open },
+    alternativeOverlays: overlays,
+    ...over,
+  } as Partial<TripPlanner>
+}
+
+/** Two offered roads, as far as the map area reads them. */
+const OFFERS = [
+  { index: 0, coordinates: [[53.55, 9.99], [53.87, 10.69]], color: 'blue', label: '1 h', note: 'Current' },
+  { index: 1, coordinates: [[53.55, 9.99], [53.7, 10.2], [53.87, 10.69]], color: 'pale', label: '1 h 10 min', note: '' },
+] as unknown as AlternativeOverlay[]
+
+/** The probe the area reads the safe area off, answering like a phone with a notch. */
+function notchedPhone(top: string, bottom: string) {
+  const real = window.getComputedStyle.bind(window)
+  return vi.spyOn(window, 'getComputedStyle').mockImplementation((el: Element, pseudo?: string | null) => (
+    el.className.toString().includes('safe-area-inset-top')
+      ? ({ paddingTop: top, paddingBottom: bottom } as CSSStyleDeclaration)
+      : real(el, pseudo)
+  ))
+}
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 beforeEach(() => {
   mocks.glMap = COMPASS
@@ -508,6 +542,87 @@ describe('MMapArea', () => {
     // The floor takes the same 76px the band does, so the credit lands a gap above the
     // stage bar rather than on it.
     expect(stageLayer.style.getPropertyValue('--m-stage-lift')).toBe('76px')
+  })
+
+  it('FE-MOB-MAPAREA-028: on the stage the map draws the offered roads, and a tap on one only lights it', () => {
+    const { planner } = renderArea(
+      { trTab: 'roadtrip', rtView: 'map' },
+      withPicker(OFFERS, { highlightedAlternative: 1 }),
+    )
+
+    expect(mocks.props.alternativeRoutes).toBe(planner.alternativeOverlays)
+    expect(mocks.props.activeAlternative).toBe(1)
+
+    ;(mocks.props.onChooseAlternative as (index: number) => void)(0)
+    // Glass has no hover to preview with, so the desk's click that takes a road would save a
+    // via on the first touch. The bar's confirm is what takes it here.
+    expect(planner.setHighlightedAlternative).toHaveBeenCalledWith(0)
+    expect(planner.chooseRouteAlternative).not.toHaveBeenCalled()
+    // A touch fires emulated enter and leave events, and the leave would put the road out.
+    expect(mocks.props.onHighlightAlternative).toBeUndefined()
+  })
+
+  it('FE-MOB-MAPAREA-029: the plan tab draws no offered roads and frames nothing for them', () => {
+    renderArea({ trTab: 'plan' }, withPicker(OFFERS, { highlightedAlternative: 1 }))
+
+    expect(mocks.props.alternativeRoutes).toBeUndefined()
+    expect(mocks.props.activeAlternative).toBeUndefined()
+    expect(mocks.props.onChooseAlternative).toBeUndefined()
+    expect(mocks.props.fitPadding).toBeUndefined()
+  })
+
+  it('FE-MOB-MAPAREA-030: with the picker open the floor clears its taller bar, and the compass is still the one inline --bottom-nav-h', () => {
+    const { container, unmount } = renderArea({ trTab: 'roadtrip', mapFront: true }, withPicker([]))
+    const layer = container.firstElementChild as HTMLElement
+
+    // 174px of bar and the stage bar's 15px gap, as soon as the question is asked.
+    expect(layer.style.getPropertyValue('--m-stage-lift')).toBe(`${RT_ALT_BAR_LIFT}px`)
+    expect(layer.style.getPropertyValue('--m-stage-lift')).toBe('189px')
+    expect(layer.getAttribute('style')).not.toContain('--bottom-nav-h')
+    expect(container.querySelectorAll('[style*="--bottom-nav-h"]')).toHaveLength(1)
+    expect(compassBand(container)).not.toBeNull()
+    unmount()
+
+    // Behind the chain the bar is not on screen, so nothing lifts.
+    const behind = renderArea({ trTab: 'roadtrip', mapFront: false }, withPicker([]))
+    expect((behind.container.firstElementChild as HTMLElement).style.getPropertyValue('--m-stage-lift')).toBe('0px')
+  })
+
+  it('FE-MOB-MAPAREA-031: the offered roads are framed between the day chips and the bar, once they are there', () => {
+    const shell = stageShell()
+    const asking = buildPlanner(withPicker([]))
+    const { rerender } = render(<MMapArea planner={asking} shell={shell} />)
+    // Nothing to frame while the router is asked: a padding handed over now would refit
+    // the stage into a smaller frame just before the answer moves the camera again.
+    expect(mocks.props.fitPadding).toBeUndefined()
+
+    const answered = { ...asking, ...withPicker(OFFERS) } as TripPlanner
+    rerender(<MMapArea planner={answered} shell={shell} />)
+    // Top: 12 of --m-safe-top, the rail's 50 offset and 42 height, a 12 gap. Bottom: the
+    // dock's 74, the bar's lift and the 38 credit row. The sides keep the phone's 20.
+    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 74 + RT_ALT_BAR_LIFT + 38, left: 20 })
+    const first = mocks.props.fitPadding
+
+    // Kept between renders, for the reason the stage data is.
+    rerender(<MMapArea planner={{ ...answered }} shell={shell} />)
+    expect(mocks.props.fitPadding).toBe(first)
+
+    // Closed, the stage frames itself with the engines' own margins again.
+    rerender(<MMapArea planner={{ ...answered, ...withPicker([]), routeAlternatives: buildPlanner().routeAlternatives }} shell={shell} />)
+    expect(mocks.props.fitPadding).toBeUndefined()
+  })
+
+  it('FE-MOB-MAPAREA-032: on a phone with a notch the frame moves in by the safe area, and follows a turn of the phone', () => {
+    const style = notchedPhone('59px', '34px')
+    renderArea({ trTab: 'roadtrip', rtView: 'map' }, withPicker(OFFERS))
+
+    expect(mocks.props.fitPadding).toEqual({ top: 59 + 116, right: 20, bottom: 34 + 301, left: 20 })
+
+    // Turned sideways the insets go to the edges, and the frame lets go of them.
+    style.mockRestore()
+    notchedPhone('0px', '21px')
+    act(() => { window.dispatchEvent(new Event('resize')) })
+    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 21 + 301, left: 20 })
   })
 
   it('FE-MOB-MAPAREA-027: the layer sets only the lift inline, so the compass stays the one inline --bottom-nav-h', () => {

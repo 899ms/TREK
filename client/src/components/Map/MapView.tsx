@@ -401,15 +401,33 @@ interface BoundsControllerProps {
    * needs that leg on screen, which is neither the day nor the trip.
    */
   focusPoints?: [number, number][]
+  /**
+   * What the caller's own chrome covers while `focusPoints` is framed, in pixels per edge.
+   *
+   * `paddingOpts` knows the planner's panels and nothing else, and on a phone it is a flat
+   * margin. A shell that lays its own bars over the map passes what they cover, so the
+   * frame lands in the part still visible. Only the fit on `focusPoints` reads it.
+   * Compared by value: the same numbers in a new object do not refit, while new numbers
+   * refit the points already handed over, because the chrome they must clear has moved.
+   */
+  fitPadding?: ViewportPadding
 }
 
-function BoundsController({ places, routeCoords, fitKey, paddingOpts, framedOnMount = false, focusPoints }: BoundsControllerProps) {
+/** A padding box as Leaflet's fit options spell it, corner pairs rather than edges. */
+function leafletPadding(box: ViewportPadding): L.FitBoundsOptions {
+  return {
+    paddingTopLeft: [box.left, box.top],
+    paddingBottomRight: [box.right, box.bottom],
+  }
+}
+
+function BoundsController({ places, routeCoords, fitKey, paddingOpts, framedOnMount = false, focusPoints, fitPadding }: BoundsControllerProps) {
   const map = useMap()
   const prevFitKey = useRef(-1)
   const awaitingRoute = useRef(false)
   const fitRan = useRef(false)
 
-  const fitTo = useCallback((coords: [number, number][]) => {
+  const fitTo = useCallback((coords: [number, number][], padding: L.FitBoundsOptions = paddingOpts) => {
     if (coords.length === 0) return
     try {
       const bounds = L.latLngBounds(coords)
@@ -428,7 +446,7 @@ function BoundsController({ places, routeCoords, fitKey, paddingOpts, framedOnMo
          * (#1982). MapViewGL never had the nudge, so this also brings the two
          * renderers back into agreement.
          */
-        map.fitBounds(bounds, { ...paddingOpts, maxZoom: 16, animate: true })
+        map.fitBounds(bounds, { ...padding, maxZoom: 16, animate: true })
       }
     } catch {}
   }, [map, paddingOpts])
@@ -460,14 +478,18 @@ function BoundsController({ places, routeCoords, fitKey, paddingOpts, framedOnMo
     fitTo([...places.map(p => [p.lat, p.lng] as [number, number]), ...routeCoords])
   }, [routeCoords]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The caller's padding as a value, so a parent that builds the object inline on every
+  // render does not move the camera each time it renders.
+  const fitPaddingKey = fitPadding ? [fitPadding.top, fitPadding.right, fitPadding.bottom, fitPadding.left].join(' ') : ''
+
   // Frame whatever was handed over. Nothing happens when it empties, so closing the
   // picker leaves the map where the user left it rather than snapping back.
   useEffect(() => {
     if (!focusPoints?.length) return
     // A day fit that has not run yet must not overwrite this a moment later.
     awaitingRoute.current = false
-    fitTo(focusPoints)
-  }, [focusPoints]) // eslint-disable-line react-hooks/exhaustive-deps
+    fitTo(focusPoints, fitPadding ? leafletPadding(fitPadding) : paddingOpts)
+  }, [focusPoints, fitPaddingKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return null
 }
@@ -687,6 +709,7 @@ export const MapView = memo(function MapView({
   onRemoveVia,
   alternativeRoutes,
   focusPoints,
+  fitPadding,
   clusterLoosely = false,
   activeAlternative,
   onChooseAlternative,
@@ -748,10 +771,7 @@ export const MapView = memo(function MapView({
     }
   }, [leftWidth, rightWidth, hasInspector, hasDayDetail])
 
-  const paddingOpts = useMemo((): L.FitBoundsOptions => ({
-    paddingTopLeft: [paddingBox.left, paddingBox.top],
-    paddingBottomRight: [paddingBox.right, paddingBox.bottom],
-  }), [paddingBox])
+  const paddingOpts = useMemo(() => leafletPadding(paddingBox), [paddingBox])
 
   // Open framed on the places rather than on the caller's default, so a trip in Japan shows
   // Japan straight away instead of the world view followed by a flight across the planet.
@@ -1070,7 +1090,7 @@ export const MapView = memo(function MapView({
       )}
 
       <MapController center={center} zoom={zoom} />
-      <BoundsController places={dayPlaces.length > 0 ? dayPlaces : places} routeCoords={dayPlaces.length > 0 ? routeCoords : []} fitKey={fitKey} paddingOpts={paddingOpts} framedOnMount={initialView.framed} focusPoints={focusPoints} />
+      <BoundsController places={dayPlaces.length > 0 ? dayPlaces : places} routeCoords={dayPlaces.length > 0 ? routeCoords : []} fitKey={fitKey} paddingOpts={paddingOpts} framedOnMount={initialView.framed} focusPoints={focusPoints} fitPadding={fitPadding} />
       <SelectionController places={places} selectedPlaceId={selectedPlaceId} dayPlaces={dayPlaces} paddingOpts={paddingOpts} />
       <MapClickHandler onClick={onMapClick} />
       <MapContextMenuHandler onContextMenu={onMapContextMenu} />

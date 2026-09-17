@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { MapViewAuto } from '../../../../components/Map/MapViewAuto'
 import { MapCompassPill, type CompassMap } from '../../../../components/Map/MapCompassPill'
 import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../components/Map/MapLayerSwitcher'
@@ -12,8 +12,10 @@ import { stageMapData } from '../../../../components/Roadtrip/stageMap'
 import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
 import { useTripStore } from '../../../../store/tripStore'
+import { RT_ALT_BAR_LIFT } from '../roadtrip/useMRtAlternatives'
 import type { MMapAreaProps } from '../MTripShell'
 import type { Poi } from '../../../../components/Map/poiCategories'
+import type { ViewportPadding } from '../../../../utils/mapViewport'
 
 /** One array, so an explore set switched off does not move every pin on the stage. */
 const NO_POIS: Poi[] = []
@@ -24,6 +26,71 @@ const NO_POIS: Poi[] = []
  * written down as 70, so moving or resizing the switcher carries the compass along.
  */
 const COMPASS_LEFT = MAP_LAYER_SWITCHER_INSET + MAP_ROUND_CONTROL_SIZE + 8
+
+/** The safe-area insets at the top and the bottom of the screen, in pixels. */
+interface SafeInsets {
+  top: number
+  bottom: number
+}
+
+const NO_INSETS: SafeInsets = { top: 0, bottom: 0 }
+
+/**
+ * The safe-area insets as numbers, read off a probe that is padded by them.
+ *
+ * The frame handed to the map engine is pixels, and `env()` only resolves inside CSS. On a
+ * phone with a notch the chrome sits a status bar lower (and a home indicator higher) than
+ * its classes spell out, so a frame worked out without the insets would put the far end of
+ * a leg under the day chips. A computed padding is where the browser hands the resolved
+ * inset back. Read on mount and again on a resize, which is what turning the phone does.
+ */
+function useSafeInsets(probe: RefObject<HTMLElement | null>): SafeInsets {
+  const [insets, setInsets] = useState<SafeInsets>(NO_INSETS)
+  useLayoutEffect(() => {
+    const read = () => {
+      const el = probe.current
+      if (!el) return
+      const style = window.getComputedStyle(el)
+      const top = Number.parseFloat(style.paddingTop) || 0
+      const bottom = Number.parseFloat(style.paddingBottom) || 0
+      setInsets(prev => (prev.top === top && prev.bottom === bottom ? prev : { top, bottom }))
+    }
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
+  }, [probe])
+  return insets
+}
+
+/**
+ * Where the roads offered for a leg are framed: in the strip of map between the day chips
+ * and the alternatives bar, rather than behind either of them.
+ *
+ * Both engines fit a phone with a flat margin that knows nothing of this shell's bars, and
+ * with the picker open those cover most of the screen: that margin would leave the leg's
+ * ends and their time pills under the chips and under a 174px bar. The numbers are the
+ * ones the classes on this screen are built from, so a change there has to be carried here.
+ *
+ * Top: the safe area, then `--m-safe-top`'s own 12px, the chip rail's 50px offset under it
+ * and its 42px height, then a 12px gap so a time pill at the far end is not flush against
+ * the rail. The search bar that sits below the rail on the stage steps away while the
+ * picker is open, so the rail is the lowest chrome up there.
+ *
+ * Bottom: the safe area, the dock's 74px (62px tall, 12px off the bottom), the bar's lift
+ * (its height and the 15px gap between the dock and its foot) and the 38px credit row
+ * over that. That is the very line `--bottom-nav-h` puts the round controls' band on, so
+ * the frame ends where they begin, and they only take the two corners of it.
+ *
+ * The sides keep the 20px both engines already give a phone: nothing floats there.
+ */
+function alternativesFitPadding(insets: SafeInsets): ViewportPadding {
+  return {
+    top: insets.top + 12 + 50 + 42 + 12,
+    right: 20,
+    bottom: insets.bottom + 74 + RT_ALT_BAR_LIFT + 38,
+    left: 20,
+  }
+}
 
 /** A camera focus the planner is holding, and the day that was on screen when it arrived. */
 interface HeldFocus {
@@ -133,6 +200,20 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   if (focus !== heldFocus) setHeldFocus(focus)
   const focusPending = focus.live && planner.mapFocusPoints.length > 0
 
+  // Handed over only once there are roads to frame, not as soon as the picker opens: the
+  // engines refit whatever they hold when this padding changes, and while the router is
+  // still thinking that is the stage, which would be flown out to a smaller frame just
+  // before the answer flies it to the leg. So the padding and the roads arrive in one
+  // render and the camera moves once, and on close both go in one render as well.
+  // Memoised for the reason the stage data is, the shell re-rendering on every store write.
+  const insetProbe = useRef<HTMLSpanElement>(null)
+  const insets = useSafeInsets(insetProbe)
+  const framingOffers = onStage && planner.alternativeOverlays.length > 0
+  const fitPadding = useMemo(
+    () => (framingOffers ? alternativesFitPadding(insets) : undefined),
+    [framingOffers, insets],
+  )
+
   /**
    * A pin on the road trip tab opens its stop: the sheet the chain row opens, not the
    * place inspector.
@@ -201,9 +282,21 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
       className="m-credit-corner absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))] [--bottom-nav-h:calc(var(--m-map-floor)+38px)]"
       // 76px is the stage bar's own height plus the gap it keeps on both sides, so the
       // credit lands one gap above the bar instead of on its top edge, and the round
-      // controls one credit row above that.
-      style={{ ['--m-stage-lift' as string]: onStage && mapActive ? '76px' : '0px' }}
+      // controls one credit row above that. While other ways of driving a leg are on offer
+      // their bar stands in that slot instead, taller, and the floor clears it the same way.
+      style={{
+        ['--m-stage-lift' as string]: onStage && mapActive
+          ? (planner.routeAlternatives.open ? `${RT_ALT_BAR_LIFT}px` : '76px')
+          : '0px',
+      }}
     >
+      {/* Measures the safe area for the alternatives frame, see useSafeInsets. Out of the
+          flow and invisible, so it takes no room and catches no tap. */}
+      <span
+        ref={insetProbe}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute left-0 top-0 pb-[env(safe-area-inset-bottom,0px)] pt-[env(safe-area-inset-top,0px)]"
+      />
       <MapViewAuto
         tripId={planner.tripId}
         dawarichTrack={planner.dawarichTrail.track}
@@ -253,6 +346,16 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
           : marker => planner.openAddPlaceFromPoi(marker, planner.selectedDayId)}
         onViewportChange={poi.onViewportChange}
         onMapReady={setGlMap}
+        // Other ways of driving the leg the stage asked about, and the one lit up.
+        alternativeRoutes={onStage ? planner.alternativeOverlays : undefined}
+        activeAlternative={onStage ? planner.highlightedAlternative : undefined}
+        // A tap on a road or its time pill only lights it; the bar's confirm takes it. The
+        // desk hands `chooseRouteAlternative` in here and previews on hover, but glass has
+        // no hover, so the same wiring would save a via on the very first touch of a line.
+        // No highlight handler either: a touch fires emulated mouse enter and leave events,
+        // and the leave would put out the road the tap has just lit.
+        onChooseAlternative={onStage ? planner.setHighlightedAlternative : undefined}
+        fitPadding={fitPadding}
       />
 
       {/* Floating map chrome — only while the map view is front-most. The POI bar

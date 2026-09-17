@@ -1,4 +1,4 @@
-import { AlertTriangle, Bike, CarFront, Footprints, Fuel, Hourglass, Moon, Pin, Plus, RotateCcw, Sunrise, X, Zap } from 'lucide-react'
+import { AlertTriangle, Bike, CarFront, Footprints, Fuel, Hourglass, Moon, Pin, Plus, RotateCcw, Shuffle, Sunrise, X, Zap } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import MDancingTrek from '../../../components/MDancingTrek'
 import MIconBtn from '../../../components/MIconBtn'
@@ -19,9 +19,11 @@ import type { TranslationFn } from '../../../../types'
  * than no badge. The rest of a stop's findings live in its sheet, written out as full
  * sentences. Which mark survives is decided in `roadtripRowModel.pickWarning`, not here.
  *
- * Nothing in this file except a destination row reacts to a tap. Drive bands, discs,
- * marks, the night block and the day-end point carry no role and no chevron, so
- * nothing looks like a button that isn't one.
+ * Few things in the chain react to a tap, and each looks like the control it is. A
+ * destination row is its own tap target, a leg has one round button that asks for other
+ * ways of driving it, and the dry band has its reserve lamp and the offers it brings
+ * back. The drive pill, discs, marks, the night block and the day-end point carry no role
+ * and no chevron, so nothing looks like a button that isn't one.
  */
 
 export interface RowChrome {
@@ -140,13 +142,32 @@ const LEG_ICONS: Record<string, typeof CarFront> = {
   cycling: Bike,
 }
 
-/** The drive between two stops. 12px rather than the desktop's 10: a four-hour leg
- *  deserves the space it takes. A div, never a button: tapping a leg to pick another
- *  route is a desktop affordance and costs up to five routing requests. */
-export function RtLegRow({ seg, mode, chrome }: {
+/**
+ * The drive between two stops. 12px rather than the desktop's 10: a four-hour leg
+ * deserves the space it takes.
+ *
+ * Other ways of driving it are asked for with one 40px round button at the end of the
+ * row, never with the whole band as on the desktop rail. The chain scrolls under a thumb,
+ * and with a band-wide target the tap that only meant to stop that scroll, landing on a
+ * leg, would cost up to five routing requests and a jump to the map. So the pill stays a
+ * line of text, and the button is the one thing on the row that acts: a small, separate
+ * target that keeps that cost behind a gesture nobody makes by accident.
+ *
+ * Open, the button takes the inner surface and the full ink rather than filling with the
+ * action colour, for the reason the rail gives: a filled chip in a column of quiet rows
+ * reads as a button that was pressed and stuck. Offline it keeps its place but dims,
+ * because a choice is saved as a via and vias are online only. Without `onAlternatives`
+ * (no permission, or a leg that cannot be rerouted) the column stays empty.
+ */
+export function RtLegRow({ seg, mode, chrome, onAlternatives, alternativesOpen = false, alternativesDisabled = false }: {
   seg: RouteSegment | undefined
   mode: string | null
   chrome: RowChrome
+  /** Asks for other ways of driving this leg. Absent means the leg offers none. */
+  onAlternatives?: () => void
+  /** True while the picker is open on this leg. */
+  alternativesOpen?: boolean
+  alternativesDisabled?: boolean
 }) {
   const { t } = chrome
   const Icon = mode && LEG_ICONS[mode] ? LEG_ICONS[mode] : mode?.startsWith('plugin:') ? Zap : CarFront
@@ -161,11 +182,28 @@ export function RtLegRow({ seg, mode, chrome }: {
       <span className="flex min-h-[40px] flex-col items-center" aria-hidden="true">
         <span className="w-[2px] flex-1" style={{ backgroundImage: 'repeating-linear-gradient(var(--m-conn) 0 4px, transparent 4px 8px)' }} />
       </span>
-      <span className="my-1.5 flex items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px]">
+      <span className="my-1.5 flex min-w-0 items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px]">
         <Icon size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
         <span className="truncate text-[0.75rem] font-semibold tabular-nums text-m-ink">{text}</span>
       </span>
-      <span />
+      {onAlternatives ? (
+        <button
+          type="button"
+          onClick={onAlternatives}
+          disabled={alternativesDisabled}
+          aria-pressed={alternativesOpen}
+          aria-label={t('roadtrip.alt.ask')}
+          className={`grid h-10 w-10 flex-none place-items-center rounded-full border disabled:opacity-35 ${
+            alternativesOpen
+              ? 'border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] text-m-ink'
+              : 'border-transparent bg-[color:var(--m-ic)] text-m-muted'
+          }`}
+        >
+          <Shuffle size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
+      ) : (
+        <span />
+      )}
     </div>
   )
 }
@@ -246,8 +284,9 @@ export function RtDryRow({ intoLegKm, chrome, electric, onSearch, offline, refue
     >
       <div className="flex min-h-[44px] items-center gap-2.5">
         {/* Renamed on this span only, never on the band: the offers below are drawn in
-            --m-ink too, and they have to stay ink. Not a tap target either, because
-            nothing in the chain but a destination row reacts to a tap. */}
+            --m-ink too, and they have to stay ink. Not a tap target either: the lamp at
+            the end of this line is its one control, and a mascot that reacted too would
+            be a second one that looks like none. */}
         <span
           className="pointer-events-none flex flex-none"
           style={{ '--m-ink': 'var(--m-st-danger)', '--m-bg': DRY_GROUND } as CSSProperties}

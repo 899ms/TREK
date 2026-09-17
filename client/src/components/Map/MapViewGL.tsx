@@ -40,7 +40,7 @@ import { resolveTrackColor, hasManualTrackColor } from './trackColors'
 import { buildPoiPopupHtml } from './placePopup'
 import { pluginsApi, type PluginMapMarker, type PluginMapLayer } from '../../api/client'
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, SATELLITE_TILE_URL, SATELLITE_TILE_ATTRIBUTION, SATELLITE_TILE_MAXZOOM } from '../../constants/mapDefaults'
-import { computeMapViewport, TILE_SIZE_GL } from '../../utils/mapViewport'
+import { computeMapViewport, TILE_SIZE_GL, type ViewportPadding } from '../../utils/mapViewport'
 
 function categoryIconSvg(iconName: string | null | undefined, size: number): string {
   const IconComponent = (iconName && CATEGORY_ICON_MAP[iconName]) || CATEGORY_ICON_MAP['MapPin']
@@ -185,6 +185,16 @@ interface Props {
    * needs that leg on screen, which is neither the day nor the trip.
    */
   focusPoints?: [number, number][]
+  /**
+   * What the caller's own chrome covers while `focusPoints` is framed, in pixels per edge.
+   *
+   * The default padding knows this component's panels and nothing else, and on a phone it
+   * is a flat margin. A shell that lays its own bars over the map passes what they cover,
+   * so the frame lands in the part still visible. Only the fit on `focusPoints` reads it.
+   * Compared by value: the same numbers in a new object do not refit, while new numbers
+   * refit the points already handed over, because the chrome they must clear has moved.
+   */
+  fitPadding?: ViewportPadding
   /**
    * Let markers stay apart longer than usual.
    *
@@ -656,6 +666,7 @@ export function MapViewGL({
   zoom = DEFAULT_MAP_ZOOM,
   fitKey = 0,
   focusPoints,
+  fitPadding,
   clusterLoosely = false,
   hazards,
   dawarichTrack = null,
@@ -2206,6 +2217,10 @@ export function MapViewGL({
     if (routeArrivedForPendingFit) pendingRouteFitRef.current = null
   }, [fitKey, routeFitKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The caller's padding as a value, so a parent that builds the object inline on every
+  // render does not move the camera each time it renders.
+  const fitPaddingKey = fitPadding ? [fitPadding.top, fitPadding.right, fitPadding.bottom, fitPadding.left].join(' ') : ''
+
   // Frame whatever was handed over. Nothing happens when it empties, so closing the
   // picker leaves the map where the user left it rather than snapping back.
   useEffect(() => {
@@ -2217,13 +2232,13 @@ export function MapViewGL({
     pendingRouteFitRef.current = null
     try {
       map.fitBounds(bounds, {
-        padding: paddingOpts,
+        padding: fitPadding ?? paddingOpts,
         maxZoom: 15,
         pitch: enableMapbox3d ? 45 : 0,
         duration: 400,
       })
     } catch { /* noop */ }
-  }, [focusPoints]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusPoints, fitPaddingKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // flyTo selected place
   useEffect(() => {

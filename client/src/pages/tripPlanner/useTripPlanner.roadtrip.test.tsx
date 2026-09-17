@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-097
+// FE-TP-ROAD-001 to FE-TP-ROAD-099
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -145,7 +145,11 @@ const rt = vi.hoisted(() => {
     ask: vi.fn(),
     close: vi.fn(),
   }
-  return { vias, routes, corridor, alt, routesArgs }
+  // Hands out a fresh copy of `alt` on every render when set, the identity the real hook
+  // had before it was memoised. A stable fixture runs an effect keyed on it once and never
+  // again, which is exactly how a close gate that fired on every render went unseen.
+  const altFresh = { current: false }
+  return { vias, routes, corridor, alt, altFresh, routesArgs }
 })
 
 vi.mock('../../components/Roadtrip/useRoadtripVias', () => ({ useRoadtripVias: () => rt.vias }))
@@ -153,7 +157,9 @@ vi.mock('../../components/Roadtrip/useRoadtripRoutes', () => ({
   useRoadtripRoutes: (...args: unknown[]) => { rt.routesArgs.current = args; return rt.routes },
 }))
 vi.mock('../../components/Roadtrip/useRoadtripCorridor', () => ({ useRoadtripCorridor: () => rt.corridor }))
-vi.mock('../../components/Roadtrip/useRouteAlternatives', () => ({ useRouteAlternatives: () => rt.alt }))
+vi.mock('../../components/Roadtrip/useRouteAlternatives', () => ({
+  useRouteAlternatives: () => (rt.altFresh.current ? { ...rt.alt } : rt.alt),
+}))
 vi.mock('../../components/Roadtrip/useFollowTrack', () => ({
   useFollowTrack: () => ({ busy: false, dayId: null, run: vi.fn(), attach: vi.fn(), detach: vi.fn() }),
 }))
@@ -311,6 +317,7 @@ beforeEach(() => {
   rt.corridor.search.spine = []
   rt.corridor.insertIndexFor.mockReturnValue(1)
   rt.alt.open = null
+  rt.altFresh.current = false
 
   usePluginStore.setState({ plugins: [], loaded: true })
   useBackgroundTasksStore.setState({ tasks: [] })
@@ -2122,5 +2129,42 @@ describe('useTripPlanner road trip: the phone feed', () => {
 
     expect(desk.result.current.stopDraft).toMatchObject({ dayId: 5, editing: { placeId: 102, stopType: 'fuel' } })
     expect(desk.result.current.showPlaceForm).toBe(false)
+  })
+
+  it('FE-TP-ROAD-098: a picker open on the drive tab survives the next render, with the mode still off', async () => {
+    // The blocker the phone picker hit. The close gate read `roadtripActive`, which is false
+    // on a phone by design, and ran on every render because the hook handed out a new
+    // object each time: asking set the picker loading, the render after it closed it again.
+    // The fixture hands out a fresh object per render so the gate is proven on its own,
+    // whatever identity the hook keeps.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: true, error: false }
+    rt.altFresh.current = true
+
+    const { result, rerender } = await renderPhone()
+    rt.alt.close.mockClear()
+    rerender()
+    rerender()
+
+    expect(rt.alt.close).not.toHaveBeenCalled()
+    expect(result.current.roadtripActive).toBe(false)
+    expect(result.current.roadtripMode).toBe(false)
+  })
+
+  it('FE-TP-ROAD-099: leaving the drive tab on a phone closes the picker, though the feed stays on', async () => {
+    // The phone's counterpart of FE-TP-ROAD-044: the overlay depends only on the picker, so
+    // a tab that no longer shows the bar must not leave the other roads drawn on its map.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+
+    const { result } = await renderPhone()
+    rt.alt.close.mockClear()
+    act(() => { result.current.handleTabChange('plan') })
+
+    await waitFor(() => expect(rt.alt.close).toHaveBeenCalled())
+    // The routed legs are kept (FE-TP-ROAD-094), so it is the tab that closed it, not the feed.
+    expect(result.current.roadtripFeedActive).toBe(true)
   })
 })

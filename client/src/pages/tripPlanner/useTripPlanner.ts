@@ -1328,9 +1328,16 @@ export function useTripPlanner() {
   // on the picker — so flipping the mode off left pale blue alternatives, their
   // casings and their drive-time pills drawn on an ordinary planner map, with no
   // road trip UI left to dismiss them from.
+  //
+  // The gate is where the picker can be seen, not the mode. `roadtripActive` is false
+  // on a phone by design (see `roadtripMode`), so gating on it alone closed a picker
+  // the phone had just opened, on the very next render. On the phone the picker lives
+  // on the drive tab, so it stays open there and closes once the tab is left. At desk
+  // width `isMobile` is false and this is exactly `roadtripActive`, as it always was.
+  const alternativesShown = roadtripActive || (isMobile && roadtripFeedActive && activeTab === 'roadtrip')
   useEffect(() => {
-    if (!roadtripActive) routeAlternatives.close()
-  }, [roadtripActive, routeAlternatives])
+    if (!alternativesShown) routeAlternatives.close()
+  }, [alternativesShown, routeAlternatives])
 
   /**
    * The offered routes as the map draws them: line, colour, and the label that sits on

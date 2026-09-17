@@ -17,6 +17,7 @@ import { formatDistance } from '../../utils/units'
 import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
+import { legReroutable } from './roadtripRowModel'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -1416,7 +1417,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onReorderStop, on
         {i < last && (!day.stops[i + 1].automaticNight || day.legs[i]?.distance !== 0) ? (
           <DriveBand
             leg={day.legs[i]}
-            onAskAlternatives={onAskAlternatives && !day.stops[i + 1].automaticNight ? () => onAskAlternatives(day.dayId, i) : undefined}
+            onAskAlternatives={onAskAlternatives && legReroutable(day, i) ? () => onAskAlternatives(day.dayId, i) : undefined}
             alternativesOpen={openAlternatives?.dayId === day.dayId && openAlternatives.index === i}
           />
         ) : null}

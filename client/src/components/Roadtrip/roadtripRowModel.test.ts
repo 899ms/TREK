@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   destinationCount,
   firstStopOfPlace,
+  legReroutable,
   pickWarning,
   roadtripRows,
   stageClocks,
@@ -14,7 +15,7 @@ import {
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
 import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-037
+// FE-RTROW-001 to FE-RTROW-039
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -441,5 +442,33 @@ describe('firstStopOfPlace', () => {
     expect(firstStopOfPlace([], 301)).toBeNull()
     // Only an automatic night sits on this position, which is not a stop anybody chose.
     expect(firstStopOfPlace([day([stop('Nacht', { placeId: 303, automaticNight: { phase: 'end', fromDayNumber: 1 } })])], 303)).toBeNull()
+  })
+})
+
+describe('legReroutable', () => {
+  it('FE-RTROW-038: a routed leg between two stops anybody chose can be offered other ways, a service stop included', () => {
+    const d = day([stop('Bremen'), stop('Aral', { stopType: 'fuel' }), stop('Kassel')])
+    expect(legReroutable(d, 0)).toBe(true)
+    expect(legReroutable(d, 1)).toBe(true)
+  })
+
+  it('FE-RTROW-039: no leg into or out of an automatic night, none without a route, none past either end', () => {
+    // Bremen, Kassel, automatic night, Fulda: the rail offers the first leg only.
+    const withNight = day([stop('Bremen'), stop('Kassel'), night(), stop('Fulda')])
+    expect(legReroutable(withNight, 0)).toBe(true)
+    // Into the marker where the window closed, and out of it again the morning after.
+    expect(legReroutable(withNight, 1)).toBe(false)
+    expect(legReroutable(withNight, 2)).toBe(false)
+    expect(legReroutable(day([night('start'), stop('Fulda')]), 0)).toBe(false)
+
+    // A leg the router has not answered for yet has nothing to weigh an offer against.
+    const unrouted = day([stop('A'), stop('B'), stop('C')], { legs: [seg(0)] })
+    expect(legReroutable(unrouted, 0)).toBe(true)
+    expect(legReroutable(unrouted, 1)).toBe(false)
+
+    // The last stop has no leg after it, whatever the legs array happens to hold.
+    const extra = day([stop('A'), stop('B')], { legs: [seg(0), seg(1)] })
+    expect(legReroutable(extra, 1)).toBe(false)
+    expect(legReroutable(extra, -1)).toBe(false)
   })
 })

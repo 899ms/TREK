@@ -2196,6 +2196,62 @@ describe('MapViewGL', () => {
     )
     expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
   })
+
+  it('FE-COMP-MAPVIEWGL-085: a caller padding frames the focus points instead of the phone margin, and the day fit keeps its own', async () => {
+    // A phone shell lays a chip rail over the top of the map and a bar plus the dock over
+    // the bottom. The flat 40px margin put the ends of a framed leg under either of them.
+    const original = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 420 })
+    try {
+      const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+      const chrome = { top: 120, right: 16, bottom: 290, left: 16 }
+      const { rerender } = render(<MapViewGL places={[]} fitKey={1} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).not.toHaveBeenCalled()
+
+      rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={chrome} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+      expect(glMap.fitBounds.mock.calls[0][1]).toMatchObject({ padding: chrome, maxZoom: 15 })
+
+      // Picking a day is not the caller's frame, so that fit keeps the phone margin.
+      const places = [buildMapPlace({ id: 88, lat: 48.1, lng: 2.1 }), buildMapPlace({ id: 89, lat: 48.2, lng: 2.2 })]
+      rerender(<MapViewGL places={places} fitKey={2} focusPoints={leg} fitPadding={chrome} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(2)
+      expect(glMap.fitBounds.mock.calls[1][1]).toMatchObject({ padding: { top: 40, right: 20, bottom: 40, left: 20 } })
+
+      // And without one, the focus fit falls back to that margin too.
+      const stage: [number, number][] = [[47, 1], [47.5, 1.5]]
+      rerender(<MapViewGL places={places} fitKey={2} focusPoints={stage} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(3)
+      expect(glMap.fitBounds.mock.calls[2][1]).toMatchObject({ padding: { top: 40, right: 20, bottom: 40, left: 20 } })
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: original })
+    }
+  })
+
+  it('FE-COMP-MAPVIEWGL-086: the caller padding is read by value, so only new numbers refit the points on screen', async () => {
+    const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+    const { rerender } = render(
+      <MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />,
+    )
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+
+    // A parent that builds the object inline hands a new one on every render. The camera
+    // belongs to the traveller between fits, so that alone must not take it back.
+    rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />)
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+
+    // New numbers mean the chrome moved, so the same points are framed again around it.
+    rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 98, left: 16 }} />)
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(2)
+    expect(glMap.fitBounds.mock.calls[1][1]).toMatchObject({ padding: { top: 120, right: 16, bottom: 98, left: 16 } })
+  })
 })
 describe('MapViewGL attribution', () => {
   const flushFrames = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 40)) })

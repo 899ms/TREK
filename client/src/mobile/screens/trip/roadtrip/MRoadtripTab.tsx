@@ -3,7 +3,9 @@ import { AlertTriangle, MapPin, Navigation } from 'lucide-react'
 import { useMPlanDaySwipe } from '../plan/useMPlanDaySwipe'
 import { showStopOnMap, useMRoadtrip } from './useMRoadtrip'
 import { useMRtCorridor } from './useMRtCorridor'
+import { useMRtAlternatives } from './useMRtAlternatives'
 import MRtCorridorBar from './MRtCorridorBar'
+import MRtAlternativesBar from './MRtAlternativesBar'
 import { RtAutoRow, RtDryRow, RtLegRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
 import { badgeLabel, distanceBadge } from './stageBadges'
 import MBadge from '../../../components/MBadge'
@@ -17,7 +19,7 @@ import { useSettingsStore } from '../../../../store/settingsStore'
 import { formatDistance } from '../../../../utils/units'
 import { isRtlLanguage } from '../../../../i18n'
 import type { MTripTabPanelProps } from '../MTripShell'
-import type { StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import { legReroutable, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 
 /**
  * The road trip tab: one day of the drive, as a chain or on the map.
@@ -38,6 +40,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   const cardRef = useRef<HTMLDivElement>(null)
   const rt = useMRoadtrip(planner)
   const corridor = useMRtCorridor(planner, shell)
+  // Called once here and handed down, like `rt`: the chain's leg buttons and the bar over
+  // the map read one controller, so a leg shows pressed for exactly the picker on the map.
+  const alts = useMRtAlternatives(planner, shell)
   const unit = useSettingsStore(s => s.settings.distance_unit)
   const chrome: RowChrome = { t, unit }
 
@@ -81,10 +86,15 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
 
   // ── Map half: the two bars, and nothing else. Everything between them belongs to the
   // map instance the shell keeps mounted, so this layer must not swallow taps.
+  //
+  // While other ways of driving a leg are on offer, their bar takes the stage bar's slot
+  // and the search bar steps away. The picker is modal on the map: its lines are the
+  // question on screen, a corridor search started under it would draw its pins over
+  // them, and the band it frees at the top is room the leg is framed into.
   if (shell.rtView === 'map') {
     return (
       <div className="pointer-events-none absolute inset-0 z-20">
-        {searchBar}
+        {!alts.open && searchBar}
         {/* Just above the dock, the same gap everything else on this shell keeps from
             it. Twenty pixels higher left a band of map between the two that read as a
             gap rather than as breathing room, and pushed the map's own buttons into
@@ -93,7 +103,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
           {/* `rt` is handed down rather than looked up again: useMRoadtrip owns a
               30s interval and a network subscription, and a second call would run a
               second pair of them for the same screen. */}
-          <StageBar planner={planner} rt={rt} onOpen={openStop} />
+          {alts.open
+            ? <MRtAlternativesBar planner={planner} alts={alts} />
+            : <StageBar planner={planner} rt={rt} onOpen={openStop} />}
         </div>
       </div>
     )
@@ -197,7 +209,22 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
             <section className="mt-2.5 overflow-hidden rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-3 pt-1">
               {rt.rows.map((row, i) => {
                 if (row.kind === 'stop') return <RtStopRow key={`s${i}`} row={row} chrome={chrome} onOpen={() => openStop(row)} />
-                if (row.kind === 'leg') return <RtLegRow key={`l${i}`} seg={row.seg} mode={row.mode} chrome={chrome} />
+                if (row.kind === 'leg') {
+                  // Only where the desk rail offers it too (legReroutable), and with the
+                  // card's day id, the one the desk passes: the planner finds the day each
+                  // stop is stored on by itself.
+                  return (
+                    <RtLegRow
+                      key={`l${i}`}
+                      seg={row.seg}
+                      mode={row.mode}
+                      chrome={chrome}
+                      onAlternatives={alts.canAsk && legReroutable(stage, row.index) ? () => alts.ask(stage.dayId, row.index) : undefined}
+                      alternativesOpen={alts.isOpenFor(stage.dayId, row.index)}
+                      alternativesDisabled={!alts.editable}
+                    />
+                  )
+                }
                 if (row.kind === 'auto') return <RtAutoRow key={`a${i}`} phase={row.phase} time={row.time} chrome={chrome} />
                 if (row.kind === 'spill') {
                   return <RtSpillRow key={`p${i}`} fromDayNumber={row.fromDayNumber} departs={row.departs} chrome={chrome} />

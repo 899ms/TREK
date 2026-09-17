@@ -152,6 +152,26 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
   return rows
 }
 
+/**
+ * Whether the leg leaving stop `index` can be offered other ways of driving it.
+ *
+ * The desktop rail's rule, kept here so the phone chain offers the button on exactly the
+ * legs the rail does. A leg needs a route, because an unrouted one has nothing to weigh an
+ * offer against. And neither of its ends may be an automatic night: that point is the
+ * shell's own marker for where the daily window closed, a spot somewhere along the road
+ * rather than a stop anyone chose. The router's offers from or to it would reshape a
+ * stretch of a longer drive, and the via a choice writes is filed by the position of a
+ * stored stop, which the marker is not. The rail draws the band out of that marker
+ * without the control for the same reason.
+ */
+export function legReroutable(day: RoadtripDay, index: number): boolean {
+  return index >= 0
+    && index < day.stops.length - 1
+    && !!day.legs[index]
+    && !day.stops[index].automaticNight
+    && !day.stops[index + 1].automaticNight
+}
+
 /** Stops that carry a number, for a count that agrees with the numbering above. */
 export function destinationCount(day: RoadtripDay): number {
   return day.stops.filter(s => !s.automaticNight && !isServiceStopType(s.stopType)).length
