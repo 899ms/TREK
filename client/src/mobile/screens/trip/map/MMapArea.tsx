@@ -282,22 +282,25 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
    * sets overlap: the same petrol station found twice would be two pins on one roof.
    */
   /**
-   * The vias the phone map draws, minus the night pauses.
+   * The vias the phone map draws: on a stage, only the night that belongs to it.
    *
-   * A night pause is a pill with a moon and a day number, drawn beside the boundary where
-   * one travel day ends. On the desktop it is a handle: it carries a hint and can be
-   * dragged to move the boundary. A phone has no hover to explain it and no room to drag
-   * it, so all it does there is sit on the map, and it sits there for EVERY day at once —
-   * the markers come from the whole drive (`automaticPoints`), not from the stage on
-   * screen, so day 1 shows day 2's pill as well. Two labels the day filter does not reach
-   * read as part of the map rather than as a control.
+   * A night pause is a pill with a moon and a day number, drawn where one travel day
+   * ends. The markers are built from the WHOLE drive (`automaticPoints`), which is right
+   * for the desktop rail and for the all-days view here, but a stage shows one day: with
+   * the unfiltered list, day 1 carried day 2's pill as well, in the middle of a map that
+   * is otherwise entirely day 1. Two ends on a map that draws one is a question, not a
+   * label.
    *
-   * Both lists go through the same filter: the plan tab's vias carry night pauses too.
+   * So on a stage the pill is kept only where its day is the day on screen, and off a
+   * stage the list is left alone, because in the all-days view every night does belong to
+   * a line that is drawn. `nightPause.day` is the day number the marker was built from
+   * (see `useAutomaticDayPoints`), which is the same number the stage carries.
    */
-  const mapVias = useMemo(
-    () => (onStage ? planner.roadtripMapVias : planner.routeVias)?.filter(v => !v.nightPause),
-    [onStage, planner.roadtripMapVias, planner.routeVias],
-  )
+  const mapVias = useMemo(() => {
+    const vias = onStage ? planner.roadtripMapVias : planner.routeVias
+    if (!vias || !stage) return vias
+    return vias.filter(v => !v.nightPause || v.nightPause.day === stage.dayNumber)
+  }, [onStage, planner.roadtripMapVias, planner.routeVias, stage])
 
   const pois = useMergedMapPois(
     onStage ? planner.roadtripCorridor.visible : null,

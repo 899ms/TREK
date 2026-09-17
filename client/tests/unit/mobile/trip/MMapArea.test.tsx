@@ -538,26 +538,27 @@ describe('MMapArea', () => {
     expect(mocks.props.focusPoints).toBe(shown)
   })
 
-  it('FE-MOB-MAPAREA-036: the phone map draws no night pause, on either tab', () => {
-    // A night pause is the moon pill beside a day boundary. On the desktop it is a drag
-    // handle with a hint; a phone has neither hover nor room to drag, and the markers come
-    // from the whole drive rather than the stage, so day 1 showed day 2's pill too.
-    const nightPause = { day: 2, atPlace: false }
-    const vias = [
-      { lat: 53.55, lng: 9.99, tone: 'default' as const, nightPause },
-      { lat: 53.87, lng: 10.69, tone: 'default' as const, label: 'Rest stop' },
-    ]
+  it('FE-MOB-MAPAREA-036: a stage keeps its own night pause and drops the other days', () => {
+    // A night pause is the moon pill where a travel day ends. The markers are built from
+    // the whole drive, so day 1 used to carry day 2's pill as well, in the middle of a map
+    // that draws day 1 only. `stagePlanner(3)` is day 1 of the drive (stageDay).
+    const own = { lat: 53.87, lng: 10.69, tone: 'default' as const, nightPause: { day: 1, atPlace: false } }
+    const other = { lat: 53.55, lng: 9.99, tone: 'default' as const, nightPause: { day: 2, atPlace: false } }
+    const plain = { lat: 53.6, lng: 10.2, tone: 'default' as const, label: 'Rest stop' }
+    const vias = [own, other, plain]
 
     const stage = renderArea(
       { trTab: 'roadtrip', mapFront: true },
       { ...stagePlanner(3), roadtripMapVias: vias } as unknown as Partial<TripPlanner>,
     )
-    expect(mocks.props.routeVias).toEqual([vias[1]])
+    // Its own night and everything that is not one; day 2's pill stays off this map.
+    expect(mocks.props.routeVias).toEqual([own, plain])
     stage.unmount()
 
-    // The plan tab's own vias carry night pauses too, so they go through the same filter.
+    // Off a stage the list is left alone: in the all-days view every night belongs to a
+    // line that is actually drawn.
     renderArea({ trTab: 'plan' }, { routeVias: vias })
-    expect(mocks.props.routeVias).toEqual([vias[1]])
+    expect(mocks.props.routeVias).toBe(vias)
   })
 
   it('FE-MOB-MAPAREA-026: the map layer carries no credit corner on either tab', () => {
