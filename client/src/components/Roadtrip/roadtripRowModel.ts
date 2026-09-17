@@ -109,6 +109,26 @@ function stopRow(
  *    card it is drawn on. The rows follow the card, because that is what the traveller
  *    reads, and anything writing back has to use `ownerDayId` instead.
  */
+/**
+ * Whether a leg is the model's placeholder for "the day ended where you were standing".
+ *
+ * `dayWindow.stationary()` puts one of these between the last stop of a day and the
+ * automatic night that closes it: same coordinate at both ends, nothing measured, no
+ * texts. It is bookkeeping, not a drive, and drawn as a pill it said either " in " (the
+ * separator of `roadtrip.leg.driveText` with both slots empty) or, once that was guarded,
+ * "No route" under a stop the traveller had simply arrived at.
+ *
+ * Matched on the shape rather than on the next stop being an automatic night, because
+ * what makes it not a drive is that it goes nowhere. A night the traveller moved to a
+ * point down the road HAS a leg, with a distance, and that one keeps its pill.
+ */
+function isStationary(seg: RouteSegment | undefined): boolean {
+  return !!seg
+    && seg.distance === 0
+    && seg.from[0] === seg.to[0]
+    && seg.from[1] === seg.to[1]
+}
+
 export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
   const rows: RoadtripRow[] = []
   const spills = day.spills ?? []
@@ -140,7 +160,7 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
     // The leg AFTER this stop, plus the dry point that falls on it. Both belong
     // between two stops, so they are emitted here rather than in their own pass.
     const seg = day.legs[i]
-    if (i < day.stops.length - 1) {
+    if (i < day.stops.length - 1 && !isStationary(seg)) {
       rows.push({ kind: 'leg', index: i, seg, mode: day.stops[i + 1]?.incomingLegMode ?? stop.legMode ?? null })
       const dry = (day.dryPoints ?? []).find(p => p.legIndex === i)
       if (dry) {

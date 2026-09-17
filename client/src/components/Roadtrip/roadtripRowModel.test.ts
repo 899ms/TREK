@@ -98,6 +98,37 @@ describe('roadtripRows numbering', () => {
     expect(stopRows(rows).map((r) => r.stop.name)).not.toContain('Nacht')
   })
 
+  it('FE-RTROW-040: the placeholder leg into an automatic night is not a row at all', () => {
+    // `dayWindow.stationary()` puts one of these between the last stop of a day and the
+    // night that closes it: same coordinate at both ends, nothing measured. It is
+    // bookkeeping, not a drive, and as a pill it read "No route" under a stop the
+    // traveller had simply arrived at (and, before that was guarded, a bare " in ").
+    const stops = [stop('Hamburg'), night()]
+    const at: [number, number] = [53.54, 10.01]
+    const stationary: RouteSegment = {
+      mid: at, from: at, to: at, distance: 0, duration: 0,
+      walkingText: '', drivingText: '', distanceText: '',
+    }
+    const rows = roadtripRows(day(stops, { legs: [stationary] }))
+
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'auto'])
+  })
+
+  it('FE-RTROW-041: a night the traveller drove to keeps its leg', () => {
+    // A boundary dragged down the road ends the day somewhere else, and that IS a drive.
+    const stops = [stop('Hamburg'), night()]
+    const rows = roadtripRows(day(stops, { legs: [seg(0)] }))
+
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'leg', 'auto'])
+  })
+
+  it('FE-RTROW-042: a leg nothing has routed yet still gets its row, so it can say it is pending', () => {
+    const stops = [stop('Hamburg'), stop('Bremen')]
+    const rows = roadtripRows(day(stops, { legs: [undefined] }))
+
+    expect(rows.map((r) => r.kind)).toEqual(['stop', 'leg', 'stop'])
+  })
+
   it('FE-RTROW-003: the automatic night carries no dwell and takes its time from the schedule', () => {
     // Die Nacht traegt dwellMinutes 480, aber keine Zeile, die eine Aufenthaltsdauer zeigen koennte.
     const rows = roadtripRows(
