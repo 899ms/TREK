@@ -12,10 +12,10 @@ export const RT_ALT_BAR_HEIGHT = 174
 /**
  * How far the map floor rises while the alternatives bar stands over the dock, in pixels.
  *
- * The bar's height plus the same 15px the 76px stage lift adds to the 61px stage bar: the
- * gap between the top of the dock and the foot of a bar standing over it. So the floor
- * lands on this bar's top edge as it lands on that one's, and the credit and the round
- * controls clear this bar the way they clear that one.
+ * The bar's height plus the 15px gap between the top of the dock and the foot of a bar
+ * standing over it. So the floor lands on this bar's top edge and the round controls
+ * clear it rather than sitting in it. It is the only bar left in that slot: the stage bar
+ * that used to hold it whenever the map was up is gone.
  *
  * A number rather than a CSS length because the map's fit padding is added up from it.
  * Kept in this module rather than in the bar's, so the map area reads it without pulling

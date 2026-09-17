@@ -7,14 +7,10 @@ import { useMRtAlternatives } from './useMRtAlternatives'
 import MRtCorridorBar from './MRtCorridorBar'
 import MRtAlternativesBar from './MRtAlternativesBar'
 import { RtAutoRow, RtDryRow, RtLegRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
-import { badgeLabel, distanceBadge } from './stageBadges'
 import MBadge from '../../../components/MBadge'
 import MDancingTrek from '../../../components/MDancingTrek'
-import PlaceAvatar from '../../../../components/shared/PlaceAvatar'
-import { dayColor } from '../../../../components/Roadtrip/dayColors'
 import { formatDurationShort } from '../../../../components/Roadtrip/roadtripModel'
 import { getNavigationTargets } from '../../../../components/Planner/placeNavigation'
-import { useRoadtripSettings } from '../../../../hooks/useRoadtripSettings'
 import { useSettingsStore } from '../../../../store/settingsStore'
 import { formatDistance } from '../../../../utils/units'
 import { isRtlLanguage } from '../../../../i18n'
@@ -84,29 +80,32 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
     </div>
   )
 
-  // ── Map half: the two bars, and nothing else. Everything between them belongs to the
-  // map instance the shell keeps mounted, so this layer must not swallow taps.
+  // ── Map half: the search bar, and the picker's bar while it is open. Everything
+  // between them belongs to the map instance the shell keeps mounted, so this layer must
+  // not swallow taps.
   //
-  // While other ways of driving a leg are on offer, their bar takes the stage bar's slot
-  // and the search bar steps away. The picker is modal on the map: its lines are the
+  // A stage bar used to stand over the dock whenever the map was up: the day's
+  // destination with its picture, its stop count, its arrival and its distance. It went
+  // because the day and the distance are already in the shell's stage header, and on a
+  // map that fills the screen a permanent card over the bottom edge costs more than the
+  // three facts it added.
+  //
+  // While other ways of driving a leg are on offer, their bar stands in that now empty
+  // slot and the search bar steps away. The picker is modal on the map: its lines are the
   // question on screen, a corridor search started under it would draw its pins over
   // them, and the band it frees at the top is room the leg is framed into.
   if (shell.rtView === 'map') {
     return (
       <div className="pointer-events-none absolute inset-0 z-20">
         {!alts.open && searchBar}
-        {/* Just above the dock, the same gap everything else on this shell keeps from
-            it. Twenty pixels higher left a band of map between the two that read as a
-            gap rather than as breathing room, and pushed the map's own buttons into
-            the bar's top edge. */}
-        <div className="pointer-events-auto absolute left-4 right-4 bottom-[calc(var(--bottom-nav-h,84px)+4px)]">
-          {/* `rt` is handed down rather than looked up again: useMRoadtrip owns a
-              30s interval and a network subscription, and a second call would run a
-              second pair of them for the same screen. */}
-          {alts.open
-            ? <MRtAlternativesBar planner={planner} alts={alts} />
-            : <StageBar planner={planner} rt={rt} onOpen={openStop} />}
-        </div>
+        {/* Just above the dock, the same gap everything else on this shell keeps from it.
+            Mounted only while the picker is open, so nothing invisible lies over the map's
+            own buttons the rest of the time. */}
+        {alts.open && (
+          <div className="pointer-events-auto absolute left-4 right-4 bottom-[calc(var(--bottom-nav-h,84px)+4px)]">
+            <MRtAlternativesBar planner={planner} alts={alts} />
+          </div>
+        )}
       </div>
     )
   }
@@ -253,107 +252,6 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
         )}
       </div>
     </div>
-  )
-}
-
-/**
- * The stage bar over the map: which day, where to, what it costs.
- *
- * One line rather than a sheet that can be dragged open. A drag sheet brings a panel
- * height the map fit has to account for and lifts the locate and style buttons with
- * it, which is a bigger change than this half of the screen needs to be useful.
- *
- * It reads as a place, so a tap opens that place's stop, the same sheet its row in the
- * chain opens. It used to switch to the chain instead, which broke the promise its name
- * makes; the header's list switch is the way back to the chain. Name, picture, clock and
- * tap all come off one row (see stageEnd), so the bar can never name one stop and open
- * another.
- *
- * It leads with a picture of that place rather than a coloured dot, because a place is
- * recognised by how it looks long before its name is read. The facts beside it are badges
- * rather than one line joined with dots: each one is a figure on its own, and a pill edge
- * separates them at a glance where a middle dot has to be found first. Every badge is
- * neutral. The whole bar is one button, and a filled pill inside it would read as a
- * second control that does something else.
- *
- * Its height is a contract: 38px picture, a 39px text column, 10px padding and the border
- * make the 61px the map area lifts its round buttons over (--m-stage-lift in MMapArea).
- * Growing the picture or a badge moves those buttons into the bar's top edge.
- */
-function StageBar({ planner, rt, onOpen }: {
-  planner: MTripTabPanelProps['planner']
-  rt: ReturnType<typeof useMRoadtrip>
-  onOpen: (row: StopRow) => void
-}) {
-  const { t } = planner
-  const unit = useSettingsStore(s => s.settings.distance_unit)
-  const dayColorsOn = useRoadtripSettings(s => s.roadtrip_day_colors, planner.tripId)
-  const stage = rt.stage
-
-  if (!stage) {
-    // No stage means the day filter is off, which on the map is the whole drive. Its total
-    // is left out while nothing is measured, rather than printed as a drive of 0 m.
-    const total = distanceBadge(planner.roadtripRoutes.totalDistance, unit)
-    return (
-      <div className="flex items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[14px] py-[11px] shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]">
-        <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold text-m-ink">{t('roadtrip.title')}</span>
-        {total && <MBadge size="sm" caps={false}>{total}</MBadge>}
-      </div>
-    )
-  }
-
-  const tint = dayColorsOn ? dayColor(stage.dayNumber) : null
-  const end = rt.end
-  const name = end?.stop.name ?? t('roadtrip.stop.none')
-  const stopCount = t('roadtrip.day.stopCount', { count: rt.stops })
-  const distance = distanceBadge(stage.distance, unit)
-  const pending = t('roadtrip.leg.pending')
-
-  const inner = (
-    <>
-      {/* Hidden from the name, which the title already carries: the photo's alt text is the
-          place name a second time. The day colour rings the picture when the day colours
-          are on, because the ring is what ties this bar to its own line on the map. */}
-      <span
-        aria-hidden="true"
-        className="flex h-[38px] w-[38px] flex-none items-center justify-center overflow-hidden rounded-full border-2 border-[color:var(--m-avbr)] bg-[color:var(--m-ic)] text-m-muted"
-        // theme-lint-disable: map paint, see dayColors.ts.
-        style={tint ? { borderColor: tint.line } : undefined}
-      >
-        {/* Keyed by place: the avatar takes its photo from the first place it is handed and
-            keeps it while a new one is still loading or has none, so without a remount a
-            swipe to the next day would still picture the previous day's destination. */}
-        {rt.endPlace ? (
-          <PlaceAvatar key={rt.endPlace.id} place={rt.endPlace} category={rt.endCategory} size={34} />
-        ) : (
-          <MapPin size={16} strokeWidth={2} />
-        )}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-[0.8125rem] font-semibold leading-[18px] text-m-ink">{name}</span>
-        <span className="mt-[3px] flex min-w-0 items-center gap-[5px] overflow-hidden">
-          <MBadge>{stopCount}</MBadge>
-          {/* dir=ltr for the reason the rows carry it: a clock reads the same way round in an RTL locale. */}
-          {end?.time && <MBadge caps={false}><span dir="ltr">{end.time}</span></MBadge>}
-        </span>
-      </span>
-      {distance ? <MBadge size="sm" caps={false}>{distance}</MBadge> : <MBadge size="sm">{pending}</MBadge>}
-    </>
-  )
-  const box = 'flex w-full items-center gap-2.5 rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-[11px] py-[10px] text-left shadow-[0_16px_44px_-14px_rgba(0,0,0,.35)] backdrop-blur-[24px] backdrop-saturate-[1.6]'
-
-  // A stage without a single stop has nothing for a tap to open, so a plain block rather
-  // than a dead button, the rule the whole-drive line above follows too.
-  if (!end) return <div className={box}>{inner}</div>
-  return (
-    <button
-      type="button"
-      onClick={() => onOpen(end)}
-      aria-label={badgeLabel([name, stopCount, end.time, distance ?? pending])}
-      className={box}
-    >
-      {inner}
-    </button>
   )
 }
 

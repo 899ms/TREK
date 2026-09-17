@@ -195,8 +195,9 @@ describe('useMRtAlternatives', () => {
     expect(viewer.result.current.canAsk).toBe(false)
   })
 
-  it('FE-MOB-RTALTH-009: the map lifts its floor by the bar and the gap the stage bar keeps', () => {
-    // 61px stage bar plus 15 is the 76px stage lift; the same 15 between the dock and this bar.
+  it('FE-MOB-RTALTH-009: the map lifts its floor by the bar and the gap it keeps from the dock', () => {
+    // The same 15px a bar standing over the dock keeps from it. This is the only such bar
+    // left: the stage bar that used to hold the slot the rest of the time is gone.
     expect(RT_ALT_BAR_HEIGHT).toBe(174)
     expect(RT_ALT_BAR_LIFT).toBe(189)
   })

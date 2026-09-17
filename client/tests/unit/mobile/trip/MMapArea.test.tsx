@@ -202,26 +202,29 @@ describe('MMapArea', () => {
     expect(compassBand(container)?.className).not.toContain('left-3')
   })
 
-  it('FE-MOB-MAPAREA-003: the map layer floats those controls one credit row above the dock', () => {
+  it('FE-MOB-MAPAREA-003: the map layer stands those controls on the dock, with no credit row under them', () => {
     const { container } = renderArea()
     const layer = container.firstElementChild as HTMLElement
 
     // The floor is the dock's top edge: 62px tall at safe-bottom + 12, raised by the stage lift.
     expect(layer.className)
       .toContain('[--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))]')
-    // The band sits one credit row (a 30px button plus an 8px gap) above that floor, so the
-    // corner under it is the credit's; the controls add their own 12 on top.
-    expect(layer.className).toContain('[--bottom-nav-h:calc(var(--m-map-floor)+38px)]')
+    // The band sits on that floor and the controls add their own 12 on top. It used to float
+    // a further 38px up to leave the corner under it to the credit; the phone map shows none,
+    // so that row would only be a gap over the dock.
+    expect(layer.className).toContain('[--bottom-nav-h:var(--m-map-floor)]')
+    expect(layer.className).not.toContain('38px')
     // No lift off the stage: the plan tab has no bar in that band.
     expect(layer.style.getPropertyValue('--m-stage-lift')).toBe('0px')
   })
 
-  it('FE-MOB-MAPAREA-013: on the stage the map floor clears the stage bar by one gap', () => {
+  it('FE-MOB-MAPAREA-013: on the stage nothing stands over the dock, so the floor stays on it', () => {
     const { container } = renderArea({ trTab: 'roadtrip', mapFront: true })
 
-    // The bar is 61px tall and keeps a gap on both sides, so the floor rises above it rather
-    // than stopping on its top edge, and the credit and the round controls rise with it.
-    expect((container.firstElementChild as HTMLElement).style.getPropertyValue('--m-stage-lift')).toBe('76px')
+    // A 61px stage bar used to hold this slot whenever the map was up, and the floor rose
+    // 76px to clear it. It is gone, so the road trip tab lifts nothing by itself; only the
+    // picker's bar still raises the floor (FE-MOB-MAPAREA-030).
+    expect((container.firstElementChild as HTMLElement).style.getPropertyValue('--m-stage-lift')).toBe('0px')
   })
 
   it('FE-MOB-MAPAREA-014: behind the chain there is no bar to clear, so nothing lifts', () => {
@@ -535,19 +538,39 @@ describe('MMapArea', () => {
     expect(mocks.props.focusPoints).toBe(shown)
   })
 
-  it('FE-MOB-MAPAREA-026: the map layer is the credit corner on both tabs, and on the stage it rides the lift', () => {
+  it('FE-MOB-MAPAREA-036: the phone map draws no night pause, on either tab', () => {
+    // A night pause is the moon pill beside a day boundary. On the desktop it is a drag
+    // handle with a hint; a phone has neither hover nor room to drag, and the markers come
+    // from the whole drive rather than the stage, so day 1 showed day 2's pill too.
+    const nightPause = { day: 2, atPlace: false }
+    const vias = [
+      { lat: 53.55, lng: 9.99, tone: 'default' as const, nightPause },
+      { lat: 53.87, lng: 10.69, tone: 'default' as const, label: 'Rest stop' },
+    ]
+
+    const stage = renderArea(
+      { trTab: 'roadtrip', mapFront: true },
+      { ...stagePlanner(3), roadtripMapVias: vias } as unknown as Partial<TripPlanner>,
+    )
+    expect(mocks.props.routeVias).toEqual([vias[1]])
+    stage.unmount()
+
+    // The plan tab's own vias carry night pauses too, so they go through the same filter.
+    renderArea({ trTab: 'plan' }, { routeVias: vias })
+    expect(mocks.props.routeVias).toEqual([vias[1]])
+  })
+
+  it('FE-MOB-MAPAREA-026: the map layer carries no credit corner on either tab', () => {
     const plan = renderArea()
     const planLayer = plan.container.firstElementChild as HTMLElement
-    // mobile.css places the credit off this class, in both GL engines and in Leaflet.
-    expect(planLayer.classList.contains('m-credit-corner')).toBe(true)
+    // The phone map shows no credit at all now (mobile.css), so the class that used to
+    // place one is gone rather than left behind pointing at nothing.
+    expect(planLayer.classList.contains('m-credit-corner')).toBe(false)
     plan.unmount()
 
     const { container } = renderArea({ trTab: 'roadtrip', mapFront: true })
     const stageLayer = container.firstElementChild as HTMLElement
-    expect(stageLayer.classList.contains('m-credit-corner')).toBe(true)
-    // The floor takes the same 76px the band does, so the credit lands a gap above the
-    // stage bar rather than on it.
-    expect(stageLayer.style.getPropertyValue('--m-stage-lift')).toBe('76px')
+    expect(stageLayer.classList.contains('m-credit-corner')).toBe(false)
   })
 
   it('FE-MOB-MAPAREA-028: on the stage the map draws the offered roads, and a tap on one only lights it', () => {
@@ -605,8 +628,8 @@ describe('MMapArea', () => {
     const answered = { ...asking, ...withPicker(OFFERS) } as TripPlanner
     rerender(<MMapArea planner={answered} shell={shell} />)
     // Top: 12 of --m-safe-top, the rail's 50 offset and 42 height, a 12 gap. Bottom: the
-    // dock's 74, the bar's lift and the 38 credit row. The sides keep the phone's 20.
-    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 74 + RT_ALT_BAR_LIFT + 38, left: 20 })
+    // dock's 74 and the bar's lift. The sides keep the phone's 20.
+    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 74 + RT_ALT_BAR_LIFT, left: 20 })
     const first = mocks.props.fitPadding
 
     // Kept between renders, for the reason the stage data is.
@@ -622,13 +645,13 @@ describe('MMapArea', () => {
     const style = notchedPhone('59px', '34px')
     renderArea({ trTab: 'roadtrip', rtView: 'map' }, withPicker(OFFERS))
 
-    expect(mocks.props.fitPadding).toEqual({ top: 59 + 116, right: 20, bottom: 34 + 301, left: 20 })
+    expect(mocks.props.fitPadding).toEqual({ top: 59 + 116, right: 20, bottom: 34 + 74 + RT_ALT_BAR_LIFT, left: 20 })
 
     // Turned sideways the insets go to the edges, and the frame lets go of them.
     style.mockRestore()
     notchedPhone('0px', '21px')
     act(() => { window.dispatchEvent(new Event('resize')) })
-    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 21 + 301, left: 20 })
+    expect(mocks.props.fitPadding).toEqual({ top: 116, right: 20, bottom: 21 + 74 + RT_ALT_BAR_LIFT, left: 20 })
   })
 
   it('FE-MOB-MAPAREA-027: the layer sets only the lift inline, so the compass stays the one inline --bottom-nav-h', () => {

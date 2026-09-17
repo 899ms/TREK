@@ -311,27 +311,28 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
     // timeline (z-10) or the browse/tab overlays (z-30) above it.
     //
     // --m-map-floor is the top edge of whatever the map ends at: the dock, 62px tall at
-    // safe-bottom + 12, or on the road trip tab the stage bar, which takes the band the
-    // round controls would otherwise sit in and is what --m-stage-lift adds. The round
-    // controls sit straight on that floor and add their own 12px, close enough to the
-    // thumb to reach one-handed. Everything that reads --bottom-nav-h (the compass, both
-    // engines' locate button and base-layer switcher, the overview stack) follows on its
-    // own. The band used to float a further 38px up to leave the corner under it to the
-    // map credit; the phone map carries no visible credit any more (see mobile.css), so
-    // that row would now only be a gap over the dock.
+    // safe-bottom + 12, or the alternatives bar when the picker puts one over it, which is
+    // what --m-stage-lift adds. The round controls sit straight on that floor and add
+    // their own 12px, close enough to the thumb to reach one-handed. Everything that reads
+    // --bottom-nav-h (the compass, both engines' locate button and base-layer switcher,
+    // the overview stack) follows on its own. The band used to float a further 38px up to
+    // leave the corner under it to the map credit; the phone map carries no visible credit
+    // any more (see mobile.css), so that row would now only be a gap over the dock.
     //
     // The metrics are classes rather than an inline --bottom-nav-h, and the lift is its
     // OWN variable folded into them: the compass band below is identified by being the
     // one element that sets that name inline, and a second one would make that ambiguous.
     <div
       className="absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))] [--bottom-nav-h:var(--m-map-floor)]"
-      // 76px is the stage bar's own height plus the gap it keeps on both sides, so the
-      // round controls land one gap above the bar instead of on its top edge. While other
-      // ways of driving a leg are on offer their bar stands in that slot instead, taller,
-      // and the floor clears it the same way.
+      // A stage bar used to stand over the dock for the whole of the road trip tab, and the
+      // floor cleared its 61px plus a gap the year round. It is gone, so the only thing
+      // left in that slot is the bar the picker raises while other ways of driving a leg
+      // are on offer, and the floor clears that one the same way: its height plus the gap
+      // it keeps from the dock, so the round controls land above it rather than on its
+      // top edge.
       style={{
-        ['--m-stage-lift' as string]: onStage && mapActive
-          ? (planner.routeAlternatives.open ? `${RT_ALT_BAR_LIFT}px` : '76px')
+        ['--m-stage-lift' as string]: onStage && mapActive && planner.routeAlternatives.open
+          ? `${RT_ALT_BAR_LIFT}px`
           : '0px',
       }}
     >
