@@ -62,6 +62,10 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
 
   const stage = rt.stage
 
+  // The disc is only a control for somebody who may change a place. Read here rather than
+  // inside the row so the whole chain asks once, the way `rt` and `chrome` are handled.
+  const canEditPlaces = planner.can('place_edit', planner.trip)
+
   const openStop = (row: StopRow) => {
     shell.openSheet('rtstop', { dayId: row.stop.ownerDayId, assignmentId: row.stop.assignmentId })
   }
@@ -207,7 +211,23 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
 
             <section className="mt-2.5 overflow-hidden rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-3 pt-1">
               {rt.rows.map((row, i) => {
-                if (row.kind === 'stop') return <RtStopRow key={`s${i}`} row={row} chrome={chrome} onOpen={() => openStop(row)} />
+                if (row.kind === 'stop') {
+                  return (
+                    <RtStopRow
+                      key={`s${i}`}
+                      row={row}
+                      chrome={chrome}
+                      onOpen={() => openStop(row)}
+                      onPickKind={canEditPlaces
+                        ? () => shell.openSheet('rtkind', {
+                            placeId: row.stop.placeId,
+                            stopType: row.stop.stopType ?? null,
+                            name: row.stop.name,
+                          })
+                        : undefined}
+                    />
+                  )
+                }
                 if (row.kind === 'leg') {
                   // Only where the desk rail offers it too (legReroutable), and with the
                   // card's day id, the one the desk passes: the planner finds the day each

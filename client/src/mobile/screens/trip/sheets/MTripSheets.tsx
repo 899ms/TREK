@@ -25,6 +25,7 @@ import MExportSheet from './MExportSheet'
 import MMehrSheet from './MMehrSheet'
 import MRtStopSheet from '../roadtrip/MRtStopSheet'
 import MRtStaySheet from '../roadtrip/MRtStaySheet'
+import MRtKindSheet from '../roadtrip/MRtKindSheet'
 import MRtInfoSheet from '../roadtrip/MRtInfoSheet'
 import MRtCorridorSheet from '../roadtrip/MRtCorridorSheet'
 import MRtDraftSheet from '../roadtrip/MRtDraftSheet'
@@ -72,6 +73,7 @@ export default function MTripSheets({ planner, shell }: MTripSheetsProps) {
           sheet hangs off planner.stopDraft the way the place editor hangs off its flag. */}
       <MRtStopSheet planner={planner} shell={shell} />
       <MRtStaySheet planner={planner} shell={shell} />
+      <MRtKindSheet planner={planner} shell={shell} />
       <MRtInfoSheet planner={planner} shell={shell} />
       {/* Before the draft sheet, not after: both sit at the same z, so the one mounted
           later paints on top, and taking a hit onto the trip opens the draft OVER the

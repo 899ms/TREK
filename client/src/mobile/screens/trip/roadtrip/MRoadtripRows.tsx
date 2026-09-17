@@ -31,28 +31,47 @@ export interface RowChrome {
   unit: DistanceUnit
 }
 
-/** 30px disc: a number for a destination, the kind's colour for a service stop. */
-function Disc({ row }: { row: StopRow }) {
+/**
+ * 30px disc: a number for a destination, the kind's colour for a service stop.
+ *
+ * With `onPickKind` it is also the control that switches between the two, which is what
+ * the desktop rail does with its own disc. The disc is what changes, so it is its own
+ * preview: tap the 3, pick the pump, and the 3 becomes an orange disc while everything
+ * below it renumbers. The tap is stopped here rather than allowed to reach the row, which
+ * opens the stop, and the 34px column the row gives this disc is the whole target.
+ */
+function Disc({ row, t, onPickKind }: { row: StopRow; t: TranslationFn; onPickKind?: () => void }) {
   const kind = row.stop.stopType ? STOP_KIND_BY_KEY[row.stop.stopType] : undefined
-  if (row.service && kind) {
-    const Icon = kind.Icon
-    return (
+  const face = row.service && kind
+    ? (
       <span
         className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full text-white"
         // theme-lint-disable: the stop kinds share their colour with the map markers,
         // which sit on tiles rather than on one of the app's own surfaces.
         style={{ background: serviceColor(row.stop.stopType) }}
       >
-        <Icon size={15} strokeWidth={2.1} aria-hidden="true" />
+        <kind.Icon size={15} strokeWidth={2.1} aria-hidden="true" />
       </span>
     )
-  }
+    : (
+      // Deliberately not font-geist: `.m-root .font-geist` caps the tier at Medium,
+      // which would quietly undo the bold on a number that has to read at 12px.
+      <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[color:var(--m-ic)] text-[0.75rem] font-bold tabular-nums text-m-ink">
+        {row.number}
+      </span>
+    )
+
+  if (!onPickKind) return face
   return (
-    // Deliberately not font-geist: `.m-root .font-geist` caps the tier at Medium,
-    // which would quietly undo the bold on a number that has to read at 12px.
-    <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[color:var(--m-ic)] text-[0.75rem] font-bold tabular-nums text-m-ink">
-      {row.number}
-    </span>
+    <button
+      type="button"
+      aria-label={row.service ? t('roadtrip.stop.kind') : t('roadtrip.stop.makeService')}
+      onClick={e => { e.stopPropagation(); onPickKind() }}
+      onKeyDown={e => { e.stopPropagation() }}
+      className="grid place-items-center rounded-full"
+    >
+      {face}
+    </button>
   )
 }
 
@@ -90,10 +109,12 @@ function warningMark(warning: ScheduleWarning, chrome: RowChrome): ReactNode {
  * why it is a div with role rather than a button: the desktop needs controls nested
  * inside its row, and a button inside a button is not markup.
  */
-export function RtStopRow({ row, chrome, onOpen }: {
+export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
   row: StopRow
   chrome: RowChrome
   onOpen: () => void
+  /** Absent for a traveller who may not edit places: the disc is then not a control. */
+  onPickKind?: () => void
 }) {
   const { t, unit } = chrome
   const marks: ReactNode[] = []
@@ -119,7 +140,7 @@ export function RtStopRow({ row, chrome, onOpen }: {
       onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpen() } }}
       className="grid cursor-pointer items-center gap-x-[10px] py-1" style={{ gridTemplateColumns: '34px 1fr auto' }}
     >
-      <span className="flex justify-center"><Disc row={row} /></span>
+      <span className="flex justify-center"><Disc row={row} t={t} onPickKind={onPickKind} /></span>
       <span className="min-w-0 py-2">
         <span className={`block text-[0.875rem] leading-[1.25] ${row.service ? 'truncate font-medium text-m-muted' : 'line-clamp-2 font-semibold text-m-ink'}`}>
           {row.stop.name}
@@ -140,6 +161,30 @@ export function RtStopRow({ row, chrome, onOpen }: {
 const LEG_ICONS: Record<string, typeof CarFront> = {
   walking: Footprints,
   cycling: Bike,
+}
+
+/**
+ * What a leg pill says: how far and how long, or that it is not routed yet.
+ *
+ * A segment carries both a pre-formatted text and the raw metres and seconds, and the two
+ * do not always arrive together: a segment that reaches the chain before its routing round
+ * has landed has the numbers at zero and the texts empty. Reading only the texts printed
+ * the template with nothing in its slots, so a leg showed as a bare " in " (the
+ * separator of `roadtrip.leg.driveText` with both values missing) — the screenshot is a
+ * hotel followed by a pill saying nothing.
+ *
+ * So the text is used when there is one and the numbers are formatted when there is not,
+ * which is what the desktop rail does with the same segment. With neither, the leg says
+ * it is pending, the honest answer and the one the missing-segment case already gave.
+ */
+function legText(seg: RouteSegment | undefined, { t, unit }: RowChrome): string {
+  if (!seg) return t('roadtrip.leg.pending')
+  const metres = Number.isFinite(seg.distance) ? seg.distance : 0
+  const seconds = Number.isFinite(seg.duration) ? seg.duration : 0
+  const distance = seg.distanceText || (metres > 0 ? formatDistance(metres / 1000, unit) : '')
+  const time = seg.durationText || seg.drivingText || (seconds > 0 ? formatDurationShort(seconds) : '')
+  if (!distance || !time) return t('roadtrip.leg.pending')
+  return t('roadtrip.leg.driveText', { distance, time })
 }
 
 /**
@@ -171,9 +216,7 @@ export function RtLegRow({ seg, mode, chrome, onAlternatives, alternativesOpen =
 }) {
   const { t } = chrome
   const Icon = mode && LEG_ICONS[mode] ? LEG_ICONS[mode] : mode?.startsWith('plugin:') ? Zap : CarFront
-  const text = seg
-    ? t('roadtrip.leg.driveText', { distance: seg.distanceText, time: seg.durationText ?? seg.drivingText })
-    : t('roadtrip.leg.pending')
+  const text = legText(seg, chrome)
   return (
     <div className="grid items-center gap-x-[10px]" style={{ gridTemplateColumns: '34px 1fr auto' }}>
       {/* flex-col, not flex: in a row the dashes would stretch sideways and read as

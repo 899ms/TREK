@@ -230,6 +230,28 @@ describe('MRoadtripTab', () => {
       expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 2, assignmentId: 503 })
     })
 
+    it('FE-MOB-RTTAB-051: the disc asks which kind of stop it is, without opening the stop', () => {
+      const { shell } = renderTab()
+
+      // Kyoto Station is a destination, so its disc offers to make it a stop on the way.
+      fireEvent.click(screen.getAllByRole('button', { name: 'roadtrip.stop.makeService' })[1])
+
+      expect(shell.openSheet).toHaveBeenCalledWith('rtkind', {
+        placeId: 103,
+        stopType: null,
+        name: 'Kyoto Station',
+      })
+      // The row's own tap opens the stop; the disc's must not do both.
+      expect(shell.openSheet).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-RTTAB-052: a traveller who may not edit places gets a disc that is not a control', () => {
+      renderTab(planner({ can: () => false }))
+
+      expect(screen.queryByRole('button', { name: 'roadtrip.stop.makeService' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'roadtrip.stop.kind' })).toBeNull()
+    })
+
     it('FE-MOB-RTTAB-006: writes the day warning out with the sentence the desktop hides in a tooltip', () => {
       const over = stage({ dayWarning: { code: 'dayDriving', minutes: 620, limitMinutes: 540 } })
       renderTab(planner({ roadtripRoutes: routes({ days: [over] }) }))

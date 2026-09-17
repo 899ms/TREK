@@ -9,7 +9,7 @@ import type { TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-040
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-046
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -168,6 +168,52 @@ describe('RtStopRow', () => {
     expect(screen.getByText('35 min')).toBeInTheDocument()
   })
 
+  // The disc as the control that switches a stop between a destination and a pause, the
+  // way the desktop rail's own disc does.
+  it('FE-MOB-RTROW-041: the disc is a button that asks for the kind, and the tap stops there', () => {
+    const onOpen = vi.fn()
+    const onPickKind = vi.fn()
+    render(<RtStopRow row={stopRow()} chrome={chrome} onOpen={onOpen} onPickKind={onPickKind} />)
+
+    const disc = screen.getByRole('button', { name: 'roadtrip.stop.makeService' })
+    expect(disc).toHaveTextContent('2')
+
+    fireEvent.click(disc)
+
+    expect(onPickKind).toHaveBeenCalledTimes(1)
+    // The row opens the stop; a tap meant for the disc must not do both.
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-RTROW-042: the disc of a service stop asks the same question, named for what it already is', () => {
+    const onPickKind = vi.fn()
+    render(
+      <RtStopRow
+        row={stopRow({ number: null, service: true, stop: { ...stopRow().stop, stopType: 'fuel' } })}
+        chrome={chrome}
+        onOpen={vi.fn()}
+        onPickKind={onPickKind}
+      />,
+    )
+
+    const disc = screen.getByRole('button', { name: 'roadtrip.stop.kind' })
+    // Still the kind's own symbol: the control is its own preview of what it changes.
+    expect(disc.querySelector('.lucide-fuel')).not.toBeNull()
+
+    fireEvent.click(disc)
+    expect(onPickKind).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-MOB-RTROW-043: without the handler the disc is not a button at all', () => {
+    // A traveller who may not edit places gets no handler, and a disabled-looking control
+    // for something they cannot do is worse than no control.
+    render(<RtStopRow row={stopRow()} chrome={chrome} onOpen={vi.fn()} />)
+
+    expect(screen.queryByRole('button', { name: 'roadtrip.stop.makeService' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'roadtrip.stop.kind' })).toBeNull()
+    expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
   it('FE-MOB-RTROW-013: writes an overnight warning as a word, since it has no figure', () => {
     const warning: ScheduleWarning = { index: 1, code: 'overnight' }
     const { container } = render(<RtStopRow row={stopRow({ warning })} chrome={chrome} onOpen={vi.fn()} />)
@@ -200,6 +246,49 @@ describe('RtLegRow', () => {
 
   it('FE-MOB-RTROW-016: says the leg is pending while no segment has come back', () => {
     render(<RtLegRow seg={undefined} mode="driving" chrome={chrome} />)
+
+    expect(screen.getByText('roadtrip.leg.pending')).toBeInTheDocument()
+  })
+
+  it('FE-MOB-RTROW-044: a segment with no texts yet is read off its numbers, the way the desktop rail reads it', () => {
+    // A segment can reach the chain before its routing round has landed: metres and
+    // seconds are there, the pre-formatted texts are not.
+    render(
+      <RtLegRow
+        seg={{ ...SEG, distanceText: '', durationText: undefined, drivingText: '' }}
+        mode="driving"
+        chrome={chrome}
+      />,
+    )
+
+    expect(screen.getByText('roadtrip.leg.driveText:210 km,2 h 40 min')).toBeInTheDocument()
+  })
+
+  it('FE-MOB-RTROW-045: a segment with neither texts nor numbers says pending, never a bare separator', () => {
+    // This printed the template with both slots empty, so the pill read " in " and said
+    // nothing at all. A leg that is not routed says so.
+    render(
+      <RtLegRow
+        seg={{ ...SEG, distance: 0, duration: 0, distanceText: '', durationText: undefined, drivingText: '' }}
+        mode="driving"
+        chrome={chrome}
+      />,
+    )
+
+    expect(screen.getByText('roadtrip.leg.pending')).toBeInTheDocument()
+    expect(screen.queryByText(/driveText/)).toBeNull()
+  })
+
+  it('FE-MOB-RTROW-046: half a segment is pending too, rather than a figure with a hole beside it', () => {
+    // A distance with no time would read "210 km in", which is worse than saying nothing:
+    // it looks like a sentence that was cut off.
+    render(
+      <RtLegRow
+        seg={{ ...SEG, duration: 0, durationText: undefined, drivingText: '' }}
+        mode="driving"
+        chrome={chrome}
+      />,
+    )
 
     expect(screen.getByText('roadtrip.leg.pending')).toBeInTheDocument()
   })
