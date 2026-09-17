@@ -331,7 +331,10 @@ function JourneyDetailPageDesktop() {
                 <div className="relative z-[3]">
                   <div className="inline-flex items-center gap-7 md:gap-9" style={{ padding: '13px 26px', borderRadius: 18, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.2)' }}>
                     {[
-                      { value: sortedDates.length, label: t('journey.stats.days') },
+                      // The journal's own days, not the ones a pending stay added to the
+                      // timeline: "11 days" for a trip of 7 counts somebody else's data as
+                      // the journey.
+                      { value: dayGroups.size, label: t('journey.stats.days') },
                       { value: current.stats.places, label: t('journey.stats.places') },
                       { value: current.stats.entries, label: t('journey.stats.entries') },
                       { value: current.stats.photos, label: t('journey.stats.photos') },
@@ -421,7 +424,7 @@ function JourneyDetailPageDesktop() {
               {/* Timeline (desktop only — mobile uses fullscreen combined view above) */}
               {!isMobile && (
                 <div className={`flex flex-col gap-6 pb-24 md:pb-6${view === 'timeline' ? '' : ' hidden'}`}>
-                  {sortedDates.length === 0 && (
+                  {dayGroups.size === 0 && sortedDates.length === 0 && (
                     <EmptyState
                       scene="journey"
                       title={query ? t('journey.detail.searchEmpty', { query }) : t('journey.detail.noEntries')}
