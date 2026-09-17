@@ -203,7 +203,10 @@ export class AmapPlacesProvider implements PlacesProvider {
     if (!secret) return null;
     const signed = { ...params, key: this.credential.key, output: 'JSON' };
     const canonical = Object.keys(signed)
-      .sort()
+      // Byte order, and it has to stay byte order: Amap computes the same signature over
+      // the same sorted names, so a locale-aware comparison would produce a signature the
+      // other side rejects.
+      .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
       .map((k) => `${k}=${signed[k]}`)
       .join('&');
     return createHash('md5').update(`${canonical}${secret}`).digest('hex');

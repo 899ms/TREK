@@ -37,7 +37,9 @@ export function useDawarichJournalTrail(
   // here rather than trusting insertion order.
   const window = useMemo(() => {
     if (dates.size === 0) return null
-    const sorted = [...dates].sort()
+    // ISO dates: lexicographic order is chronological, and staying locale-independent
+    // keeps the window identical on every runtime.
+    const sorted = [...dates].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
     return { from: `${sorted[0]}T00:00:00Z`, to: `${sorted[sorted.length - 1]}T23:59:59Z` }
   }, [dates])
 

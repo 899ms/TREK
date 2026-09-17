@@ -34,7 +34,9 @@ export function groupByDay(suggestions: DawarichSuggestion[]): SuggestionDay[] {
     else byDate.set(stay.localDate, [stay])
   }
 
-  const oldestFirst = [...byDate.keys()].sort()
+  // ISO dates, so lexicographic order IS chronological order. Spelled out rather than
+  // left bare, and deliberately not locale-aware, which would vary by runtime.
+  const oldestFirst = [...byDate.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
   return oldestFirst
     .map((date, index) => ({
       date,
