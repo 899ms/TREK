@@ -9,13 +9,13 @@ import type { TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-046
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-048
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
   params ? `${key}:${Object.values(params).join(',')}` : key
 
-const chrome: RowChrome = { t, unit: 'metric' }
+const chrome: RowChrome = { t, unit: 'metric', is12h: false }
 
 function stopRow(over: Partial<StopRow> = {}): StopRow {
   return {
@@ -212,6 +212,22 @@ describe('RtStopRow', () => {
     expect(screen.queryByRole('button', { name: 'roadtrip.stop.makeService' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'roadtrip.stop.kind' })).toBeNull()
     expect(screen.getByText('2')).toBeInTheDocument()
+  })
+
+  it('FE-MOB-RTROW-047: a clock follows the reader twelve hour setting', () => {
+    // The model hands clocks over as HH:MM, which is the shape the schedule computes in.
+    // Printing that straight to the screen ignored the setting the desktop rail, the day
+    // timeline and this tab's own sheets all honour.
+    render(<RtStopRow row={stopRow({ time: '14:05' })} chrome={{ ...chrome, is12h: true }} onOpen={vi.fn()} />)
+
+    expect(screen.getByText('2:05 PM')).toBeInTheDocument()
+    expect(screen.queryByText('14:05')).toBeNull()
+  })
+
+  it('FE-MOB-RTROW-048: on a twenty four hour clock it stays exactly as the model wrote it', () => {
+    render(<RtStopRow row={stopRow({ time: '14:05' })} chrome={chrome} onOpen={vi.fn()} />)
+
+    expect(screen.getByText('14:05')).toBeInTheDocument()
   })
 
   it('FE-MOB-RTROW-013: writes an overnight warning as a word, since it has no figure', () => {

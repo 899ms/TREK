@@ -66,7 +66,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Od začátku etapy',
   'mobileTrip.rtNoneAhead': 'Na cestě před vámi nic není. Zkuste celou etapu.',
   'mobileTrip.rtNoneOnStage': 'Nic takového podél této etapy není.',
-  'mobileTrip.rtTruncated':
-    '{count} úseků mělo víc, než se vejde do jedné odpovědi. Vyberte méně druhů, ať uvidíte zbytek.',
+  'mobileTrip.rtTruncated.one':
+    '1 úsek měl víc, než se vejde do jedné odpovědi. Vyberte méně druhů, ať uvidíte zbytek.',
+  'mobileTrip.rtTruncated.other':
+    'Úseky, kde bylo víc, než se vejde do jedné odpovědi: {count}. Vyberte méně druhů, ať uvidíte zbytek.',
 };
 export default mobileTrip;

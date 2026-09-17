@@ -64,6 +64,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'من بداية المرحلة',
   'mobileTrip.rtNoneAhead': 'لا شيء على الطريق أمامك. جرّب المرحلة كاملة.',
   'mobileTrip.rtNoneOnStage': 'لا شيء من هذا النوع على طول هذه المرحلة.',
-  'mobileTrip.rtTruncated': '{count} مقاطع فيها أكثر مما يتسع في إجابة واحدة. اختر أنواعًا أقل لرؤية الباقي.',
+  'mobileTrip.rtTruncated.one': 'مقطع واحد فيه أكثر مما يتسع في إجابة واحدة. اختر أنواعًا أقل لرؤية الباقي.',
+  'mobileTrip.rtTruncated.other': 'مقاطع فيها أكثر مما يتسع في إجابة واحدة: {count}. اختر أنواعًا أقل لرؤية الباقي.',
 };
 export default mobileTrip;

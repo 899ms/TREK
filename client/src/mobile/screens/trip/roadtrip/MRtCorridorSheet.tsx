@@ -187,7 +187,15 @@ function StatusBand({ corridor, t }: { corridor: MRtCorridorController; t: Trans
   // The phone's own wording, because the desk's ends in "narrow the corridor" and the
   // corridor width is a control this screen deliberately does not have. What it does
   // have is the category chips, and fewer of them really is what makes a box fit.
-  if (corridor.truncatedAreas > 0) notes.push(t('mobileTrip.rtTruncated', { count: corridor.truncatedAreas }))
+  // Two keys picked by the count: the i18n layer has no plural engine, so a single key
+  // with {count} in a sentence that names the noun once reads as "1 stretches".
+  if (corridor.truncatedAreas > 0) {
+    notes.push(
+      t(corridor.truncatedAreas === 1 ? 'mobileTrip.rtTruncated.one' : 'mobileTrip.rtTruncated.other', {
+        count: corridor.truncatedAreas,
+      }),
+    )
+  }
 
   if (corridor.offline) return <Note tone="warn" icon={<WifiOff size={13} strokeWidth={2} />}>{t('mobileTrip.rtSearchOffline')}</Note>
   if (corridor.error) return <Note tone="warn" icon={<AlertTriangle size={13} strokeWidth={2} />}>{t('roadtrip.poi.failed')}</Note>

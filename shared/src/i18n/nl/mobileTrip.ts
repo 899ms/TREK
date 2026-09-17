@@ -65,7 +65,8 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Vanaf het begin van de etappe',
   'mobileTrip.rtNoneAhead': 'Niets op de weg die voor je ligt. Probeer de hele etappe.',
   'mobileTrip.rtNoneOnStage': 'Niets van dat soort langs deze etappe.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one': '1 stuk had meer dan in één antwoord past. Kies minder soorten om de rest te zien.',
+  'mobileTrip.rtTruncated.other':
     '{count} stukken hadden meer dan in één antwoord past. Kies minder soorten om de rest te zien.',
 };
 export default mobileTrip;

@@ -50,7 +50,7 @@ function makePlanner(overrides: Record<string, unknown> = {}) {
 
 function makeShell(overrides: Record<string, unknown> = {}) {
   return buildShell({
-    sheet: { id: 'rtstay', payload: { placeId: 202, minutes: 30, name: 'Bremen Marktplatz' } },
+    sheet: { id: 'rtstay', payload: { placeId: 202, minutes: 30, name: 'Bremen Marktplatz', dayId: 11, assignmentId: 102 } },
     ...overrides,
   } as unknown as Partial<MTripShellApi>)
 }
@@ -95,7 +95,7 @@ describe('MRtStaySheet', () => {
   })
 
   it('FE-MOB-RTSTAY-004: minus stops at zero instead of going negative', () => {
-    renderSheet({}, { sheet: { id: 'rtstay', payload: { placeId: 202, minutes: 3, name: 'Bremen Marktplatz' } } })
+    renderSheet({}, { sheet: { id: 'rtstay', payload: { placeId: 202, minutes: 3, name: 'Bremen Marktplatz', dayId: 11, assignmentId: 102 } } })
     fireEvent.click(minus())
     expect(value()).toHaveTextContent('0')
     expect(minus()).toBeDisabled()
@@ -158,7 +158,25 @@ describe('MRtStaySheet', () => {
     fireEvent.click(plus())
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(planner.setRoadtripStay).toHaveBeenCalledWith(202, 35))
-    expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { placeId: 202, minutes: 35, name: 'Bremen Marktplatz' })
+    // Addressed by day and assignment, which is how 'rtstop' locates a row. Spreading this
+    // sheet's own payload left it unable to resolve anything, so it drew nothing while still
+    // counting as open, and the day swipe stayed blocked behind it.
+    expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 11, assignmentId: 102 })
+  })
+
+  it('FE-MOB-RTSTAY-019: with no row to go back to it closes rather than opening a sheet that resolves to nothing', async () => {
+    // Every caller sends the row, but a payload without one must not leave `shell.sheet`
+    // pointing at a stop sheet that cannot locate anything: it would draw nothing and still
+    // count as open, and the day swipe reads exactly that to decide it is blocked.
+    const { planner, shell } = renderSheet({}, {
+      sheet: { id: 'rtstay', payload: { placeId: 202, minutes: 30, name: 'Bremen Marktplatz' } },
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(planner.setRoadtripStay).toHaveBeenCalledWith(202, 30))
+    expect(shell.closeSheet).toHaveBeenCalled()
+    expect(shell.openSheet).not.toHaveBeenCalledWith('rtstop', expect.anything())
   })
 
   it('FE-MOB-RTSTAY-013: clearing the stay is a save of zero, not a second write path', async () => {
@@ -168,7 +186,7 @@ describe('MRtStaySheet', () => {
     expect(value()).toHaveTextContent('0')
     fireEvent.click(screen.getByRole('button', { name: 'Save' }))
     await waitFor(() => expect(planner.setRoadtripStay).toHaveBeenCalledWith(202, 0))
-    expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { placeId: 202, minutes: 0, name: 'Bremen Marktplatz' })
+    expect(shell.openSheet).toHaveBeenCalledWith('rtstop', { dayId: 11, assignmentId: 102 })
   })
 
   it('FE-MOB-RTSTAY-014: closing without saving writes nothing and does not reopen the stop', () => {

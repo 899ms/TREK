@@ -17,6 +17,9 @@ interface RtStaySheetPayload {
   /** The stay the place carries right now; absent and zero mean the same thing. */
   minutes?: number | null
   name?: string
+  /** Where the stop sheet was standing, so saving can hand the traveller back to it. */
+  dayId?: number
+  assignmentId?: number
 }
 
 /** The step the two buttons move in. Same five minutes as the desktop dialog. */
@@ -141,7 +144,14 @@ export default function MRtStaySheet({ planner, shell }: MTripSheetsProps) {
     setSaving(true)
     try {
       await planner.setRoadtripStay(placeId, value)
-      shell.openSheet('rtstop', { ...stop, placeId, minutes: value })
+      // 'rtstop' is located by day and assignment, not by place: spreading this sheet's own
+      // payload into it opened a sheet that resolved to nothing, drew nothing, and still
+      // counted as open, which blocks the day swipe until something else closes it.
+      if (stop?.dayId != null && stop.assignmentId != null) {
+        shell.openSheet('rtstop', { dayId: stop.dayId, assignmentId: stop.assignmentId })
+      } else {
+        shell.closeSheet()
+      }
     } catch {
       setMinutes(stored)
       planner.toast.error(t('common.unknownError'))

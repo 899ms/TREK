@@ -5,7 +5,12 @@ import ToggleSwitch from '../Settings/ToggleSwitch'
 
 export interface EndDayControlProps {
   active: boolean
-  onToggle: () => Promise<void>
+  /**
+   * Whatever it resolves to is ignored here: this control reads its state back from the
+   * trip. The writer reports success to callers that flip a switch optimistically, and the
+   * type has to let that through.
+   */
+  onToggle: () => Promise<unknown>
 }
 
 export default function EndDayControl({ active, onToggle }: EndDayControlProps) {

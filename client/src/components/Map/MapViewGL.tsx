@@ -74,7 +74,11 @@ const GPX_HIT_LAYER_ID = 'trip-gpx-hit'
 const SATELLITE_SOURCE_ID = 'trip-satellite'
 const SATELLITE_LAYER_ID = 'trip-satellite-raster'
 /** Everything TREK draws is prefixed; the imagery is inserted before the first of them. */
-const OWN_LAYER_PREFIXES = ['trip-', 'trek-']
+// Everything TREK draws on a GL map, so the satellite raster can be slipped underneath all
+// of it. `route-alt-` earns its place here: the roads offered for a leg are added before the
+// route source so they sit under the current route, which also puts them before the first
+// `trip-` layer, and anchoring the imagery there painted right over them.
+const OWN_LAYER_PREFIXES = ['trip-', 'trek-', 'route-alt-']
 
 type PlaceWithCoords = Place & { lat: number; lng: number }
 

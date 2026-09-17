@@ -66,7 +66,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Od początku etapu',
   'mobileTrip.rtNoneAhead': 'Na drodze przed tobą nic nie ma. Spróbuj całego etapu.',
   'mobileTrip.rtNoneOnStage': 'Na tym etapie nie ma nic takiego.',
-  'mobileTrip.rtTruncated':
-    '{count} odcinków miało więcej, niż mieści się w jednej odpowiedzi. Wybierz mniej rodzajów, by zobaczyć resztę.',
+  'mobileTrip.rtTruncated.one':
+    '1 odcinek miał więcej, niż mieści się w jednej odpowiedzi. Wybierz mniej rodzajów, by zobaczyć resztę.',
+  'mobileTrip.rtTruncated.other':
+    'Odcinki, na których było więcej, niż mieści się w jednej odpowiedzi: {count}. Wybierz mniej rodzajów, by zobaczyć resztę.',
 };
 export default mobileTrip;

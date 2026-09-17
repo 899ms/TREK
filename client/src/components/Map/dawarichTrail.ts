@@ -130,7 +130,9 @@ export function collapsedDayDates(
     const foldedInPlan = !!expandedDayIds && !expandedDayIds.has(day.id)
     if (foldedInPlan || collapsedDayIds?.has(day.id)) dates.add(day.date)
   }
-  return [...dates].sort()
+  // Explicit rather than bare: these are ISO dates, where lexicographic IS chronological,
+  // and a locale-aware comparison would reorder them differently per runtime.
+  return [...dates].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 }
 
 /** The overlay as a GeoJSON FeatureCollection, for the GL renderer. */

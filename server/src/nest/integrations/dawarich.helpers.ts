@@ -340,7 +340,8 @@ export function bucketPointsByDay(
     else byDay.set(date, [{ lat, lng, ts }]);
   }
 
-  const dates = [...byDay.keys()].sort();
+  // ISO dates, so lexicographic order is chronological. Explicit and locale-independent.
+  const dates = [...byDay.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   const days: DawarichTrackDay[] = [];
 
   for (let d = 0; d < dates.length; d++) {

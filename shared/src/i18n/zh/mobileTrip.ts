@@ -63,6 +63,7 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': '从本段起点起',
   'mobileTrip.rtNoneAhead': '前方路上没有找到。试试整段。',
   'mobileTrip.rtNoneOnStage': '本段沿途没有这类地点。',
-  'mobileTrip.rtTruncated': '{count} 段路的结果超出一次回答能装下的量。少选几类就能看到其余的。',
+  'mobileTrip.rtTruncated.one': '1 段路的结果超出一次回答能装下的量。少选几类就能看到其余的。',
+  'mobileTrip.rtTruncated.other': '{count} 段路的结果超出一次回答能装下的量。少选几类就能看到其余的。',
 };
 export default mobileTrip;

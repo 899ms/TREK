@@ -67,7 +67,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'A szakasz elejétől',
   'mobileTrip.rtNoneAhead': 'Az előtted lévő úton nincs semmi. Próbáld az egész szakaszt.',
   'mobileTrip.rtNoneOnStage': 'Ezen a szakaszon nincs ilyesmi.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    '1 szakaszon több volt, mint ami egy válaszba fér. Válassz kevesebb fajtát, hogy lásd a többit.',
+  'mobileTrip.rtTruncated.other':
     '{count} szakaszon több volt, mint ami egy válaszba fér. Válassz kevesebb fajtát, hogy lásd a többit.',
 };
 export default mobileTrip;

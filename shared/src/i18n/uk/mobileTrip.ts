@@ -67,7 +67,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Від початку етапу',
   'mobileTrip.rtNoneAhead': 'На дорозі попереду нічого немає. Спробуйте весь етап.',
   'mobileTrip.rtNoneOnStage': 'На цьому етапі нічого такого немає.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    'На 1 ділянці знайшлося більше, ніж уміщується в одну відповідь. Виберіть менше видів, щоб побачити решту.',
+  'mobileTrip.rtTruncated.other':
     'На {count} ділянках знайшлося більше, ніж уміщується в одну відповідь. Виберіть менше видів, щоб побачити решту.',
 };
 export default mobileTrip;

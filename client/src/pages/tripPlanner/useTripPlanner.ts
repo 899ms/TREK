@@ -1223,17 +1223,43 @@ export function useTripPlanner() {
    */
   const [stayDraft, setStayDraft] = useState<{ placeId: number; name: string; minutes: number | null; arrival: string | null } | null>(null)
 
-  const setRoadtripEndDay = useCallback(async (stop: RoadtripStop) => {
-    if (!dailyTimesActive || !can('day_edit', trip)) return
+  /**
+   * Whether the day ends at this stop, from BOTH the things that can end it.
+   *
+   * A stop carries an `end_day` flag, and a day can also be closed by a manual boundary
+   * filed against that stop (`to_assignment_id === null`). `setRoadtripEndDay` already
+   * knows about both and clears whichever is set, so a surface reading only the flag shows
+   * a day end as off, and the tap meant to switch it on deletes the boundary instead. The
+   * question is asked here once rather than answered again per surface.
+   */
+  const roadtripEndsDayAt = useCallback(
+    (stop: RoadtripStop): boolean =>
+      !!stop.endDay
+      || dayBoundaries.boundaries.some(b => b.to_assignment_id === null && b.from_assignment_id === stop.assignmentId),
+    [dayBoundaries.boundaries],
+  );
+
+  /**
+   * Returns whether the day end actually moved.
+   *
+   * It reports rather than throws, because it shows its own toast and a second one from the
+   * caller would be the same news twice. A caller that flipped a switch optimistically has
+   * to hear about a refusal all the same, or it sits there showing a state the trip never
+   * reached: the phone sheet's catch was unreachable for exactly this reason.
+   */
+  const setRoadtripEndDay = useCallback(async (stop: RoadtripStop): Promise<boolean> => {
+    if (!dailyTimesActive || !can('day_edit', trip)) return false
     try {
       const manual = dayBoundaries.boundaries.find(b => b.to_assignment_id === null && b.from_assignment_id === stop.assignmentId)
       if (manual) {
         await dayBoundaries.save(manual.day_number, null)
-        if (!stop.endDay) return
+        if (!stop.endDay) return true
       }
       await tripActions.setAssignmentEndDay(tripId, stop.ownerDayId, stop.assignmentId, !stop.endDay)
+      return true
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'))
+      return false
     }
   }, [dailyTimesActive, can, trip, tripActions, tripId, toast, t, dayBoundaries.boundaries, dayBoundaries.save])
 
@@ -2396,7 +2422,7 @@ export function useTripPlanner() {
   )
   const endDayStop = selectedRoadtripStops.length === 1 ? selectedRoadtripStops[0] : undefined
   const roadtripEndDay = roadtripActive && dailyTimesActive && can('day_edit', trip) && endDayStop && endDayStop.assignmentId > 0
-    ? { active: !!endDayStop.endDay || dayBoundaries.boundaries.some(b => b.to_assignment_id === null && b.from_assignment_id === endDayStop.assignmentId), onToggle: () => setRoadtripEndDay(endDayStop) }
+    ? { active: roadtripEndsDayAt(endDayStop), onToggle: () => setRoadtripEndDay(endDayStop) }
     : undefined
   const roadtripStay = roadtripActive && selectedPlace
     ? { minutes: endDayStop ? endDayStop.dwellMinutes : selectedPlace.duration_minutes ?? null, onEdit: can('place_edit', trip) ? () => editRoadtripStay({ placeId: selectedPlace.id, name: selectedPlace.name, minutes: selectedPlace.duration_minutes ?? null, arrival: null }) : undefined }
@@ -2459,6 +2485,7 @@ export function useTripPlanner() {
     stopDraft, setStopDraft, saveStopDraft, saveStopDraftAsNight, stopDraftToForm, stopDraftDuplicate, reorderRoadtripStop,
     setRoadtripStopKind,
     setRoadtripStopFill,
+    roadtripEndsDayAt,
     roadtripSettingsLoading: !roadtripPreferencesState.ready && !roadtripPreferencesState.failed,
     saveRoadtripLimit: roadtripPreferencesState.ready && can('day_edit', trip) ? saveRoadtripLimit : undefined,
     roadtripVias, addRoadtripVia, moveRoadtripVia, removeRoadtripVia, dayBoundaryControls, resetDayBoundaries,

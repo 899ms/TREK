@@ -67,7 +67,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Từ đầu chặng',
   'mobileTrip.rtNoneAhead': 'Không có gì trên đường phía trước. Thử cả chặng xem sao.',
   'mobileTrip.rtNoneOnStage': 'Không có gì thuộc loại đó dọc chặng này.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    '1 đoạn có nhiều hơn mức vừa trong một câu trả lời. Chọn ít loại hơn để xem phần còn lại.',
+  'mobileTrip.rtTruncated.other':
     '{count} đoạn có nhiều hơn mức vừa trong một câu trả lời. Chọn ít loại hơn để xem phần còn lại.',
 };
 export default mobileTrip;

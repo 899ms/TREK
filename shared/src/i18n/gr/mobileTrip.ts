@@ -67,7 +67,9 @@ const mobileTrip: TranslationStrings = {
   'mobileTrip.rtFromStart': 'Από την αρχή του σκέλους',
   'mobileTrip.rtNoneAhead': 'Τίποτα στον δρόμο μπροστά σας. Δοκιμάστε όλο το σκέλος.',
   'mobileTrip.rtNoneOnStage': 'Τίποτα τέτοιο κατά μήκος αυτού του σκέλους.',
-  'mobileTrip.rtTruncated':
+  'mobileTrip.rtTruncated.one':
+    '1 τμήμα είχε περισσότερα από όσα χωρούν σε μία απάντηση. Διαλέξτε λιγότερα είδη για να δείτε τα υπόλοιπα.',
+  'mobileTrip.rtTruncated.other':
     '{count} τμήματα είχαν περισσότερα από όσα χωρούν σε μία απάντηση. Διαλέξτε λιγότερα είδη για να δείτε τα υπόλοιπα.',
 };
 export default mobileTrip;
