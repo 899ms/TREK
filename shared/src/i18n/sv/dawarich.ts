@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km bort',
   'dawarich.bucket.rule': 'En önskning räknas som uppfylld inom {meters} m och efter {minutes} minuter på plats.',
 
+  'dawarich.journey.dayStays.one': '1 stopp från Dawarich',
+  'dawarich.journey.dayStays.other': '{count} stopp från Dawarich',
 };
 
 export default dawarich;

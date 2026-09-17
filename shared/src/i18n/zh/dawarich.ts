@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} 公里外',
   'dawarich.bucket.rule': '在 {meters} 米以内停留 {minutes} 分钟以上，才算实现心愿。',
 
+  'dawarich.journey.dayStays.one': '来自 Dawarich 的 1 个停留',
+  'dawarich.journey.dayStays.other': '来自 Dawarich 的 {count} 个停留',
 };
 
 export default dawarich;

@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km stąd',
   'dawarich.bucket.rule': 'Marzenie uznaje się za spełnione w promieniu {meters} m i po {minutes} minutach na miejscu.',
 
+  'dawarich.journey.dayStays.one': '1 postój z Dawarich',
+  'dawarich.journey.dayStays.other': 'Postoje z Dawarich: {count}',
 };
 
 export default dawarich;

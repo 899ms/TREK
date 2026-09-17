@@ -176,6 +176,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km uzakta',
   'dawarich.bucket.rule': 'Bir dilek {meters} m yakınlıkta ve yerinde {minutes} dakika sonra ulaşılmış sayılır.',
 
+  'dawarich.journey.dayStays.one': "Dawarich'ten 1 durak",
+  'dawarich.journey.dayStays.other': "Dawarich'ten {count} durak",
 };
 
 export default dawarich;

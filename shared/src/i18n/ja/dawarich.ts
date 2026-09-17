@@ -178,6 +178,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km 先',
   'dawarich.bucket.rule': '{meters} m 以内に {minutes} 分以上滞在すると、願いがかなったとみなします。',
 
+  'dawarich.journey.dayStays.one': 'Dawarich の滞在 1 件',
+  'dawarich.journey.dayStays.other': 'Dawarich の滞在 {count} 件',
 };
 
 export default dawarich;

@@ -277,7 +277,14 @@ export default function DawarichSuggestionsPanel({
  * The actions fade in on hover on a pointer device and stay visible on touch,
  * where there is no hover to reveal them.
  */
-function SuggestionRow({
+/**
+ * One stay, as a card with its actions clipped to the side.
+ *
+ * Exported because the journal draws these rows in its own timeline now — folded into a
+ * day rather than stacked in a panel above it — and a second copy of a row this detailed
+ * would be two things to keep in step, plus a straight hit on the duplication budget.
+ */
+export function SuggestionRow({
   suggestion,
   busy,
   allowJournal = false,

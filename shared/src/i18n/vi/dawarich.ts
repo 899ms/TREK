@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': 'cách {km} km',
   'dawarich.bucket.rule': 'Một điều ước được tính là đã đến khi trong vòng {meters} m và sau {minutes} phút tại chỗ.',
 
+  'dawarich.journey.dayStays.one': '1 điểm dừng từ Dawarich',
+  'dawarich.journey.dayStays.other': '{count} điểm dừng từ Dawarich',
 };
 
 export default dawarich;
