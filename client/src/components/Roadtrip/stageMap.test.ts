@@ -80,6 +80,7 @@ function routes(over: Partial<RoadtripRoutes> = {}): RoadtripRoutes {
     quietDays: [],
     lines: LINES,
     lineDays: [1, 2, 2, 3],
+    lineJoins: [false, false, false, false],
     accessLines: [],
     vias: [],
     segments: [],
@@ -122,6 +123,38 @@ describe('stageMapData with a stage', () => {
 
   it('FE-RTSTAGE-005: keeps only the lines of that day', () => {
     expect(stageMapData(routes(), stage, true).lines).toEqual([LINES[1], LINES[2]])
+  })
+
+  it('FE-RTSTAGE-016: the drive into the next day is left off the stage', () => {
+    // With "connect the days" on, that leg is drawn in the colour of the day it leaves, so
+    // filtering by day number alone handed the stage a line running off it to a place the
+    // day never visits. On a phone, where the stage IS the map, it was the longest thing
+    // on screen and read as the day's own route.
+    const withJoin = routes({ lineJoins: [false, false, true, false] })
+
+    expect(stageMapData(withJoin, stage, true).lines).toEqual([LINES[1]])
+  })
+
+  it('FE-RTSTAGE-017: the colours still line up once a join has been dropped', () => {
+    const data = stageMapData(routes({ lineJoins: [false, false, true, false] }), stage, true)
+
+    expect(data.lineColors).toHaveLength(data.lines.length)
+    expect(data.lineColors).toEqual([dayColor(2)])
+  })
+
+  it('FE-RTSTAGE-018: the all-days view keeps the joins, which is the view they are for', () => {
+    // The setting draws the whole drive as one connected line; that is what it is for, and
+    // on this map the connection has the other days beside it.
+    expect(stageMapData(routes({ lineJoins: [false, false, true, false] }), null, true).lines).toEqual(LINES)
+  })
+
+  it('FE-RTSTAGE-019: routes from before the flag existed are drawn as they were', () => {
+    // `lineJoins` arrives with this change, and a RoadtripRoutes read back from an older
+    // cache has none. Without the marks nothing is known to be a join, so nothing is
+    // dropped: the day is drawn the way it was drawn before.
+    const legacy = { ...routes(), lineJoins: undefined } as unknown as Parameters<typeof stageMapData>[0]
+
+    expect(stageMapData(legacy, stage, true).lines).toEqual([LINES[1], LINES[2]])
   })
 
   it('FE-RTSTAGE-006: the colours stay lined up with the lines that are left', () => {

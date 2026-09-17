@@ -175,6 +175,18 @@ export interface RoadtripRoutes {
 
   lineDays: number[];
 
+  /**
+   * Which of `lines` is the drive INTO the following day rather than a drive within the
+   * day it is drawn as, parallel to `lines` and `lineDays`.
+   *
+   * With "connect the days" on, the leg from one day's last stop to the next day's first
+   * is drawn in the colour of the day it leaves, so on a map showing the whole drive it
+   * reads as that day continuing. A surface showing ONE day has to tell the two apart:
+   * the connection leads off the day on screen and belongs to the next one, and drawn
+   * there it is a line to a place that day never visits.
+   */
+  lineJoins: boolean[];
+
   accessLines: AccessSpur[];
 
   vias: RouteVia[];

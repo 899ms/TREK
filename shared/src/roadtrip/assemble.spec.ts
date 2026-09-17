@@ -162,4 +162,23 @@ describe('assembleRoadtrip connected days', () => {
     expect(routes.days[1]!.arrivingFrom).toBeUndefined();
     expect(routes.days[1]!.geometry[0]).toEqual([60, 10]);
   });
+
+  it('ROADTRIP-ASSEMBLE-006: that drive is marked as the connection it is, in the colour of the day it leaves', () => {
+    const routes = assembleTwoDays(true);
+
+    // Day 1 drives two of its own legs and then on into day 2; day 2 drives one.
+    expect(routes.lineDays).toEqual([1, 1, 1, 2]);
+    expect(routes.lines).toHaveLength(routes.lineJoins.length);
+    // The third line is drawn as day 1 but runs into day 2, and only it is a join. A
+    // surface showing one day needs that apart from the day number, which says day 1 for
+    // both the day's own legs and for the drive leading off it.
+    expect(routes.lineJoins).toEqual([false, false, true, false]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-007: with the days unconnected there is no join to mark', () => {
+    const routes = assembleTwoDays(false);
+
+    expect(routes.lineDays).toEqual([1, 1, 2]);
+    expect(routes.lineJoins).toEqual([false, false, false]);
+  });
 });
