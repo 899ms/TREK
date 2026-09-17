@@ -76,10 +76,10 @@ function useSafeInsets(probe: RefObject<HTMLElement | null>): SafeInsets {
  * the rail. The search bar that sits below the rail on the stage steps away while the
  * picker is open, so the rail is the lowest chrome up there.
  *
- * Bottom: the safe area, the dock's 74px (62px tall, 12px off the bottom), the bar's lift
- * (its height and the 15px gap between the dock and its foot) and the 38px credit row
- * over that. That is the very line `--bottom-nav-h` puts the round controls' band on, so
- * the frame ends where they begin, and they only take the two corners of it.
+ * Bottom: the safe area, the dock's 74px (62px tall, 12px off the bottom) and the bar's
+ * lift (its height and the 15px gap between the dock and its foot). That is the very line
+ * `--bottom-nav-h` puts the round controls' band on, so the frame ends where they begin,
+ * and they only take the two corners of it.
  *
  * The sides keep the 20px both engines already give a phone: nothing floats there.
  */
@@ -87,7 +87,7 @@ function alternativesFitPadding(insets: SafeInsets): ViewportPadding {
   return {
     top: insets.top + 12 + 50 + 42 + 12,
     right: 20,
-    bottom: insets.bottom + 74 + RT_ALT_BAR_LIFT + 38,
+    bottom: insets.bottom + 74 + RT_ALT_BAR_LIFT,
     left: 20,
   }
 }
@@ -281,6 +281,24 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
    * Merged through the planner's own hook rather than concatenated here, because the
    * sets overlap: the same petrol station found twice would be two pins on one roof.
    */
+  /**
+   * The vias the phone map draws, minus the night pauses.
+   *
+   * A night pause is a pill with a moon and a day number, drawn beside the boundary where
+   * one travel day ends. On the desktop it is a handle: it carries a hint and can be
+   * dragged to move the boundary. A phone has no hover to explain it and no room to drag
+   * it, so all it does there is sit on the map, and it sits there for EVERY day at once —
+   * the markers come from the whole drive (`automaticPoints`), not from the stage on
+   * screen, so day 1 shows day 2's pill as well. Two labels the day filter does not reach
+   * read as part of the map rather than as a control.
+   *
+   * Both lists go through the same filter: the plan tab's vias carry night pauses too.
+   */
+  const mapVias = useMemo(
+    () => (onStage ? planner.roadtripMapVias : planner.routeVias)?.filter(v => !v.nightPause),
+    [onStage, planner.roadtripMapVias, planner.routeVias],
+  )
+
   const pois = useMergedMapPois(
     onStage ? planner.roadtripCorridor.visible : null,
     onStage ? NO_POIS : poi.pois,
@@ -294,27 +312,23 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
     //
     // --m-map-floor is the top edge of whatever the map ends at: the dock, 62px tall at
     // safe-bottom + 12, or on the road trip tab the stage bar, which takes the band the
-    // round controls would otherwise sit in and is what --m-stage-lift adds. The map
-    // credit (the little (i)) takes the bottom right corner a gap above that floor:
-    // beside the locate button it read as a stray control in the middle of the band.
-    // The round controls float one credit row higher (a 30px button plus an 8px gap) and
-    // add their own 12px on top of that, still close enough to the thumb to reach
-    // one-handed. The whole band moves rather than the one control over the corner, so
-    // the compass and the locate button stay on one line, and everything that reads
-    // --bottom-nav-h (the compass, both engines' locate button and base-layer switcher,
-    // the overview stack) follows on its own. Where the credit lands is written once, in
-    // mobile.css under `m-credit-corner`, where the GL containers and the Leaflet (i)
-    // both read it.
+    // round controls would otherwise sit in and is what --m-stage-lift adds. The round
+    // controls sit straight on that floor and add their own 12px, close enough to the
+    // thumb to reach one-handed. Everything that reads --bottom-nav-h (the compass, both
+    // engines' locate button and base-layer switcher, the overview stack) follows on its
+    // own. The band used to float a further 38px up to leave the corner under it to the
+    // map credit; the phone map carries no visible credit any more (see mobile.css), so
+    // that row would now only be a gap over the dock.
     //
     // The metrics are classes rather than an inline --bottom-nav-h, and the lift is its
     // OWN variable folded into them: the compass band below is identified by being the
     // one element that sets that name inline, and a second one would make that ambiguous.
     <div
-      className="m-credit-corner absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))] [--bottom-nav-h:calc(var(--m-map-floor)+38px)]"
+      className="absolute inset-0 isolate overflow-hidden bg-[color:var(--m-mapb)] [--m-map-floor:calc(env(safe-area-inset-bottom,0px)+74px+var(--m-stage-lift,0px))] [--bottom-nav-h:var(--m-map-floor)]"
       // 76px is the stage bar's own height plus the gap it keeps on both sides, so the
-      // credit lands one gap above the bar instead of on its top edge, and the round
-      // controls one credit row above that. While other ways of driving a leg are on offer
-      // their bar stands in that slot instead, taller, and the floor clears it the same way.
+      // round controls land one gap above the bar instead of on its top edge. While other
+      // ways of driving a leg are on offer their bar stands in that slot instead, taller,
+      // and the floor clears it the same way.
       style={{
         ['--m-stage-lift' as string]: onStage && mapActive
           ? (planner.routeAlternatives.open ? `${RT_ALT_BAR_LIFT}px` : '76px')
@@ -342,7 +356,7 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
         focusPoints={stageMap
           ? (focusPending ? planner.mapFocusPoints : stageMap.focusPoints)
           : planner.overviewActive ? planner.tripOverview.focusPoints : undefined}
-        routeVias={onStage ? planner.roadtripMapVias : planner.routeVias}
+        routeVias={mapVias}
         showTransitRoutes={onStage ? false : planner.transitRoutesShown}
         // The route toggle belongs to one day, so the map needs that day to know
         // which automated transports may ride it (#2019).

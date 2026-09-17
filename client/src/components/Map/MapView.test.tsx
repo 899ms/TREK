@@ -989,29 +989,19 @@ describe('MapView live location', () => {
     expect(geoMock.cycleMode).toHaveBeenCalled()
   })
 
-  it('FE-COMP-MAPVIEW-077: the credit (i) is a phone control, and it opens the credit through a class on the wrapper', () => {
+  it('FE-COMP-MAPVIEW-077: the map draws no credit control of its own, on either width', () => {
     const desktop = render(<MapView />)
+    // The desktop credit is Leaflet's own, in its own container; this component adds none.
     expect(screen.queryByRole('button', { name: 'Map credits' })).toBeNull()
     desktop.unmount()
 
     Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 420 })
     const { container } = render(<MapView />)
-    const toggle = screen.getByRole('button', { name: 'Map credits' })
+    // The phone used to get an (i) here that opened the credit through a class on the
+    // wrapper. The phone map now carries no visible credit at all (mobile.css), so neither
+    // the button nor the class it toggled is left behind.
+    expect(screen.queryByRole('button', { name: 'Map credits' })).toBeNull()
     const wrapper = container.querySelector('div.w-full.h-full.relative') as HTMLElement
-    // Starts closed: on a phone the map is the screen, and the credit is one tap away.
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
-    expect(wrapper.classList.contains('m-attrib-open')).toBe(false)
-    // The locate button's band is only the fallback; a credit corner around the map wins.
-    expect(toggle.style.bottom).toBe('var(--m-credit-bottom, calc(var(--bottom-nav-h, 84px) + 12px))')
-
-    // A class on the wrapper rather than markup in Leaflet's own container, which Leaflet
-    // rewrites whenever a layer with an attribution comes or goes.
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-expanded')).toBe('true')
-    expect(wrapper.classList.contains('m-attrib-open')).toBe(true)
-
-    fireEvent.click(toggle)
-    expect(toggle.getAttribute('aria-expanded')).toBe('false')
     expect(wrapper.classList.contains('m-attrib-open')).toBe(false)
   })
 })
