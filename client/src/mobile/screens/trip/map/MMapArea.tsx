@@ -92,26 +92,49 @@ function alternativesFitPadding(insets: SafeInsets): ViewportPadding {
   }
 }
 
+type FocusPoints = readonly [number, number][]
+
 /** A camera focus the planner is holding, and the day that was on screen when it arrived. */
 interface HeldFocus {
-  points: readonly [number, number][]
+  points: FocusPoints
   dayId: number | null
   live: boolean
+  /**
+   * Every array held before this one. Weak, so the offers of a long session are not kept
+   * alive by it. Only ever added to, and adding twice changes nothing, so a render React
+   * runs twice or throws away leaves it saying the same thing.
+   */
+  shown: WeakSet<FocusPoints>
 }
 
 /**
- * Lets go of a pending focus once the day moves off the one it arrived with.
+ * Lets go of a pending focus once the day moves off the one it arrived with, and never
+ * takes one back that the planner hands over a second time.
  *
  * The planner keeps a point it was asked to show until its next routing round, whatever
  * day is picked in the meantime, and a pending focus wins over the stage's own frame. So
  * after "show on map" every stage swiped to afterwards stayed on that one point instead of
  * framing its drive. Coming back to the day does not bring the point back either: the
- * traveller has moved on since, and the camera belongs to the stage they came back to. A
- * new focus is a new array, held again from the day it arrives together with.
+ * traveller has moved on since, and the camera belongs to the stage they came back to.
+ *
+ * The same kept point is also what the planner falls back to once the fuel offers or the
+ * other roads for a leg close, as the very array it handed over before. Read as a new
+ * focus, closing either one flew the camera back to that old stop, on another day's stage
+ * too. So only an array never held before is a new focus. The one exception is the open
+ * picker's roads (`openRoads`): fuel offers asked for over an open picker take the camera
+ * from it, and once they close the picker is still asking about its leg.
  */
-function holdFocus(prev: HeldFocus, points: readonly [number, number][], dayId: number | null): HeldFocus {
-  if (prev.points !== points) return { points, dayId, live: true }
-  if (prev.live && prev.dayId !== dayId) return { points, dayId, live: false }
+function holdFocus(
+  prev: HeldFocus,
+  points: FocusPoints,
+  dayId: number | null,
+  openRoads: FocusPoints,
+): HeldFocus {
+  if (prev.points !== points) {
+    prev.shown.add(prev.points)
+    return { points, dayId, live: points === openRoads || !prev.shown.has(points), shown: prev.shown }
+  }
+  if (prev.live && prev.dayId !== dayId) return { ...prev, dayId, live: false }
   return prev
 }
 
@@ -172,8 +195,8 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   )
 
   // Only what the stage carries, so a trip's other 200 pins stay off a screen that
-  // is answering one question. Without a stage (the all-days view) every planned
-  // place comes back, which is what the drive looks like end to end.
+  // is answering one question. Without a stage (the all-days view) every place a stored
+  // visit stops at comes back, which is what the drive looks like end to end.
   //
   // Out of the trip store rather than `planner.mapPlaces`, which is the plan tab's map.
   // That list drops the pins of every day its declutter has put away, and this tab moves
@@ -184,19 +207,27 @@ export default function MMapArea({ planner, shell }: MMapAreaProps) {
   // that the chain still draws. The category filter stays off the stage too, on purpose:
   // the stage is one day's chain on a map, and a stop the chain lists with no pin under its
   // line, hidden by a control on another tab, reads as a broken map rather than a filter.
-  const stagePlaces = useMemo(
-    () => stageMap && stage
-      ? tripPlaces.filter(p => p.lat != null && p.lng != null && stageMap.placeIds.has(p.id))
-      : planner.roadtripMapPlaces,
-    [stageMap, stage, tripPlaces, planner.roadtripMapPlaces],
+  //
+  // The all-days view reads the stored visits for the same reasons, not the planner's
+  // planned list: that one is built from the day lists, which on a phone always leave out
+  // a booked night and, with the setting off, the service stops, while the drive the routing
+  // round draws still ends at that hotel and stops at that pump. Its pin is what opens the
+  // stop, so a missing one left the stop out of reach from this view.
+  const drivePlaceIds = useMemo(
+    () => new Set(Object.values(planner.storedAssignments).flat().map(visit => visit.place_id)),
+    [planner.storedAssignments],
   )
+  const stagePlaces = useMemo(() => {
+    const pinned = stageMap && stage ? stageMap.placeIds : drivePlaceIds
+    return tripPlaces.filter(p => p.lat != null && p.lng != null && pinned.has(p.id))
+  }, [stageMap, stage, tripPlaces, drivePlaceIds])
 
   // Computed during render rather than in an effect, so the frame handed over below is
   // already the right one in the render a day change happens in. See holdFocus.
   const [heldFocus, setHeldFocus] = useState<HeldFocus>(
-    () => ({ points: planner.mapFocusPoints, dayId: planner.selectedDayId, live: true }),
+    () => ({ points: planner.mapFocusPoints, dayId: planner.selectedDayId, live: true, shown: new WeakSet() }),
   )
-  const focus = holdFocus(heldFocus, planner.mapFocusPoints, planner.selectedDayId)
+  const focus = holdFocus(heldFocus, planner.mapFocusPoints, planner.selectedDayId, planner.alternativeFocusPoints)
   if (focus !== heldFocus) setHeldFocus(focus)
   const focusPending = focus.live && planner.mapFocusPoints.length > 0
 

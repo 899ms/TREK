@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, render, screen } from '../../../helpers/render'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
-import { buildPlace } from '../../../helpers/factories'
+import { buildAssignment, buildPlace } from '../../../helpers/factories'
 import type { AccessSpur, RoadtripDay } from '@trek/shared/roadtrip'
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import type { CompassMap } from '../../../../src/components/Map/MapCompassPill'
@@ -14,7 +14,7 @@ import type { AlternativeOverlay } from '../../../../src/components/Roadtrip/alt
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { RT_ALT_BAR_LIFT } from '../../../../src/mobile/screens/trip/roadtrip/useMRtAlternatives'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-032
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-035
 //
 // The stage's pins come out of the trip store rather than the planner's map list, so the
 // stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
@@ -97,8 +97,13 @@ function stagePlanner(selectedDayId: number | null): TripPlanner {
   return buildPlanner({
     selectedDayId,
     mapPlaces: [buildPlace({ id: 11 }), buildPlace({ id: 12 }), buildPlace({ id: 99 })],
-    // Every planned place, which is what the all days view draws.
-    roadtripMapPlaces: [buildPlace({ id: 11 }), buildPlace({ id: 12 })],
+    // The stored visits, which are what the all days view draws: 99 is on no day.
+    storedAssignments: {
+      '3': [
+        buildAssignment({ day_id: 3, place: buildPlace({ id: 11 }) }),
+        buildAssignment({ day_id: 3, place: buildPlace({ id: 12 }) }),
+      ],
+    },
     roadtripRoutes: {
       ...base.roadtripRoutes,
       days: [stageDay()],
@@ -386,7 +391,8 @@ describe('MMapArea', () => {
 
     const allDays = { ...planner, selectedDayId: null }
     rerender(<MMapArea planner={allDays} shell={shell} />)
-    expect(mocks.props.places).toBe(allDays.roadtripMapPlaces)
+    expect((mocks.props.places as Place[]).map(p => p.id)).toEqual([11, 12])
+    expect(mocks.props.places).toContain(renamed)
     expect(mocks.props.focusPoints).toEqual([])
 
     // Off the tab the stage hands nothing through, so the plan tab frames itself again.
@@ -640,5 +646,98 @@ describe('MMapArea', () => {
       expect(compassBand(container)).not.toBeNull()
       unmount()
     }
+  })
+
+  it('FE-MOB-MAPAREA-033: a point the planner hands back once offers or roads close does not take the camera again', () => {
+    const planner = drivePlanner(2)
+    const shell = stageShell()
+    const view = (dayId: number, mapFocusPoints: [number, number][], alternativeFocusPoints: [number, number][] = []) =>
+      <MMapArea planner={{ ...planner, selectedDayId: dayId, mapFocusPoints, alternativeFocusPoints }} shell={shell} />
+    const point: [number, number][] = [[50, 8]]
+    const { rerender } = render(view(2, point))
+    expect(mocks.props.focusPoints).toBe(point)
+
+    // Swiped on: the planner still keeps the point from day 2, and this stage frames itself.
+    rerender(view(3, point))
+    const stageFrame = mocks.props.focusPoints
+    expect(stageFrame).not.toBe(point)
+
+    // The fuel offers take the camera, and closing them hands the same point back. The chips
+    // still say day 3, so flying to day 2's stop would leave the map on a stage nobody picked.
+    const offers: [number, number][] = [[53.4, 9.7]]
+    rerender(view(3, offers))
+    expect(mocks.props.focusPoints).toBe(offers)
+    rerender(view(3, point))
+    expect(mocks.props.focusPoints).toBe(stageFrame)
+
+    // On its own day as well: the roads for a leg, cancelled, give the frame back to the stage.
+    const shown: [number, number][] = [[53.87, 10.69]]
+    rerender(view(3, shown))
+    expect(mocks.props.focusPoints).toBe(shown)
+    const roads: [number, number][] = [[53.55, 9.99], [53.7, 10.2], [53.87, 10.69]]
+    rerender(view(3, roads, roads))
+    expect(mocks.props.focusPoints).toBe(roads)
+    rerender(view(3, shown))
+    expect(mocks.props.focusPoints).toBe(stageFrame)
+
+    // And every time after: a second round of offers is new, the point behind it is not.
+    const again: [number, number][] = [[53.3, 9.6]]
+    rerender(view(3, again))
+    expect(mocks.props.focusPoints).toBe(again)
+    rerender(view(3, shown))
+    expect(mocks.props.focusPoints).toBe(stageFrame)
+  })
+
+  it('FE-MOB-MAPAREA-034: fuel offers asked over an open picker give the camera back to its roads when they close', () => {
+    const planner = drivePlanner(3)
+    const shell = stageShell()
+    const roads: [number, number][] = [[53.55, 9.99], [53.7, 10.2], [53.87, 10.69]]
+    const view = (mapFocusPoints: [number, number][], alternativeFocusPoints: [number, number][]) =>
+      <MMapArea planner={{ ...planner, mapFocusPoints, alternativeFocusPoints }} shell={shell} />
+    const { rerender } = render(view(roads, roads))
+    expect(mocks.props.focusPoints).toBe(roads)
+
+    const offers: [number, number][] = [[53.4, 9.7]]
+    rerender(view(offers, roads))
+    expect(mocks.props.focusPoints).toBe(offers)
+
+    // The picker is still open and still asking about its leg, so its roads are framed again.
+    rerender(view(roads, roads))
+    expect(mocks.props.focusPoints).toBe(roads)
+
+    // Closed, nothing is pending and the stage frames itself.
+    const closed: [number, number][] = []
+    rerender(view(closed, closed))
+    expect(mocks.props.focusPoints).toEqual([[53.55, 9.99], [53.87, 10.69], [53.55, 9.99]])
+  })
+
+  it('FE-MOB-MAPAREA-035: the all days view pins every stored visit, a booked night and a hidden service stop included', () => {
+    const hotel = buildPlace({ id: 20 })
+    const pump = buildPlace({ id: 21, stop_type: 'fuel' } as Partial<Place>)
+    const base = drivePlanner(null)
+    // The places browser on 'unplanned' with a category picked, which empties the plan tab's map.
+    seedStore(useTripStore, {
+      places: [buildPlace({ id: 11 }), hotel, pump, buildPlace({ id: 99 })],
+      placesFilter: 'unplanned',
+      placesCategoryFilter: new Set(['9']),
+    })
+    const planner = {
+      ...base,
+      mapPlaces: [],
+      // The planner's planned list on a phone: its day lists leave the booked night and the
+      // hidden pump out, so it is not what the drive the routing round draws stops at.
+      roadtripMapPlaces: [buildPlace({ id: 11 })],
+      storedAssignments: {
+        '3': [
+          buildAssignment({ day_id: 3, place: buildPlace({ id: 11 }) }),
+          buildAssignment({ day_id: 3, place: pump }),
+        ],
+        '4': [buildAssignment({ day_id: 4, place: hotel, accommodation_id: 5 })],
+      },
+    } as TripPlanner
+    render(<MMapArea planner={planner} shell={stageShell()} />)
+
+    expect((mocks.props.places as Place[]).map(p => p.id)).toEqual([11, 20, 21])
+    expect(mocks.props.places).not.toBe(planner.roadtripMapPlaces)
   })
 })
