@@ -1185,6 +1185,26 @@ describe('CostsPanel — expense rows', () => {
     expect(screen.getByText(/\$20\.00 → 10,00 €/)).toBeInTheDocument()
   })
 
+  it('FE-W5COSTS-078: a booked rate outlives the live one, for the expense and for the transfer', async () => {
+    // What a tester hit after settling up: the euro moved, and so did a bill that had
+    // already been paid. A cost is money that changed hands at a rate that was true that
+    // day, so the frozen rate wins over whatever the market says this morning.
+    localStorage.setItem('trek_fx_EUR', JSON.stringify({ rates: { EUR: 1, USD: 2 }, ts: Date.now() }))
+    mount([expense({
+      id: 131, name: 'Diner', category: 'food', total_price: 120, currency: 'USD', exchange_rate: 1.2,
+      expense_date: '2025-06-15',
+      payers: [{ user_id: 1, amount: 120 }],
+      members: [{ user_id: 1, username: 'alice' }, { user_id: 2, username: 'bob' }],
+    })], { settlements: [{ id: 9, from_user_id: 2, to_user_id: 1, amount: 24, currency: 'USD', exchange_rate: 1.2, created_at: '2025-06-15 09:00:00' }] })
+
+    await screen.findByText('Diner')
+    // 120 USD at the booked 1.2 per euro is 100 euro. At today's 2 it would read 60,00 euro.
+    expect(screen.getByText(/\$120\.00 → 100,00 €/)).toBeInTheDocument()
+    expect(screen.queryByText(/60,00 €/)).toBeNull()
+    // The settled transfer is read back the same way: 24 USD booked at 1.2 is 20 euro.
+    expect(screen.getByText(/\$24\.00 → 20,00 €/)).toBeInTheDocument()
+  })
+
   it('FE-W5COSTS-022: deleting an expense removes it, and a failure is reported', async () => {
     const addToast = vi.fn()
     window.__addToast = addToast as unknown as typeof window.__addToast

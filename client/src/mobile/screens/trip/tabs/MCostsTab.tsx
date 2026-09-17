@@ -1,3 +1,4 @@
+import { convertBooked } from '../../../../hooks/useExchangeRates'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   AlertCircle, ArrowDown, ArrowLeftRight, ArrowRight, ArrowUp, Check, ChevronDown, ChevronUp,
@@ -754,7 +755,8 @@ function PaymentRow({ settlement, ctx, base, locale, t, personName, canEdit, onE
   onUndo: () => void
 }) {
   const cur = (settlement.currency || base).toUpperCase()
-  const amount = ctx.convert(settlement.amount, cur)
+  // At the rate it was settled at, not today's (#1445), matching the desktop ledger.
+  const amount = convertBooked(settlement.amount, settlement.currency, settlement.exchange_rate, ctx.tripCurrency, ctx.convert)
   return (
     <div className="mt-2 flex items-center gap-[6px]">
       <div className="relative min-w-0 flex-1 rounded-2xl border border-[color:var(--m-rowbr)] bg-m-card px-3 py-[12px]">

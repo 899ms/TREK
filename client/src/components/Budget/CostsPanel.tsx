@@ -9,7 +9,7 @@ import { useToast } from '../shared/Toast'
 import { useTranslation } from '../../i18n'
 import { budgetApi } from '../../api/client'
 import { saveWithReceipts } from './receiptUploads'
-import { useExchangeRates } from '../../hooks/useExchangeRates'
+import { convertBooked, useExchangeRates } from '../../hooks/useExchangeRates'
 import { useIsMobile } from '../../hooks/useIsMobile'
 import { formatMoney, currencyDecimals, currencyLocale, localizeAmountInput, amountToInputString } from '../../utils/formatters'
 import { downloadBlob, openFile } from '../../utils/fileDownload'
@@ -41,6 +41,9 @@ interface Settlement {
   // The currency the transfer was entered in. Legacy rows predate it (null) and are
   // read as the display currency, which is what the server assumes for them too.
   currency?: string | null
+  // The rate frozen when the transfer was settled, in units of `currency` per 1 trip
+  // currency (#1445). Absent, or exactly 1, on rows written before the freeze existed.
+  exchange_rate?: number
   created_at?: string
   // The day the transfer actually happened; editable, unlike created_at (when it
   // was recorded). Null/absent on rows predating this field — settlementDate()
@@ -135,8 +138,19 @@ export default function CostsPanel({ tripId, tripMembers = [] }: CostsPanelProps
   }, [searchParams])
 
   // ── derived expense maths (everything converted to the base currency) ────
-  const baseTotal = (e: BudgetItem) => convert(e.total_price || 0, curOf(e))
-  const myPaidOf = (e: BudgetItem) => convert(paidByUser(e, me), curOf(e))
+  // Booked, not live: an expense entered in a foreign currency keeps the rate it was
+  // entered at, which is the same rule the server settles by (#1335).
+  const booked = useCallback(
+    (amount: number, e: BudgetItem) => convertBooked(amount, e.currency, e.exchange_rate, tripCurrency, convert),
+    [convert, tripCurrency],
+  )
+  const baseTotal = (e: BudgetItem) => booked(e.total_price || 0, e)
+  // A transfer freezes its own rate at settle time, in its own table (#1445).
+  const settled = useCallback(
+    (s: Settlement) => convertBooked(s.amount, s.currency, s.exchange_rate, tripCurrency, convert),
+    [convert, tripCurrency],
+  )
+  const myPaidOf = (e: BudgetItem) => booked(paidByUser(e, me), e)
   // "Unfinished": a recorded total nobody has paid yet — counts toward the trip
   // total but stays out of settlements until who-paid is filled in. A negative
   // total (a refund, #2176) is just as unfinished until its recipient is named.
@@ -148,11 +162,11 @@ export default function CostsPanel({ tripId, tripMembers = [] }: CostsPanelProps
     const myMember = (e.members || []).find(m => m.user_id === me)
     if (!myMember) return 0
     if (myMember.amount !== null && myMember.amount !== undefined) {
-      return convert(myMember.amount, curOf(e))
+      return booked(myMember.amount, e)
     }
     const shares = splitEqualShares(e.total_price || 0, e.members || [], e.id)
     const myShare = shares[me] || 0
-    return convert(myShare, curOf(e))
+    return booked(myShare, e)
   }
 
   const totals = useMemo(() => {
@@ -835,7 +849,7 @@ export default function CostsPanel({ tripId, tripMembers = [] }: CostsPanelProps
               {payers.map(p => (
                 <span key={p.user_id} className="bg-surface-secondary border border-edge" title={personName(p.user_id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px 3px 3px', borderRadius: 999, fontSize: 'calc(11.5px * var(--fs-scale-caption, 1))' }}>
                   <Avatar id={p.user_id} size={18} />
-                  <span className="text-content" style={{ fontWeight: 700 }}>{fmt(convert(p.amount, cur))}</span>
+                  <span className="text-content" style={{ fontWeight: 700 }}>{fmt(booked(p.amount, e))}</span>
                 </span>
               ))}
             </div>
@@ -887,7 +901,7 @@ export default function CostsPanel({ tripId, tripMembers = [] }: CostsPanelProps
         <div style={{ minWidth: 0 }}>
           <div className="text-content" style={{ fontSize: 'calc(15px * var(--fs-scale-subtitle, 1))', fontWeight: 600, marginBottom: 6 }}>
             {t('costs.payment')}
-            {cur !== base && <span className="text-content-faint" style={{ fontWeight: 400, fontSize: 'calc(12px * var(--fs-scale-body, 1))' }}> · {fmt(s.amount, cur)} → {fmt(convert(s.amount, cur))}</span>}
+            {cur !== base && <span className="text-content-faint" style={{ fontWeight: 400, fontSize: 'calc(12px * var(--fs-scale-body, 1))' }}> · {fmt(s.amount, cur)} → {fmt(settled(s))}</span>}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7, minWidth: 0 }} title={`${personName(s.from_user_id)} → ${personName(s.to_user_id)}`}>
             <Avatar id={s.from_user_id} size={20} /><ArrowRight size={13} className="text-content-faint" /><Avatar id={s.to_user_id} size={20} />
@@ -898,7 +912,7 @@ export default function CostsPanel({ tripId, tripMembers = [] }: CostsPanelProps
             on the same axis as every expense above it. */}
         {!isMobile && <span />}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, alignSelf: 'center' }}>
-          <span className="bg-surface-secondary border border-edge text-content" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 13px', borderRadius: 999, fontSize: 'calc(15px * var(--fs-scale-subtitle, 1))', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(convert(s.amount, cur))}</span>
+          <span className="bg-surface-secondary border border-edge text-content" style={{ display: 'inline-flex', alignItems: 'center', padding: '6px 13px', borderRadius: 999, fontSize: 'calc(15px * var(--fs-scale-subtitle, 1))', fontWeight: 700, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>{fmt(settled(s))}</span>
         </div>
       </div>
       {canEdit && (
