@@ -480,12 +480,15 @@ describe('MRoadtripTab', () => {
 
     it('FE-MOB-RTTAB-018: leaves the navigate link dead when the stop has no place row behind it', () => {
       const date = freezeAt(7, 0)
+      // Found by the attribute, not by a label: the button carries the single navigation
+      // target's own name when there is exactly one, and a translated word otherwise, so
+      // its text depends on which map apps a place qualifies for.
       const enabled = renderTab(planner(today(date)))
-      expect(screen.getByText('places.navigate').closest('a')).toHaveAttribute('aria-disabled', 'false')
+      expect(enabled.container.querySelector('a[aria-disabled]')).toHaveAttribute('aria-disabled', 'false')
       enabled.unmount()
 
-      renderTab(planner({ ...today(date), places: [] }))
-      const link = screen.getByText('places.navigate').closest('a') as HTMLElement
+      const { container } = renderTab(planner({ ...today(date), places: [] }))
+      const link = container.querySelector('a[aria-disabled]') as HTMLElement
       expect(link).toHaveAttribute('aria-disabled', 'true')
       expect(link).toHaveAttribute('href', '#')
     })
