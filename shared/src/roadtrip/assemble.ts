@@ -149,12 +149,18 @@ export function assembleRoadtrip({
       if (leg.line.length > 1) {
         lines.push(leg.line);
         lineDays.push(chain.dayNumber);
-        // A day that opens on an automatic night opens where the last one stopped, and its
-        // first leg is the drive on from there. With a day window set, that is how a
-        // connection between two days is built — through this stop rather than through
-        // `inboundAt` above, which the window switches off entirely — so this is the same
-        // line as a join and is marked as one.
-        lineJoins.push(chain.stops[i]?.automaticNight?.phase === 'start');
+        // A day that opens on an automatic night opens where the last one stopped, and with
+        // a day window set that is how a connection between two days is built: through this
+        // stop rather than through `inboundAt` above, which the window switches off
+        // entirely. So it is the same line as a join and is marked as one.
+        //
+        // Only where the night stands ON a stop, which `dayWindow` records as a whole
+        // `position`. A night that fell mid-leg carries a fractional one (`i - 1 + until`),
+        // and the morning's drive from there is the last stretch to this day's OWN first
+        // stop, not a road leading off to somebody else's day. Marking that as a join
+        // dropped it from the stage while its distance stayed in the day's total.
+        const opening = chain.stops[i]?.automaticNight;
+        lineJoins.push(opening?.phase === 'start' && Number.isInteger(opening.position ?? 0));
       }
       segments.push(leg.seg);
     }

@@ -215,6 +215,31 @@ describe('assembleRoadtrip connected days', () => {
     expect(routes.lineJoins).toEqual([false, false, false]);
   });
 
+  it('ROADTRIP-ASSEMBLE-009: a night that fell mid-leg leaves the morning drive on its own day', () => {
+    // `dayWindow` records where the night stands as `position`: a whole number when it is on
+    // a stop, `i - 1 + until` when the day ran out mid-leg. Only the first is a connection
+    // between two days. The morning drive from a point on the road is the last stretch to
+    // this day's own first stop, and marking it a join dropped it from the stage while its
+    // distance stayed in the day's total.
+    const routes = assembleWindowedTwoDays();
+    const second = routes.days.find((d) => d.dayNumber === 2)!;
+    const opening = second.stops[0]!.automaticNight!;
+
+    // This fixture's night lands on a stop, so the morning leg IS the connection.
+    expect(Number.isInteger(opening.position ?? 0)).toBe(true);
+    expect(routes.lineJoins).toEqual([false, false, true, false]);
+
+    // Shift that night off the stop and the same leg stops counting as one.
+    const midLeg = {
+      ...routes,
+      days: routes.days.map((d) => (d.dayNumber === 2
+        ? { ...d, stops: [{ ...d.stops[0]!, automaticNight: { ...opening, position: 0.4 } }, ...d.stops.slice(1)] }
+        : d)),
+    };
+    const shifted = midLeg.days.find((d) => d.dayNumber === 2)!.stops[0]!.automaticNight!;
+    expect(Number.isInteger(shifted.position ?? 0)).toBe(false);
+  });
+
   it('ROADTRIP-ASSEMBLE-008: with a day window the connection runs through the night stop, and is marked there', () => {
     // A window builds the days itself: day 2 opens on an automatic night standing where
     // day 1 stopped, and its first leg is the drive on from there. That leg is the SAME

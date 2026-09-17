@@ -8,6 +8,7 @@ import type { RoadtripDay } from '@trek/shared/roadtrip'
 import type { MTripShellApi, TripPlanner } from '../MTripShell'
 import type { RoadtripRow, StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import type { Category, Place } from '../../../../types'
+import { localIsoDate } from '../../../../utils/localDate'
 
 /** Minutes since midnight, local time. */
 const nowMinutes = (): number => {
@@ -90,7 +91,10 @@ export function useMRoadtrip(planner: TripPlanner): MRoadtripController {
   const isToday = useMemo(() => {
     const date = days.find(d => d.id === selectedDayId)?.date
     if (!date) return false
-    return date.slice(0, 10) === new Date().toISOString().slice(0, 10)
+    // The wall clock, not UTC: `nowMinutes` above is local, and between local midnight
+    // and the UTC rollover the two disagree, so east of Greenwich the card hung on
+    // yesterday's stage for the first hours of every night. `localDate.ts` says as much.
+    return date.slice(0, 10) === localIsoDate()
   }, [days, selectedDayId])
 
   return {

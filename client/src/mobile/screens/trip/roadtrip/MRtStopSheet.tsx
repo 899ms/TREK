@@ -258,7 +258,10 @@ export default function MRtStopSheet({ planner, shell }: MTripSheetsProps) {
     setPending({ from: endDayTruth, to: next })
     setSaving(true)
     try {
-      await planner.setRoadtripEndDay(stop)
+      // The writer reports rather than throws, and shows its own toast, so the catch below
+      // could never fire: a refused write left the switch standing at the state the trip
+      // never reached, with only a toast to say otherwise.
+      if (!await planner.setRoadtripEndDay(stop)) setPending(null)
     } catch (err: unknown) {
       setPending(null)
       planner.toast.error(err instanceof Error ? err.message : t('common.unknownError'))

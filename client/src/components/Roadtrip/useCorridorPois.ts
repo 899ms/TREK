@@ -212,7 +212,17 @@ export function useCorridorPois(
           if (controller.signal.aborted || runId !== runIdRef.current) return
           // Out of time stops STARTING boxes; whatever answered stays on screen and the
           // rest reports itself as unsearched, the same way a failed box does.
-          if (outOfTime()) { failures += jobs.length - next; setFailedAreas(failures); return }
+          //
+          // The remainder is claimed before it is counted, because every worker still alive
+          // runs this line: each one used to add the whole rest, so a search that timed out
+          // with three workers up reported three times the boxes it had left, which can be
+          // more than there ever were. Taking `next` to the end also ends the others' loops.
+          if (outOfTime()) {
+            const unsearched = jobs.length - next
+            next = jobs.length
+            if (unsearched > 0) { failures += unsearched; setFailedAreas(failures) }
+            return
+          }
           const job = jobs[next++]
           if (!(await collect(job))) retryable.push(job)
           done++

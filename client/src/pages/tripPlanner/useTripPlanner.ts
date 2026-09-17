@@ -1239,17 +1239,27 @@ export function useTripPlanner() {
     [dayBoundaries.boundaries],
   );
 
-  const setRoadtripEndDay = useCallback(async (stop: RoadtripStop) => {
-    if (!dailyTimesActive || !can('day_edit', trip)) return
+  /**
+   * Returns whether the day end actually moved.
+   *
+   * It reports rather than throws, because it shows its own toast and a second one from the
+   * caller would be the same news twice. A caller that flipped a switch optimistically has
+   * to hear about a refusal all the same, or it sits there showing a state the trip never
+   * reached: the phone sheet's catch was unreachable for exactly this reason.
+   */
+  const setRoadtripEndDay = useCallback(async (stop: RoadtripStop): Promise<boolean> => {
+    if (!dailyTimesActive || !can('day_edit', trip)) return false
     try {
       const manual = dayBoundaries.boundaries.find(b => b.to_assignment_id === null && b.from_assignment_id === stop.assignmentId)
       if (manual) {
         await dayBoundaries.save(manual.day_number, null)
-        if (!stop.endDay) return
+        if (!stop.endDay) return true
       }
       await tripActions.setAssignmentEndDay(tripId, stop.ownerDayId, stop.assignmentId, !stop.endDay)
+      return true
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'))
+      return false
     }
   }, [dailyTimesActive, can, trip, tripActions, tripId, toast, t, dayBoundaries.boundaries, dayBoundaries.save])
 

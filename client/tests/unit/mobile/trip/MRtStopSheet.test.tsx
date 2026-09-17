@@ -98,7 +98,7 @@ function makePlanner(overrides: Record<string, unknown> = {}) {
   return buildPlanner({
     tripId: 4,
     dailyTimesActive: true,
-    setRoadtripEndDay: vi.fn(async () => undefined),
+    setRoadtripEndDay: vi.fn(async () => true),
     roadtripRoutes: { days: [DAY_A, DAY_B] },
     ...overrides,
   } as unknown as Partial<TripPlanner>)
@@ -258,6 +258,20 @@ describe('MRtStopSheet', () => {
     fireEvent.click(toggle)
     await waitFor(() => expect(planner.toast.error).toHaveBeenCalledWith('Day boundary refused'))
     expect(toggle).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('FE-MOB-RTSTOP-037: a refused write rolls the switch back even though nothing was thrown', async () => {
+    // The writer reports rather than throws, and shows its own toast, so the case above
+    // pins a path production never takes. Refused, it answers false, and the switch has to
+    // come back: it was standing at a state the trip never reached, with only a toast on
+    // the other side of the screen saying otherwise.
+    renderSheet({ setRoadtripEndDay: vi.fn(async () => false) })
+    const toggle = screen.getByRole('switch', { name: 'End the day here' })
+
+    fireEvent.click(toggle)
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+
+    await waitFor(() => expect(toggle).toHaveAttribute('aria-checked', 'false'))
   })
 
   it('FE-MOB-RTSTOP-014: dropping the day window takes the end-day switch away entirely', () => {
