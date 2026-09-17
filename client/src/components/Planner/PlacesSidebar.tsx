@@ -65,34 +65,27 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
         </div>
       )}
 
-      {/* Stays Dawarich recorded on these dates, waiting to be reviewed (#2279).
-          Above the list because that is what they become, and the panel renders
-          nothing at all when there is nothing pending — an integration that is
-          connected and quiet should be invisible rather than a permanent empty
-          card. */}
-      {/* Capped and scrolling on its own. Open, the panel is as tall as the day has stays —
-          ten of them on a day of driving — and with nothing holding it back it pushed the
-          places list, which is the flex child that scrolls, down to nothing: the rail
-          stopped scrolling and half the stays sat below the bottom edge with no way to
-          reach them. Half the rail at most, so the list it sits above is always still a
-          list. */}
-      <div style={{ padding: '0 12px 8px', flexShrink: 0, minHeight: 0, maxHeight: '50%', overflowY: 'auto' }}>
-        <DawarichSuggestionsPanel
-          tripId={tripId}
-          trips={[{ id: tripId, label: t('dawarich.accept.thisTrip') }]}
-          daysForTrip={() => days.map(day => ({
-            id: day.id,
-            ...formatDayOption(day.day_number, day.date, locale, t),
-          }))}
-          // The place it just created belongs on the map and in the list
-          // now, not after a reload.
-          onAccepted={() => { void refreshTripAfterAccept(tripId) }}
-          initiallyCollapsed
-        />
-      </div>
-
-      {/* Liste */}
-      <PlacesList {...S} />
+      {/* Liste, with the Dawarich stays riding on top of it inside the same scroller —
+          see the `header` prop for why they are not a band of their own. */}
+      <PlacesList
+        {...S}
+        header={(
+          <div style={{ padding: '0 12px 8px' }}>
+            <DawarichSuggestionsPanel
+              tripId={tripId}
+              trips={[{ id: tripId, label: t('dawarich.accept.thisTrip') }]}
+              daysForTrip={() => days.map(day => ({
+                id: day.id,
+                ...formatDayOption(day.day_number, day.date, locale, t),
+              }))}
+              // The place it just created belongs on the map and in the list
+              // now, not after a reload.
+              onAccepted={() => { void refreshTripAfterAccept(tripId) }}
+              initiallyCollapsed
+            />
+          </div>
+        )}
+      />
 
       {dayPickerPlace && <MobileDayPickerSheet {...S} />}
       {listImportOpen && <ListImportModal {...S} />}
