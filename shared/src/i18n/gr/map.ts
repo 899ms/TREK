@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Εμφάνιση όλου του ταξιδιού',
   'map.overview.hide': 'Απόκρυψη όλου του ταξιδιού',
   'map.overview.total': 'Συνολική απόσταση',
+  'map.attribution': 'Πηγές χάρτη',
 };
 export default map;

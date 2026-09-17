@@ -99,6 +99,9 @@ export function assembleRoadtrip({
 
   const lines: [number, number][][] = [];
   const lineDays: number[] = [];
+  // Parallel to `lines`: true where the line is the drive into the NEXT day, drawn in the
+  // leaving day's colour. See `lineJoins` on RoadtripRoutes.
+  const lineJoins: boolean[] = [];
   const segments: RouteSegment[] = [];
   const accessLines: RoadtripRoutes['accessLines'] = [];
 
@@ -134,6 +137,10 @@ export function assembleRoadtrip({
         if (inbound.line.length > 1) {
           lines.push(inbound.line);
           lineDays.push(inbound.drawnAs);
+          // A spill carries its own `fromDayNumber` and a joined day the number of the day
+          // it left: either way, a line drawn as a day other than the one it runs in is
+          // the connection into this one.
+          lineJoins.push(inbound.drawnAs !== chain.dayNumber);
         }
         if (inbound.seg) segments.push(inbound.seg);
       }
@@ -142,6 +149,12 @@ export function assembleRoadtrip({
       if (leg.line.length > 1) {
         lines.push(leg.line);
         lineDays.push(chain.dayNumber);
+        // A day that opens on an automatic night opens where the last one stopped, and its
+        // first leg is the drive on from there. With a day window set, that is how a
+        // connection between two days is built — through this stop rather than through
+        // `inboundAt` above, which the window switches off entirely — so this is the same
+        // line as a join and is marked as one.
+        lineJoins.push(chain.stops[i]?.automaticNight?.phase === 'start');
       }
       segments.push(leg.seg);
     }
@@ -288,6 +301,7 @@ export function assembleRoadtrip({
     days: drives,
     lines,
     lineDays,
+    lineJoins,
     segments,
     accessLines,
     vias: out.flatMap((d) => d.legVias.flat()),

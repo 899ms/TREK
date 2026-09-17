@@ -4,6 +4,7 @@ import type { DawarichAccept, DawarichSuggestion, DawarichSuggestionTarget } fro
 import { useTranslation } from '../../i18n'
 import { useDawarichSuggestions } from '../../hooks/useDawarichSuggestions'
 import { useTripStore } from '../../store/tripStore'
+import { useSettingsStore } from '../../store/settingsStore'
 import { useIsPhone } from '../../mobile/useIsPhone'
 import { relativeTime } from '../../utils/relativeTime'
 import { Tooltip } from '../shared/Tooltip'
@@ -123,6 +124,9 @@ export default function DawarichSuggestionsPanel({
     allowPlace: trips.length > 0,
     // The trip name is noise when every row is from the same trip.
     showTrip: tripId === undefined,
+    // In the trip rail the arrival is the half that places a stop; how long somebody stood
+    // there is a second figure on a row that already does not wrap.
+    showDuration: tripId === undefined,
   }
 
   return (
@@ -277,13 +281,21 @@ export default function DawarichSuggestionsPanel({
  * The actions fade in on hover on a pointer device and stay visible on touch,
  * where there is no hover to reveal them.
  */
-function SuggestionRow({
+/**
+ * One stay, as a card with its actions clipped to the side.
+ *
+ * Exported because the journal draws these rows in its own timeline now — folded into a
+ * day rather than stacked in a panel above it — and a second copy of a row this detailed
+ * would be two things to keep in step, plus a straight hit on the duplication budget.
+ */
+export function SuggestionRow({
   suggestion,
   busy,
   allowJournal = false,
   allowPlace = false,
   showTrip = false,
   showDate = false,
+  showDuration = true,
   phone = false,
   onAccept,
   onDismiss,
@@ -295,6 +307,8 @@ function SuggestionRow({
   allowPlace?: boolean
   showTrip?: boolean
   showDate?: boolean
+  /** How long the stay lasted. Off in the trip rail, where the arrival is the useful half. */
+  showDuration?: boolean
   /** Rendered inside the phone shell, which has its own palette and its own reach. */
   phone?: boolean
   onAccept?: (target: DawarichSuggestionTarget) => void
@@ -302,6 +316,9 @@ function SuggestionRow({
   onRestore?: () => void
 }): React.ReactElement {
   const { t, locale } = useTranslation()
+  // The traveller's own clock: these times used to come straight out of the timestamp, so
+  // a 12-hour setting got 24-hour times here and nowhere else.
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
 
   return (
     <div className="flex items-stretch gap-[6px] px-3 py-[5px]">
@@ -348,8 +365,8 @@ function SuggestionRow({
           {showDate && (
             <Badge icon={CalendarDays}>{formatDayHeading(suggestion.localDate, locale)}</Badge>
           )}
-          <Badge icon={Clock}>{timeRange(suggestion.startedAt, suggestion.endedAt)}</Badge>
-          <Badge icon={Hourglass}>{formatDuration(suggestion.durationMinutes, t)}</Badge>
+          <Badge icon={Clock}>{timeRange(suggestion.startedAt, suggestion.endedAt, is12h)}</Badge>
+          {showDuration && <Badge icon={Hourglass}>{formatDuration(suggestion.durationMinutes, t)}</Badge>}
 
           {suggestion.state === 'accepted' && (
             <Badge icon={Check} tone="success">

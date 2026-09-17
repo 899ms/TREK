@@ -178,6 +178,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} χλμ. μακριά',
   'dawarich.bucket.rule': 'Μια επιθυμία μετράει ως εκπληρωμένη σε απόσταση έως {meters} μ. και μετά από {minutes} λεπτά στο σημείο.',
 
+  'dawarich.journey.dayStays.one': '1 στάση από το Dawarich',
+  'dawarich.journey.dayStays.other': '{count} στάσεις από το Dawarich',
 };
 
 export default dawarich;

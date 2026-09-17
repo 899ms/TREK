@@ -174,6 +174,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km daleko',
   'dawarich.bucket.rule': 'Přání se počítá jako splněné do {meters} m a po {minutes} minutách na místě.',
 
+  'dawarich.journey.dayStays.one': '1 zastávka z Dawarichu',
+  'dawarich.journey.dayStays.other': 'Zastávky z Dawarichu: {count}',
 };
 
 export default dawarich;

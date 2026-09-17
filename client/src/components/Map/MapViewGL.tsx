@@ -9,7 +9,7 @@ import { renderIconMarkup } from '../../utils/iconMarkup'
 import type mapboxgl from 'mapbox-gl'
 import { useSettingsStore } from '../../store/settingsStore'
 import { useTranslation } from '../../i18n/TranslationContext'
-import { MapLayerSwitcher, type BaseLayer } from './MapLayerSwitcher'
+import { MapLayerSwitcher, MAP_LAYER_SWITCHER_INSET, type BaseLayer } from './MapLayerSwitcher'
 import { useAuthStore } from '../../store/authStore'
 import { getCached, isLoading, fetchPhoto, onThumbReady, getAllThumbs } from '../../services/photoService'
 import { isCustomPlaceImage, photoCacheKey } from './placePhoto'
@@ -40,7 +40,7 @@ import { resolveTrackColor, hasManualTrackColor } from './trackColors'
 import { buildPoiPopupHtml } from './placePopup'
 import { pluginsApi, type PluginMapMarker, type PluginMapLayer } from '../../api/client'
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, SATELLITE_TILE_URL, SATELLITE_TILE_ATTRIBUTION, SATELLITE_TILE_MAXZOOM } from '../../constants/mapDefaults'
-import { computeMapViewport, TILE_SIZE_GL } from '../../utils/mapViewport'
+import { computeMapViewport, TILE_SIZE_GL, type ViewportPadding } from '../../utils/mapViewport'
 
 function categoryIconSvg(iconName: string | null | undefined, size: number): string {
   const IconComponent = (iconName && CATEGORY_ICON_MAP[iconName]) || CATEGORY_ICON_MAP['MapPin']
@@ -186,6 +186,16 @@ interface Props {
    */
   focusPoints?: [number, number][]
   /**
+   * What the caller's own chrome covers while `focusPoints` is framed, in pixels per edge.
+   *
+   * The default padding knows this component's panels and nothing else, and on a phone it
+   * is a flat margin. A shell that lays its own bars over the map passes what they cover,
+   * so the frame lands in the part still visible. Only the fit on `focusPoints` reads it.
+   * Compared by value: the same numbers in a new object do not refit, while new numbers
+   * refit the points already handed over, because the chrome they must clear has moved.
+   */
+  fitPadding?: ViewportPadding
+  /**
    * Let markers stay apart longer than usual.
    *
    * A road trip is read along a line: two stops fifty kilometres apart on the same
@@ -277,15 +287,30 @@ function addPlaceClusterLayers(map: any): void {
  * Puts the imagery on the map, or takes it off again.
  *
  * Built on demand rather than once at load: a style change drops every source the map
- * had, and a hot reload does the same. Guarded on its own absence, so the usual pass is
- * a no-op and only the visibility flips.
+ * had, and a hot reload does the same. Visibility comes first: a layer that is already
+ * there only needs flipping, so the usual pass is one call and a tap answers at once.
+ *
+ * Deliberately not gated on `isStyleLoaded()`. That reports false for as long as any
+ * source has tiles or a setData in flight (see useDawarichTrailGL), which on a phone is
+ * the usual state, and the only retry here is `styledata`, which fires on style edits
+ * and not when those finish. Behind that gate a stored choice met a busy map on load,
+ * and a tap on the road trip stage met the sources the same render had just set again,
+ * so the imagery was never drawn. The gate was also the wrong question: this only runs
+ * after `load`, and addSource and addLayer refuse only a style document that is not in
+ * yet. The catch covers that case, and `styledata` brings the pass back once it is in.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applySatellite(map: any, on: boolean): void {
   try {
-    if (!map.isStyleLoaded?.()) return
+    if (map.getLayer(SATELLITE_LAYER_ID)) {
+      map.setLayoutProperty(SATELLITE_LAYER_ID, 'visibility', on ? 'visible' : 'none')
+      return
+    }
+    if (!on) return // Nothing to build while it is switched off.
+    // The layer is what is missing, not necessarily the source: a pass that got the
+    // source in and then failed on the layer would otherwise leave a source that stops
+    // every later pass from ever building the layer.
     if (!map.getSource(SATELLITE_SOURCE_ID)) {
-      if (!on) return // Nothing to build while it is switched off.
       map.addSource(SATELLITE_SOURCE_ID, {
         type: 'raster',
         tiles: [SATELLITE_TILE_URL],
@@ -293,21 +318,18 @@ function applySatellite(map: any, on: boolean): void {
         maxzoom: SATELLITE_TILE_MAXZOOM,
         attribution: SATELLITE_TILE_ATTRIBUTION,
       })
-      // Under the first thing TREK draws, over everything the basemap style draws.
-      // Without the anchor the imagery lands on top and buries the route.
-      const layers = map.getStyle?.()?.layers ?? []
-      const firstOwn = layers.find((l: { id: string }) =>
-        OWN_LAYER_PREFIXES.some(prefix => l.id.startsWith(prefix)))
-      map.addLayer({
-        id: SATELLITE_LAYER_ID,
-        type: 'raster',
-        source: SATELLITE_SOURCE_ID,
-        paint: { 'raster-opacity': 1 },
-      }, firstOwn?.id)
     }
-    if (map.getLayer(SATELLITE_LAYER_ID)) {
-      map.setLayoutProperty(SATELLITE_LAYER_ID, 'visibility', on ? 'visible' : 'none')
-    }
+    // Under the first thing TREK draws, over everything the basemap style draws.
+    // Without the anchor the imagery lands on top and buries the route.
+    const layers = map.getStyle?.()?.layers ?? []
+    const firstOwn = layers.find((l: { id: string }) =>
+      OWN_LAYER_PREFIXES.some(prefix => l.id.startsWith(prefix)))
+    map.addLayer({
+      id: SATELLITE_LAYER_ID,
+      type: 'raster',
+      source: SATELLITE_SOURCE_ID,
+      paint: { 'raster-opacity': 1 },
+    }, firstOwn?.id)
   } catch { /* a style that refuses the layer keeps the plain basemap */ }
 }
 
@@ -644,6 +666,7 @@ export function MapViewGL({
   zoom = DEFAULT_MAP_ZOOM,
   fitKey = 0,
   focusPoints,
+  fitPadding,
   clusterLoosely = false,
   hazards,
   dawarichTrack = null,
@@ -1170,6 +1193,23 @@ export function MapViewGL({
       maxWidth: '240px',
       className: 'trek-map-popup',
     })
+    /*
+     * The credit starts as the little (i), not as a ribbon across the map.
+     *
+     * Both engines collapse their attribution below 640px, and both then open it
+     * anyway and wait for a drag before tucking it away. On a phone, where the map IS
+     * the screen, that means the first thing anybody sees is a two-line grey band
+     * over the bottom of it. Dragging is exactly what maplibre does on its own
+     * `drag` handler; this only starts where that would have ended up, so the credit
+     * is one tap away and nothing about it is removed.
+     */
+    map.once('idle', () => {
+      const attrib = containerRef.current?.querySelector('.maplibregl-ctrl-attrib.maplibregl-compact-show')
+        ?? containerRef.current?.querySelector('.mapboxgl-ctrl-attrib.mapboxgl-compact-show')
+      attrib?.classList.remove('maplibregl-compact-show', 'mapboxgl-compact-show')
+      attrib?.removeAttribute('open')
+    })
+
     // Hand the map out so the trip planner can render its own compass pill next to
     // the POI pill (a custom round control instead of Mapbox's default top-right one).
     onMapReadyRef.current?.(map)
@@ -2177,6 +2217,10 @@ export function MapViewGL({
     if (routeArrivedForPendingFit) pendingRouteFitRef.current = null
   }, [fitKey, routeFitKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The caller's padding as a value, so a parent that builds the object inline on every
+  // render does not move the camera each time it renders.
+  const fitPaddingKey = fitPadding ? [fitPadding.top, fitPadding.right, fitPadding.bottom, fitPadding.left].join(' ') : ''
+
   // Frame whatever was handed over. Nothing happens when it empties, so closing the
   // picker leaves the map where the user left it rather than snapping back.
   useEffect(() => {
@@ -2188,13 +2232,13 @@ export function MapViewGL({
     pendingRouteFitRef.current = null
     try {
       map.fitBounds(bounds, {
-        padding: paddingOpts,
+        padding: fitPadding ?? paddingOpts,
         maxZoom: 15,
         pitch: enableMapbox3d ? 45 : 0,
         duration: 400,
       })
     } catch { /* noop */ }
-  }, [focusPoints]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusPoints, fitPaddingKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // flyTo selected place
   useEffect(() => {
@@ -2264,7 +2308,9 @@ export function MapViewGL({
 
   // Satellite, the same setting the Leaflet map reads, so switching it on one renderer
   // and reloading into the other keeps the choice. `styledata` is subscribed because a
-  // basemap change rebuilds the style from scratch and takes the imagery with it.
+  // basemap change rebuilds the style from scratch and takes the imagery with it. It is
+  // the retry for a style that is not in yet, never for a busy one: it fires on style
+  // edits, not when tiles arrive, which is why applySatellite does not wait for those.
   useEffect(() => {
     const map = mapRef.current
     if (!map || !mapReady) return
@@ -2314,7 +2360,7 @@ export function MapViewGL({
           card too, and used to send the pill to the top of the map for a corner it never
           covers. */}
       <div style={{
-        position: 'absolute', left: leftWidth + 20, zIndex: 1000, pointerEvents: 'none',
+        position: 'absolute', left: leftWidth + MAP_LAYER_SWITCHER_INSET, zIndex: 1000, pointerEvents: 'none',
         bottom: isMobile && hasDayDetail
           ? 'calc(var(--bottom-nav-h, 0px) + 20px + var(--day-panel-h, 0px) + 12px)'
           : 'calc(var(--bottom-nav-h, 0px) + 12px)',

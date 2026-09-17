@@ -100,6 +100,10 @@ function buildHook(over: Record<string, unknown> = {}): Record<string, unknown> 
     hideSkeletons: false, setHideSkeletons: vi.fn(),
     query: '', setQuery: vi.fn(), dismissSuggestion: vi.fn(async () => {}),
     restoreSuggestions: vi.fn(async () => {}), openAtEntryId: null,
+    // The stays Dawarich recorded, by the day they fall on. Empty here: the fold each day
+    // carries has its own suite (FE-JRN-DAYDAW), and what this file pins is the wiring.
+    dawarichByDate: new Map(), dawarichBusyId: null,
+    acceptDawarich: vi.fn(async () => {}), dismissDawarich: vi.fn(),
     mapRef: { current: null }, fullMapRef: { current: null }, galleryUploadRef: { current: null },
     galleryProviders: [], setGalleryProviders: vi.fn(), galleryBrowseRef: { current: null },
     activeLocationId: null, handleMarkerClick: vi.fn(), handleLocationClick: vi.fn(),

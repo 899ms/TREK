@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { reachableRefuels, outcomeOf } from './refuelSuggestion'
+import {
+  reachableRefuels, outcomeOf, refuelBandState, refuelKey, REFUEL_EMPTY_KEY, REFUEL_OFFER_LIMIT, REFUEL_WORDS,
+  type RefuelCandidate, type RefuelOutcome, type RefuelSearchView,
+} from './refuelSuggestion'
 import type { LatLng } from './corridor'
 import type { Poi } from '../Map/poiCategories'
 
@@ -120,5 +123,69 @@ describe('reachableRefuels — one entry per station', () => {
     // Position alone is not identity either.
     const out = reachableRefuels([at('Aral', 52, 13.3), at('Shell', 52.0003, 13.3)], LINE, 100)
     expect(out.map(p => p.name).sort()).toEqual(['Aral', 'Shell'])
+  })
+})
+
+describe('refuelBandState', () => {
+  const candidate = (name: string): RefuelCandidate =>
+    ({ ...poi(name, 52, 13.5), alongKm: 40, offRouteKm: 0.4, spareKm: 30 })
+  const search = (over: Partial<RefuelSearchView> = {}): RefuelSearchView =>
+    ({ openFor: null, loading: false, outcome: null, results: [], ...over })
+
+  it('FE-ROADTRIP-REFUEL-013: a search filed under another leg leaves this band alone', () => {
+    // One search is open at a time and it names the dry point it belongs to, so a band
+    // three legs down the chain must not light up for a question asked about this one.
+    expect(refuelKey(7, 1)).toBe('7:1')
+    const band = refuelBandState(search({ openFor: '7:4', outcome: 'found', results: [candidate('a')] }), 7, 1)
+    expect(band).toEqual({ open: false, loading: false, offers: [], empty: null, control: 'find' })
+  })
+
+  it('FE-ROADTRIP-REFUEL-014: while the request runs the lamp steps aside for the way out', () => {
+    const band = refuelBandState(search({ openFor: '7:1', loading: true }), 7, 1)
+    expect(band).toEqual({ open: true, loading: true, offers: [], empty: null, control: 'close' })
+  })
+
+  it('FE-ROADTRIP-REFUEL-015: an answer lists three at most, in the order the search ranked them', () => {
+    const results = ['a', 'b', 'c', 'd', 'e'].map(candidate)
+    const band = refuelBandState(search({ openFor: '7:1', outcome: 'found', results }), 7, 1)
+    expect(REFUEL_OFFER_LIMIT).toBe(3)
+    expect(band.offers.map(o => o.name)).toEqual(['a', 'b', 'c'])
+    expect(band.control).toBe('close')
+    expect(band.empty).toBeNull()
+  })
+
+  it.each<Exclude<RefuelOutcome, 'found'>>(['none', 'incomplete', 'failed'])(
+    'FE-ROADTRIP-REFUEL-016: an empty answer (%s) says which nothing it was and leaves a retry',
+    outcome => {
+      // A retry rather than a dead end: the place search is a shared service that does
+      // time out, and no answer with no way to ask again reads as broken.
+      const band = refuelBandState(search({ openFor: '7:1', outcome }), 7, 1)
+      expect(band).toEqual({ open: true, loading: false, offers: [], empty: outcome, control: 'again' })
+      expect(REFUEL_EMPTY_KEY[outcome]).toBe(`roadtrip.refuel.${outcome}`)
+    },
+  )
+
+  it('FE-ROADTRIP-REFUEL-017: asked but nothing back yet keeps the lamp and says nothing', () => {
+    const band = refuelBandState(search({ openFor: '7:1' }), 7, 1)
+    expect(band).toEqual({ open: true, loading: false, offers: [], empty: null, control: 'find' })
+  })
+
+  it('FE-ROADTRIP-REFUEL-018: the battery never borrows the tank\'s words', () => {
+    expect(REFUEL_WORDS.fuel).toEqual({
+      dry: 'roadtrip.refuel.dry', find: 'roadtrip.refuel.find', add: 'roadtrip.refuel.add',
+    })
+    expect(REFUEL_WORDS.electric).toEqual({
+      dry: 'roadtrip.refuel.dryElectric', find: 'roadtrip.refuel.findElectric', add: 'roadtrip.refuel.addElectric',
+    })
+  })
+
+  it('FE-ROADTRIP-REFUEL-019: results that arrive before their outcome already offer the way out', () => {
+    // The close control follows the results rather than the outcome, which is how the
+    // desktop rail always decided it: once there is something on the map to dismiss,
+    // the band offers to dismiss it.
+    const band = refuelBandState(search({ openFor: '7:1', results: [candidate('a')] }), 7, 1)
+    expect(band.control).toBe('close')
+    expect(band.offers).toEqual([])
+    expect(band.empty).toBeNull()
   })
 })

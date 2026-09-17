@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Zobrazit celou cestu',
   'map.overview.hide': 'Skrýt celou cestu',
   'map.overview.total': 'Celková vzdálenost',
+  'map.attribution': 'Zdroje mapy',
 };
 export default map;

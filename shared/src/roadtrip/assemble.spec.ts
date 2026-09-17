@@ -145,6 +145,39 @@ describe('assembleRoadtrip connected days', () => {
     });
   }
 
+  /** The same two days, driven under an 08:00 to 20:00 window, which builds the nights. */
+  function assembleWindowedTwoDays() {
+    const first = [stop({ ownerIndex: 0 }), stop({ ownerIndex: 1 }), stop({ ownerIndex: 2 })];
+    const second = [
+      stop({ ownerDayId: 2, ownerIndex: 0, assignmentId: 300, placeId: 400, lat: 60 }),
+      stop({ ownerDayId: 2, ownerIndex: 1, assignmentId: 301, placeId: 401, lat: 61 }),
+    ];
+    const allLegs: Record<string, RoutedLeg> = {};
+    for (const run of [first, second, [first[2]!, second[0]!]]) {
+      run.slice(0, -1).forEach((from, i) => {
+        allLegs[legKey(from, run[i + 1]!)] = lineFrom(from, run[i + 1]!);
+      });
+    }
+    return assembleRoadtrip({
+      plan: [
+        { dayId: 1, dayNumber: 1, date: '2026-06-01', title: null, stops: first },
+        { dayId: 2, dayNumber: 2, date: '2026-06-02', title: null, stops: second },
+      ],
+      quietDays: [],
+      window: { start: 8 * 60, end: 20 * 60, endMode: 'time' } as never,
+      distanceUnit: 'metric',
+      allLegs,
+      snapByDay: {},
+      missedByDay: {},
+      loading: false,
+      limits: { rangeKm: null, legMinutes: null, dayMinutes: null },
+      vehicleKind: null,
+      connectDays: false,
+      boundaries: [],
+      labels: { start: 'start', end: 'end' },
+    });
+  }
+
   it('ROADTRIP-ASSEMBLE-004: the drive drawn at the head of a connected day names the stop it left from', () => {
     const routes = assembleTwoDays(true);
     const [first, second] = routes.days;
@@ -161,5 +194,41 @@ describe('assembleRoadtrip connected days', () => {
 
     expect(routes.days[1]!.arrivingFrom).toBeUndefined();
     expect(routes.days[1]!.geometry[0]).toEqual([60, 10]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-006: that drive is marked as the connection it is, in the colour of the day it leaves', () => {
+    const routes = assembleTwoDays(true);
+
+    // Day 1 drives two of its own legs and then on into day 2; day 2 drives one.
+    expect(routes.lineDays).toEqual([1, 1, 1, 2]);
+    expect(routes.lines).toHaveLength(routes.lineJoins.length);
+    // The third line is drawn as day 1 but runs into day 2, and only it is a join. A
+    // surface showing one day needs that apart from the day number, which says day 1 for
+    // both the day's own legs and for the drive leading off it.
+    expect(routes.lineJoins).toEqual([false, false, true, false]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-007: with the days unconnected there is no join to mark', () => {
+    const routes = assembleTwoDays(false);
+
+    expect(routes.lineDays).toEqual([1, 1, 2]);
+    expect(routes.lineJoins).toEqual([false, false, false]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-008: with a day window the connection runs through the night stop, and is marked there', () => {
+    // A window builds the days itself: day 2 opens on an automatic night standing where
+    // day 1 stopped, and its first leg is the drive on from there. That leg is the SAME
+    // connection `connectDays` draws without a window, but it arrives as one of day 2's
+    // own legs, under day 2's number, and `inboundAt` is switched off entirely. Unmarked,
+    // a surface showing one day had no way to tell it from a drive within the day, and the
+    // phone drew the whole way back to yesterday's last stop on today's map.
+    const routes = assembleWindowedTwoDays();
+    const second = routes.days.find((d) => d.dayNumber === 2)!;
+
+    expect(second.stops[0]!.automaticNight?.phase).toBe('start');
+    // Day 1 drives its own two legs; day 2 opens with the drive on from the night and then
+    // drives its own. Only that first one of day 2's is the connection.
+    expect(routes.lineDays).toEqual([1, 1, 2, 2]);
+    expect(routes.lineJoins).toEqual([false, false, true, false]);
   });
 });

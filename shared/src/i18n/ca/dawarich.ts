@@ -174,6 +174,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': 'a {km} km',
   'dawarich.bucket.rule': 'Un desig es considera assolit a menys de {meters} m i després de {minutes} minuts al lloc.',
 
+  'dawarich.journey.dayStays.one': '1 estada de Dawarich',
+  'dawarich.journey.dayStays.other': '{count} estades de Dawarich',
 };
 
 export default dawarich;

@@ -12,6 +12,9 @@ import { useIsMobile } from '../../hooks/useIsMobile'
 import { lockBodyScroll } from '../../utils/bodyScrollLock'
 import type { JourneyEntry } from '../../store/journeyStore'
 import { createDraftJourneyEntry } from './JourneyDetailPage.helpers'
+import { useDawarichSuggestions } from '../../hooks/useDawarichSuggestions'
+import { openStaysByDate } from '../../components/Dawarich/dawarichSuggestionModel'
+import type { DawarichSuggestion, DawarichSuggestionTarget } from '@trek/shared'
 
 import { useDawarichJournalTrail } from '../../hooks/useDawarichJournalTrail'
 
@@ -298,6 +301,34 @@ export function useJourneyDetail() {
     }
   }, [current, loadJourney, toast, t])
 
+  /**
+   * The stays Dawarich recorded over this journal's dates, by the day they happened on.
+   *
+   * Read here rather than inside a panel so the timeline can fold each day's stays into
+   * that day (discussion with Roel, 16.09.): stacked above the entries, a fortnight of
+   * driving put forty rows between the reader and their own first entry.
+   *
+   * Only what is still open — an accepted stay is an entry on the timeline already, and a
+   * dismissed one was waved away on purpose. Within a day the order is the order they were
+   * lived in, which is what makes a run of them read as an afternoon.
+   */
+  const dawarich = useDawarichSuggestions()
+  const dawarichByDate = useMemo(() => openStaysByDate(dawarich.suggestions), [dawarich.suggestions])
+
+  /**
+   * Accepting writes the stay into THIS journal and reloads it, which is how the new entry
+   * reaches the timeline the stay was standing in.
+   */
+  const acceptDawarich = useCallback(async (suggestion: DawarichSuggestion, target: DawarichSuggestionTarget) => {
+    if (!current) return
+    const ok = await dawarich.accept(suggestion.id, { target, journalId: current.id })
+    if (ok) await loadJourney(current.id)
+  }, [dawarich, current, loadJourney])
+
+  const dismissDawarich = useCallback((suggestion: DawarichSuggestion) => {
+    void dawarich.dismiss(suggestion.id)
+  }, [dawarich])
+
   const handleMarkerClick = useCallback((entryId: string) => {
     const el = document.querySelector(`[data-entry-id="${entryId}"]`)
     if (!el) return
@@ -503,6 +534,7 @@ export function useJourneyDetail() {
     unlinkTrip, setUnlinkTrip, showSettings, setShowSettings,
     hideSkeletons, setHideSkeletons,
     query, setQuery, dismissSuggestion, restoreSuggestions,
+    dawarichByDate, dawarichBusyId: dawarich.busyId, acceptDawarich, dismissDawarich,
     openAtEntryId,
     mapRef, fullMapRef, galleryUploadRef, galleryProviders, setGalleryProviders, galleryBrowseRef,
     activeLocationId, handleMarkerClick, handleLocationClick,

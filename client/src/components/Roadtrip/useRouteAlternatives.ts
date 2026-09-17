@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 import { calculateAlternatives, calculateRoute, type RouteAlternative } from '../Map/RouteCalculator'
 import type { RoadtripStop } from './useRoadtripRoutes'
 import type { RoadtripVia } from '@trek/shared'
@@ -108,5 +108,11 @@ export function useRouteAlternatives(): RouteAlternativesState {
       })
   }, [])
 
-  return { open, ask, close }
+  // One object for as long as nothing in it changes. The planner keys its close gate and
+  // the callbacks that ask, choose and focus on this state as a whole, so a fresh object
+  // per render re-ran that gate and rebuilt those callbacks on every render of the
+  // planner, whatever had caused it. Whether the picker stays open is still the gate's own
+  // condition to decide (a new `open` runs it either way); the memo only stops that work
+  // from repeating on renders that changed nothing about the picker.
+  return useMemo(() => ({ open, ask, close }), [open, ask, close])
 }

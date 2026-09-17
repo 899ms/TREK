@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Hiện toàn bộ chuyến đi',
   'map.overview.hide': 'Ẩn toàn bộ chuyến đi',
   'map.overview.total': 'Tổng quãng đường',
+  'map.attribution': 'Nguồn bản đồ',
 };
 export default map;

@@ -67,6 +67,7 @@ function routes(over: Partial<RoadtripRoutes> = {}): RoadtripRoutes {
     days: [day()],
     lines: [],
     lineDays: [],
+    lineJoins: [],
     segments: [],
     accessLines: [],
     vias: [],

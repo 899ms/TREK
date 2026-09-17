@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': 'على بُعد {km} كم',
   'dawarich.bucket.rule': 'تُحتسب الأمنية محققة ضمن {meters} م وبعد {minutes} دقيقة في المكان.',
 
+  'dawarich.journey.dayStays.one': 'إقامة واحدة من Dawarich',
+  'dawarich.journey.dayStays.other': 'إقامات من Dawarich: {count}',
 };
 
 export default dawarich;

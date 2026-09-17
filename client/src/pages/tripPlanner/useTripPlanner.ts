@@ -9,7 +9,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { dayColor } from '../../components/Roadtrip/dayColors'
 import { getCached, fetchPhoto } from '../../services/photoService'
 import { useToast } from '../../components/shared/Toast'
-import { Map, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train } from 'lucide-react'
+import { Map, Ticket, PackageCheck, Wallet, FolderOpen, Users, Train, Route } from 'lucide-react'
 import { resolvePluginIcon } from '../../components/shared/PluginIcon'
 import { useTranslation, translateApiError } from '../../i18n'
 import { addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi, healthApi, airtrailApi, mapsApi, placesApi } from '../../api/client'
@@ -34,6 +34,7 @@ import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { collapsedDayDates } from '../../components/Map/dawarichTrail'
 import { useRoadtripCorridor } from '../../components/Roadtrip/useRoadtripCorridor'
+import { PHONE_CORRIDOR_OPTIONS } from '../../components/Roadtrip/corridorSearchModel'
 import { useRoadtripVias } from '../../components/Roadtrip/useRoadtripVias'
 import { useRefuelSearch } from '../../components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../components/Roadtrip/refuelSuggestion'
@@ -222,6 +223,9 @@ export function useTripPlanner() {
     { id: 'plan', label: t(TRIP_TAB_LABEL_KEYS.plan), icon: Map },
     { id: 'transports', label: t(TRIP_TAB_LABEL_KEYS.transports), icon: Train },
     { id: 'buchungen', label: t(TRIP_TAB_LABEL_KEYS.buchungen), shortLabel: t('trip.tabs.reservationsShort'), icon: Ticket },
+    // Phone only: the desktop reaches the drive through the mode switch beside the
+    // day plan, and a second entry point there would be a tab nobody needs.
+    ...(enabledAddons.roadtrip && isMobile ? [{ id: 'roadtrip', label: t(TRIP_TAB_LABEL_KEYS.roadtrip), icon: Route }] : []),
     ...(enabledAddons.packing ? [{ id: 'listen', label: t(TRIP_TAB_LABEL_KEYS.listen), shortLabel: t('trip.tabs.listsShort'), icon: PackageCheck }] : []),
     ...(enabledAddons.budget ? [{ id: 'finanzplan', label: t(TRIP_TAB_LABEL_KEYS.finanzplan), icon: Wallet }] : []),
     ...(enabledAddons.documents ? [{ id: 'dateien', label: t(TRIP_TAB_LABEL_KEYS.dateien), icon: FolderOpen }] : []),
@@ -625,12 +629,30 @@ export function useTripPlanner() {
   // Road trip mode reads the whole trip, not the selected day, so it owns its own legs.
   // Passing no days while the mode is off keeps it inert — no routing requests, no state.
   const roadtripActive = !!enabledAddons.roadtrip && roadtripMode
+  // The phone's own way into the drive, and the reason line 148 above stays as it is.
+  //
+  // `roadtripMode` is not a view switch, it is a data switch: `assignments` and
+  // `places` are derived from it for the whole hook, and every permanently mounted
+  // sheet of the phone shell reads those same lists. Letting the phone flip it would
+  // bring back exactly the regressions the comment up there describes, on paths that
+  // never touch a tab. The second tap on a day chip opens the day sheet, the More
+  // button opens the PDF export.
+  //
+  // So the phone feeds the routing round instead, and nothing else. Once the tab has
+  // been opened the feed stays on for as long as the trip is: a tab switch must not
+  // throw away legs that cost a rate-limited request each.
+  const roadtripTabSeen = useRef(false)
+  if (activeTab === 'roadtrip') roadtripTabSeen.current = true
+  const roadtripFeedActive = !!enabledAddons.roadtrip
+    && (roadtripMode || (isMobile && (activeTab === 'roadtrip' || roadtripTabSeen.current)))
   const roadtripPreferencesState = useLoadRoadtripSettings(tripId, !!enabledAddons.roadtrip)
   useEffect(() => {
     if (roadtripPreferencesState.failed) toast.error(t('common.error'))
   }, [roadtripPreferencesState.failed, toast, t])
   const dailyTimesActive = !!dayWindow(roadtripSettings.roadtrip_day_start, roadtripSettings.roadtrip_day_end)
-  const dayBoundaries = useDayBoundaries(tripId, roadtripActive && dailyTimesActive, assignments)
+  // Fed from the same flag as the routing round: without the boundaries the phone
+  // would draw a drive that never ends for the night.
+  const dayBoundaries = useDayBoundaries(tripId, roadtripFeedActive && dailyTimesActive, assignments)
   useEffect(() => { if (dayBoundaries.stale) toast.error(t('trip.toast.loadError')) }, [dayBoundaries.stale, toast, t])
   const resetDayBoundaries = dayBoundaries.editable && dayBoundaries.boundaries.length && can('day_edit', trip) ? async () => {
     try {
@@ -648,8 +670,11 @@ export function useTripPlanner() {
   const refuel = useRefuelSearch()
   const roadtripRoutes = useRoadtripRoutes(
     tripId,
-    roadtripActive && roadtripPreferencesState.ready ? days : EMPTY_DAYS,
-    assignments,
+    roadtripFeedActive && roadtripPreferencesState.ready ? days : EMPTY_DAYS,
+    // Deliberately the stored list, not the filtered one: the drive wants the
+    // service stops and the night a lodging booking put on the map, and the filter
+    // above only exists to keep those out of a day list read as a plan.
+    roadtripFeedActive ? storedAssignments : assignments,
     routeProfile,
     roadtripVias.byDay,
     dayBoundaries.boundaries,
@@ -658,7 +683,10 @@ export function useTripPlanner() {
   // Lives here rather than in the panel because the map draws what it finds.
   // The trip comes with it for the vehicle: an electric car looks for chargers rather
   // than for pumps, and that preference is stored per trip.
-  const roadtripCorridor = useRoadtripCorridor(roadtripRoutes, tripId)
+  // The phone searches under a smaller ceiling: fewer boxes, a capped retry pass and a
+  // deadline, because a search that keeps the radio warm costs battery somebody is
+  // navigating on. Which stretch of the day it asks about is decided per search.
+  const roadtripCorridor = useRoadtripCorridor(roadtripRoutes, tripId, isMobile ? PHONE_CORRIDOR_OPTIONS : undefined)
   // Applying a track is a long job — a routing round trip per refinement — so it lives
   // above the dialog: a component that unmounted halfway would leave the day holding
   // half a chain of vias.
@@ -815,7 +843,12 @@ export function useTripPlanner() {
     if (!can('place_edit', trip)) return
     // A corridor hit knows how far along the drive it sits, so it can go straight into
     // the chain in driving order instead of being dragged there afterwards.
-    const hit = roadtripActive && 'alongKm' in poi ? (poi as unknown as CorridorPoi) : null
+    //
+    // Gated on the FEED, not on road trip mode: the phone never turns that mode on (it
+    // is a data switch the mobile sheets cannot survive, see `roadtripFeedActive`), so
+    // reading it here sent every hit found on the stage map into the full place form
+    // instead, losing the stop kind, the stay, and the position worked out just above.
+    const hit = roadtripFeedActive && 'alongKm' in poi ? (poi as unknown as CorridorPoi) : null
     if (hit && roadtripDayId != null) {
       const displayed = roadtripRoutes.days.find(d => d.dayId === roadtripDayId)
       const insert = displayed && roadtripInsertion(displayed, roadtripInsertIndexFor(hit))
@@ -834,8 +867,8 @@ export function useTripPlanner() {
     }
     const selected = roadtripRoutes.days.find(d => d.dayId === roadtripDayId)
     const target = selected && roadtripInsertion(selected, selected.stops.length)
-    openAddPlaceFromPoi(poi, roadtripActive ? target?.dayId ?? roadtripDayId : undefined)
-  }, [openAddPlaceFromPoi, roadtripActive, roadtripDayId, roadtripDayNumber, roadtripInsertIndexFor, roadtripRoutes.days, overnightOptions, can, trip])
+    openAddPlaceFromPoi(poi, roadtripFeedActive ? target?.dayId ?? roadtripDayId : undefined)
+  }, [openAddPlaceFromPoi, roadtripFeedActive, roadtripDayId, roadtripDayNumber, roadtripInsertIndexFor, roadtripRoutes.days, overnightOptions, can, trip])
 
   /**
    * The stops of a day as the road trip counts them, in the order it drives them.
@@ -1295,9 +1328,16 @@ export function useTripPlanner() {
   // on the picker — so flipping the mode off left pale blue alternatives, their
   // casings and their drive-time pills drawn on an ordinary planner map, with no
   // road trip UI left to dismiss them from.
+  //
+  // The gate is where the picker can be seen, not the mode. `roadtripActive` is false
+  // on a phone by design (see `roadtripMode`), so gating on it alone closed a picker
+  // the phone had just opened, on the very next render. On the phone the picker lives
+  // on the drive tab, so it stays open there and closes once the tab is left. At desk
+  // width `isMobile` is false and this is exactly `roadtripActive`, as it always was.
+  const alternativesShown = roadtripActive || (isMobile && roadtripFeedActive && activeTab === 'roadtrip')
   useEffect(() => {
-    if (!roadtripActive) routeAlternatives.close()
-  }, [roadtripActive, routeAlternatives])
+    if (!alternativesShown) routeAlternatives.close()
+  }, [alternativesShown, routeAlternatives])
 
   /**
    * The offered routes as the map draws them: line, colour, and the label that sits on
@@ -2402,7 +2442,7 @@ export function useTripPlanner() {
     selectedDayId, isLoading, tripActions, can, canUploadFiles,
     pushUndo, undo, canUndo, lastActionLabel, handleUndo,
     enabledAddons, collabFeatures, tripAccommodations, setTripAccommodations,
-    roadtripMode, toggleRoadtripMode, roadtripActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
+    roadtripMode, toggleRoadtripMode, roadtripActive, roadtripFeedActive, roadtripRoutes, roadtripLineColors, roadtripMapLines, roadtripMapPlaces, collapsedRoadtripDays, toggleRoadtripDay, roadtripCorridor,
     overviewShown, toggleOverview, overviewActive, tripOverview,
     dawarichTrailShown, toggleDawarichTrail, dawarichTrail, dawarichHiddenDates, dawarichEnabled: !!enabledAddons.dawarich,
     followTrack, roadtripViaCounts,
@@ -2426,6 +2466,10 @@ export function useTripPlanner() {
     refuel, askRefuel, acceptRefuel,
     routeAlternatives, askRouteAlternatives, chooseRouteAlternative, alternativeOverlays, alternativeFocusPoints, mapFocusPoints, roadtripMapVias, focusRoadtripPoint,
     stayDraft, setStayDraft, editRoadtripStay, setRoadtripStay, roadtripEndDay, roadtripStay,
+    // Addressed by stop rather than by selection: the phone's stage sheet knows which
+    // stop it is showing, and going through the place selection there would open the
+    // permanently mounted place inspector underneath it.
+    setRoadtripEndDay, dailyTimesActive,
     highlightedAlternative, setHighlightedAlternative,
     moveRoadtripStopToDay,
     dropPoiOnRoute,

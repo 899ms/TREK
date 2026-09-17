@@ -176,6 +176,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km-re',
   'dawarich.bucket.rule': 'Egy kívánság {meters} méteren belül és {minutes} perc helyszíni idő után számít teljesítettnek.',
 
+  'dawarich.journey.dayStays.one': '1 tartózkodás a Dawarichból',
+  'dawarich.journey.dayStays.other': '{count} tartózkodás a Dawarichból',
 };
 
 export default dawarich;

@@ -2,7 +2,7 @@ import React from 'react'
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render } from '../../../tests/helpers/render'
-import { act, waitFor } from '@testing-library/react'
+import { act, fireEvent, waitFor } from '@testing-library/react'
 import { resetAllStores } from '../../../tests/helpers/store'
 import { buildPlace } from '../../../tests/helpers/factories'
 import { server } from '../../../tests/helpers/msw/server'
@@ -10,6 +10,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAuthStore } from '../../store/authStore'
 import maplibregl from 'maplibre-gl'
 import { DEFAULT_MAP_ZOOM } from '../../constants/mapDefaults'
+import { MAP_LAYER_SWITCHER_INSET } from './MapLayerSwitcher'
 import type { GeoPosition, TrackingMode } from '../../hooks/useGeolocation'
 import type { PluginMapLayer, PluginMapLayerFeature, PluginMapMarker } from '../../api/client'
 import type { Poi } from './poiCategories'
@@ -254,6 +255,12 @@ beforeEach(() => {
   glMap.getCanvas.mockImplementation(() => document.createElement('canvas'))
   glMap.getBearing.mockReturnValue(0)
   glMap.queryTerrainElevation.mockReturnValue(null)
+  // A busy style, a refused source and a custom layer list are each set by one test
+  // for the case it covers. Put back here, or every test after it would silently run
+  // against a map that never settles.
+  glMap.isStyleLoaded.mockReturnValue(true)
+  glMap.getStyle.mockReturnValue({ layers: [] })
+  glMap.addSource.mockImplementation(() => undefined)
   glMarkers.clear()
   // clearAllMocks() wipes call history but keeps implementations, so anything a
   // test overrides with mockReturnValue has to be put back here.
@@ -2064,5 +2071,230 @@ describe('MapViewGL', () => {
     await flushFrames()
 
     expect(glMap.setLayoutProperty).toHaveBeenCalledWith('trip-satellite-raster', 'visibility', 'none')
+  })
+
+  // A map is busy (isStyleLoaded() false) for as long as tiles or a setData are in flight,
+  // which on a phone is most of the time and on the road trip stage was every tap. The
+  // imagery used to wait for a settled style that `styledata` never announced.
+
+  it('FE-COMP-MAPVIEWGL-079: a stored satellite choice is drawn even while the map is still busy', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // Right after `load` the basemap tiles and the overlay sources are still loading.
+    glMap.isStyleLoaded.mockReturnValue(false)
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+
+    expect(glMap.addSource).toHaveBeenCalledWith('trip-satellite', expect.objectContaining({ type: 'raster' }))
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster', type: 'raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-080: a tap on the switcher while a source update is in flight still shows the imagery', async () => {
+    loadOnAttach()
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+
+    const { getByRole } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
+
+    glMap.isStyleLoaded.mockReturnValue(false)
+    fireEvent.click(getByRole('button', { name: 'Switch to satellite view' }))
+    await flushFrames()
+
+    expect(useSettingsStore.getState().settings.map_base_layer).toBe('satellite')
+    expect(glMap.addSource).toHaveBeenCalledWith('trip-satellite', expect.objectContaining({ type: 'raster' }))
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-081: imagery that is already on the map flips visibility at once, busy or not', async () => {
+    loadOnAttach()
+    glMap.getSource.mockImplementation((id: string) => (id === 'trip-satellite' ? {} : null))
+    glMap.getLayer.mockImplementation((id: string) => (id === 'trip-satellite-raster' ? {} : null))
+
+    const { getByRole } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    glMap.setLayoutProperty.mockClear()
+
+    glMap.isStyleLoaded.mockReturnValue(false)
+    fireEvent.click(getByRole('button', { name: 'Switch to satellite view' }))
+    await flushFrames()
+
+    expect(glMap.setLayoutProperty).toHaveBeenCalledWith('trip-satellite-raster', 'visibility', 'visible')
+    // Flipping it is all a second tap takes: nothing is built a second time.
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
+    expect(glMap.addLayer).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'trip-satellite-raster' }), expect.anything())
+  })
+
+  it('FE-COMP-MAPVIEWGL-082: a style that is not in yet keeps the plain basemap until styledata brings it', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // What both engines do when the style document itself has not loaded.
+    let styleIn = false
+    glMap.addSource.mockImplementation((id: string) => {
+      if (id === 'trip-satellite' && !styleIn) throw new Error('Style is not done loading.')
+    })
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    expect(glMap.addLayer).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'trip-satellite-raster' }), expect.anything())
+
+    styleIn = true
+    const subscribed = glMap.on.mock.calls.filter(c => c[0] === 'styledata')
+    const styledata = subscribed[subscribed.length - 1]?.[1] as (() => void) | undefined
+    expect(styledata).toBeDefined()
+    act(() => { styledata!() })
+
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster' }),
+      'trip-route',
+    )
+  })
+
+  it('FE-COMP-MAPVIEWGL-083: the switcher sits the shared inset off the map edge, past any side panel', async () => {
+    const { getByRole, rerender } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    // Button, then its frosted shell, then the positioned wrapper.
+    const wrapper = () => getByRole('button', { name: 'Switch to satellite view' }).parentElement!.parentElement!
+
+    // The phone's compass is placed off the same inset, so the two cannot drift apart.
+    expect(wrapper().style.left).toBe(`${MAP_LAYER_SWITCHER_INSET}px`)
+
+    rerender(<MapViewGL places={[]} fitKey={1} leftWidth={240} />)
+    await flushFrames()
+    expect(wrapper().style.left).toBe(`${240 + MAP_LAYER_SWITCHER_INSET}px`)
+  })
+
+  it('FE-COMP-MAPVIEWGL-084: a source left behind without its layer still gets the layer', async () => {
+    loadOnAttach()
+    useSettingsStore.setState({
+      settings: { ...useSettingsStore.getState().settings, map_base_layer: 'satellite' },
+    } as never)
+    glMap.getStyle.mockReturnValue({ layers: [{ id: 'background' }, { id: 'trip-route' }] })
+    // An earlier pass that got the source in and then failed on the layer.
+    glMap.getSource.mockImplementation((id: string) => (id === 'trip-satellite' ? {} : null))
+
+    render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+
+    // Guarded on the source, the pass would have seen it and built nothing, for good.
+    expect(glMap.addLayer).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'trip-satellite-raster', type: 'raster' }),
+      'trip-route',
+    )
+    expect(glMap.addSource).not.toHaveBeenCalledWith('trip-satellite', expect.anything())
+  })
+
+  it('FE-COMP-MAPVIEWGL-085: a caller padding frames the focus points instead of the phone margin, and the day fit keeps its own', async () => {
+    // A phone shell lays a chip rail over the top of the map and a bar plus the dock over
+    // the bottom. The flat 40px margin put the ends of a framed leg under either of them.
+    const original = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 420 })
+    try {
+      const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+      const chrome = { top: 120, right: 16, bottom: 290, left: 16 }
+      const { rerender } = render(<MapViewGL places={[]} fitKey={1} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).not.toHaveBeenCalled()
+
+      rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={chrome} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+      expect(glMap.fitBounds.mock.calls[0][1]).toMatchObject({ padding: chrome, maxZoom: 15 })
+
+      // Picking a day is not the caller's frame, so that fit keeps the phone margin.
+      const places = [buildMapPlace({ id: 88, lat: 48.1, lng: 2.1 }), buildMapPlace({ id: 89, lat: 48.2, lng: 2.2 })]
+      rerender(<MapViewGL places={places} fitKey={2} focusPoints={leg} fitPadding={chrome} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(2)
+      expect(glMap.fitBounds.mock.calls[1][1]).toMatchObject({ padding: { top: 40, right: 20, bottom: 40, left: 20 } })
+
+      // And without one, the focus fit falls back to that margin too.
+      const stage: [number, number][] = [[47, 1], [47.5, 1.5]]
+      rerender(<MapViewGL places={places} fitKey={2} focusPoints={stage} />)
+      await act(async () => {})
+      expect(glMap.fitBounds).toHaveBeenCalledTimes(3)
+      expect(glMap.fitBounds.mock.calls[2][1]).toMatchObject({ padding: { top: 40, right: 20, bottom: 40, left: 20 } })
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: original })
+    }
+  })
+
+  it('FE-COMP-MAPVIEWGL-086: the caller padding is read by value, so only new numbers refit the points on screen', async () => {
+    const leg: [number, number][] = [[48.1, 2.1], [48.3, 2.4]]
+    const { rerender } = render(
+      <MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />,
+    )
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+
+    // A parent that builds the object inline hands a new one on every render. The camera
+    // belongs to the traveller between fits, so that alone must not take it back.
+    rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 290, left: 16 }} />)
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(1)
+
+    // New numbers mean the chrome moved, so the same points are framed again around it.
+    rerender(<MapViewGL places={[]} fitKey={1} focusPoints={leg} fitPadding={{ top: 120, right: 16, bottom: 98, left: 16 }} />)
+    await act(async () => {})
+    expect(glMap.fitBounds).toHaveBeenCalledTimes(2)
+    expect(glMap.fitBounds.mock.calls[1][1]).toMatchObject({ padding: { top: 120, right: 16, bottom: 98, left: 16 } })
+  })
+})
+describe('MapViewGL attribution', () => {
+  const flushFrames = () => act(async () => { await new Promise(resolve => setTimeout(resolve, 40)) })
+
+  /** The compact control as maplibre leaves it on a narrow map: collapsed class, open. */
+  function compactAttribution(container: HTMLElement): HTMLElement {
+    const el = document.createElement('details')
+    el.className = 'maplibregl-ctrl maplibregl-ctrl-attrib maplibregl-compact maplibregl-compact-show'
+    el.setAttribute('open', '')
+    // Inside the map container itself, where maplibre puts its controls.
+    container.querySelectorAll('div')[1]?.appendChild(el)
+    return el
+  }
+
+  it('FE-COMP-MAPVIEWGL-077: the credit starts as the little button, not as a ribbon', async () => {
+    const { container } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    const attrib = compactAttribution(container)
+
+    const idle = glMap.once.mock.calls.find(c => c[0] === 'idle')?.[1] as (() => void) | undefined
+    expect(idle).toBeDefined()
+    act(() => { idle!() })
+
+    // Both engines open theirs on a phone and only tuck it away on the first drag, so
+    // the first thing on a screen the map fills is a two-line band across the bottom.
+    expect(attrib.classList.contains('maplibregl-compact-show')).toBe(false)
+    expect(attrib.hasAttribute('open')).toBe(false)
+    // Still there, still one tap away: nothing about the credit is removed.
+    expect(attrib.classList.contains('maplibregl-ctrl-attrib')).toBe(true)
+  })
+
+  it('FE-COMP-MAPVIEWGL-078: a map wide enough to show the credit in full is left alone', async () => {
+    const { container } = render(<MapViewGL places={[]} fitKey={1} />)
+    await flushFrames()
+    const el = document.createElement('details')
+    // No `compact-show`, which is what a map over 640px reports.
+    el.className = 'maplibregl-ctrl maplibregl-ctrl-attrib'
+    el.setAttribute('open', '')
+    container.querySelectorAll('div')[1]?.appendChild(el)
+
+    const idle = glMap.once.mock.calls.find(c => c[0] === 'idle')?.[1] as (() => void) | undefined
+    act(() => { idle!() })
+
+    expect(el.hasAttribute('open')).toBe(true)
   })
 })

@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { buildAlternativeOverlays } from './alternativeOverlays'
+import { alternativeSubline, alternativesPhase, buildAlternativeOverlays, type AlternativeOverlay } from './alternativeOverlays'
+import { formatDurationShort } from './roadtripModel'
 import { ALT_PRIMARY, ALT_SECONDARY, ALT_LABEL_PRIMARY_BG, ALT_LABEL_SECONDARY_BG } from './alternativeColors'
 import type { RouteAlternative } from '../Map/RouteCalculator'
 
 /**
- * FE-ALTOVL-001..010 — turning the router's answers into something drawable.
+ * FE-ALTOVL-001..017: turning the router's answers into something drawable.
  *
  * Two decisions live here and neither is cosmetic: which of the offered roads is
  * drawn as the one you are on, and where each label hangs. A label anchored on a
@@ -219,5 +220,38 @@ describe('buildAlternativeOverlays', () => {
     expect(out[0].color).toBe(ALT_PRIMARY)
     expect(out[0].note).toBe('Current')
     expect(out[1].color).toBe(ALT_SECONDARY)
+  })
+})
+
+describe('alternativesPhase', () => {
+  const two = buildAlternativeOverlays([alt({ coordinates: line(20, 0) }), alt({ coordinates: line(20, 1) })], LABELS)
+
+  it('FE-ALTOVL-016: asking beats a failure, a failure beats an empty list, and only two roads are a choice', () => {
+    // A new question replaces the old answer and its error with it.
+    expect(alternativesPhase({ loading: true, error: true }, two)).toBe('loading')
+    expect(alternativesPhase({ loading: true, error: false }, [])).toBe('loading')
+    // A router that will not answer is not a leg with one sensible way.
+    expect(alternativesPhase({ loading: false, error: true }, [])).toBe('failed')
+    expect(alternativesPhase({ loading: false, error: true }, two)).toBe('failed')
+    expect(alternativesPhase({ loading: false, error: false }, [])).toBe('onlyOne')
+    expect(alternativesPhase({ loading: false, error: false }, two.slice(0, 1))).toBe('onlyOne')
+    expect(alternativesPhase({ loading: false, error: false }, two)).toBe('choose')
+  })
+})
+
+describe('alternativeSubline', () => {
+  const overlay = (over: Partial<AlternativeOverlay>): AlternativeOverlay => ({
+    ...buildAlternativeOverlays([alt({ coordinates: line(20, 0) }), alt({ coordinates: line(20, 1) })], LABELS)[1],
+    ...over,
+  })
+
+  it('FE-ALTOVL-017: an offer is named by what it is, and only a plain one by how much slower it is', () => {
+    const slower = (time: string) => `${time} slower`
+    for (const note of ['No motorway', 'Current', 'Fastest']) {
+      expect(alternativeSubline(overlay({ note, slowerThanQuickest: 1800 }), slower)).toBe(note)
+    }
+    // The caller words the difference; the figure is the same short duration the map prints.
+    expect(alternativeSubline(overlay({ note: '', slowerThanQuickest: 1800 }), slower))
+      .toBe(`${formatDurationShort(1800)} slower`)
   })
 })

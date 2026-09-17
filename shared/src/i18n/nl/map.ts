@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Hele reis tonen',
   'map.overview.hide': 'Hele reis verbergen',
   'map.overview.total': 'Totale afstand',
+  'map.attribution': 'Kaartvermeldingen',
 };
 export default map;

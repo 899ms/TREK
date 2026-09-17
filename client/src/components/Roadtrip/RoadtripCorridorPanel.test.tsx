@@ -53,7 +53,7 @@ const day = (dayId: number, dayNumber: number): RoadtripDay => ({
 
 const routes = (days: RoadtripDay[]): RoadtripRoutes => ({
   days,
-  lines: [], lineDays: [],
+  lines: [], lineDays: [], lineJoins: [],
   accessLines: [],
   vias: [],
   segments: [],

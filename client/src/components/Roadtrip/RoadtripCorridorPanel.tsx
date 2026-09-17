@@ -12,6 +12,7 @@ import { formatDistance } from '../../utils/units'
 import CustomSelect from '../shared/CustomSelect'
 import RoadtripCategoryPicker from './RoadtripCategoryPicker'
 import { serviceColor } from './roadtripModel'
+import { alongLabel, offRouteLabel } from './corridorSearchModel'
 import { CORRIDOR_CATEGORY_BY_KEY } from './stopKinds'
 import { FS } from './typeScale'
 import { CORRIDOR_CATEGORY_KEYS, CORRIDOR_SECTION_KM, CORRIDOR_WIDTHS_KM, type RoadtripCorridor } from './useRoadtripCorridor'
@@ -154,14 +155,11 @@ function ResultRow({ poi, onAdd, onFocus }: { poi: CorridorPoi; onAdd?: () => vo
               row still wraps cleanly at a narrow width because nothing has to break around
               a separator. */}
           <div className="flex flex-wrap items-center gap-1" style={{ fontSize: FS.meta }}>
-            <span className={POI_CHIP}>
-              {t('roadtrip.poi.offRoute', { distance: formatDistance(poi.offRouteKm, distanceUnit) })}
-            </span>
-            <span className={POI_CHIP}>
-              {poi.alongKm < 0.5
-                ? t('roadtrip.poi.atStart')
-                : t('roadtrip.poi.alongRoute', { distance: formatDistance(poi.alongKm, distanceUnit) })}
-            </span>
+            {/* Written by the shared model rather than here: the phone says the same two
+                things in one line, and the wording of a hit should not depend on which
+                shell is reading it. */}
+            <span className={POI_CHIP}>{offRouteLabel(poi.offRouteKm, distanceUnit, t)}</span>
+            <span className={POI_CHIP}>{alongLabel(poi.alongKm, distanceUnit, t)}</span>
             {/* What the charger offers, where OSM says. Socket names are proper nouns and
                 stay as they are; the numbers around them are what decides whether a car can
                 use it at all. A station that says nothing shows nothing rather than a row
@@ -455,7 +453,9 @@ export default function RoadtripCorridorPanel({
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={search.search}
+            // Wrapped, not handed over: `search` takes an optional stretch of the drive,
+            // and a click handler passed straight through would hand it the MouseEvent.
+            onClick={() => search.search()}
             disabled={!canSearch}
             aria-label={t('roadtrip.poi.search')}
             title={narrow ? t('roadtrip.poi.search') : undefined}

@@ -7,6 +7,7 @@ import {
   formatDayOption,
   formatDuration,
   groupByDay,
+  openStaysByDate,
   timeRange,
 } from './dawarichSuggestionModel'
 
@@ -105,12 +106,22 @@ describe('clockOf / timeRange', () => {
   })
 
   it('FE-DAWARICH-SUGMODEL-006: a range when both ends read, the arrival alone when the end does not', () => {
-    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00')).toBe('10:15 – 12:40')
-    expect(timeRange('2026-09-10T10:15:00+02:00', 'nonsense')).toBe('10:15')
+    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00', false)).toBe('10:15 – 12:40')
+    expect(timeRange('2026-09-10T10:15:00+02:00', 'nonsense', false)).toBe('10:15')
   })
 
   it('FE-DAWARICH-SUGMODEL-007: no arrival, no range', () => {
-    expect(timeRange('nonsense', '2026-09-10T12:40:00+02:00')).toBe('')
+    expect(timeRange('nonsense', '2026-09-10T12:40:00+02:00', false)).toBe('')
+  })
+
+  it('FE-DAWARICH-SUGMODEL-012: a twelve-hour clock gets twelve-hour times, both ends of the range', () => {
+    // These were cut out of the timestamp and printed as they stood, so a traveller on a
+    // 12-hour clock read every Dawarich time in 24-hour while the rest of the app obeyed
+    // the setting.
+    expect(timeRange('2026-09-10T10:15:00+02:00', '2026-09-10T12:40:00+02:00', true)).toBe('10:15 AM – 12:40 PM')
+    expect(timeRange('2026-09-10T14:05:00+02:00', '2026-09-10T23:00:00+02:00', true)).toBe('2:05 PM – 11:00 PM')
+    // Midnight is 12 AM, not 0 AM, and noon is 12 PM.
+    expect(timeRange('2026-09-10T00:30:00+02:00', '2026-09-10T12:00:00+02:00', true)).toBe('12:30 AM – 12:00 PM')
   })
 })
 
@@ -154,5 +165,51 @@ describe('formatDayOption', () => {
 
   it('FE-DAWARICH-SUGMODEL-012: a day without a date gets no badge rather than an empty one', () => {
     expect(formatDayOption(1, null, 'en-GB', t)).toEqual({ label: 'planner.dayN:{"n":1}', badge: undefined })
+  })
+})
+
+describe('openStaysByDate', () => {
+  it('FE-DAWARICH-SUGMODEL-015: buckets the open stays by their own local day', () => {
+    // What a journal timeline asks for: it draws one day and folds that day's stays into
+    // it, so it looks them up by date rather than walking a flat list per day.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10' }),
+      stay({ id: 2, localDate: '2026-09-11' }),
+      stay({ id: 3, localDate: '2026-09-10' }),
+    ])
+
+    expect([...byDate.keys()].sort()).toEqual(['2026-09-10', '2026-09-11'])
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([1, 3])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-016: within a day they are in the order they were lived', () => {
+    // A run of stays reads as an afternoon only in that order; whatever order the server
+    // sent them in is not it.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10', startedAt: '2026-09-10T16:00:00+02:00' }),
+      stay({ id: 2, localDate: '2026-09-10', startedAt: '2026-09-10T08:30:00+02:00' }),
+      stay({ id: 3, localDate: '2026-09-10', startedAt: '2026-09-10T12:15:00+02:00' }),
+    ])
+
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([2, 3, 1])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-017: only what is still waiting', () => {
+    // An accepted stay is an entry on that timeline already, and a dismissed one was waved
+    // away on purpose; offering either again is offering to do it twice.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10', state: 'accepted' }),
+      stay({ id: 2, localDate: '2026-09-10', state: 'dismissed' }),
+      stay({ id: 3, localDate: '2026-09-10' }),
+    ])
+
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([3])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-018: a day whose every stay is handled is not a day at all', () => {
+    // An empty bucket would draw a fold saying "0 stays" on a day that has none.
+    const byDate = openStaysByDate([stay({ id: 1, localDate: '2026-09-10', state: 'accepted' })])
+
+    expect(byDate.size).toBe(0)
   })
 })

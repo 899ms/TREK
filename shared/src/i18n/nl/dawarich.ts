@@ -175,6 +175,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km verderop',
   'dawarich.bucket.rule': 'Een wens telt als bereikt binnen {meters} m en na {minutes} minuten ter plaatse.',
 
+  'dawarich.journey.dayStays.one': '1 stop van Dawarich',
+  'dawarich.journey.dayStays.other': '{count} stops van Dawarich',
 };
 
 export default dawarich;

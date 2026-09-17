@@ -12,7 +12,7 @@ import type { RoadtripStop } from './useRoadtripRoutes'
 import type { RoadtripVia } from '@trek/shared'
 
 /**
- * FE-ALTHOOK-001..009 — asking for other ways of driving one leg.
+ * FE-ALTHOOK-001..010: asking for other ways of driving one leg.
  *
  * The case that carries the feature: when the leg already carries vias, the road
  * actually being driven is NOT among what the router offers for the two bare
@@ -146,5 +146,26 @@ describe('useRouteAlternatives', () => {
     act(() => { result.current.close() })
     expect(signals[1].aborted).toBe(true)
     expect(result.current.open).toBeNull()
+  })
+
+  it('FE-ALTHOOK-010: the state keeps its identity until the picker itself changes', async () => {
+    // The planner keys its close gate on this object. A new one per render ran that
+    // effect on every render, so any render at all was a chance to close the picker.
+    const { result, rerender } = renderHook(() => useRouteAlternatives())
+    const idle = result.current
+    rerender()
+    expect(result.current).toBe(idle)
+
+    act(() => { result.current.ask(4, 1, from, to, 'driving', []) })
+    const asking = result.current
+    expect(asking).not.toBe(idle)
+    // The functions themselves never change, only the object carrying the new `open`.
+    expect(asking.ask).toBe(idle.ask)
+    expect(asking.close).toBe(idle.close)
+
+    await waitFor(() => expect(result.current.open?.loading).toBe(false))
+    const answered = result.current
+    rerender()
+    expect(result.current).toBe(answered)
   })
 })

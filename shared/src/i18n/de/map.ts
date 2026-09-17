@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': 'Ganze Reise anzeigen',
   'map.overview.hide': 'Ganze Reise ausblenden',
   'map.overview.total': 'Gesamtstrecke',
+  'map.attribution': 'Kartenquellen',
 };
 export default map;

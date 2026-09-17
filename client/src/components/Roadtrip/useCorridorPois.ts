@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { roadtripSearchRepo } from '../../repo/roadtripSearchRepo'
 import { useTranslation } from '../../i18n'
-import { corridorTiles, projectOntoRoute, simplifyLine, type Bbox, type LatLng } from './corridor'
+import { corridorTiles, projectOntoRoute, simplifyLine, sliceAtMeters, type Bbox, type LatLng } from './corridor'
+import { DESKTOP_CORRIDOR_BUDGET, type CorridorBudget } from './corridorSearchModel'
 import type { Poi } from '../Map/poiCategories'
 
 /** A POI that is actually on the way, with the two numbers that make it one. */
@@ -30,16 +31,24 @@ export interface CorridorSearch {
   error: boolean
   /** The thinned line every `alongKm` above is measured along. */
   spine: LatLng[]
-  search: () => void
+  /**
+   * Asks, optionally only about a stretch of the line.
+   *
+   * The window is an argument rather than hook state because it belongs to the question:
+   * one traveller asks about the fifty kilometres ahead and the next about the whole day,
+   * off the same route and the same categories, and neither should make the other's
+   * answer disappear before it was read.
+   */
+  search: (window?: CorridorWindow | null) => void
   clear: () => void
 }
 
-/**
- * How many bounding boxes one search may ask Overpass for. A German-to-Italian drive
- * would otherwise be dozens of requests against a shared public mirror; past this the
- * search stops and says so rather than quietly covering half the route.
- */
-const MAX_TILES = 16
+/** A stretch of the drive, in kilometres along the spine. */
+export interface CorridorWindow {
+  fromKm: number
+  toKm: number
+}
+
 /** Gap after a request before the same worker starts the next — the mirrors are shared. */
 const REQUEST_SPACING_MS = 250
 /** How many boxes are in flight at once. */
@@ -64,7 +73,21 @@ const sleep = (ms: number, signal: AbortSignal): Promise<void> =>
  * every route change, because each run is several Overpass requests and the mirrors are
  * shared. Results stay until the categories or the route change.
  */
-export function useCorridorPois(line: LatLng[], categories: string[], widthKm: number): CorridorSearch {
+export function useCorridorPois(
+  line: LatLng[],
+  categories: string[],
+  widthKm: number,
+  /**
+   * What one search may cost.
+   *
+   * Absent means the desktop's behaviour, unchanged: every box of the whole day, every
+   * failed box retried, no deadline. The phone passes a smaller ceiling, because a cell
+   * is not a desk and a search that keeps the radio warm for a minute is a search that
+   * costs battery somebody is navigating on.
+   */
+  options?: { budget?: CorridorBudget },
+): CorridorSearch {
+  const budget = options?.budget ?? DESKTOP_CORRIDOR_BUDGET
   const { locale } = useTranslation()
   const [results, setResults] = useState<CorridorPoi[]>([])
   const [progress, setProgress] = useState({ done: 0, total: 0 })
@@ -104,15 +127,22 @@ export function useCorridorPois(line: LatLng[], categories: string[], widthKm: n
   const catKey = categories.join(',')
   useEffect(() => { clear() }, [routeKey, catKey, widthKm, clear])
 
-  const search = useCallback(() => {
+  const search = useCallback((window?: CorridorWindow | null) => {
     abortRef.current?.abort()
     if (spine.length < 2 || categories.length === 0) return
     const controller = new AbortController()
     abortRef.current = controller
     const runId = ++runIdRef.current
 
-    const allTiles = corridorTiles(spine, widthKm)
-    const tiles = allTiles.slice(0, MAX_TILES)
+    // Only the TILE line is cut, never the spine: every `alongKm` in a result is a
+    // distance along the spine, and so is every entry in `stopsAlongKm`. Cutting the
+    // spine would renumber both the moment the window moved, and a hit would land at the
+    // wrong position in the day's chain.
+    const tileLine = window ? sliceAtMeters(spine, window.fromKm * 1000, window.toKm * 1000) : spine
+    const allTiles = corridorTiles(tileLine, widthKm)
+    const tiles = allTiles.slice(0, budget.maxTiles)
+    const startedAt = Date.now()
+    const outOfTime = (): boolean => budget.deadlineMs != null && Date.now() - startedAt > budget.deadlineMs
 
     setCapped(allTiles.length > tiles.length)
     setFailedSources([])
@@ -180,6 +210,9 @@ export function useCorridorPois(line: LatLng[], categories: string[], widthKm: n
       const worker = async (): Promise<void> => {
         while (next < jobs.length) {
           if (controller.signal.aborted || runId !== runIdRef.current) return
+          // Out of time stops STARTING boxes; whatever answered stays on screen and the
+          // rest reports itself as unsearched, the same way a failed box does.
+          if (outOfTime()) { failures += jobs.length - next; setFailedAreas(failures); return }
           const job = jobs[next++]
           if (!(await collect(job))) retryable.push(job)
           done++
@@ -195,8 +228,11 @@ export function useCorridorPois(line: LatLng[], categories: string[], widthKm: n
       // One more pass over what did not answer. Overpass mirrors time out under load far
       // more often than they are truly empty, and reporting "4 stretches went unsearched"
       // when a second ask would have answered them is the wrong end of the trade.
-      for (const job of retryable) {
+      const retries = budget.maxRetries == null ? retryable : retryable.slice(0, budget.maxRetries)
+      failures += retryable.length - retries.length
+      for (const job of retries) {
         if (controller.signal.aborted || runId !== runIdRef.current) return
+        if (outOfTime()) { failures += retries.length - retries.indexOf(job); break }
         if (await collect(job)) continue
         failures++
         setFailedAreas(failures)
@@ -205,7 +241,7 @@ export function useCorridorPois(line: LatLng[], categories: string[], widthKm: n
       setError(failures === jobs.length && failures > 0)
       setLoading(false)
     })()
-  }, [spine, categories, widthKm, locale])
+  }, [spine, categories, widthKm, locale, budget.maxTiles, budget.maxRetries, budget.deadlineMs])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 

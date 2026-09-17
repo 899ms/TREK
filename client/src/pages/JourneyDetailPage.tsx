@@ -14,7 +14,7 @@ import {
   Plus, ChevronUp, ChevronDown, Eye, EyeOff, BookOpen, Image, Search, X,
 } from 'lucide-react'
 import MobileMapTimeline from '../components/Journey/MobileMapTimeline'
-import DawarichSuggestionsPanel from '../components/Dawarich/DawarichSuggestionsPanel'
+import JourneyDayDawarich from '../components/Journey/JourneyDayDawarich'
 import MobileEntryView from '../components/Journey/MobileEntryView'
 import { useJourneyStore } from '../store/journeyStore'
 import { computeJourneyLifecycle } from '../utils/journeyLifecycle'
@@ -47,6 +47,7 @@ function JourneyDetailPageDesktop() {
     unlinkTrip, setUnlinkTrip, showSettings, setShowSettings,
     hideSkeletons, setHideSkeletons,
     query, setQuery, dismissSuggestion, restoreSuggestions, openAtEntryId,
+    dawarichByDate, dawarichBusyId, acceptDawarich, dismissDawarich,
     mapRef, fullMapRef, galleryUploadRef, galleryProviders, setGalleryProviders, galleryBrowseRef,
     activeLocationId, handleMarkerClick, handleLocationClick,
     mapEntries, sidebarMapItems, tripDates, isMobile, tracks,
@@ -70,7 +71,14 @@ function JourneyDetailPageDesktop() {
     query,
   )
   const dayGroups = groupByDate(timelineEntries)
-  const sortedDates = [...dayGroups.keys()].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
+  // A stay falls on the day it happened, and that is often a day the journal has no entry
+  // on yet — which is the whole point of offering it. Those days join the timeline so the
+  // stay can be reached; without them the only way to a quiet day's stays would be to
+  // write an entry on it first. Not while a search is running: a day whose entries the
+  // query filtered out is not a day the reader is looking at.
+  const suggestionDates = canEditEntries && !query ? [...dawarichByDate.keys()] : []
+  const sortedDates = [...new Set([...dayGroups.keys(), ...suggestionDates])]
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))
 
   const tripDateMin = current.trips.length
     ? current.trips.reduce((min: string, t: any) => t.start_date && (!min || t.start_date < min) ? t.start_date : min, '')
@@ -323,7 +331,10 @@ function JourneyDetailPageDesktop() {
                 <div className="relative z-[3]">
                   <div className="inline-flex items-center gap-7 md:gap-9" style={{ padding: '13px 26px', borderRadius: 18, background: 'rgba(255,255,255,0.14)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.2)' }}>
                     {[
-                      { value: sortedDates.length, label: t('journey.stats.days') },
+                      // The journal's own days, not the ones a pending stay added to the
+                      // timeline: "11 days" for a trip of 7 counts somebody else's data as
+                      // the journey.
+                      { value: dayGroups.size, label: t('journey.stats.days') },
                       { value: current.stats.places, label: t('journey.stats.places') },
                       { value: current.stats.entries, label: t('journey.stats.entries') },
                       { value: current.stats.photos, label: t('journey.stats.photos') },
@@ -413,20 +424,7 @@ function JourneyDetailPageDesktop() {
               {/* Timeline (desktop only — mobile uses fullscreen combined view above) */}
               {!isMobile && (
                 <div className={`flex flex-col gap-6 pb-24 md:pb-6${view === 'timeline' ? '' : ' hidden'}`}>
-                  {/* Stays Dawarich recorded over this journal's dates, waiting to
-                      be turned into entries (#2279). Above the timeline because
-                      that is what they become; renders nothing when there is
-                      nothing pending. */}
-                  {canEditEntries && (
-                    <DawarichSuggestionsPanel
-                      journals={[{ id: current.id, label: current.title }]}
-                      // The entry the acceptance created belongs on the timeline
-                      // immediately; re-reading the journey is how it gets there.
-                      onAccepted={() => { void loadJourney(current.id) }}
-                    />
-                  )}
-
-                  {sortedDates.length === 0 && (
+                  {dayGroups.size === 0 && sortedDates.length === 0 && (
                     <EmptyState
                       scene="journey"
                       title={query ? t('journey.detail.searchEmpty', { query }) : t('journey.detail.noEntries')}
@@ -434,7 +432,9 @@ function JourneyDetailPageDesktop() {
                   )}
 
                   {sortedDates.map((date, dayIdx) => {
-                    const entries = dayGroups.get(date)!
+                    // Empty on a day that only has stays waiting on it.
+                    const entries = dayGroups.get(date) ?? []
+                    const stays = canEditEntries ? dawarichByDate.get(date) ?? [] : []
                     const fd = formatDate(date, locale)
                     const locations = [...new Set(entries.map(e => e.location_name).filter(Boolean))]
 
@@ -550,6 +550,16 @@ function JourneyDetailPageDesktop() {
                             </div>
                           )
                         })}
+
+                        {/* What Dawarich recorded on this day, folded into it. One line
+                            with a count, the mark for where it came from, and the rows on
+                            a tap. Nothing at all on a day with nothing pending. */}
+                        <JourneyDayDawarich
+                          suggestions={stays}
+                          busyId={dawarichBusyId}
+                          onAccept={acceptDawarich}
+                          onDismiss={dismissDawarich}
+                        />
                       </div>
                     )
                   })}

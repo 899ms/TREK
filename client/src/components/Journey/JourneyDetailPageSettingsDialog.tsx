@@ -11,6 +11,7 @@ import type { JourneyDetail } from '../../store/journeyStore'
 import { pickGradient } from '../../pages/journeyDetail/JourneyDetailPage.helpers'
 import { AddTripDialog } from './JourneyDetailPageAddTripDialog'
 import { normalizeImageFile } from '../../utils/convertHeic'
+import ToggleSwitch from '../Settings/ToggleSwitch'
 
 export function JourneySettingsDialog({ journey, onClose, onSaved, onOpenInvite, onRefresh, onRestoreSuggestions }: {
   journey: JourneyDetail
@@ -188,25 +189,17 @@ export function JourneySettingsDialog({ journey, onClose, onSaved, onOpenInvite,
           {/* Trip GPX tracks on the journey map (#2194) */}
           <div>
             <label className="text-[10px] font-semibold tracking-[0.12em] uppercase text-zinc-500 block mb-1.5">{t('journey.settings.tracks')}</label>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={!!journey.show_trip_tracks}
-              disabled={savingTracks}
-              onClick={handleTracksToggle}
-              className="w-full flex items-center gap-3 px-3.5 py-2.5 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 text-left disabled:opacity-60"
-            >
+            <div className={`w-full flex items-center gap-3 px-3.5 py-2.5 border border-edge rounded-xl bg-surface-card text-left${savingTracks ? ' opacity-60' : ''}`}>
               <span className="flex-1 min-w-0">
-                <span className="block text-[14px] text-zinc-900 dark:text-white">{t('journey.settings.showTripTracks')}</span>
-                <span className="block text-[11px] text-zinc-500">{t('journey.settings.showTripTracksHint')}</span>
+                <span className="block text-[14px] text-content-primary">{t('journey.settings.showTripTracks')}</span>
+                <span className="block text-[11px] text-content-faint">{t('journey.settings.showTripTracksHint')}</span>
               </span>
-              <span
-                aria-hidden="true"
-                className={`w-9 h-5 rounded-full flex-shrink-0 p-0.5 transition-colors ${journey.show_trip_tracks ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}
-              >
-                <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${journey.show_trip_tracks ? 'translate-x-4' : ''}`} />
-              </span>
-            </button>
+              <ToggleSwitch
+                on={!!journey.show_trip_tracks}
+                onToggle={() => { if (!savingTracks) handleTracksToggle() }}
+                label={t('journey.settings.showTripTracks')}
+              />
+            </div>
           </div>
 
           {/* The three fields a journey may put away (discussion #2299) */}
@@ -221,21 +214,17 @@ export function JourneySettingsDialog({ journey, onClose, onSaved, onOpenInvite,
               ] as const).map(([field, label]) => {
                 const on = journey[field] !== 0
                 return (
-                  <button
+                  <div
                     key={field}
-                    type="button"
-                    role="switch"
-                    aria-checked={on}
-                    aria-label={label}
-                    disabled={savingField !== null}
-                    onClick={() => handleFieldToggle(field)}
-                    className="w-full flex items-center gap-3 px-3.5 py-2.5 border border-zinc-200 dark:border-zinc-700 rounded-xl bg-white dark:bg-zinc-800 text-left disabled:opacity-60"
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 border border-edge rounded-xl bg-surface-card text-left${savingField !== null ? ' opacity-60' : ''}`}
                   >
-                    <span className="flex-1 min-w-0 text-[14px] text-zinc-900 dark:text-white">{label}</span>
-                    <span aria-hidden="true" className={`w-9 h-5 rounded-full flex-shrink-0 p-0.5 transition-colors ${on ? 'bg-emerald-500' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
-                      <span className={`block w-4 h-4 rounded-full bg-white transition-transform ${on ? 'translate-x-4' : ''}`} />
-                    </span>
-                  </button>
+                    <span className="flex-1 min-w-0 text-[14px] text-content-primary">{label}</span>
+                    <ToggleSwitch
+                      on={on}
+                      onToggle={() => { if (savingField === null) handleFieldToggle(field) }}
+                      label={label}
+                    />
+                  </div>
                 )
               })}
             </div>

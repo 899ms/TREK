@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-074
+// FE-TP-ROAD-001 to FE-TP-ROAD-099
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -87,6 +87,10 @@ const rt = vi.hoisted(() => {
     remove: vi.fn(async () => {}),
     reanchor: vi.fn(async () => {}),
   }
+  // What the routing round was last called with. The round itself is a fixture, so
+  // the arguments are the only place the planner's own decisions are visible: which
+  // days it is willing to route, and which assignment list it builds them from.
+  const routesArgs = { current: [] as unknown[] }
   const routes = {
     days: [] as Array<Record<string, unknown>>,
     quietDays: [] as unknown[],
@@ -141,13 +145,21 @@ const rt = vi.hoisted(() => {
     ask: vi.fn(),
     close: vi.fn(),
   }
-  return { vias, routes, corridor, alt }
+  // Hands out a fresh copy of `alt` on every render when set, the identity the real hook
+  // had before it was memoised. A stable fixture runs an effect keyed on it once and never
+  // again, which is exactly how a close gate that fired on every render went unseen.
+  const altFresh = { current: false }
+  return { vias, routes, corridor, alt, altFresh, routesArgs }
 })
 
 vi.mock('../../components/Roadtrip/useRoadtripVias', () => ({ useRoadtripVias: () => rt.vias }))
-vi.mock('../../components/Roadtrip/useRoadtripRoutes', () => ({ useRoadtripRoutes: () => rt.routes }))
+vi.mock('../../components/Roadtrip/useRoadtripRoutes', () => ({
+  useRoadtripRoutes: (...args: unknown[]) => { rt.routesArgs.current = args; return rt.routes },
+}))
 vi.mock('../../components/Roadtrip/useRoadtripCorridor', () => ({ useRoadtripCorridor: () => rt.corridor }))
-vi.mock('../../components/Roadtrip/useRouteAlternatives', () => ({ useRouteAlternatives: () => rt.alt }))
+vi.mock('../../components/Roadtrip/useRouteAlternatives', () => ({
+  useRouteAlternatives: () => (rt.altFresh.current ? { ...rt.alt } : rt.alt),
+}))
 vi.mock('../../components/Roadtrip/useFollowTrack', () => ({
   useFollowTrack: () => ({ busy: false, dayId: null, run: vi.fn(), attach: vi.fn(), detach: vi.fn() }),
 }))
@@ -295,6 +307,7 @@ beforeEach(() => {
   rt.vias.stale = false
   rt.vias.editable = true
   rt.routes.days = []
+  rt.routesArgs.current = []
   rt.routes.lines = []
   rt.routes.lineDays = []
   rt.corridor.day = undefined
@@ -304,6 +317,7 @@ beforeEach(() => {
   rt.corridor.search.spine = []
   rt.corridor.insertIndexFor.mockReturnValue(1)
   rt.alt.open = null
+  rt.altFresh.current = false
 
   usePluginStore.setState({ plugins: [], loaded: true })
   useBackgroundTasksStore.setState({ tasks: [] })
@@ -1925,4 +1939,232 @@ it('preserves exclusive service stops when reordering the visible Days stops', a
   act(() => result.current.toggleRoadtripMode())
   await act(async () => result.current.handleReorder(5, [13, 11]))
   expect(actions.reorderAssignments).toHaveBeenCalledWith(42, 5, [13, 12, 11])
+})
+
+/**
+ * The phone's own way into the drive.
+ *
+ * Road trip MODE is a data switch, not a view switch: `assignments` and `places` are
+ * derived from it for the whole hook, and every permanently mounted sheet of the phone
+ * shell reads those same two lists. The phone has no control that turns the mode back
+ * off, so it never turns it on. `roadtripMode = storedRoadtripMode && !isMobile` stays
+ * exactly as it is, and the tab feeds the routing round instead.
+ */
+describe('useTripPlanner road trip: the phone feed', () => {
+  let desktopWidth: number
+
+  beforeEach(() => {
+    desktopWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 390 })
+  })
+
+  afterEach(() => {
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth })
+  })
+
+  /** The days the routing round was handed. Empty means it is standing down. */
+  const fedDays = () => rt.routesArgs.current[1] as Array<{ id: number }>
+  /** The assignment list the drive is built from. */
+  const fedAssignments = () => rt.routesArgs.current[2] as Record<string, Array<{ id: number }>>
+
+  /** The routed shape of one day, which `renderRoadtrip` builds for the desk suites. */
+  const routeDay = (dayId: number) => {
+    rt.routes.days = [{
+      dayId,
+      dayNumber: 1,
+      schedule: { entries: [] },
+      legs: [],
+      stops: [0, 1, 2].map((i) => ({
+        assignmentId: i + 1, placeId: i + 1, lat: 53 - i, lng: 10 + i,
+        ownerDayId: dayId, ownerIndex: i,
+      })),
+    }]
+  }
+
+  /** Mount on a phone and wait until the addon feed has answered. */
+  async function renderPhone() {
+    const rendered = renderHook(() => useTripPlanner(), { wrapper })
+    await act(async () => { await Promise.resolve() })
+    // The drive tab exists on the phone and nowhere else, so its arrival doubles as
+    // the proof that the addon feed landed.
+    await waitFor(() => expect(rendered.result.current.TRIP_TABS.some(tab => tab.id === 'roadtrip')).toBe(true))
+    return rendered
+  }
+
+  it('FE-TP-ROAD-090: the phone opens the feed and leaves the mode alone', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const { result } = await renderPhone()
+
+    // The session still carries the switch from an earlier, wider window, which is
+    // the whole point: narrowing past the breakpoint must not bring the mode along.
+    expect(sessionStorage.getItem('trip-roadtrip-42')).toBe('1')
+    expect(result.current.roadtripMode).toBe(false)
+    expect(result.current.roadtripActive).toBe(false)
+    expect(result.current.roadtripFeedActive).toBe(true)
+  })
+
+  it('FE-TP-ROAD-091: a phone that never opened the drive routes nothing', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+
+    const { result } = await renderPhone()
+
+    expect(result.current.activeTab).toBe('plan')
+    expect(result.current.roadtripFeedActive).toBe(false)
+    // A day costs a rate-limited routing request, so the tab has to be asked for first.
+    expect(fedDays()).toHaveLength(0)
+  })
+
+  it('FE-TP-ROAD-092: with the drive tab open the round is handed the trip days', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const { result } = await renderPhone()
+
+    expect(result.current.roadtripFeedActive).toBe(true)
+    expect(fedDays().map(d => d.id)).toEqual([5, 6])
+  })
+
+  it('FE-TP-ROAD-093: the round is fed the STORED list, the day sheet keeps the filtered one', async () => {
+    const town = buildPlace({ id: 101, name: 'Bergen' })
+    const fuelStop = buildPlace({ id: 102, name: 'Tankstelle', stop_type: 'fuel' })
+    const hotel = buildPlace({ id: 103, name: 'Fjordhotell' })
+    seedTrip({
+      places: [town, fuelStop, hotel],
+      days: [buildDay({ id: 5, day_number: 1 })],
+      assignments: {
+        '5': [
+          buildAssignment({ id: 11, day_id: 5, order_index: 0, place: town }),
+          buildAssignment({ id: 12, day_id: 5, order_index: 1, place: fuelStop }),
+          buildAssignment({ id: 13, day_id: 5, order_index: 2, place: hotel, accommodation_id: 9 }),
+        ],
+      },
+    })
+    useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_service_stops_in_days: false } }))
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const { result } = await renderPhone()
+
+    // What the day sheet, the day list and the PDF export read: the pump is switched
+    // out of the plan, and the booked night is already its own overnight block.
+    expect(result.current.assignments['5'].map(v => v.id)).toEqual([11])
+    // What the drive is built from: the pump it stops at and the night it ends on.
+    expect(fedAssignments()['5'].map(v => v.id)).toEqual([11, 12, 13])
+  })
+
+  it('FE-TP-ROAD-094: leaving the drive tab does not throw the routed legs away', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const { result } = await renderPhone()
+    act(() => { result.current.handleTabChange('plan') })
+
+    expect(result.current.activeTab).toBe('plan')
+    expect(result.current.roadtripFeedActive).toBe(true)
+    expect(fedDays().map(d => d.id)).toEqual([5])
+  })
+  it('FE-TP-ROAD-095: a hit found on the phone lands in the chain, not in the full place form', async () => {
+    // The sharp one. `roadtripActive` is false on a phone by design, so gating the
+    // corridor branch on it sent every hit the stage map found into the ordinary place
+    // form, losing the stop kind, the stay, and the position worked out just above it.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.corridor.insertIndexFor.mockReturnValue(2)
+    routeDay(5)
+
+    const { result } = await renderPhone()
+    act(() => { result.current.handlePoiClick(poi() as never) })
+
+    expect(result.current.roadtripActive).toBe(false)
+    expect(result.current.stopDraft).toMatchObject({ dayId: 5, position: 2, dayNumber: 1 })
+    expect(result.current.showPlaceForm).toBe(false)
+  })
+
+  it('FE-TP-ROAD-096: an ordinary POI on the phone still carries the stage it was tapped on', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+
+    const { result } = await renderPhone()
+    const { alongKm: _drop, offRouteKm: _drop2, ...plain } = poi()
+    act(() => { result.current.handlePoiClick(plain as never) })
+
+    // Without the day it lands in the unplanned pool, which the stage does not show.
+    expect(result.current.showPlaceForm).toBe(true)
+    expect(result.current.placeFormDayId).toBe(5)
+  })
+
+  it('FE-TP-ROAD-097: a service stop opened for editing on the phone gets the place form with its own visit', async () => {
+    // The stop sheet's pencil relies on this. The desk popup it would otherwise open has
+    // no start time, and for a service stop the start time is the only way to pin or
+    // unpin its arrival (a booked night can also be held by the booking's check-in).
+    const fuelStop = buildPlace({ id: 102, name: 'Tankstelle', stop_type: 'fuel', lat: 60.39, lng: 5.32 })
+    seedTrip({
+      places: [fuelStop],
+      days: [buildDay({ id: 5, day_number: 1 })],
+      assignments: { '5': [buildAssignment({ id: 12, day_id: 5, order_index: 0, place: fuelStop })] },
+    })
+    // The STORED mode is on, set here rather than trusted to the suite's beforeEach: with
+    // it off the form branch would be taken anyway and this test would prove nothing.
+    sessionStorage.setItem('trip-roadtrip-42', '1')
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+
+    const phone = await renderPhone()
+    act(() => { phone.result.current.openPlaceEditor(fuelStop, 12) })
+
+    expect(phone.result.current.roadtripMode).toBe(false)
+    expect(phone.result.current.stopDraft).toBeNull()
+    expect(phone.result.current.showPlaceForm).toBe(true)
+    expect(phone.result.current.editingPlace?.id).toBe(102)
+    expect(phone.result.current.editingAssignmentId).toBe(12)
+    phone.unmount()
+
+    // The very same trip at desk width opens the stop popup, so what kept the phone on
+    // the form is the width alone.
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth })
+    const desk = await renderRoadtrip()
+    act(() => { desk.result.current.openPlaceEditor(fuelStop, 12) })
+
+    expect(desk.result.current.stopDraft).toMatchObject({ dayId: 5, editing: { placeId: 102, stopType: 'fuel' } })
+    expect(desk.result.current.showPlaceForm).toBe(false)
+  })
+
+  it('FE-TP-ROAD-098: a picker open on the drive tab survives the next render, with the mode still off', async () => {
+    // The blocker the phone picker hit. The close gate read `roadtripActive`, which is false
+    // on a phone by design, and ran on every render because the hook handed out a new
+    // object each time: asking set the picker loading, the render after it closed it again.
+    // The fixture hands out a fresh object per render so the gate is proven on its own,
+    // whatever identity the hook keeps.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: true, error: false }
+    rt.altFresh.current = true
+
+    const { result, rerender } = await renderPhone()
+    rt.alt.close.mockClear()
+    rerender()
+    rerender()
+
+    expect(rt.alt.close).not.toHaveBeenCalled()
+    expect(result.current.roadtripActive).toBe(false)
+    expect(result.current.roadtripMode).toBe(false)
+  })
+
+  it('FE-TP-ROAD-099: leaving the drive tab on a phone closes the picker, though the feed stays on', async () => {
+    // The phone's counterpart of FE-TP-ROAD-044: the overlay depends only on the picker, so
+    // a tab that no longer shows the bar must not leave the other roads drawn on its map.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    sessionStorage.setItem('trip-tab-42', 'roadtrip')
+    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+
+    const { result } = await renderPhone()
+    rt.alt.close.mockClear()
+    act(() => { result.current.handleTabChange('plan') })
+
+    await waitFor(() => expect(rt.alt.close).toHaveBeenCalled())
+    // The routed legs are kept (FE-TP-ROAD-094), so it is the tab that closed it, not the feed.
+    expect(result.current.roadtripFeedActive).toBe(true)
+  })
 })

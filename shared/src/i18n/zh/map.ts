@@ -25,5 +25,6 @@ const map: TranslationStrings = {
   'map.overview.show': '显示整个行程',
   'map.overview.hide': '隐藏整个行程',
   'map.overview.total': '总距离',
+  'map.attribution': '地图来源',
 };
 export default map;

@@ -1,6 +1,7 @@
 import { formatDurationShort } from './roadtripModel'
 import { ALT_PRIMARY, ALT_SECONDARY, ALT_LABEL_PRIMARY_BG, ALT_LABEL_SECONDARY_BG } from './alternativeColors'
 import type { RouteAlternative } from '../Map/RouteCalculator'
+import type { LegAlternatives } from './useRouteAlternatives'
 
 /** One offered route, ready to draw: the line, its colour, and where its label sits. */
 export interface AlternativeOverlay {
@@ -153,4 +154,40 @@ export function buildAlternativeOverlays(
       at: at ?? { lat: 0, lng: 0 },
     }
   })
+}
+
+/** What a picker has to say about one leg, whichever shell draws it. */
+export type AlternativesPhase = 'loading' | 'failed' | 'onlyOne' | 'choose'
+
+/**
+ * Which of its four states a picker is in.
+ *
+ * Both bars branch on this, so the desk and the phone cannot disagree about when a leg has
+ * a choice. Asking wins over a failure, because a new question replaces the old answer
+ * and its error with it. A failure wins over an empty list, so a router that will not
+ * answer is never read as a leg with only one sensible way. Fewer than two overlays is
+ * that single way: `buildAlternativeOverlays` draws nothing for one answer, and one road
+ * is not a choice.
+ */
+export function alternativesPhase(
+  open: Pick<LegAlternatives, 'loading' | 'error'>,
+  overlays: readonly AlternativeOverlay[],
+): AlternativesPhase {
+  if (open.loading) return 'loading'
+  if (open.error) return 'failed'
+  return overlays.length < 2 ? 'onlyOne' : 'choose'
+}
+
+/**
+ * The second line an offer is listed with: what this way is, or else how much slower.
+ *
+ * Its own note wins, for the reason the note exists: a road offered because the motorway
+ * was left out of it is taken for that, not for its minutes. Without one the line is the
+ * difference to the quickest, worded by the caller (a translation this module stays free
+ * of). The desk bar's docstring tells what two copies of one figure once did, the driven
+ * road called "Fastest" beside an offer called quicker, so both bars read this line here
+ * instead of each keeping its own.
+ */
+export function alternativeSubline(alt: AlternativeOverlay, slower: (time: string) => string): string {
+  return alt.note || slower(formatDurationShort(alt.slowerThanQuickest))
 }

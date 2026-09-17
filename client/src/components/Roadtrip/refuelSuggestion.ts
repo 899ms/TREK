@@ -121,3 +121,103 @@ function oneEach(sorted: RefuelCandidate[]): RefuelCandidate[] {
   }
   return kept
 }
+
+/**
+ * How many answers a band lists, on the desktop rail and on the phone alike.
+ *
+ * Three at most. This is an offer beside a plan, not a list to browse; the corridor
+ * search is where somebody goes to see all of them. Named once so the two bands can never
+ * disagree about what "the offers" are.
+ */
+export const REFUEL_OFFER_LIMIT = 3
+
+/**
+ * The name a search is filed under: the card day the band is drawn on and the leg.
+ *
+ * One search is open at a time and it names the dry point it belongs to, so a band three
+ * legs down the chain does not light up for a question asked about this one. The card
+ * day rather than the day a borrowed stop is stored on, because the answer has to arrive
+ * under a key the band that asked is watching.
+ */
+export function refuelKey(dayId: number, legIndex: number): string {
+  return `${dayId}:${legIndex}`
+}
+
+/** What sits in the band's trailing slot: the lamp that goes looking, a retry, or a close. */
+export type RefuelControl = 'find' | 'again' | 'close'
+
+/**
+ * The part of the search a band reads.
+ *
+ * Structural rather than the hook's own type, because useRefuelSearch.ts imports this
+ * module and the pure half should not have to know about the half with the network in it.
+ */
+export interface RefuelSearchView {
+  openFor: string | null
+  loading: boolean
+  outcome: RefuelOutcome | null
+  results: readonly RefuelCandidate[]
+}
+
+/** Everything a band shows that is not markup, decided once for both shells. */
+export interface RefuelBandState {
+  /** The open search belongs to this band. */
+  open: boolean
+  /** This band's question is out and has not come back yet. */
+  loading: boolean
+  /** The answers to list, already capped at REFUEL_OFFER_LIMIT; empty until there are some. */
+  offers: RefuelCandidate[]
+  /** Which kind of nothing came back, or null while there is no empty answer to report. */
+  empty: Exclude<RefuelOutcome, 'found'> | null
+  /** What fills the trailing slot; `refuelBandState` says why each one wins when it does. */
+  control: RefuelControl
+}
+
+/**
+ * The state of one dry band, given the one search that may be open.
+ *
+ * The lamp steps aside while a request runs or offers are showing, for the way to close
+ * the answer: every press is a real request against a shared service, and a lamp still
+ * standing there invites a second one nobody asked for. An answer that found nothing
+ * leaves a retry rather than a dead end, because the place search is a public service
+ * that does time out, and "it did not answer" with no way to ask again reads as broken
+ * rather than as busy.
+ *
+ * The empty answer keeps three different sentences for three different facts. "Nothing
+ * on this stretch" after a request that failed or was cut short states something that was
+ * never checked, which is worse than saying nothing, so anything that is not a plain
+ * `none` or `incomplete` reads as `failed`.
+ */
+export function refuelBandState(search: RefuelSearchView, dayId: number, legIndex: number): RefuelBandState {
+  const open = search.openFor === refuelKey(dayId, legIndex)
+  const loading = open && search.loading
+  const settled = open && !search.loading && search.outcome != null
+  const offers = settled && search.results.length > 0 ? search.results.slice(0, REFUEL_OFFER_LIMIT) : []
+  let empty: RefuelBandState['empty'] = null
+  if (settled && offers.length === 0) {
+    empty = search.outcome === 'none' || search.outcome === 'incomplete' ? search.outcome : 'failed'
+  }
+  let control: RefuelControl = 'find'
+  if (loading || (open && search.results.length > 0)) control = 'close'
+  else if (settled && search.outcome !== 'found') control = 'again'
+  return { open, loading, offers, empty, control }
+}
+
+/** Which sentence each kind of empty answer gets. */
+export const REFUEL_EMPTY_KEY: Record<Exclude<RefuelOutcome, 'found'>, string> = {
+  none: 'roadtrip.refuel.none',
+  incomplete: 'roadtrip.refuel.incomplete',
+  failed: 'roadtrip.refuel.failed',
+}
+
+/**
+ * The band's words for a tank and for a battery.
+ *
+ * An electric car does not run out of TANK, and a battery band that talks about fuel is
+ * the kind of detail that makes the rest look careless. Kept as one table so the title,
+ * the lamp's label and the offer's label never mix the two vocabularies.
+ */
+export const REFUEL_WORDS = {
+  fuel: { dry: 'roadtrip.refuel.dry', find: 'roadtrip.refuel.find', add: 'roadtrip.refuel.add' },
+  electric: { dry: 'roadtrip.refuel.dryElectric', find: 'roadtrip.refuel.findElectric', add: 'roadtrip.refuel.addElectric' },
+} as const

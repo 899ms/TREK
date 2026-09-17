@@ -173,6 +173,8 @@ const dawarich: TranslationStrings = {
   'dawarich.bucket.kilometersAway': '{km} km 거리',
   'dawarich.bucket.rule': '{meters} m 이내에서 {minutes}분 이상 머무르면 소원을 이룬 것으로 봅니다.',
 
+  'dawarich.journey.dayStays.one': 'Dawarich 체류 1곳',
+  'dawarich.journey.dayStays.other': 'Dawarich 체류 {count}곳',
 };
 
 export default dawarich;

@@ -204,7 +204,30 @@ export default function MJourneyDetail() {
   const [pickerProvider, setPickerProvider] = useState<string | null>(null)
   const dawarichEnabled = useAddonStore(state => state.isEnabled)('dawarich')
   const [dawarichOpen, setDawarichOpen] = useState(false)
+  /**
+   * How tall the card rail over the dock currently is.
+   *
+   * Measured rather than written down: the rail is a day scrubber over a row of covers,
+   * and a cover grows from 152 to 180px when it becomes the active one. The Dawarich
+   * button above it used to clear a hard-coded 128px, which was short of the rail on any
+   * screen and left the button sitting over the cards. Zero while there is no rail, which
+   * is also the empty-journal case, and the button then sits straight above the dock.
+   */
+  const [railHeight, setRailHeight] = useState(0)
+  const railRef = useRef<HTMLDivElement>(null)
   const [uploading, setUploading] = useState(false)
+
+  useEffect(() => {
+    const node = railRef.current
+    if (!node) { setRailHeight(0); return }
+    // Observed rather than read once: the rail changes height when the active card grows,
+    // and a height read at mount would be the wrong one from the first swipe onwards.
+    if (typeof ResizeObserver === 'undefined') { setRailHeight(node.offsetHeight); return }
+    const observer = new ResizeObserver(() => setRailHeight(node.offsetHeight))
+    observer.observe(node)
+    setRailHeight(node.offsetHeight)
+    return () => observer.disconnect()
+  }, [view, entries.length])
 
   const openUpload = useCallback(() => {
     if (availableProviders.length > 0) setShowUploadMenu(true)
@@ -450,7 +473,10 @@ export default function MJourneyDetail() {
           type="button"
           onClick={() => setDawarichOpen(true)}
           aria-label={t('dawarich.suggestions.title')}
-          className="absolute right-4 z-[9] flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-sheet)] shadow-[0_6px_18px_-8px_rgba(0,0,0,.35)] bottom-[calc(var(--bottom-nav-h,84px)+16px+128px)]"
+          className="absolute right-4 z-[9] flex h-[46px] w-[46px] items-center justify-center overflow-hidden rounded-full border border-[color:var(--m-gbr)] bg-[color:var(--m-sheet)] shadow-[0_6px_18px_-8px_rgba(0,0,0,.35)]"
+          // The rail's own offset over the dock, its measured height, then a gap. The 128px
+          // this used to guess at was short of the rail, so the button lay on the cards.
+          style={{ bottom: `calc(var(--bottom-nav-h, 84px) + 2px + ${railHeight}px + 12px)` }}
         >
           <DawarichIcon size={46} />
         </button>
@@ -487,7 +513,7 @@ export default function MJourneyDetail() {
           nothing between the cards and it; two pixels keeps a hair of daylight and
           gives the strip the rest. */}
       {view === 'timeline' && entries.length > 0 && (
-        <div className="absolute left-0 right-0 z-[8] bottom-[calc(var(--bottom-nav-h,84px)+2px)]">
+        <div ref={railRef} className="absolute left-0 right-0 z-[8] bottom-[calc(var(--bottom-nav-h,84px)+2px)]">
         <JourneyDayScrubber
           days={scrubberDays}
           activeDate={entries[activeIndex]?.entry_date ?? null}
