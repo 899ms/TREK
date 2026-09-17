@@ -124,6 +124,9 @@ export default function DawarichSuggestionsPanel({
     allowPlace: trips.length > 0,
     // The trip name is noise when every row is from the same trip.
     showTrip: tripId === undefined,
+    // In the trip rail the arrival is the half that places a stop; how long somebody stood
+    // there is a second figure on a row that already does not wrap.
+    showDuration: tripId === undefined,
   }
 
   return (
@@ -292,6 +295,7 @@ export function SuggestionRow({
   allowPlace = false,
   showTrip = false,
   showDate = false,
+  showDuration = true,
   phone = false,
   onAccept,
   onDismiss,
@@ -303,6 +307,8 @@ export function SuggestionRow({
   allowPlace?: boolean
   showTrip?: boolean
   showDate?: boolean
+  /** How long the stay lasted. Off in the trip rail, where the arrival is the useful half. */
+  showDuration?: boolean
   /** Rendered inside the phone shell, which has its own palette and its own reach. */
   phone?: boolean
   onAccept?: (target: DawarichSuggestionTarget) => void
@@ -360,7 +366,7 @@ export function SuggestionRow({
             <Badge icon={CalendarDays}>{formatDayHeading(suggestion.localDate, locale)}</Badge>
           )}
           <Badge icon={Clock}>{timeRange(suggestion.startedAt, suggestion.endedAt, is12h)}</Badge>
-          <Badge icon={Hourglass}>{formatDuration(suggestion.durationMinutes, t)}</Badge>
+          {showDuration && <Badge icon={Hourglass}>{formatDuration(suggestion.durationMinutes, t)}</Badge>}
 
           {suggestion.state === 'accepted' && (
             <Badge icon={Check} tone="success">
