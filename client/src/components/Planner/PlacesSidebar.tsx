@@ -70,7 +70,13 @@ const PlacesSidebar = React.memo(function PlacesSidebar(props: PlacesSidebarProp
           nothing at all when there is nothing pending — an integration that is
           connected and quiet should be invisible rather than a permanent empty
           card. */}
-      <div style={{ padding: '0 12px 8px', flexShrink: 0 }}>
+      {/* Capped and scrolling on its own. Open, the panel is as tall as the day has stays —
+          ten of them on a day of driving — and with nothing holding it back it pushed the
+          places list, which is the flex child that scrolls, down to nothing: the rail
+          stopped scrolling and half the stays sat below the bottom edge with no way to
+          reach them. Half the rail at most, so the list it sits above is always still a
+          list. */}
+      <div style={{ padding: '0 12px 8px', flexShrink: 0, minHeight: 0, maxHeight: '50%', overflowY: 'auto' }}>
         <DawarichSuggestionsPanel
           tripId={tripId}
           trips={[{ id: tripId, label: t('dawarich.accept.thisTrip') }]}
