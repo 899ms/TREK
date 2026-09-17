@@ -7,6 +7,7 @@ import {
   formatDayOption,
   formatDuration,
   groupByDay,
+  openStaysByDate,
   timeRange,
 } from './dawarichSuggestionModel'
 
@@ -164,5 +165,51 @@ describe('formatDayOption', () => {
 
   it('FE-DAWARICH-SUGMODEL-012: a day without a date gets no badge rather than an empty one', () => {
     expect(formatDayOption(1, null, 'en-GB', t)).toEqual({ label: 'planner.dayN:{"n":1}', badge: undefined })
+  })
+})
+
+describe('openStaysByDate', () => {
+  it('FE-DAWARICH-SUGMODEL-015: buckets the open stays by their own local day', () => {
+    // What a journal timeline asks for: it draws one day and folds that day's stays into
+    // it, so it looks them up by date rather than walking a flat list per day.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10' }),
+      stay({ id: 2, localDate: '2026-09-11' }),
+      stay({ id: 3, localDate: '2026-09-10' }),
+    ])
+
+    expect([...byDate.keys()].sort()).toEqual(['2026-09-10', '2026-09-11'])
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([1, 3])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-016: within a day they are in the order they were lived', () => {
+    // A run of stays reads as an afternoon only in that order; whatever order the server
+    // sent them in is not it.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10', startedAt: '2026-09-10T16:00:00+02:00' }),
+      stay({ id: 2, localDate: '2026-09-10', startedAt: '2026-09-10T08:30:00+02:00' }),
+      stay({ id: 3, localDate: '2026-09-10', startedAt: '2026-09-10T12:15:00+02:00' }),
+    ])
+
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([2, 3, 1])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-017: only what is still waiting', () => {
+    // An accepted stay is an entry on that timeline already, and a dismissed one was waved
+    // away on purpose; offering either again is offering to do it twice.
+    const byDate = openStaysByDate([
+      stay({ id: 1, localDate: '2026-09-10', state: 'accepted' }),
+      stay({ id: 2, localDate: '2026-09-10', state: 'dismissed' }),
+      stay({ id: 3, localDate: '2026-09-10' }),
+    ])
+
+    expect(byDate.get('2026-09-10')!.map(s => s.id)).toEqual([3])
+  })
+
+  it('FE-DAWARICH-SUGMODEL-018: a day whose every stay is handled is not a day at all', () => {
+    // An empty bucket would draw a fold saying "0 stays" on a day that has none.
+    const byDate = openStaysByDate([stay({ id: 1, localDate: '2026-09-10', state: 'accepted' })])
+
+    expect(byDate.size).toBe(0)
   })
 })

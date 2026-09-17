@@ -45,6 +45,30 @@ export function groupByDay(suggestions: DawarichSuggestion[]): SuggestionDay[] {
     .reverse()
 }
 
+/**
+ * The stays still waiting, by the local day they happened on.
+ *
+ * What a journal timeline needs: it draws one day at a time and folds that day's stays
+ * into it, so it asks by date rather than walking a flat list per day. Only `new` ones —
+ * an accepted stay is already an entry on that timeline and a dismissed one was waved
+ * away on purpose — and within a day the order is the order they were lived in, which is
+ * what makes a run of them read as an afternoon.
+ *
+ * A Map rather than the day list `groupByDay` builds: that one is ordered newest-first for
+ * a panel to print, and this one is looked up by the day the timeline is already drawing.
+ */
+export function openStaysByDate(suggestions: DawarichSuggestion[]): Map<string, DawarichSuggestion[]> {
+  const byDate = new Map<string, DawarichSuggestion[]>();
+  for (const stay of suggestions) {
+    if (stay.state !== 'new') continue;
+    const bucket = byDate.get(stay.localDate);
+    if (bucket) bucket.push(stay);
+    else byDate.set(stay.localDate, [stay]);
+  }
+  for (const stays of byDate.values()) stays.sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1));
+  return byDate;
+}
+
 /** `HH:MM` out of an ISO timestamp, in the offset the timestamp carries. */
 export function clockOf(iso: string): string {
   return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(iso) ? iso.slice(11, 16) : ''

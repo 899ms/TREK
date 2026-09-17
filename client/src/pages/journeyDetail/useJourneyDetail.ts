@@ -13,6 +13,7 @@ import { lockBodyScroll } from '../../utils/bodyScrollLock'
 import type { JourneyEntry } from '../../store/journeyStore'
 import { createDraftJourneyEntry } from './JourneyDetailPage.helpers'
 import { useDawarichSuggestions } from '../../hooks/useDawarichSuggestions'
+import { openStaysByDate } from '../../components/Dawarich/dawarichSuggestionModel'
 import type { DawarichSuggestion, DawarichSuggestionTarget } from '@trek/shared'
 
 import { useDawarichJournalTrail } from '../../hooks/useDawarichJournalTrail'
@@ -312,17 +313,7 @@ export function useJourneyDetail() {
    * lived in, which is what makes a run of them read as an afternoon.
    */
   const dawarich = useDawarichSuggestions()
-  const dawarichByDate = useMemo(() => {
-    const byDate = new Map<string, DawarichSuggestion[]>()
-    for (const stay of dawarich.suggestions) {
-      if (stay.state !== 'new') continue
-      const bucket = byDate.get(stay.localDate)
-      if (bucket) bucket.push(stay)
-      else byDate.set(stay.localDate, [stay])
-    }
-    for (const stays of byDate.values()) stays.sort((a, b) => (a.startedAt < b.startedAt ? -1 : 1))
-    return byDate
-  }, [dawarich.suggestions])
+  const dawarichByDate = useMemo(() => openStaysByDate(dawarich.suggestions), [dawarich.suggestions])
 
   /**
    * Accepting writes the stay into THIS journal and reloads it, which is how the new entry
