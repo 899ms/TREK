@@ -1772,6 +1772,16 @@ describe('PlaceFormModal as a road trip service stop', () => {
     expect(screen.getAllByText('Add as a stop').length).toBeGreaterThan(0);
   });
 
+  it('FE-PLANNER-PLACEFORM-085: it opens on the kind the corridor was looking for, dwell and all', () => {
+    // The panel seeds itself to charging on an electric car, and a form opening on a
+    // fuel pump under a picker that says Charging is the fault this carries the answer to.
+    render(<PlaceFormModal {...defaultProps} serviceStop={serviceStop({ defaultKind: 'charging' })} />);
+
+    expect(screen.getByRole('button', { name: 'Charging' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /30 min/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Fuel' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('FE-PLANNER-PLACEFORM-076: picking a kind also picks how long that kind takes', async () => {
     const onSave = vi.fn().mockResolvedValue({ id: 9 });
     render(<PlaceFormModal {...defaultProps} onSave={onSave} serviceStop={serviceStop()} />);

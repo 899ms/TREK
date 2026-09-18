@@ -254,10 +254,15 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
       // path exists to avoid. Read out of the closure rather than watched, because the
       // mode is fixed for the life of one opening and a rebuilt drive must not reset a
       // half-filled form.
+      // What the corridor panel was looking for when the button was pressed, because
+      // that is the traveller's own answer to what they are adding; only a panel with
+      // nothing selected falls back to the constant. The dwell follows the kind, the
+      // same way picking one by hand moves it.
+      const kind = serviceStop.defaultKind ?? DEFAULT_SERVICE_KIND
       setForm({
         ...DEFAULT_FORM,
-        stop_type: DEFAULT_SERVICE_KIND,
-        duration_minutes: STOP_KIND_BY_KEY[DEFAULT_SERVICE_KIND].defaultMinutes,
+        stop_type: kind,
+        duration_minutes: STOP_KIND_BY_KEY[kind].defaultMinutes,
       })
     } else {
       setForm(DEFAULT_FORM)

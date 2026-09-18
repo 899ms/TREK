@@ -3,7 +3,7 @@ import { roadtripStopTypeSchema } from '@trek/shared'
 import { SERVICE_STOP_TYPES, SERVICE_COLORS } from './roadtripModel'
 import {
   STOP_KINDS, STOP_KIND_BY_KEY, CORRIDOR_CATEGORIES, CORRIDOR_CATEGORY_BY_KEY, CORRIDOR_CATEGORY_KEYS,
-  SERVICE_KIND_KEYS, REFUELLING_STOP_TYPES, isOvernightCategory,
+  SERVICE_KIND_KEYS, REFUELLING_STOP_TYPES, isOvernightCategory, manualStopKindFor,
 } from './stopKinds'
 
 /**
@@ -76,5 +76,20 @@ describe('stop kinds', () => {
       expect(kind.defaultMinutes).toBeGreaterThan(0)
       expect(Number.isInteger(kind.defaultMinutes)).toBe(true)
     }
+  })
+
+  it('FE-STOPKIND-008: the manual add opens on what the corridor is looking for', () => {
+    // A stop added by hand used to open on fuel whatever the panel above it said, which
+    // on an electric car meant a picker reading Charging over a form reading Fuel.
+    for (const category of CORRIDOR_CATEGORIES) {
+      expect(manualStopKindFor([category.key])).toBe(category.stopKind)
+    }
+    // Multi-select, so the first the panel LISTS wins: falling back would open on a kind
+    // that is not among the ones switched on, which is a worse answer than any of them.
+    const [first, second] = CORRIDOR_CATEGORY_KEYS
+    expect(manualStopKindFor([second, first])).toBe(CORRIDOR_CATEGORY_BY_KEY[first].stopKind)
+    // Nothing selected is no answer at all, and the caller decides what to do with that.
+    expect(manualStopKindFor([])).toBeNull()
+    expect(manualStopKindFor(['not-a-category'])).toBeNull()
   })
 })

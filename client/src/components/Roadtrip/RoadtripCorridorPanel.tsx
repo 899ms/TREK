@@ -13,9 +13,10 @@ import CustomSelect from '../shared/CustomSelect'
 import RoadtripCategoryPicker from './RoadtripCategoryPicker'
 import { serviceColor } from './roadtripModel'
 import { alongLabel, offRouteLabel } from './corridorSearchModel'
-import { CORRIDOR_CATEGORY_BY_KEY } from './stopKinds'
+import { CORRIDOR_CATEGORY_BY_KEY, manualStopKindFor } from './stopKinds'
 import { FS } from './typeScale'
 import { CORRIDOR_CATEGORY_KEYS, CORRIDOR_SECTION_KM, CORRIDOR_WIDTHS_KM, type RoadtripCorridor } from './useRoadtripCorridor'
+import type { RoadtripStopType } from '@trek/shared'
 import type { CorridorPoi } from './useCorridorPois'
 import type { RoadtripRoutes } from './useRoadtripRoutes'
 
@@ -38,8 +39,12 @@ interface RoadtripCorridorPanelProps {
   /**
    * Opens the place form for a stop the search never found. Given only to somebody who
    * may add places, which is what keeps the button off a reader's panel.
+   *
+   * Carries the kind the panel is looking for, so the form opens on it rather than on a
+   * constant: the categories above the button are the traveller's own answer to "what am
+   * I adding", and ignoring them made every manual stop start life as a fuel stop.
    */
-  onAddManual?: () => void
+  onAddManual?: (kind: RoadtripStopType | null) => void
 }
 
 /**
@@ -476,7 +481,9 @@ export default function RoadtripCorridorPanel({
           {onAddPoi && onAddManual && corridor.day ? (
             <button
               type="button"
-              onClick={onAddManual}
+              // Wrapped rather than handed the prop directly: `onClick` would otherwise
+              // pass the MouseEvent as the kind.
+              onClick={() => onAddManual(manualStopKindFor(corridor.categories))}
               // The full sentence is the accessible name and the tooltip; the face of
               // the button carries the one word that fits beside "Search".
               aria-label={t('roadtrip.poi.addManual')}

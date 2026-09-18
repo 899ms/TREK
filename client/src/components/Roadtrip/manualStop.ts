@@ -36,6 +36,13 @@ export interface ServiceStopDay {
 
 /** Everything the form needs to ask where a service stop belongs, and nothing else. */
 export interface ServiceStopMode {
+  /**
+   * The kind the form opens on, from what the corridor panel is looking for.
+   *
+   * Absent or null when the panel had nothing selected, and then `DEFAULT_SERVICE_KIND`
+   * stands in. Optional so a caller with no panel behind it stays unchanged.
+   */
+  defaultKind?: RoadtripStopType | null
   days: ServiceStopDay[]
   /** Where a stop goes at the end of the day the panel is on, routed or not. */
   appendDay: { dayId: number; dayNumber: number; position: number } | null
@@ -99,12 +106,13 @@ export interface ServiceStopChoice {
 }
 
 /**
- * The kind the form opens on.
+ * The kind the form opens on when nothing better is known.
  *
- * The panel it is reached from is headed by pumps and chargers, and one click is the
- * whole distance to any of the others. Opening on nothing would be worse than a guess: a
- * stop left without a kind is a numbered destination that counts in every total, which
- * is the very thing this path exists to avoid.
+ * Nothing better means the panel had no category switched on at all; normally the form
+ * opens on what the corridor is looking for (`manualStopKindFor`), because that is the
+ * traveller's own answer rather than a guess. Opening on nothing would be worse than
+ * either: a stop left without a kind is a numbered destination that counts in every
+ * total, which is the very thing this path exists to avoid.
  */
 export const DEFAULT_SERVICE_KIND: RoadtripStopType = 'fuel'
 

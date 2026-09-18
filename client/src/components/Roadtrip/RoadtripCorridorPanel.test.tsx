@@ -441,6 +441,35 @@ describe('RoadtripCorridorPanel', () => {
     // nothing is added until a place has been found and saved in there.
     fireEvent.click(manual)
     expect(onAddManual).toHaveBeenCalledTimes(1)
+    // The kind, never the MouseEvent: the categories above the button are the answer to
+    // what is being added, and a form that ignored them opened every manual stop on fuel.
+    expect(onAddManual).toHaveBeenCalledWith('fuel')
+  })
+
+  it('FE-ROADTRIP-PANEL-035: the manual add opens on what the panel is looking for', () => {
+    const open = (categories: string[]): unknown => {
+      const onAddManual = vi.fn()
+      const { unmount } = wrap(
+        <RoadtripCorridorPanel
+          corridor={corridor({ categories })}
+          routes={routes([day(1, 1)])}
+          onAddPoi={vi.fn()}
+          onAddManual={onAddManual}
+        />,
+      )
+      fireEvent.click(searchRow()[1])
+      unmount()
+      return onAddManual.mock.calls[0][0]
+    }
+
+    // An electric car seeds the panel to charging, and this is the case the fault was
+    // reported on: the panel said Charging and the form opened on Fuel.
+    expect(open(['charging'])).toBe('charging')
+    expect(open(['restaurant'])).toBe('restaurant')
+    // Multi-select: the first the panel LISTS wins, rather than a kind nobody switched on.
+    expect(open(['sights', 'rest_area'])).toBe('rest_area')
+    // Nothing selected is no answer, and the form falls back on its own.
+    expect(open([])).toBeNull()
   })
 
   it('FE-ROADTRIP-PANEL-026: with no drive on the trip there is nowhere to add one by hand', () => {
