@@ -2,28 +2,23 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Dokumentumok szinkronizálása',
-  'docsync.subtitle': 'Tartsd szinkronban ennek az útnak a dokumentumait a saját dokumentumtárolóddal.',
   'docsync.noProviders': 'Nincs elérhető dokumentumszolgáltató',
   'docsync.noProvidersHint': 'A példány rendszergazdája kapcsolja be ezeket az Admin, Bővítmények, Dokumentumok alatt.',
   'docsync.addProvider': 'Szolgáltató csatlakoztatása',
   'docsync.test': 'Kapcsolat tesztelése',
+  'docsync.connect.optional': 'Nem kötelező',
   'docsync.connected': 'Kapcsolódva',
   'docsync.chooseFolder': 'Mappa kiválasztása',
-  'docsync.chooseFolderHint':
-    'Válaszd ki az ehhez az úthoz tartozó mappát, címkét vagy teret. Csak az abban lévő dokumentumok szinkronizálódnak.',
   'docsync.noFolders': 'Ezen a példányon még nem található semmi.',
   'docsync.newFolderPlaceholder': 'Az új mappa neve',
-  'docsync.createFolder': 'Létrehozás',
   'docsync.syncNow': 'Szinkronizálás most',
   'docsync.unlink': 'Leválasztás',
+  'docsync.confirmUnlink':
+    'A dokumentumok a TREK-ben és a tárolóban is megmaradnak. Csak a köztük lévő párosítás szűnik meg.',
   'docsync.syncEnabled': 'Automatikus szinkronizálás',
-  'docsync.direction': 'Irány',
-  'docsync.directionBoth': 'Mindkét irányban',
-  'docsync.directionPull': 'Csak a TREK-be',
-  'docsync.directionPush': 'Csak a szolgáltató felé',
   'docsync.deletePolicy': 'Ha egy dokumentumot törölnek',
-  'docsync.deleteUnlink': 'Mindkét példány maradjon meg, csak a párosítás szűnjön meg',
-  'docsync.deleteTrash': 'A másik példány kerüljön a saját kukájába',
+  'docsync.deleteUnlink': 'Mindkét példány megtartása',
+  'docsync.deleteTrash': 'Áthelyezés a kukába',
   'docsync.webhookHint':
     'Illeszd be ezt az URL-t a szolgáltatódnál, hogy a változások azonnal megérkezzenek. Enélkül a TREK időzítve ellenőriz.',
 
@@ -100,6 +95,82 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Egyszerre tűnt el a dokumentumok nagy része, ezért semmi nem változott. Ellenőrizd, hogy a mappa még csatolva van-e.',
   'docsync.error.unknown': 'Valami hiba történt.',
+
+  // ── A párbeszédablak ───────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Ez az út',
+  'docsync.addAnother': 'Másik hozzáadása',
+  'docsync.syncing': 'Szinkronizálás',
+  'docsync.card.pickFolder': 'Kapcsolódva, válassz mappát',
+
+  'docsync.empty.title': 'Még nincs semmi csatlakoztatva',
+  'docsync.empty.hintOwner':
+    'Válassz egy tárolót a bal oldalon. A TREK mindenről saját másolatot tart, így semmi nem vész el, ha a tároló megszűnik.',
+  'docsync.empty.hintMember': 'Ezt az út tulajdonosa állítja be. A dokumentumok így is, úgy is megmaradnak a TREK-ben.',
+
+  // Hogyan rendszerez az egyes termékek. A csatlakozás előtt látszik, mert ez az,
+  // amit a következő képernyő kérni fog.
+  'docsync.model.paperless': 'Címke szerint rendszerez',
+  'docsync.model.papra': 'Címke szerint rendszerez, egy szervezeten belül',
+  'docsync.model.nextcloud': 'Mappába rendszerez',
+  'docsync.model.opencloud': 'Térbe rendszerez',
+  'docsync.model.synologydrive': 'A NAS egyik mappájába rendszerez',
+
+  // ── A folyamatsáv ──────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Ki a tárolóba',
+  'docsync.flow.toTrek': 'Be a tárolóból',
+  'docsync.flow.documents': 'dokumentum',
+  'docsync.flow.summary.both': 'A dokumentumok oda-vissza mozognak.',
+  'docsync.flow.summary.pull': 'A dokumentumok csak befelé jönnek.',
+  'docsync.flow.summary.push': 'A dokumentumok csak kifelé mennek.',
+  'docsync.flow.summaryEditable.both': 'Oda-vissza mozognak. Koppints egy sávra a leállításhoz.',
+  'docsync.flow.summaryEditable.pull': 'Csak befelé. Koppints a másik sávra a kiküldéshez is.',
+  'docsync.flow.summaryEditable.push': 'Csak kifelé. Koppints a másik sávra a behozatalhoz is.',
+
+  // ── Egy összekapcsolás ─────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Beállítások',
+  'docsync.binding.folder': 'Mappa',
+  'docsync.binding.lastRun': 'Utolsó futás',
+  'docsync.binding.autoOff': 'Szüneteltetve',
+  'docsync.binding.neverRun': 'még nem futott',
+  'docsync.binding.deleteHint': 'Mi történjen a másik oldalon lévő példánnyal.',
+  'docsync.binding.autoHint': 'Változások keresése a háttérben.',
+  'docsync.binding.webhookTitle': 'Azonnali frissítések',
+  'docsync.binding.copy': 'Másolás',
+  'docsync.binding.copied': 'Másolva',
+
+  // ── Csatlakozás ────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Csatlakozás',
+  'docsync.connect.testing': 'Próbálom elérni',
+  'docsync.connect.okAs': 'Elértem, bejelentkezve mint {account}',
+  'docsync.connect.insecureHint': 'Saját hálózaton futó, saját aláírású tanúsítványt használó példányhoz.',
+  'docsync.connect.about.paperless':
+    'A TREK saját címke alá rendezi ezt az utat, és az archívumod többi részéhez nem nyúl.',
+  'docsync.connect.about.papra':
+    'Válaszd ki a szervezetet, amelyhez ez az út tartozik. A TREK azon belül saját címke alá rendezi.',
+  'docsync.connect.about.nextcloud':
+    'Alkalmazásjelszót használj, ne a fiókod jelszavát: átmegy a kétlépcsős azonosításon, és külön is visszavonható.',
+  'docsync.connect.about.opencloud': 'A TREK saját teret kap ehhez az úthoz, mindentől elkülönítve.',
+  'docsync.connect.about.synologydrive':
+    'Legjobb egy olyan DSM-fiók, amely csak az ehhez az úthoz tartozó megosztott mappát éri el.',
+
+  // ── A tároló kiválasztása ──────────────────────────────────────────────────
+  'docsync.scope.title': 'Hová kerüljön ez az út a(z) {provider} tárolóban?',
+  'docsync.scope.intro': 'Csak az szinkronizálódik, ami itt van. A tárolód minden más tartalma kívül marad a TREK-en.',
+  'docsync.scope.createTitle': 'Új létrehozása',
+  'docsync.scope.createAction': 'Létrehozás',
+  'docsync.scope.pickTitle': 'Vagy használj egy meglévőt',
+  'docsync.scope.search': 'Keresés',
+  'docsync.scope.noMatch': 'Erre nincs találat.',
+
+  // ── Amikről dönteni kell ───────────────────────────────────────────────────
+  'docsync.issues.title': 'Átnézést igényel',
+  'docsync.issues.conflict': 'Mindkét helyen megváltozott. Válaszd ki, melyik maradjon.',
+  'docsync.issues.remote_missing': 'Eltűnt a tárolóból. A TREK-példány még megvan.',
+  'docsync.issues.rejected_type': 'Ez a fájltípus itt nem engedélyezett.',
+  'docsync.issues.too_large': 'Nagyobb a megengedettnél.',
+  'docsync.issues.error': 'Az átvitel nem sikerült.',
+
   'docsync.error.unknown_provider': 'Ez a szolgáltató nem érhető el ezen a példányon.',
 };
 

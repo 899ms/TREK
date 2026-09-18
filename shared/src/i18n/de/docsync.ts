@@ -2,29 +2,23 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Dokumentenabgleich',
-  'docsync.subtitle': 'Halte die Dokumente dieser Reise und deinen eigenen Dokumentenspeicher im Gleichstand.',
   'docsync.noProviders': 'Es sind keine Dokumentenanbieter verfügbar',
   'docsync.noProvidersHint':
     'Ein Administrator dieser Instanz schaltet sie unter Administration, Addons, Dokumente frei.',
   'docsync.addProvider': 'Anbieter verbinden',
   'docsync.test': 'Verbindung testen',
+  'docsync.connect.optional': 'Optional',
   'docsync.connected': 'Verbunden',
   'docsync.chooseFolder': 'Ordner wählen',
-  'docsync.chooseFolderHint':
-    'Wähle den Ordner, das Tag oder den Bereich, der zu dieser Reise gehört. Abgeglichen wird nur, was darin liegt.',
   'docsync.noFolders': 'Auf dieser Instanz wurde noch nichts gefunden.',
   'docsync.newFolderPlaceholder': 'Name des neuen Ordners',
-  'docsync.createFolder': 'Anlegen',
   'docsync.syncNow': 'Jetzt abgleichen',
   'docsync.unlink': 'Trennen',
+  'docsync.confirmUnlink': 'Die Dokumente bleiben in TREK und im Speicher. Nur die Verknüpfung dazwischen fällt weg.',
   'docsync.syncEnabled': 'Automatisch abgleichen',
-  'docsync.direction': 'Richtung',
-  'docsync.directionBoth': 'In beide Richtungen',
-  'docsync.directionPull': 'Nur nach TREK',
-  'docsync.directionPush': 'Nur zum Anbieter',
   'docsync.deletePolicy': 'Wenn ein Dokument gelöscht wird',
-  'docsync.deleteUnlink': 'Beide Kopien behalten, die Verknüpfung lösen',
-  'docsync.deleteTrash': 'Die andere Kopie in den Papierkorb verschieben',
+  'docsync.deleteUnlink': 'Beide Kopien behalten',
+  'docsync.deleteTrash': 'In den Papierkorb verschieben',
   'docsync.webhookHint':
     'Trage diese URL bei deinem Anbieter ein, damit Änderungen sofort ankommen. Ohne sie fragt TREK in festen Abständen nach.',
 
@@ -99,6 +93,83 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Es sind auf einen Schlag fast alle Dokumente verschwunden, deshalb wurde nichts geändert. Prüfe, ob der Ordner noch eingebunden ist.',
   'docsync.error.unknown': 'Da ist etwas schiefgelaufen.',
+
+  // ── Der Dialog ─────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Diese Reise',
+  'docsync.addAnother': 'Weiteren hinzufügen',
+  'docsync.syncing': 'Wird abgeglichen',
+  'docsync.card.pickFolder': 'Verbunden, jetzt Ordner wählen',
+
+  'docsync.empty.title': 'Noch nichts verbunden',
+  'docsync.empty.hintOwner':
+    'Wähle links einen Speicher. TREK behält von allem eine eigene Kopie, es geht also nichts verloren, wenn er wegfällt.',
+  'docsync.empty.hintMember': 'Das richtet der Besitzer der Reise ein. Die Dokumente bleiben so oder so in TREK.',
+
+  // Wie das jeweilige Produkt ablegt. Steht vor dem Verbinden da, weil der
+  // nächste Schritt genau danach fragt.
+  'docsync.model.paperless': 'Legt nach Tag ab',
+  'docsync.model.papra': 'Legt nach Tag ab, innerhalb einer Organisation',
+  'docsync.model.nextcloud': 'Legt in einem Ordner ab',
+  'docsync.model.opencloud': 'Legt in einem Space ab',
+  'docsync.model.synologydrive': 'Legt in einem Ordner auf dem NAS ab',
+
+  // ── Die Flussleiste ────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Raus zum Speicher',
+  'docsync.flow.toTrek': 'Rein vom Speicher',
+  'docsync.flow.documents': 'Dokumente',
+  'docsync.flow.summary.both': 'Dokumente gehen in beide Richtungen.',
+  'docsync.flow.summary.pull': 'Dokumente kommen nur herein.',
+  'docsync.flow.summary.push': 'Dokumente gehen nur hinaus.',
+  'docsync.flow.summaryEditable.both': 'Beide Richtungen. Spur antippen, um sie zu stoppen.',
+  'docsync.flow.summaryEditable.pull': 'Kommt nur herein. Andere Spur antippen, um auch zu senden.',
+  'docsync.flow.summaryEditable.push': 'Geht nur hinaus. Andere Spur antippen, um auch zu empfangen.',
+
+  // ── Eine Verknüpfung ───────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Einstellungen',
+  'docsync.binding.folder': 'Ordner',
+  'docsync.binding.lastRun': 'Zuletzt gelaufen',
+  'docsync.binding.autoOff': 'Pausiert',
+  'docsync.binding.neverRun': 'noch nie gelaufen',
+  'docsync.binding.deleteHint': 'Was mit der Kopie auf der anderen Seite geschieht.',
+  'docsync.binding.autoHint': 'Im Hintergrund nach Änderungen suchen.',
+  'docsync.binding.webhookTitle': 'Sofortige Updates',
+  'docsync.binding.copy': 'Kopieren',
+  'docsync.binding.copied': 'Kopiert',
+
+  // ── Verbinden ──────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Verbinden',
+  'docsync.connect.testing': 'Verbindung wird versucht',
+  'docsync.connect.okAs': 'Erreicht, angemeldet als {account}',
+  'docsync.connect.insecureHint': 'Für eine Instanz im eigenen Netz mit selbstsigniertem Zertifikat.',
+  'docsync.connect.about.paperless':
+    'TREK legt diese Reise unter einem eigenen Tag ab und rührt den Rest deines Archivs nicht an.',
+  'docsync.connect.about.papra':
+    'Wähle die Organisation, zu der diese Reise gehört. TREK legt sie darin unter einem eigenen Tag ab.',
+  'docsync.connect.about.nextcloud':
+    'Nimm ein App-Passwort, nicht dein Kontopasswort: Es übersteht Zwei-Faktor und lässt sich einzeln widerrufen.',
+  'docsync.connect.about.opencloud': 'TREK bekommt für diese Reise einen eigenen Space, getrennt von allem anderen.',
+  'docsync.connect.about.synologydrive':
+    'Am besten ein DSM-Konto, das nur an den freigegebenen Ordner dieser Reise kommt.',
+
+  // ── Den Ablageort wählen ───────────────────────────────────────────────────
+  'docsync.scope.title': 'Wo soll diese Reise in {provider} liegen?',
+  'docsync.scope.intro':
+    'Abgeglichen wird nur, was hier drin liegt. Alles andere in deinem Speicher bleibt außerhalb von TREK.',
+  'docsync.scope.createTitle': 'Neu anlegen',
+  'docsync.scope.createAction': 'Anlegen',
+  'docsync.scope.pickTitle': 'Oder etwas Vorhandenes nehmen',
+  'docsync.scope.search': 'Suchen',
+  'docsync.scope.noMatch': 'Dazu passt nichts.',
+
+  // ── Was jemand entscheiden muss ────────────────────────────────────────────
+  'docsync.issues.title': 'Braucht einen Blick',
+  'docsync.issues.conflict': 'An beiden Stellen geändert. Wähle, welche Fassung bleibt.',
+  'docsync.issues.remote_missing': 'Im Speicher nicht mehr da. Die Kopie in TREK ist noch hier.',
+  'docsync.issues.rejected_type': 'Dieser Dateityp ist hier nicht erlaubt.',
+  'docsync.issues.too_large': 'Größer als das Limit.',
+  'docsync.issues.error': 'Die Übertragung ist nicht durchgegangen.',
+
   'docsync.error.unknown_provider': 'Dieser Anbieter steht auf dieser Instanz nicht zur Verfügung.',
 };
 

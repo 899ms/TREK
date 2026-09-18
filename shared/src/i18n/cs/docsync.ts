@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Synchronizace dokumentů',
-  'docsync.subtitle': 'Udržujte dokumenty této cesty v souladu s vlastním úložištěm dokumentů.',
   'docsync.noProviders': 'Nejsou dostupní žádní poskytovatelé dokumentů',
-  'docsync.noProvidersHint': 'Správce instance je zapíná v Administrace → Doplňky → Dokumenty.',
+  'docsync.noProvidersHint': 'Správce instance je zapíná v Administraci, Doplňky, Dokumenty.',
   'docsync.addProvider': 'Připojit poskytovatele',
   'docsync.test': 'Otestovat připojení',
+  'docsync.connect.optional': 'Volitelné',
   'docsync.connected': 'Připojeno',
   'docsync.chooseFolder': 'Vybrat složku',
-  'docsync.chooseFolderHint':
-    'Zvolte složku, štítek nebo prostor, který patří k této cestě. Synchronizují se jen dokumenty v něm.',
   'docsync.noFolders': 'Na této instanci zatím nic nenalezeno.',
   'docsync.newFolderPlaceholder': 'Název nové složky',
-  'docsync.createFolder': 'Vytvořit',
   'docsync.syncNow': 'Synchronizovat teď',
   'docsync.unlink': 'Odpojit',
+  'docsync.confirmUnlink': 'Dokumenty zůstanou v TREKu i v úložišti. Zruší se jen jejich propojení.',
   'docsync.syncEnabled': 'Synchronizovat automaticky',
-  'docsync.direction': 'Směr',
-  'docsync.directionBoth': 'Oběma směry',
-  'docsync.directionPull': 'Jen do TREKu',
-  'docsync.directionPush': 'Jen k poskytovateli',
   'docsync.deletePolicy': 'Když se dokument smaže',
-  'docsync.deleteUnlink': 'Zachovat obě kopie, zrušit propojení',
-  'docsync.deleteTrash': 'Přesunout druhou kopii do jejího koše',
+  'docsync.deleteUnlink': 'Zachovat obě kopie',
+  'docsync.deleteTrash': 'Přesunout do koše',
   'docsync.webhookHint':
     'Vložte tuto URL k poskytovateli, aby změny přicházely okamžitě. Bez toho se TREK ptá v pravidelných intervalech.',
 
@@ -46,7 +40,7 @@ const docsync: TranslationStrings = {
     'Vytvořte jej v aplikaci Papra pod API keys. Klíče Papra vždy dosáhnou na všechny organizace, do kterých patříte.',
   'docsync.hintPapraOrg': 'ID ve tvaru org_… z adresního řádku aplikace Papra.',
   'docsync.hintNextcloudLogin': 'Vaše přihlašovací jméno v Nextcloudu, ne e-mailová adresa.',
-  'docsync.hintNextcloudAppPassword': 'Nastavení → Zabezpečení → Vytvořit nové heslo aplikace. Nikdy heslo k účtu.',
+  'docsync.hintNextcloudAppPassword': 'Nastavení, Zabezpečení, Vytvořit nové heslo aplikace. Nikdy heslo k účtu.',
   'docsync.hintOpenCloudToken': 'Vytváří se v OpenCloudu pod tokeny aplikací.',
   'docsync.hintBasePath': 'Kde TREK hledá složky cest. Výchozí je /TREK.',
   'docsync.hintSynologyUrl': 'Uveďte i port, například https://nas.example.com:5001',
@@ -97,6 +91,80 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Najednou zmizela většina dokumentů, proto se nic nezměnilo. Zkontrolujte, zda je složka stále připojená.',
   'docsync.error.unknown': 'Něco se pokazilo.',
+
+  // ── Dialog ─────────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Tato cesta',
+  'docsync.addAnother': 'Přidat další',
+  'docsync.syncing': 'Synchronizuje se',
+  'docsync.card.pickFolder': 'Připojeno, vyberte složku',
+
+  'docsync.empty.title': 'Zatím nic nepřipojeno',
+  'docsync.empty.hintOwner':
+    'Vyberte úložiště vlevo. TREK si vždy nechává vlastní kopii, takže se nic neztratí, ani když úložiště zmizí.',
+  'docsync.empty.hintMember': 'Nastavuje to vlastník cesty. Dokumenty tak jako tak zůstávají v TREKu.',
+
+  // Jak každý produkt věci ukládá. Zobrazuje se ještě před připojením, protože
+  // právě na to se zeptá další obrazovka.
+  'docsync.model.paperless': 'Ukládá podle štítků',
+  'docsync.model.papra': 'Ukládá podle štítků v rámci organizace',
+  'docsync.model.nextcloud': 'Ukládá do složky',
+  'docsync.model.opencloud': 'Ukládá do prostoru',
+  'docsync.model.synologydrive': 'Ukládá do složky na NAS',
+
+  // ── Pruh toku ──────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Do úložiště',
+  'docsync.flow.toTrek': 'Z úložiště',
+  'docsync.flow.documents': 'dokumentů',
+  'docsync.flow.summary.both': 'Dokumenty putují oběma směry.',
+  'docsync.flow.summary.pull': 'Dokumenty jen přicházejí.',
+  'docsync.flow.summary.push': 'Dokumenty jen odcházejí.',
+  'docsync.flow.summaryEditable.both': 'Oběma směry. Klepnutím na pruh jeden směr vypnete.',
+  'docsync.flow.summaryEditable.pull': 'Jen dovnitř. Klepnutím na druhý pruh zapnete i odesílání.',
+  'docsync.flow.summaryEditable.push': 'Jen ven. Klepnutím na druhý pruh zapnete i příjem.',
+
+  // ── Jedno propojení ────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Nastavení',
+  'docsync.binding.folder': 'Složka',
+  'docsync.binding.lastRun': 'Poslední běh',
+  'docsync.binding.autoOff': 'Pozastaveno',
+  'docsync.binding.neverRun': 'zatím neproběhlo',
+  'docsync.binding.deleteHint': 'Co se stane s kopií na druhé straně.',
+  'docsync.binding.autoHint': 'Kontrolovat změny na pozadí.',
+  'docsync.binding.webhookTitle': 'Okamžité aktualizace',
+  'docsync.binding.copy': 'Kopírovat',
+  'docsync.binding.copied': 'Zkopírováno',
+
+  // ── Připojování ────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Připojit',
+  'docsync.connect.testing': 'Navazuje se spojení',
+  'docsync.connect.okAs': 'Spojení navázáno, přihlášeno jako {account}',
+  'docsync.connect.insecureHint': 'Pro instanci ve vlastní síti s vlastnoručně podepsaným certifikátem.',
+  'docsync.connect.about.paperless': 'TREK ukládá tuto cestu pod vlastním štítkem a zbytku vašeho archivu se nedotkne.',
+  'docsync.connect.about.papra': 'Vyberte organizaci, do které cesta patří. TREK ji v ní uloží pod vlastním štítkem.',
+  'docsync.connect.about.nextcloud':
+    'Použijte heslo aplikace, ne heslo k účtu: funguje i s dvoufaktorovým ověřením a dá se zrušit samostatně.',
+  'docsync.connect.about.opencloud': 'TREK dostane pro tuto cestu vlastní prostor, oddělený od všeho ostatního.',
+  'docsync.connect.about.synologydrive':
+    'Nejlépe účet DSM, který dosáhne jen na sdílenou složku určenou pro tuto cestu.',
+
+  // ── Výběr umístění ─────────────────────────────────────────────────────────
+  'docsync.scope.title': 'Kam v {provider} tuto cestu uložit?',
+  'docsync.scope.intro': 'Synchronizuje se jen to, co je uvnitř. Zbytek vašeho úložiště zůstane mimo TREK.',
+  'docsync.scope.createTitle': 'Vytvořit nové',
+  'docsync.scope.createAction': 'Vytvořit',
+  'docsync.scope.pickTitle': 'Nebo použijte existující',
+  'docsync.scope.search': 'Hledat',
+  'docsync.scope.noMatch': 'Nic neodpovídá.',
+
+  // ── Co musí rozhodnout člověk ──────────────────────────────────────────────
+  'docsync.issues.title': 'Vyžaduje pozornost',
+  'docsync.issues.conflict': 'Změněno na obou stranách. Vyberte, kterou verzi ponechat.',
+  'docsync.issues.remote_missing': 'V úložišti už není. Kopie v TREKu tu zůstává.',
+  'docsync.issues.rejected_type': 'Tento typ souboru zde není povolen.',
+  'docsync.issues.too_large': 'Větší než povolený limit.',
+  'docsync.issues.error': 'Přenos neproběhl.',
+
   'docsync.error.unknown_provider': 'Tento poskytovatel není na této instanci dostupný.',
 };
 

@@ -74,8 +74,14 @@ export interface LinkRow {
 
 interface ProviderFieldRow {
   field_key: string;
+  /** i18n key suffix, never display text — the client resolves `docsync.<label>`. */
+  label: string;
+  input_type: string;
+  placeholder: string | null;
+  hint: string | null;
   secret: number;
   required: number;
+  sort_order: number;
 }
 
 @Injectable()
@@ -96,8 +102,14 @@ export class DocSyncConfigService {
   }
 
   providerFields(providerId: string): ProviderFieldRow[] {
+    // Every column the form needs, not just the three the secret bookkeeping
+    // uses: the client renders the field from this row, and a missing `label`
+    // turns into a literal "docsync.undefined" on screen.
     return this.db.connection
-      .prepare('SELECT field_key, secret, required FROM document_provider_fields WHERE provider_id = ? ORDER BY sort_order')
+      .prepare(
+        `SELECT field_key, label, input_type, placeholder, hint, secret, required, sort_order
+           FROM document_provider_fields WHERE provider_id = ? ORDER BY sort_order`,
+      )
       .all(providerId) as ProviderFieldRow[];
   }
 

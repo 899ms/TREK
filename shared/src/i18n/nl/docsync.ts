@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Documentsynchronisatie',
-  'docsync.subtitle': 'Houd de documenten van deze reis gelijk met je eigen documentopslag.',
   'docsync.noProviders': 'Er zijn geen documentaanbieders beschikbaar',
   'docsync.noProvidersHint': 'Een beheerder van deze instantie zet ze aan onder Beheer, Add-ons, Documenten.',
   'docsync.addProvider': 'Aanbieder koppelen',
   'docsync.test': 'Verbinding testen',
+  'docsync.connect.optional': 'Optioneel',
   'docsync.connected': 'Verbonden',
   'docsync.chooseFolder': 'Map kiezen',
-  'docsync.chooseFolderHint':
-    'Kies de map, tag of ruimte die bij deze reis hoort. Alleen documenten daarin worden gesynchroniseerd.',
   'docsync.noFolders': 'Nog niets gevonden op deze instantie.',
   'docsync.newFolderPlaceholder': 'Naam van de nieuwe map',
-  'docsync.createFolder': 'Aanmaken',
   'docsync.syncNow': 'Nu synchroniseren',
   'docsync.unlink': 'Verbinding verbreken',
+  'docsync.confirmUnlink': 'Documenten blijven in TREK en in de opslag. Alleen de koppeling ertussen verdwijnt.',
   'docsync.syncEnabled': 'Automatisch synchroniseren',
-  'docsync.direction': 'Richting',
-  'docsync.directionBoth': 'Beide richtingen',
-  'docsync.directionPull': 'Alleen naar TREK',
-  'docsync.directionPush': 'Alleen naar de aanbieder',
   'docsync.deletePolicy': 'Als een document wordt verwijderd',
-  'docsync.deleteUnlink': 'Beide kopieën behouden, de koppeling loslaten',
-  'docsync.deleteTrash': 'De andere kopie naar de prullenbak verplaatsen',
+  'docsync.deleteUnlink': 'Beide kopieën behouden',
+  'docsync.deleteTrash': 'Naar de prullenbak verplaatsen',
   'docsync.webhookHint':
     'Plak deze URL bij je aanbieder, dan komen wijzigingen meteen binnen. Zonder die URL kijkt TREK op vaste tijden.',
 
@@ -97,8 +91,82 @@ const docsync: TranslationStrings = {
   'docsync.error.timeout': 'De aanbieder deed er te lang over om te antwoorden.',
   'docsync.error.ssrf_blocked': 'Dat adres is niet toegestaan.',
   'docsync.error.mass_delete_guard':
-    'Bijna alle documenten verdwenen in één keer, dus er is niets gewijzigd. Controleer of de map nog gekoppeld is.',
+    'De meeste documenten verdwenen in één keer, dus er is niets gewijzigd. Controleer of de map nog gekoppeld is.',
   'docsync.error.unknown': 'Er ging iets mis.',
+
+  // ── Het venster ────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Deze reis',
+  'docsync.addAnother': 'Nog een toevoegen',
+  'docsync.syncing': 'Bezig met synchroniseren',
+  'docsync.card.pickFolder': 'Verbonden, kies een map',
+
+  'docsync.empty.title': 'Nog niets verbonden',
+  'docsync.empty.hintOwner':
+    'Kies links een opslag. TREK houdt van alles een eigen kopie, dus er gaat niets verloren als die wegvalt.',
+  'docsync.empty.hintMember': 'De eigenaar van de reis stelt dit in. Documenten blijven hoe dan ook in TREK.',
+
+  // Hoe elk product dingen opbergt. Staat er al voordat iemand verbindt, want het
+  // is wat het volgende scherm gaat vragen.
+  'docsync.model.paperless': 'Ordent op tag',
+  'docsync.model.papra': 'Ordent op tag, binnen een organisatie',
+  'docsync.model.nextcloud': 'Ordent in een map',
+  'docsync.model.opencloud': 'Ordent in een ruimte',
+  'docsync.model.synologydrive': 'Ordent in een map op de NAS',
+
+  // ── De stroombalk ──────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Naar de opslag',
+  'docsync.flow.toTrek': 'Uit de opslag',
+  'docsync.flow.documents': 'documenten',
+  'docsync.flow.summary.both': 'Documenten gaan beide kanten op.',
+  'docsync.flow.summary.pull': 'Documenten komen alleen binnen.',
+  'docsync.flow.summary.push': 'Documenten gaan alleen naar buiten.',
+  'docsync.flow.summaryEditable.both': 'Gaat beide kanten op. Tik op een baan om die te stoppen.',
+  'docsync.flow.summaryEditable.pull': 'Komt alleen binnen. Tik op de andere baan om ook te versturen.',
+  'docsync.flow.summaryEditable.push': 'Gaat alleen naar buiten. Tik op de andere baan om ook op te halen.',
+
+  // ── Eén koppeling ──────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Instellingen',
+  'docsync.binding.folder': 'Map',
+  'docsync.binding.lastRun': 'Laatst uitgevoerd',
+  'docsync.binding.autoOff': 'Gepauzeerd',
+  'docsync.binding.neverRun': 'nog niet uitgevoerd',
+  'docsync.binding.deleteHint': 'Wat er met de kopie aan de andere kant gebeurt.',
+  'docsync.binding.autoHint': 'Op de achtergrond op wijzigingen controleren.',
+  'docsync.binding.webhookTitle': 'Directe updates',
+  'docsync.binding.copy': 'Kopiëren',
+  'docsync.binding.copied': 'Gekopieerd',
+
+  // ── Verbinden ──────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Verbinden',
+  'docsync.connect.testing': 'Bezig met verbinden',
+  'docsync.connect.okAs': 'Bereikt, aangemeld als {account}',
+  'docsync.connect.insecureHint': 'Voor een instantie op je eigen netwerk met een zelfondertekend certificaat.',
+  'docsync.connect.about.paperless': 'TREK zet deze reis onder een eigen tag en komt nooit aan de rest van je archief.',
+  'docsync.connect.about.papra':
+    'Kies de organisatie waar deze reis bij hoort. TREK zet hem daarbinnen onder een eigen tag.',
+  'docsync.connect.about.nextcloud':
+    'Gebruik een app-wachtwoord, niet je accountwachtwoord: het blijft werken met tweestapsverificatie en je kunt het los intrekken.',
+  'docsync.connect.about.opencloud': 'TREK krijgt een eigen ruimte voor deze reis, los van al het andere.',
+  'docsync.connect.about.synologydrive': 'Het beste een DSM-account dat alleen bij de gedeelde map van deze reis kan.',
+
+  // ── De plek kiezen ─────────────────────────────────────────────────────────
+  'docsync.scope.title': 'Waar moet deze reis in {provider} komen te staan?',
+  'docsync.scope.intro': 'Alleen wat hierin staat wordt gesynchroniseerd. De rest van je opslag blijft buiten TREK.',
+  'docsync.scope.createTitle': 'Een nieuwe maken',
+  'docsync.scope.createAction': 'Aanmaken',
+  'docsync.scope.pickTitle': 'Of gebruik er een die je al hebt',
+  'docsync.scope.search': 'Zoeken',
+  'docsync.scope.noMatch': 'Niets komt daarmee overeen.',
+
+  // ── Dingen waar iemand over moet beslissen ─────────────────────────────────
+  'docsync.issues.title': 'Vraagt om aandacht',
+  'docsync.issues.conflict': 'Op beide plekken gewijzigd. Kies welke je behoudt.',
+  'docsync.issues.remote_missing': 'Weg uit de opslag. De kopie in TREK staat er nog.',
+  'docsync.issues.rejected_type': 'Dit bestandstype is hier niet toegestaan.',
+  'docsync.issues.too_large': 'Groter dan de limiet.',
+  'docsync.issues.error': 'De overdracht is niet gelukt.',
+
   'docsync.error.unknown_provider': 'Deze aanbieder is niet beschikbaar op deze instantie.',
 };
 

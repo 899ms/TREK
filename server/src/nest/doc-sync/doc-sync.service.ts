@@ -162,6 +162,7 @@ export class DocSyncService {
       direction: link.direction as 'both' | 'pull' | 'push',
       remoteTruncated: listing.data.truncated,
       stableRemoteIds: provider.capabilities(ref).stableId,
+      maxAttempts: ITEM_MAX_ATTEMPTS,
     });
 
     if (plan.massDeleteGuardTripped) {
@@ -440,13 +441,32 @@ export class DocSyncService {
     return 'pushed';
   }
 
+  /**
+   * Put the shelved rows of one binding back in the queue.
+   *
+   * A row that has used up its attempts stays put until a person says otherwise,
+   * and pressing "Sync now" is that person saying otherwise: they have taken the
+   * bad document out of the folder, cleared the quota, or fixed the permission,
+   * and the only way to find out is to try again. The scheduler never calls
+   * this — automatic retries are exactly what the limit exists to stop.
+   */
+  retryShelvedItems(linkId: number): void {
+    this.db.connection
+      .prepare(
+        `UPDATE document_sync_items
+            SET attempts = 0, next_attempt_at = NULL
+          WHERE link_id = ? AND state = 'error'`,
+      )
+      .run(linkId);
+  }
+
   // ── State loading and writing ──────────────────────────────────────────────
 
   private loadItems(linkId: number): SyncItemState[] {
     const rows = this.db.connection
       .prepare(
         `SELECT id, file_id, trek_doc_uid, remote_id, remote_version, remote_name, content_sha256,
-                pushed_sha256, state, attempts, remote_missing_at
+                pushed_sha256, state, attempts, next_attempt_at, remote_missing_at
            FROM document_sync_items WHERE link_id = ?`,
       )
       .all(linkId) as Array<Record<string, unknown>>;
@@ -461,6 +481,7 @@ export class DocSyncService {
       pushedSha256: r.pushed_sha256 === null ? null : String(r.pushed_sha256),
       state: String(r.state),
       attempts: Number(r.attempts ?? 0),
+      nextAttemptAt: r.next_attempt_at === null || r.next_attempt_at === undefined ? null : String(r.next_attempt_at),
       remoteMissingAt: r.remote_missing_at === null ? null : String(r.remote_missing_at),
     }));
   }
@@ -694,8 +715,48 @@ export class DocSyncService {
     const counts = this.db.connection
       .prepare('SELECT state, COUNT(*) AS n FROM document_sync_items WHERE trip_id = ? GROUP BY state')
       .all(tripId) as Array<{ state: string; n: number }>;
+
+    /**
+     * What each side is actually holding, per binding.
+     *
+     * The UI showed the last run's transfer counts, which are zero on a binding
+     * that is already in step — so the interesting screen said nothing. These
+     * are the standing numbers instead: how many documents this trip has, how
+     * many of them the store has, and how many are only on one side.
+     */
+    const totalHere = this.db.connection
+      .prepare(
+        `SELECT COUNT(*) AS n FROM trip_files
+          WHERE trip_id = ? AND deleted_at IS NULL AND message_id IS NULL AND note_id IS NULL`,
+      )
+      .get(tripId) as { n: number };
+
+    const perLink = this.db.connection
+      .prepare(
+        `SELECT link_id,
+                SUM(CASE WHEN file_id IS NOT NULL AND remote_id IS NOT NULL AND state = 'synced' THEN 1 ELSE 0 END) AS paired,
+                SUM(CASE WHEN remote_id IS NOT NULL AND state != 'remote_missing' THEN 1 ELSE 0 END) AS atProvider,
+                SUM(CASE WHEN state = 'remote_missing' THEN 1 ELSE 0 END) AS missing
+           FROM document_sync_items
+          WHERE trip_id = ?
+          GROUP BY link_id`,
+      )
+      .all(tripId) as Array<{ link_id: number; paired: number; atProvider: number; missing: number }>;
+
+    const byLink = new Map(perLink.map((r) => [r.link_id, r]));
     return {
-      links: links.map((l) => this.config.publicLink(l, null)),
+      links: links.map((l) => {
+        const row = byLink.get(l.id);
+        return {
+          ...this.config.publicLink(l, null),
+          holdings: {
+            inTrek: totalHere.n,
+            atProvider: Number(row?.atProvider ?? 0),
+            paired: Number(row?.paired ?? 0),
+            missing: Number(row?.missing ?? 0),
+          },
+        };
+      }),
       items: Object.fromEntries(counts.map((c) => [c.state, c.n])),
     };
   }

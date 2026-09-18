@@ -1,7 +1,8 @@
-import { Controller, HttpCode, Param, Post, Req } from '@nestjs/common';
+import { Controller, HttpCode, OnModuleDestroy, Param, Post, Req } from '@nestjs/common';
 import type { Request } from 'express';
 import crypto from 'crypto';
 import { Public } from '../auth/public.decorator';
+import { WEBHOOK_NUDGE_DEBOUNCE_SECONDS } from './doc-sync.constants';
 import { DocSyncConfigService } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 
@@ -22,11 +23,28 @@ import { DocSyncService } from './doc-sync.service';
  * supports it, a shared secret is checked as well.
  */
 @Controller('api/docsync/webhook')
-export class DocSyncWebhookController {
+export class DocSyncWebhookController implements OnModuleDestroy {
+  /**
+   * One pending run per binding, so a burst folds into a single pass.
+   *
+   * Providers fire per document: dropping twenty files into a watched Nextcloud
+   * folder is twenty calls within a second or two. Each one used to start its
+   * own run, which the service's in-flight guard then answered with `busy` —
+   * so nineteen changes were announced and thrown away, and the one run that
+   * did start had begun before most of them landed. Collecting them for a beat
+   * and then running once is both less work and more correct.
+   */
+  private readonly pending = new Map<number, ReturnType<typeof setTimeout>>();
+
   constructor(
     private readonly config: DocSyncConfigService,
     private readonly sync: DocSyncService,
   ) {}
+
+  onModuleDestroy(): void {
+    for (const timer of this.pending.values()) clearTimeout(timer);
+    this.pending.clear();
+  }
 
   @Post(':token')
   @Public('A provider cannot hold a TREK session; the per-link token in the URL is the authentication, and the call can only ever trigger a sync run.')
@@ -42,9 +60,32 @@ export class DocSyncWebhookController {
 
     // Fire and forget. Paperless allows five seconds before it counts the call
     // as failed and retries, and a sync run takes longer than that whenever
-    // there is anything to do.
-    void this.sync.syncLink(link);
+    // there is anything to do — so the answer goes out now and the run happens
+    // after the debounce window, by which time the rest of the burst has
+    // arrived and been folded into this same timer.
+    this.schedule(link.id, () => this.config.getLink(link.id));
     return { received: true };
+  }
+
+  /**
+   * Start one run per binding per window, trailing rather than leading.
+   *
+   * Trailing on purpose: the first call of a burst is the least informed one,
+   * because the provider is usually still writing the rest. The link is looked
+   * up again when the timer fires, so a binding switched off or deleted in the
+   * meantime does not get one last run out of a stale row.
+   */
+  private schedule(linkId: number, reload: () => ReturnType<DocSyncConfigService['getLink']>): void {
+    if (this.pending.has(linkId)) return;
+    const timer = setTimeout(() => {
+      this.pending.delete(linkId);
+      const fresh = reload();
+      if (!fresh || fresh.sync_enabled !== 1) return;
+      void this.sync.syncLink(fresh);
+    }, WEBHOOK_NUDGE_DEBOUNCE_SECONDS * 1000);
+    // A pending nudge must not hold the process open at shutdown.
+    if (typeof timer.unref === 'function') timer.unref();
+    this.pending.set(linkId, timer);
   }
 
   /**

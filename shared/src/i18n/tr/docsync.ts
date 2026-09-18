@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Belge eşitleme',
-  'docsync.subtitle': 'Bu gezinin belgelerini kendi belge deponuzla aynı durumda tutun.',
   'docsync.noProviders': 'Kullanılabilir belge sağlayıcısı yok',
-  'docsync.noProvidersHint': 'Bunları bir kurulum yöneticisi Yönetim → Eklentiler → Belgeler altından açar.',
+  'docsync.noProvidersHint': 'Bunları bir kurulum yöneticisi Yönetim, Eklentiler, Belgeler altından açar.',
   'docsync.addProvider': 'Sağlayıcı bağla',
   'docsync.test': 'Bağlantıyı test et',
+  'docsync.connect.optional': 'İsteğe bağlı',
   'docsync.connected': 'Bağlandı',
   'docsync.chooseFolder': 'Klasör seç',
-  'docsync.chooseFolderHint':
-    'Bu geziye ait klasörü, etiketi veya alanı seçin. Yalnızca onun içindeki belgeler eşitlenir.',
   'docsync.noFolders': 'Bu kurulumda henüz bir şey bulunamadı.',
   'docsync.newFolderPlaceholder': 'Yeni klasör adı',
-  'docsync.createFolder': 'Oluştur',
   'docsync.syncNow': 'Şimdi eşitle',
   'docsync.unlink': 'Bağlantıyı kes',
+  'docsync.confirmUnlink': 'Belgeler hem TREK’te hem depoda kalır. Yalnızca aralarındaki eşleştirme kaldırılır.',
   'docsync.syncEnabled': 'Otomatik eşitle',
-  'docsync.direction': 'Yön',
-  'docsync.directionBoth': 'Her iki yönde',
-  'docsync.directionPull': 'Yalnızca TREK’e',
-  'docsync.directionPush': 'Yalnızca sağlayıcıya',
   'docsync.deletePolicy': 'Bir belge silindiğinde',
-  'docsync.deleteUnlink': 'İki kopyayı da tut, eşleştirmeyi kaldır',
-  'docsync.deleteTrash': 'Diğer kopyayı kendi çöp kutusuna taşı',
+  'docsync.deleteUnlink': 'İki kopyayı da tut',
+  'docsync.deleteTrash': 'Geri dönüşüm kutusuna taşı',
   'docsync.webhookHint':
     'Değişikliklerin hemen ulaşması için bu URL’yi sağlayıcınıza yapıştırın. Bu olmadan TREK belirli aralıklarla denetler.',
 
@@ -46,8 +40,7 @@ const docsync: TranslationStrings = {
     'Papra’da API anahtarları altında oluşturun. Papra anahtarları her zaman üyesi olduğunuz bütün kuruluşlara erişir.',
   'docsync.hintPapraOrg': 'Papra adres çubuğundaki org_… kimliği.',
   'docsync.hintNextcloudLogin': 'Nextcloud oturum açma adınız, e-posta adresiniz değil.',
-  'docsync.hintNextcloudAppPassword':
-    'Ayarlar → Güvenlik → Yeni uygulama parolası oluştur. Asla hesap parolanız değil.',
+  'docsync.hintNextcloudAppPassword': 'Ayarlar, Güvenlik, Yeni uygulama parolası oluştur. Asla hesap parolanız değil.',
   'docsync.hintOpenCloudToken': 'OpenCloud’da uygulama belirteçleri altında oluşturulur.',
   'docsync.hintBasePath': 'TREK’in gezi klasörlerini aradığı yer. Varsayılan /TREK.',
   'docsync.hintSynologyUrl': 'Bağlantı noktasını da yazın, örneğin https://nas.example.com:5001',
@@ -99,6 +92,82 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Belgelerin çoğu bir anda kayboldu, bu yüzden hiçbir şey değiştirilmedi. Klasörün hâlâ bağlı olduğunu denetleyin.',
   'docsync.error.unknown': 'Bir şeyler ters gitti.',
+
+  // ── İletişim kutusu ────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Bu gezi',
+  'docsync.addAnother': 'Başka ekle',
+  'docsync.syncing': 'Eşitleniyor',
+  'docsync.card.pickFolder': 'Bağlandı, bir klasör seçin',
+
+  'docsync.empty.title': 'Henüz bir şey bağlanmadı',
+  'docsync.empty.hintOwner':
+    'Soldan bir depo seçin. TREK her şeyin kendi kopyasını tutar, depo ortadan kalksa da hiçbir şey kaybolmaz.',
+  'docsync.empty.hintMember': 'Bunu gezi sahibi ayarlar. Belgeler her durumda TREK’te kalır.',
+
+  // Her ürünün dosyalama biçimi. Kimse bağlanmadan önce gösterilir, çünkü bir
+  // sonraki ekranın soracağı şey budur.
+  'docsync.model.paperless': 'Etiketlerle düzenler',
+  'docsync.model.papra': 'Bir kuruluş içinde etiketlerle düzenler',
+  'docsync.model.nextcloud': 'Bir klasörde tutar',
+  'docsync.model.opencloud': 'Bir alanda tutar',
+  'docsync.model.synologydrive': 'NAS’taki bir klasörde tutar',
+
+  // ── Akış çubuğu ────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Depoya giden',
+  'docsync.flow.toTrek': 'Depodan gelen',
+  'docsync.flow.documents': 'belge',
+  'docsync.flow.summary.both': 'Belgeler iki yönde de taşınır.',
+  'docsync.flow.summary.pull': 'Belgeler yalnızca içeri gelir.',
+  'docsync.flow.summary.push': 'Belgeler yalnızca dışarı gider.',
+  'docsync.flow.summaryEditable.both': 'İki yönde de taşınıyor. Durdurmak için bir şeride dokunun.',
+  'docsync.flow.summaryEditable.pull': 'Yalnızca içeri geliyor. Dışarı da göndermek için diğer şeride dokunun.',
+  'docsync.flow.summaryEditable.push': 'Yalnızca dışarı gidiyor. İçeri de almak için diğer şeride dokunun.',
+
+  // ── Tek bir bağ ────────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Ayarlar',
+  'docsync.binding.folder': 'Klasör',
+  'docsync.binding.lastRun': 'Son çalışma',
+  'docsync.binding.autoOff': 'Duraklatıldı',
+  'docsync.binding.neverRun': 'henüz çalışmadı',
+  'docsync.binding.deleteHint': 'Karşı taraftaki kopyaya ne olacağı.',
+  'docsync.binding.autoHint': 'Değişiklikleri arka planda denetler.',
+  'docsync.binding.webhookTitle': 'Anında güncelleme',
+  'docsync.binding.copy': 'Kopyala',
+  'docsync.binding.copied': 'Kopyalandı',
+
+  // ── Bağlanma ───────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Bağlan',
+  'docsync.connect.testing': 'Ulaşılmaya çalışılıyor',
+  'docsync.connect.okAs': 'Ulaşıldı, {account} olarak oturum açıldı',
+  'docsync.connect.insecureHint': 'Kendi ağınızdaki, kendinden imzalı sertifikası olan kurulumlar için.',
+  'docsync.connect.about.paperless':
+    'TREK bu geziyi kendi etiketi altında tutar, arşivinizin geri kalanına hiç dokunmaz.',
+  'docsync.connect.about.papra':
+    'Bu gezinin ait olduğu kuruluşu seçin. TREK geziyi onun içinde kendi etiketi altında tutar.',
+  'docsync.connect.about.nextcloud':
+    'Hesap parolanızı değil, bir uygulama parolası kullanın: iki adımlı doğrulamayla çalışır ve tek başına iptal edilebilir.',
+  'docsync.connect.about.opencloud': 'TREK bu gezi için her şeyden ayrı, kendi alanını alır.',
+  'docsync.connect.about.synologydrive':
+    'En iyisi, yalnızca bu gezinin kullanacağı paylaşılan klasöre erişen bir DSM hesabı.',
+
+  // ── Kapsayıcıyı seçme ──────────────────────────────────────────────────────
+  'docsync.scope.title': 'Bu gezi {provider} içinde nerede dursun?',
+  'docsync.scope.intro': 'Yalnızca buradakiler eşitlenir. Deponuzdaki diğer her şey TREK’in dışında kalır.',
+  'docsync.scope.createTitle': 'Yeni bir tane oluştur',
+  'docsync.scope.createAction': 'Oluştur',
+  'docsync.scope.pickTitle': 'Ya da var olanlardan birini kullanın',
+  'docsync.scope.search': 'Ara',
+  'docsync.scope.noMatch': 'Eşleşen bir şey yok.',
+
+  // ── Kişinin karar vermesi gerekenler ───────────────────────────────────────
+  'docsync.issues.title': 'Bakılması gerekenler',
+  'docsync.issues.conflict': 'İki yerde de değişti. Hangisinin kalacağını seçin.',
+  'docsync.issues.remote_missing': 'Depoda yok. TREK’teki kopya duruyor.',
+  'docsync.issues.rejected_type': 'Bu dosya türüne burada izin verilmiyor.',
+  'docsync.issues.too_large': 'Sınırdan büyük.',
+  'docsync.issues.error': 'Aktarım tamamlanamadı.',
+
   'docsync.error.unknown_provider': 'Bu sağlayıcı bu kurulumda kullanılamıyor.',
 };
 

@@ -63,8 +63,9 @@ const TRASH_FOLDER = '.trek-trash';
 
 /**
  * The adapter's own ceiling for one transfer. Not a policy — the install's limit
- * lives in `docsync_max_file_bytes` and is enforced by the core — just a bound
- * so a wrong path or a truncated header cannot start an unbounded read.
+ * is the upload limit (`MAX_FILE_SIZE`), enforced by the core before and during
+ * every transfer — just a bound so a wrong path or a truncated header cannot
+ * start an unbounded read.
  */
 const MAX_TRANSFER_BYTES = 2 * 1024 * 1024 * 1024;
 

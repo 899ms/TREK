@@ -77,4 +77,8 @@ export const MAX_TRANSFERS_PER_RUN = 25;
 /** app_settings keys, read per tick so an admin toggle needs no restart. */
 export const SETTING_POLL_INTERVAL = 'docsync_poll_interval_seconds';
 export const SETTING_SYNC_ENABLED = 'docsync_sync_enabled';
-export const SETTING_MAX_FILE_BYTES = 'docsync_max_file_bytes';
+// There is deliberately no size key here: a document that arrives through a
+// binding is bound by the same ceiling as one somebody uploads (MAX_FILE_SIZE in
+// files.constants), checked against the announced size and again while the
+// bytes stream. A second, sync-only limit would be a number nobody maintains
+// and a way for the two paths to disagree about what fits.

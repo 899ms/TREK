@@ -2,28 +2,23 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Sinkronisasi dokumen',
-  'docsync.subtitle': 'Jaga dokumen perjalanan ini tetap selaras dengan penyimpanan dokumen milikmu sendiri.',
   'docsync.noProviders': 'Tidak ada penyedia dokumen yang tersedia',
   'docsync.noProvidersHint': 'Administrator instans mengaktifkannya di Admin → Addon → Dokumen.',
   'docsync.addProvider': 'Hubungkan penyedia',
   'docsync.test': 'Uji koneksi',
+  'docsync.connect.optional': 'Opsional',
   'docsync.connected': 'Terhubung',
   'docsync.chooseFolder': 'Pilih folder',
-  'docsync.chooseFolderHint':
-    'Pilih folder, tag, atau ruang yang menjadi milik perjalanan ini. Hanya dokumen di dalamnya yang disinkronkan.',
   'docsync.noFolders': 'Belum ada yang ditemukan di instans ini.',
   'docsync.newFolderPlaceholder': 'Nama folder baru',
-  'docsync.createFolder': 'Buat',
   'docsync.syncNow': 'Sinkronkan sekarang',
   'docsync.unlink': 'Putuskan',
+  'docsync.confirmUnlink':
+    'Dokumen tetap ada di TREK dan di penyimpananmu. Hanya pasangan di antara keduanya yang dilepas.',
   'docsync.syncEnabled': 'Sinkronkan otomatis',
-  'docsync.direction': 'Arah',
-  'docsync.directionBoth': 'Dua arah',
-  'docsync.directionPull': 'Hanya ke dalam TREK',
-  'docsync.directionPush': 'Hanya ke penyedia',
   'docsync.deletePolicy': 'Saat sebuah dokumen dihapus',
-  'docsync.deleteUnlink': 'Simpan kedua salinan, lepaskan pasangannya',
-  'docsync.deleteTrash': 'Pindahkan salinan satunya ke tempat sampahnya',
+  'docsync.deleteUnlink': 'Simpan kedua salinan',
+  'docsync.deleteTrash': 'Pindahkan ke tempat sampah',
   'docsync.webhookHint':
     'Tempelkan URL ini di penyediamu agar perubahan langsung tiba. Tanpa itu, TREK memeriksa secara berkala.',
 
@@ -99,6 +94,82 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Hampir semua dokumen hilang sekaligus, jadi tidak ada yang diubah. Periksa apakah foldernya masih terpasang.',
   'docsync.error.unknown': 'Ada yang tidak beres.',
+
+  // ── Dialognya ──────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Perjalanan ini',
+  'docsync.addAnother': 'Tambah lagi',
+  'docsync.syncing': 'Menyinkronkan',
+  'docsync.card.pickFolder': 'Terhubung, pilih folder',
+
+  'docsync.empty.title': 'Belum ada yang terhubung',
+  'docsync.empty.hintOwner':
+    'Pilih penyimpanan di sebelah kiri. TREK menyimpan salinannya sendiri untuk semuanya, jadi tidak ada yang hilang kalau penyimpanan itu lenyap.',
+  'docsync.empty.hintMember': 'Pemilik perjalanan yang mengaturnya. Dokumen tetap ada di TREK, apa pun pilihannya.',
+
+  // Cara tiap produk mengarsipkan. Ditampilkan sebelum ada yang menghubungkan,
+  // karena inilah yang akan ditanyakan layar berikutnya.
+  'docsync.model.paperless': 'Mengarsipkan per tag',
+  'docsync.model.papra': 'Mengarsipkan per tag, di dalam sebuah organisasi',
+  'docsync.model.nextcloud': 'Mengarsipkan di dalam folder',
+  'docsync.model.opencloud': 'Mengarsipkan di dalam sebuah ruang',
+  'docsync.model.synologydrive': 'Mengarsipkan di dalam folder di NAS',
+
+  // ── Bilah alur ─────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Keluar ke penyimpanan',
+  'docsync.flow.toTrek': 'Masuk dari penyimpanan',
+  'docsync.flow.documents': 'dokumen',
+  'docsync.flow.summary.both': 'Dokumen bergerak dua arah.',
+  'docsync.flow.summary.pull': 'Dokumen hanya masuk.',
+  'docsync.flow.summary.push': 'Dokumen hanya keluar.',
+  'docsync.flow.summaryEditable.both': 'Bergerak dua arah. Ketuk satu jalur untuk menghentikannya.',
+  'docsync.flow.summaryEditable.pull': 'Hanya masuk. Ketuk jalur satunya agar ikut dikirim keluar.',
+  'docsync.flow.summaryEditable.push': 'Hanya keluar. Ketuk jalur satunya agar ikut dibawa masuk.',
+
+  // ── Satu pasangan ──────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Pengaturan',
+  'docsync.binding.folder': 'Folder',
+  'docsync.binding.lastRun': 'Terakhir dijalankan',
+  'docsync.binding.autoOff': 'Dijeda',
+  'docsync.binding.neverRun': 'belum pernah dijalankan',
+  'docsync.binding.deleteHint': 'Apa yang terjadi pada salinan di sisi satunya.',
+  'docsync.binding.autoHint': 'Periksa perubahan di latar belakang.',
+  'docsync.binding.webhookTitle': 'Pembaruan seketika',
+  'docsync.binding.copy': 'Salin',
+  'docsync.binding.copied': 'Tersalin',
+
+  // ── Menghubungkan ──────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Hubungkan',
+  'docsync.connect.testing': 'Mencoba menjangkaunya',
+  'docsync.connect.okAs': 'Terjangkau, masuk sebagai {account}',
+  'docsync.connect.insecureHint': 'Untuk instans di jaringanmu sendiri dengan sertifikat yang ditandatangani sendiri.',
+  'docsync.connect.about.paperless':
+    'TREK mengarsipkan perjalanan ini di bawah tag miliknya sendiri dan tidak pernah menyentuh sisa arsipmu.',
+  'docsync.connect.about.papra':
+    'Pilih organisasi tempat perjalanan ini berada. TREK mengarsipkannya di bawah tag miliknya sendiri di dalamnya.',
+  'docsync.connect.about.nextcloud':
+    'Pakai sandi aplikasi, bukan kata sandi akunmu: sandi aplikasi tahan terhadap dua faktor dan bisa dicabut sendiri.',
+  'docsync.connect.about.opencloud': 'TREK mendapat ruang sendiri untuk perjalanan ini, terpisah dari yang lain.',
+  'docsync.connect.about.synologydrive':
+    'Sebaiknya akun DSM yang hanya menjangkau folder bersama untuk perjalanan ini.',
+
+  // ── Memilih wadahnya ───────────────────────────────────────────────────────
+  'docsync.scope.title': 'Di mana perjalanan ini disimpan di {provider}?',
+  'docsync.scope.intro': 'Hanya isi di sini yang disinkronkan. Semua hal lain di penyimpananmu tetap di luar TREK.',
+  'docsync.scope.createTitle': 'Buat yang baru',
+  'docsync.scope.createAction': 'Buat',
+  'docsync.scope.pickTitle': 'Atau pakai yang sudah ada',
+  'docsync.scope.search': 'Cari',
+  'docsync.scope.noMatch': 'Tidak ada yang cocok.',
+
+  // ── Hal yang harus diputuskan orang ────────────────────────────────────────
+  'docsync.issues.title': 'Perlu dilihat',
+  'docsync.issues.conflict': 'Berubah di kedua tempat. Pilih mana yang dipertahankan.',
+  'docsync.issues.remote_missing': 'Hilang dari penyimpanan. Salinan TREK masih ada.',
+  'docsync.issues.rejected_type': 'Tipe file ini tidak diizinkan di sini.',
+  'docsync.issues.too_large': 'Lebih besar dari batas.',
+  'docsync.issues.error': 'Transfer tidak berhasil.',
+
   'docsync.error.unknown_provider': 'Penyedia ini tidak tersedia di instans ini.',
 };
 

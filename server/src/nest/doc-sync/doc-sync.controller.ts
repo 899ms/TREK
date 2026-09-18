@@ -319,6 +319,9 @@ export class DocSyncController {
   ) {
     const link = this.config.getLink(Number(linkId));
     if (!link || link.trip_id !== Number(tripId)) throw new HttpException('Link not found', 404);
+    // A person asking for a run is also asking for the rows that gave up to be
+    // tried once more; the scheduler gets no such reprieve.
+    this.sync.retryShelvedItems(link.id);
     return this.sync.syncLink(link, { full: body.full });
   }
 

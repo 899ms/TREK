@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Document sync',
-  'docsync.subtitle': "Keep this trip's documents in step with your own document store.",
   'docsync.noProviders': 'No document providers are available',
   'docsync.noProvidersHint': 'An instance administrator switches these on under Admin, Addons, Documents.',
   'docsync.addProvider': 'Connect a provider',
   'docsync.test': 'Test connection',
+  'docsync.connect.optional': 'Optional',
   'docsync.connected': 'Connected',
   'docsync.chooseFolder': 'Choose folder',
-  'docsync.chooseFolderHint':
-    'Pick the folder, tag or space that belongs to this trip. Only documents in it are synced.',
   'docsync.noFolders': 'Nothing found on this instance yet.',
   'docsync.newFolderPlaceholder': 'New folder name',
-  'docsync.createFolder': 'Create',
   'docsync.syncNow': 'Sync now',
   'docsync.unlink': 'Disconnect',
+  'docsync.confirmUnlink': 'Documents stay in TREK and at the store. Only the pairing between them goes.',
   'docsync.syncEnabled': 'Sync automatically',
-  'docsync.direction': 'Direction',
-  'docsync.directionBoth': 'Both ways',
-  'docsync.directionPull': 'Only into TREK',
-  'docsync.directionPush': 'Only out to the provider',
   'docsync.deletePolicy': 'When a document is deleted',
-  'docsync.deleteUnlink': 'Keep both copies, drop the pairing',
-  'docsync.deleteTrash': 'Move the other copy to its recycle bin',
+  'docsync.deleteUnlink': 'Keep both copies',
+  'docsync.deleteTrash': 'Move to recycle bin',
   'docsync.webhookHint':
     'Paste this URL into your provider so changes arrive immediately. Without it, TREK checks on a timer.',
 
@@ -97,6 +91,81 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Most documents vanished at once, so nothing was changed. Check that the folder is still mounted.',
   'docsync.error.unknown': 'Something went wrong.',
+
+  // ── The dialog ─────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'This trip',
+  'docsync.addAnother': 'Add another',
+  'docsync.syncing': 'Syncing',
+  'docsync.card.pickFolder': 'Connected, pick a folder',
+
+  'docsync.empty.title': 'Nothing connected yet',
+  'docsync.empty.hintOwner':
+    'Pick a store on the left. TREK keeps its own copy of everything, so nothing is lost if it goes away.',
+  'docsync.empty.hintMember': 'The trip owner sets this up. Documents stay in TREK either way.',
+
+  // How each product files things. Shown before anyone connects, because it is
+  // what the next screen will ask for.
+  'docsync.model.paperless': 'Files by tag',
+  'docsync.model.papra': 'Files by tag, inside an organisation',
+  'docsync.model.nextcloud': 'Files in a folder',
+  'docsync.model.opencloud': 'Files in a space',
+  'docsync.model.synologydrive': 'Files in a folder on the NAS',
+
+  // ── The flow bar ───────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Out to the store',
+  'docsync.flow.toTrek': 'In from the store',
+  'docsync.flow.documents': 'documents',
+  'docsync.flow.summary.both': 'Documents move both ways.',
+  'docsync.flow.summary.pull': 'Documents only come in.',
+  'docsync.flow.summary.push': 'Documents only go out.',
+  'docsync.flow.summaryEditable.both': 'Moving both ways. Tap a lane to stop it.',
+  'docsync.flow.summaryEditable.pull': 'Only coming in. Tap the other lane to send out too.',
+  'docsync.flow.summaryEditable.push': 'Only going out. Tap the other lane to bring in too.',
+
+  // ── One binding ────────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Settings',
+  'docsync.binding.folder': 'Folder',
+  'docsync.binding.lastRun': 'Last run',
+  'docsync.binding.autoOff': 'Paused',
+  'docsync.binding.neverRun': 'not run yet',
+  'docsync.binding.deleteHint': 'What happens to the copy on the other side.',
+  'docsync.binding.autoHint': 'Check for changes in the background.',
+  'docsync.binding.webhookTitle': 'Instant updates',
+  'docsync.binding.copy': 'Copy',
+  'docsync.binding.copied': 'Copied',
+
+  // ── Connecting ─────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Connect',
+  'docsync.connect.testing': 'Trying to reach it',
+  'docsync.connect.okAs': 'Reached it, signed in as {account}',
+  'docsync.connect.insecureHint': 'For an instance on your own network with a self-signed certificate.',
+  'docsync.connect.about.paperless':
+    'TREK files this trip under its own tag and never touches the rest of your archive.',
+  'docsync.connect.about.papra':
+    'Pick the organisation this trip belongs to. TREK files it under its own tag inside it.',
+  'docsync.connect.about.nextcloud':
+    'Use an app password, not your account password: it survives two-factor and you can revoke it on its own.',
+  'docsync.connect.about.opencloud': 'TREK gets its own space for this trip, separate from everything else.',
+  'docsync.connect.about.synologydrive': 'Best a DSM account that only reaches the shared folder this trip should use.',
+
+  // ── Picking the container ──────────────────────────────────────────────────
+  'docsync.scope.title': 'Where should this trip live in {provider}?',
+  'docsync.scope.intro': 'Only what is in here is synced. Everything else in your store stays out of TREK.',
+  'docsync.scope.createTitle': 'Make a new one',
+  'docsync.scope.createAction': 'Create',
+  'docsync.scope.pickTitle': 'Or use one you already have',
+  'docsync.scope.search': 'Search',
+  'docsync.scope.noMatch': 'Nothing matches that.',
+
+  // ── Things a person has to decide ──────────────────────────────────────────
+  'docsync.issues.title': 'Needs a look',
+  'docsync.issues.conflict': 'Changed in both places. Pick which one to keep.',
+  'docsync.issues.remote_missing': 'Gone from the store. The TREK copy is still here.',
+  'docsync.issues.rejected_type': 'This file type is not allowed here.',
+  'docsync.issues.too_large': 'Bigger than the limit.',
+  'docsync.issues.error': 'The transfer did not go through.',
+
   'docsync.error.unknown_provider': 'This provider is not available on this instance.',
 };
 

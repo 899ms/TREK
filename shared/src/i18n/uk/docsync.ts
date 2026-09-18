@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Синхронізація документів',
-  'docsync.subtitle': 'Тримайте документи цієї подорожі узгодженими з власним сховищем документів.',
   'docsync.noProviders': 'Немає доступних постачальників документів',
-  'docsync.noProvidersHint': 'Адміністратор сервера вмикає їх у розділі Адміністрування → Доповнення → Документи.',
+  'docsync.noProvidersHint': 'Адміністратор сервера вмикає їх у розділі Адміністрування, Доповнення, Документи.',
   'docsync.addProvider': 'Підключити постачальника',
   'docsync.test': 'Перевірити з’єднання',
+  'docsync.connect.optional': 'Необов’язково',
   'docsync.connected': 'Підключено',
   'docsync.chooseFolder': 'Вибрати теку',
-  'docsync.chooseFolderHint':
-    'Оберіть теку, мітку або простір, що належить цій подорожі. Синхронізуються лише документи в ній.',
   'docsync.noFolders': 'На цьому сервері поки нічого не знайдено.',
   'docsync.newFolderPlaceholder': 'Назва нової теки',
-  'docsync.createFolder': 'Створити',
   'docsync.syncNow': 'Синхронізувати зараз',
   'docsync.unlink': 'Відключити',
+  'docsync.confirmUnlink': 'Документи залишаються і в TREK, і у сховищі. Зникає лише зв’язок між ними.',
   'docsync.syncEnabled': 'Синхронізувати автоматично',
-  'docsync.direction': 'Напрямок',
-  'docsync.directionBoth': 'В обидва боки',
-  'docsync.directionPull': 'Лише в TREK',
-  'docsync.directionPush': 'Лише до постачальника',
   'docsync.deletePolicy': 'Коли документ видалено',
-  'docsync.deleteUnlink': 'Зберегти обидві копії, розірвати зв’язок',
-  'docsync.deleteTrash': 'Перемістити другу копію до її кошика',
+  'docsync.deleteUnlink': 'Залишити обидві копії',
+  'docsync.deleteTrash': 'Перемістити до кошика',
   'docsync.webhookHint':
     'Вставте цю URL-адресу у свого постачальника, щоб зміни надходили одразу. Без цього TREK перевіряє їх за таймером.',
 
@@ -48,7 +42,7 @@ const docsync: TranslationStrings = {
   'docsync.hintPapraOrg': 'Ідентифікатор org_… з адресного рядка Papra.',
   'docsync.hintNextcloudLogin': 'Ваше ім’я для входу в Nextcloud, а не адреса електронної пошти.',
   'docsync.hintNextcloudAppPassword':
-    'Налаштування → Безпека → Створити новий пароль додатка. Ніколи не пароль облікового запису.',
+    'Налаштування, Безпека, Створити новий пароль додатка. Ніколи не пароль облікового запису.',
   'docsync.hintOpenCloudToken': 'Створюється в OpenCloud у розділі токенів додатків.',
   'docsync.hintBasePath': 'Де TREK шукає теки подорожей. Типово /TREK.',
   'docsync.hintSynologyUrl': 'Вкажіть і порт, наприклад https://nas.example.com:5001',
@@ -99,6 +93,81 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Більшість документів зникла одночасно, тому нічого не змінено. Перевірте, чи теку досі підключено.',
   'docsync.error.unknown': 'Щось пішло не так.',
+
+  // ── Діалог ─────────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Ця подорож',
+  'docsync.addAnother': 'Додати ще',
+  'docsync.syncing': 'Синхронізація',
+  'docsync.card.pickFolder': 'Підключено, виберіть теку',
+
+  'docsync.empty.title': 'Ще нічого не підключено',
+  'docsync.empty.hintOwner':
+    'Виберіть сховище ліворуч. TREK зберігає власну копію всього, тож нічого не зникне, якщо сховища не стане.',
+  'docsync.empty.hintMember': 'Це налаштовує власник подорожі. Документи в будь-якому разі залишаються в TREK.',
+
+  // Як кожен продукт упорядковує файли. Показується ще до підключення, бо саме
+  // про це запитає наступний екран.
+  'docsync.model.paperless': 'Зберігає за мітками',
+  'docsync.model.papra': 'Зберігає за мітками в межах організації',
+  'docsync.model.nextcloud': 'Зберігає в теці',
+  'docsync.model.opencloud': 'Зберігає в просторі',
+  'docsync.model.synologydrive': 'Зберігає в теці на NAS',
+
+  // ── Смуга напрямків ────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'До сховища',
+  'docsync.flow.toTrek': 'Зі сховища',
+  'docsync.flow.documents': 'документів',
+  'docsync.flow.summary.both': 'Документи рухаються в обидва боки.',
+  'docsync.flow.summary.pull': 'Документи лише надходять.',
+  'docsync.flow.summary.push': 'Документи лише надсилаються.',
+  'docsync.flow.summaryEditable.both': 'Рух в обидва боки. Торкніться смуги, щоб зупинити її.',
+  'docsync.flow.summaryEditable.pull': 'Лише надходять. Торкніться іншої смуги, щоб також надсилати.',
+  'docsync.flow.summaryEditable.push': 'Лише надсилаються. Торкніться іншої смуги, щоб також отримувати.',
+
+  // ── Один зв’язок ───────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Налаштування',
+  'docsync.binding.folder': 'Тека',
+  'docsync.binding.lastRun': 'Останній запуск',
+  'docsync.binding.autoOff': 'Призупинено',
+  'docsync.binding.neverRun': 'ще не запускалося',
+  'docsync.binding.deleteHint': 'Що станеться з копією на іншому боці.',
+  'docsync.binding.autoHint': 'Перевіряти зміни у фоновому режимі.',
+  'docsync.binding.webhookTitle': 'Миттєві оновлення',
+  'docsync.binding.copy': 'Копіювати',
+  'docsync.binding.copied': 'Скопійовано',
+
+  // ── Підключення ────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Підключити',
+  'docsync.connect.testing': 'Пробуємо з’єднатися',
+  'docsync.connect.okAs': 'З’єднано, вхід як {account}',
+  'docsync.connect.insecureHint': 'Для сервера у вашій власній мережі із самопідписаним сертифікатом.',
+  'docsync.connect.about.paperless': 'TREK зберігає цю подорож під власною міткою і не чіпає решту вашого архіву.',
+  'docsync.connect.about.papra':
+    'Виберіть організацію, до якої належить ця подорож. TREK зберігає її там під власною міткою.',
+  'docsync.connect.about.nextcloud':
+    'Використовуйте пароль додатка, а не пароль облікового запису: він працює з двофакторною автентифікацією, і його можна відкликати окремо.',
+  'docsync.connect.about.opencloud': 'TREK отримує власний простір для цієї подорожі, окремо від усього іншого.',
+  'docsync.connect.about.synologydrive':
+    'Найкраще обліковий запис DSM, який має доступ лише до спільної теки для цієї подорожі.',
+
+  // ── Вибір місця зберігання ─────────────────────────────────────────────────
+  'docsync.scope.title': 'Де ця подорож має зберігатися в {provider}?',
+  'docsync.scope.intro': 'Синхронізується лише те, що всередині. Решта вашого сховища залишається поза TREK.',
+  'docsync.scope.createTitle': 'Створити нову',
+  'docsync.scope.createAction': 'Створити',
+  'docsync.scope.pickTitle': 'Або скористайтеся наявною',
+  'docsync.scope.search': 'Пошук',
+  'docsync.scope.noMatch': 'Нічого не знайдено.',
+
+  // ── Те, що має вирішити людина ─────────────────────────────────────────────
+  'docsync.issues.title': 'Потребує уваги',
+  'docsync.issues.conflict': 'Змінено в обох місцях. Виберіть, яку копію залишити.',
+  'docsync.issues.remote_missing': 'Зник зі сховища. Копія в TREK лишається.',
+  'docsync.issues.rejected_type': 'Цей тип файлу тут не дозволено.',
+  'docsync.issues.too_large': 'Більший за ліміт.',
+  'docsync.issues.error': 'Передавання не відбулося.',
+
   'docsync.error.unknown_provider': 'Цей постачальник недоступний на цьому сервері.',
 };
 

@@ -105,6 +105,8 @@ export interface SyncItemState {
   pushedSha256: string | null;
   state: string;
   attempts: number;
+  /** When the backoff lets this row be tried again; null once it is shelved. */
+  nextAttemptAt: string | null;
   remoteMissingAt: string | null;
 }
 
@@ -156,6 +158,10 @@ export interface ReconcileInput {
   remoteTruncated: boolean;
   /** Providers without stable ids need the rename heuristic. */
   stableRemoteIds: boolean;
+  /** How many failures a row gets before it is shelved for a person to look at. */
+  maxAttempts: number;
+  /** Injected so the backoff window is testable; defaults to now. */
+  now?: string;
 }
 
 /**
@@ -168,8 +174,42 @@ export interface ReconcileInput {
  * or ping-pong forever.
  */
 export function planReconcile(input: ReconcileInput): ReconcilePlan {
-  const { items, remote, local, direction, remoteTruncated, stableRemoteIds } = input;
+  const { items, remote, local, direction, remoteTruncated, stableRemoteIds, maxAttempts } = input;
+  const now = input.now ?? new Date().toISOString().replace('T', ' ').slice(0, 19);
   const actions: PlanAction[] = [];
+
+  /**
+   * Rows that must not be tried again on this run.
+   *
+   * A provider that refuses a document refuses it every time — a file it reads
+   * as corrupt, a type it does not accept, a quota that is full. Without this
+   * the row is re-planned on every pass, so a single bad document turns into an
+   * upload attempt every cron tick forever; rows were found at 46 attempts
+   * against a limit of 6, because the limit was written to the database and
+   * never read back out.
+   *
+   * Shelved is not dead: a manual run clears the counter (see resetItemAttempts),
+   * which is what "waits for a person" means.
+   */
+  const blocked = new Set<number>();
+  for (const it of items) {
+    if (it.state !== 'error') continue;
+    if (it.attempts >= maxAttempts) { blocked.add(it.id); continue; }
+    if (it.nextAttemptAt !== null && it.nextAttemptAt > now) blocked.add(it.id);
+  }
+
+  /**
+   * Every action goes through here so one rule covers all of them.
+   *
+   * No exception for `mark_remote_missing`: a row only counts as vanished if it
+   * was `synced` last run, and a row is only shelved if it is in `error`, so the
+   * two can never describe the same row.
+   */
+  const add = (action: PlanAction): void => {
+    const itemId = 'itemId' in action ? action.itemId : null;
+    if (itemId !== null && blocked.has(itemId)) return;
+    actions.push(action);
+  };
 
   const remoteById = new Map<string, RemoteDocument>();
   for (const r of remote) if (!r.isDeleted) remoteById.set(r.remoteId, r);
@@ -213,22 +253,22 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     const localChanged = !!l && l.sha256 !== null && it.contentSha256 !== null && l.sha256 !== it.contentSha256;
 
     if (l?.deletedAt) {
-      actions.push({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
+      add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
       continue;
     }
 
     if (remoteChanged && !isEcho && localChanged) {
-      actions.push({ kind: 'conflict', itemId: it.id, remote: r, local: l ?? null });
+      add({ kind: 'conflict', itemId: it.id, remote: r, local: l ?? null });
       continue;
     }
     if (remoteChanged && !isEcho) {
-      if (direction === 'push') { actions.push({ kind: 'touch', itemId: it.id, remote: r }); continue; }
-      actions.push({ kind: 'pull_update', remote: r, itemId: it.id });
+      if (direction === 'push') { add({ kind: 'touch', itemId: it.id, remote: r }); continue; }
+      add({ kind: 'pull_update', remote: r, itemId: it.id });
       continue;
     }
     if (localChanged && l) {
-      if (direction === 'pull') { actions.push({ kind: 'touch', itemId: it.id, remote: r }); continue; }
-      actions.push({ kind: 'push_update', local: l, itemId: it.id, remoteId: it.remoteId });
+      if (direction === 'pull') { add({ kind: 'touch', itemId: it.id, remote: r }); continue; }
+      add({ kind: 'push_update', local: l, itemId: it.id, remoteId: it.remoteId });
       continue;
     }
 
@@ -242,28 +282,28 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
       const localRenamed = it.remoteName !== null && l.name !== it.remoteName;
 
       if (providerRenamed && !localRenamed && direction !== 'push') {
-        actions.push({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: r.name });
+        add({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: r.name });
         continue;
       }
       if (localRenamed && !providerRenamed && direction !== 'pull') {
-        actions.push({ kind: 'rename_remote', itemId: it.id, remoteId: it.remoteId, name: l.name });
+        add({ kind: 'rename_remote', itemId: it.id, remoteId: it.remoteId, name: l.name });
         continue;
       }
       if (providerRenamed && localRenamed) {
         // Both sides renamed. Nothing here can pick the right one, and picking
         // wrong loses a name somebody chose, so it goes to a person.
-        actions.push({ kind: 'conflict', itemId: it.id, remote: r, local: l });
+        add({ kind: 'conflict', itemId: it.id, remote: r, local: l });
         continue;
       }
       // No stored name to arbitrate with (a row from before this column, or a
       // freshly paired document): follow the binding's direction.
-      if (direction === 'pull') actions.push({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: r.name });
-      else if (direction === 'push') actions.push({ kind: 'rename_remote', itemId: it.id, remoteId: it.remoteId, name: l.name });
-      else actions.push({ kind: 'touch', itemId: it.id, remote: r });
+      if (direction === 'pull') add({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: r.name });
+      else if (direction === 'push') add({ kind: 'rename_remote', itemId: it.id, remoteId: it.remoteId, name: l.name });
+      else add({ kind: 'touch', itemId: it.id, remote: r });
       continue;
     }
 
-    actions.push({ kind: 'touch', itemId: it.id, remote: r });
+    add({ kind: 'touch', itemId: it.id, remote: r });
   }
 
   // ── Upstream only ─────────────────────────────────────────────────────────
@@ -281,11 +321,11 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
           (i) => i.contentSha256 === r.contentHash && i.remoteId !== null && !remoteById.has(i.remoteId),
         );
         if (reuse) {
-          actions.push({ kind: 'touch', itemId: reuse.id, remote: r });
+          add({ kind: 'touch', itemId: reuse.id, remote: r });
           continue;
         }
       }
-      actions.push({ kind: 'pull', remote: r, itemId: null });
+      add({ kind: 'pull', remote: r, itemId: null });
     }
   }
 
@@ -299,7 +339,7 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
       // "missing", not re-uploaded — otherwise a broken listing duplicates the
       // entire trip upstream.
       if (it?.remoteId) continue;
-      actions.push({ kind: 'push', local: l, itemId: it?.id ?? null, remoteId: null });
+      add({ kind: 'push', local: l, itemId: it?.id ?? null, remoteId: null });
     }
   }
 
@@ -307,7 +347,7 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
   if (!guardTripped && !remoteTruncated) {
     for (const it of vanished) {
       if (it.remoteMissingAt) continue;
-      actions.push({ kind: 'mark_remote_missing', itemId: it.id });
+      add({ kind: 'mark_remote_missing', itemId: it.id });
     }
   }
 

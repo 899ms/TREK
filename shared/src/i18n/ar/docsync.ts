@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'مزامنة المستندات',
-  'docsync.subtitle': 'أبقِ مستندات هذه الرحلة متوافقة مع مخزن المستندات الخاص بك.',
   'docsync.noProviders': 'لا يوجد مزوّدو مستندات متاحون',
   'docsync.noProvidersHint': 'يفعّلها مسؤول الخادم من الإدارة ← الإضافات ← المستندات.',
   'docsync.addProvider': 'ربط مزوّد',
   'docsync.test': 'اختبار الاتصال',
+  'docsync.connect.optional': 'اختياري',
   'docsync.connected': 'متصل',
   'docsync.chooseFolder': 'اختيار مجلد',
-  'docsync.chooseFolderHint':
-    'اختر المجلد أو الوسم أو المساحة التي تخص هذه الرحلة. تُزامَن المستندات الموجودة فيها فقط.',
   'docsync.noFolders': 'لم يُعثر على شيء على هذا الخادم بعد.',
   'docsync.newFolderPlaceholder': 'اسم المجلد الجديد',
-  'docsync.createFolder': 'إنشاء',
   'docsync.syncNow': 'زامن الآن',
   'docsync.unlink': 'قطع الاتصال',
+  'docsync.confirmUnlink': 'تبقى المستندات في TREK وفي المخزن. يزول الاقتران بينهما فقط.',
   'docsync.syncEnabled': 'المزامنة تلقائياً',
-  'docsync.direction': 'الاتجاه',
-  'docsync.directionBoth': 'في الاتجاهين',
-  'docsync.directionPull': 'إلى TREK فقط',
-  'docsync.directionPush': 'إلى المزوّد فقط',
   'docsync.deletePolicy': 'عند حذف مستند',
-  'docsync.deleteUnlink': 'الإبقاء على النسختين وإلغاء الاقتران',
-  'docsync.deleteTrash': 'نقل النسخة الأخرى إلى سلة المهملات لديها',
+  'docsync.deleteUnlink': 'الإبقاء على النسختين',
+  'docsync.deleteTrash': 'النقل إلى سلة المهملات',
   'docsync.webhookHint': 'الصق هذا الـ URL في المزوّد لتصل التغييرات فوراً. بدونه يتحقق TREK على فترات زمنية.',
 
   // حقول نموذج الاتصال. تطابق المفاتيح عمود `label` في
@@ -95,6 +89,78 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'اختفت معظم المستندات دفعة واحدة، لذا لم يُغيَّر شيء. تأكد من أن المجلد لا يزال موصولاً.',
   'docsync.error.unknown': 'حدث خطأ ما.',
+
+  // ── النافذة ────────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'هذه الرحلة',
+  'docsync.addAnother': 'إضافة آخر',
+  'docsync.syncing': 'جارٍ المزامنة',
+  'docsync.card.pickFolder': 'متصل، اختر مجلداً',
+
+  'docsync.empty.title': 'لا شيء مرتبط بعد',
+  'docsync.empty.hintOwner':
+    'اختر مخزناً من القائمة الجانبية. يحتفظ TREK بنسخته الخاصة من كل شيء، فلا يضيع شيء إذا اختفى المخزن.',
+  'docsync.empty.hintMember': 'يتولى مالك الرحلة إعداد هذا. تبقى المستندات في TREK في الحالتين.',
+
+  // كيف يرتّب كل منتج الملفات. يظهر قبل أي ربط، لأنه ما ستطلبه الشاشة التالية.
+  'docsync.model.paperless': 'التصنيف بالوسوم',
+  'docsync.model.papra': 'التصنيف بالوسوم داخل مؤسسة',
+  'docsync.model.nextcloud': 'التصنيف في مجلد',
+  'docsync.model.opencloud': 'التصنيف في مساحة',
+  'docsync.model.synologydrive': 'التصنيف في مجلد على جهاز NAS',
+
+  // ── شريط التدفق ────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'إلى المخزن',
+  'docsync.flow.toTrek': 'من المخزن',
+  'docsync.flow.documents': 'مستندات',
+  'docsync.flow.summary.both': 'المستندات تنتقل في الاتجاهين.',
+  'docsync.flow.summary.pull': 'المستندات تدخل فقط.',
+  'docsync.flow.summary.push': 'المستندات تخرج فقط.',
+  'docsync.flow.summaryEditable.both': 'تنتقل في الاتجاهين. انقر مساراً لإيقافه.',
+  'docsync.flow.summaryEditable.pull': 'تدخل فقط. انقر المسار الآخر لإرسالها أيضاً.',
+  'docsync.flow.summaryEditable.push': 'تخرج فقط. انقر المسار الآخر لاستقبالها أيضاً.',
+
+  // ── اقتران واحد ────────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'الإعدادات',
+  'docsync.binding.folder': 'المجلد',
+  'docsync.binding.lastRun': 'آخر تشغيل',
+  'docsync.binding.autoOff': 'متوقفة مؤقتاً',
+  'docsync.binding.neverRun': 'لم تُشغَّل بعد',
+  'docsync.binding.deleteHint': 'ما الذي يحدث للنسخة في الجهة الأخرى.',
+  'docsync.binding.autoHint': 'التحقق من التغييرات في الخلفية.',
+  'docsync.binding.webhookTitle': 'تحديثات فورية',
+  'docsync.binding.copy': 'نسخ',
+  'docsync.binding.copied': 'تم النسخ',
+
+  // ── الربط ──────────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'ربط',
+  'docsync.connect.testing': 'جارٍ محاولة الوصول',
+  'docsync.connect.okAs': 'تم الوصول، وسُجّل الدخول باسم {account}',
+  'docsync.connect.insecureHint': 'لخادم على شبكتك الخاصة بشهادة موقّعة ذاتياً.',
+  'docsync.connect.about.paperless': 'يحفظ TREK هذه الرحلة تحت وسم خاص بها ولا يمسّ بقية أرشيفك.',
+  'docsync.connect.about.papra': 'اختر المؤسسة التي تنتمي إليها هذه الرحلة. يحفظها TREK داخلها تحت وسم خاص بها.',
+  'docsync.connect.about.nextcloud':
+    'استخدم كلمة مرور تطبيق لا كلمة مرور حسابك: فهي تعمل مع المصادقة الثنائية ويمكنك إبطالها وحدها.',
+  'docsync.connect.about.opencloud': 'يحصل TREK على مساحة خاصة بهذه الرحلة، منفصلة عن كل ما عداها.',
+  'docsync.connect.about.synologydrive': 'يُفضّل حساب DSM لا يصل إلا إلى المجلد المشترك المخصّص لهذه الرحلة.',
+
+  // ── اختيار الحاوية ─────────────────────────────────────────────────────────
+  'docsync.scope.title': 'أين تُحفظ هذه الرحلة في {provider}؟',
+  'docsync.scope.intro': 'يُزامَن ما بداخله فقط. كل ما عداه في مخزنك يبقى خارج TREK.',
+  'docsync.scope.createTitle': 'إنشاء واحد جديد',
+  'docsync.scope.createAction': 'إنشاء',
+  'docsync.scope.pickTitle': 'أو استخدم واحداً موجوداً لديك',
+  'docsync.scope.search': 'بحث',
+  'docsync.scope.noMatch': 'لا شيء يطابق ذلك.',
+
+  // ── أمور تحتاج قراراً من المستخدم ──────────────────────────────────────────
+  'docsync.issues.title': 'يحتاج إلى مراجعة',
+  'docsync.issues.conflict': 'تغيّر في الجهتين. اختر النسخة التي تبقى.',
+  'docsync.issues.remote_missing': 'اختفى من المخزن. نسخة TREK لا تزال هنا.',
+  'docsync.issues.rejected_type': 'نوع الملف هذا غير مسموح به هنا.',
+  'docsync.issues.too_large': 'أكبر من الحد المسموح.',
+  'docsync.issues.error': 'لم يتم النقل.',
+
   'docsync.error.unknown_provider': 'هذا المزوّد غير متاح على هذا الخادم.',
 };
 

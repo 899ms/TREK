@@ -2,28 +2,23 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Sincronització de documents',
-  'docsync.subtitle': 'Mantén els documents d’aquest viatge en sintonia amb el teu propi gestor de documents.',
   'docsync.noProviders': 'No hi ha cap proveïdor de documents disponible',
   'docsync.noProvidersHint': 'Un administrador de la instància els activa a Administració, Complements, Documents.',
   'docsync.addProvider': 'Connecta un proveïdor',
   'docsync.test': 'Prova la connexió',
+  'docsync.connect.optional': 'Opcional',
   'docsync.connected': 'Connectat',
   'docsync.chooseFolder': 'Tria una carpeta',
-  'docsync.chooseFolderHint':
-    'Tria la carpeta, l’etiqueta o l’espai que pertany a aquest viatge. Només se’n sincronitzen els documents que hi ha a dins.',
   'docsync.noFolders': 'Encara no s’ha trobat res en aquesta instància.',
   'docsync.newFolderPlaceholder': 'Nom de la carpeta nova',
-  'docsync.createFolder': 'Crea',
   'docsync.syncNow': 'Sincronitza ara',
   'docsync.unlink': 'Desconnecta',
+  'docsync.confirmUnlink':
+    'Els documents es queden a TREK i al teu gestor. Només desapareix l’aparellament entre els dos.',
   'docsync.syncEnabled': 'Sincronitza automàticament',
-  'docsync.direction': 'Direcció',
-  'docsync.directionBoth': 'En tots dos sentits',
-  'docsync.directionPull': 'Només cap a TREK',
-  'docsync.directionPush': 'Només cap al proveïdor',
   'docsync.deletePolicy': 'Quan s’elimina un document',
-  'docsync.deleteUnlink': 'Conserva les dues còpies i desfés l’aparellament',
-  'docsync.deleteTrash': 'Mou l’altra còpia a la seva paperera',
+  'docsync.deleteUnlink': 'Conserva les dues còpies',
+  'docsync.deleteTrash': 'Mou a la paperera',
   'docsync.webhookHint':
     'Enganxa aquesta URL al teu proveïdor perquè els canvis arribin de seguida. Sense això, TREK ho comprova cada cert temps.',
 
@@ -99,6 +94,82 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Han desaparegut molts documents de cop, així que no s’ha canviat res. Comprova que la carpeta encara estigui muntada.',
   'docsync.error.unknown': 'Alguna cosa ha anat malament.',
+
+  // ── El diàleg ──────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Aquest viatge',
+  'docsync.addAnother': 'Afegeix-ne un altre',
+  'docsync.syncing': 'Sincronitzant',
+  'docsync.card.pickFolder': 'Connectat, tria una carpeta',
+
+  'docsync.empty.title': 'Encara no hi ha res connectat',
+  'docsync.empty.hintOwner':
+    'Tria un gestor a l’esquerra. TREK en guarda sempre una còpia pròpia, així que no es perd res si desapareix.',
+  'docsync.empty.hintMember': 'Això ho configura el propietari del viatge. Els documents es queden a TREK igualment.',
+
+  // Com arxiva les coses cada producte. Es mostra abans que ningú connecti res,
+  // perquè és el que demanarà la pantalla següent.
+  'docsync.model.paperless': 'Arxiva per etiqueta',
+  'docsync.model.papra': 'Arxiva per etiqueta, dins d’una organització',
+  'docsync.model.nextcloud': 'Arxiva en una carpeta',
+  'docsync.model.opencloud': 'Arxiva en un espai',
+  'docsync.model.synologydrive': 'Arxiva en una carpeta del NAS',
+
+  // ── La barra de flux ───────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Cap al gestor',
+  'docsync.flow.toTrek': 'Des del gestor',
+  'docsync.flow.documents': 'documents',
+  'docsync.flow.summary.both': 'Els documents van en tots dos sentits.',
+  'docsync.flow.summary.pull': 'Els documents només entren.',
+  'docsync.flow.summary.push': 'Els documents només surten.',
+  'docsync.flow.summaryEditable.both': 'Van en tots dos sentits. Toca un carril per aturar-lo.',
+  'docsync.flow.summaryEditable.pull': 'Només entren. Toca l’altre carril per enviar-ne també.',
+  'docsync.flow.summaryEditable.push': 'Només surten. Toca l’altre carril per rebre’n també.',
+
+  // ── Un aparellament ────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Configuració',
+  'docsync.binding.folder': 'Carpeta',
+  'docsync.binding.lastRun': 'Última execució',
+  'docsync.binding.autoOff': 'En pausa',
+  'docsync.binding.neverRun': 'encara no s’ha executat',
+  'docsync.binding.deleteHint': 'Què passa amb la còpia de l’altra banda.',
+  'docsync.binding.autoHint': 'Comprova si hi ha canvis en segon pla.',
+  'docsync.binding.webhookTitle': 'Actualitzacions instantànies',
+  'docsync.binding.copy': 'Copia',
+  'docsync.binding.copied': 'Copiat',
+
+  // ── La connexió ────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Connecta',
+  'docsync.connect.testing': 'Provant de contactar-hi',
+  'docsync.connect.okAs': 'Contactat, sessió iniciada com a {account}',
+  'docsync.connect.insecureHint': 'Per a una instància de la teva xarxa amb un certificat autosignat.',
+  'docsync.connect.about.paperless':
+    'TREK arxiva aquest viatge sota una etiqueta pròpia i no toca mai la resta del teu arxiu.',
+  'docsync.connect.about.papra':
+    'Tria l’organització a què pertany aquest viatge. TREK l’arxiva sota una etiqueta pròpia a dins.',
+  'docsync.connect.about.nextcloud':
+    'Fes servir una contrasenya d’aplicació, no la del compte: funciona amb el doble factor i la pots revocar per separat.',
+  'docsync.connect.about.opencloud': 'TREK té un espai propi per a aquest viatge, separat de tota la resta.',
+  'docsync.connect.about.synologydrive':
+    'Millor un compte DSM que només arribi a la carpeta compartida que ha de fer servir aquest viatge.',
+
+  // ── Tria del contenidor ────────────────────────────────────────────────────
+  'docsync.scope.title': 'On ha d’anar aquest viatge dins de {provider}?',
+  'docsync.scope.intro': 'Només se sincronitza el que hi ha aquí dins. La resta del teu gestor es queda fora de TREK.',
+  'docsync.scope.createTitle': 'Crea’n un de nou',
+  'docsync.scope.createAction': 'Crea',
+  'docsync.scope.pickTitle': 'O fes servir un que ja tinguis',
+  'docsync.scope.search': 'Cerca',
+  'docsync.scope.noMatch': 'No hi coincideix res.',
+
+  // ── Coses que ha de decidir una persona ────────────────────────────────────
+  'docsync.issues.title': 'Cal revisar-ho',
+  'docsync.issues.conflict': 'Ha canviat als dos llocs. Tria quina còpia vols conservar.',
+  'docsync.issues.remote_missing': 'Ha desaparegut del gestor. La còpia de TREK encara hi és.',
+  'docsync.issues.rejected_type': 'Aquest tipus de fitxer no s’admet aquí.',
+  'docsync.issues.too_large': 'Més gran que el límit.',
+  'docsync.issues.error': 'La transferència no s’ha completat.',
+
   'docsync.error.unknown_provider': 'Aquest proveïdor no està disponible en aquesta instància.',
 };
 

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'crypto';
 import type { Request } from 'express';
 
@@ -27,8 +27,11 @@ import type { DocSyncService } from '../../../../src/nest/doc-sync/doc-sync.serv
  * always the same, and whether a run was scheduled, which is the only place the
  * decision is visible at all.
  *
- * No timers and no clock: the signature is computed here from a fixed id and
- * timestamp, exactly as the provider would.
+ * The signature is computed here from a fixed id and timestamp, exactly as the
+ * provider would. Timers are faked, because the endpoint now collects a burst
+ * before it runs: providers fire once per document, and twenty files dropped
+ * into a watched folder used to be twenty runs — nineteen of which the service
+ * answered `busy` and threw away.
  */
 
 const SECRET = 'M7dQ2vLp5rTn8kYw1xZc4bJh';
@@ -60,6 +63,9 @@ const link = (over: Partial<LinkRow> = {}): LinkRow => ({
 
 const config = {
   getLinkByToken: vi.fn((token: string) => (token === 'tok-live' ? link() : undefined)),
+  // Looked up again when the timer fires, so a binding switched off during the
+  // window does not get one last run out of a stale row.
+  getLink: vi.fn((id: number) => (id === 4 ? link() : undefined)),
   webhookSecret: vi.fn(() => SECRET),
 };
 
@@ -98,9 +104,21 @@ function papraReq(payload: string, signature: string, sent = payload): Request {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.useFakeTimers();
   config.getLinkByToken.mockImplementation((token: string) => (token === 'tok-live' ? link() : undefined));
+  config.getLink.mockImplementation((id: number) => (id === 4 ? link() : undefined));
   config.webhookSecret.mockReturnValue(SECRET);
 });
+
+afterEach(() => {
+  vi.runOnlyPendingTimers();
+  vi.useRealTimers();
+});
+
+/** Let the debounce window pass, so a scheduled run actually happens. */
+function settle() {
+  vi.advanceTimersByTime(6000);
+}
 
 describe('an unknown token', () => {
   it('answers as if it were known, so nobody can enumerate which tokens exist', () => {
@@ -124,7 +142,9 @@ describe('a binding whose sync is switched off', () => {
 describe('a shared-secret header', () => {
   it('triggers the run when it matches', () => {
     controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
+    settle();
     expect(sync.syncLink.mock.calls[0][0]).toMatchObject({ id: 4 });
   });
 
@@ -142,6 +162,7 @@ describe('a shared-secret header', () => {
   it('is not demanded from a binding that carries no secret — the token alone authenticates there', () => {
     config.webhookSecret.mockReturnValue('');
     controller.nudge('tok-live', makeReq());
+    settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 });
@@ -151,6 +172,7 @@ describe('a Papra standard-webhooks signature', () => {
 
   it('triggers the run when it covers the bytes that arrived', () => {
     controller.nudge('tok-live', papraReq(payload, sign(payload)));
+    settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 
@@ -184,6 +206,7 @@ describe('a Papra standard-webhooks signature', () => {
       { rawBody: Buffer.from(payload, 'utf8') },
     );
     controller.nudge('tok-live', req);
+    settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 
@@ -194,6 +217,7 @@ describe('a Papra standard-webhooks signature', () => {
       { body },
     );
     controller.nudge('tok-live', req);
+    settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 
@@ -221,6 +245,78 @@ describe('a credential of the wrong length', () => {
 
   it('is rejected the same way when it is longer than the stored secret', () => {
     expect(() => controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': `${SECRET}extra` }))).not.toThrow();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A burst of calls is one run.
+ *
+ * Every provider here fires per document: a folder of twenty files is twenty
+ * calls within a second or two. Each used to start its own run — the service's
+ * in-flight guard then answered `busy` to nineteen of them, so nineteen
+ * announcements were thrown away and the one run that did start had begun
+ * before most of the changes landed.
+ */
+describe('a burst of nudges', () => {
+  it('runs once for twenty calls rather than twenty times', () => {
+    for (let i = 0; i < 20; i += 1) {
+      controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    }
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('answers every one of them immediately, before any run happens', () => {
+    const answers = [];
+    for (let i = 0; i < 5; i += 1) {
+      answers.push(controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET })));
+    }
+    // Paperless gives the call five seconds before it counts it as failed.
+    expect(answers).toEqual(Array.from({ length: 5 }, () => ({ received: true })));
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('runs again for a burst that arrives after the window closed', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps one window per binding, so a busy trip cannot starve a quiet one', () => {
+    const other = link({ id: 9, webhook_token: 'tok-other' });
+    config.getLinkByToken.mockImplementation((t: string) =>
+      t === 'tok-live' ? link() : t === 'tok-other' ? other : undefined);
+    config.getLink.mockImplementation((id: number) => (id === 4 ? link() : id === 9 ? other : undefined));
+
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    controller.nudge('tok-other', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+    expect(sync.syncLink.mock.calls.map((c) => c[0].id).sort()).toEqual([4, 9]);
+  });
+
+  it('drops the run when the binding is switched off inside the window', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    config.getLink.mockReturnValue(link({ sync_enabled: 0 }));
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('drops the run when the binding is deleted inside the window', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    config.getLink.mockReturnValue(undefined);
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('forgets its pending timers when the module goes down', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    controller.onModuleDestroy();
+    settle();
     expect(sync.syncLink).not.toHaveBeenCalled();
   });
 });

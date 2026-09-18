@@ -52,6 +52,7 @@ const item = (over: Partial<SyncItemState> = {}): SyncItemState => ({
   pushedSha256: null,
   state: 'synced',
   attempts: 0,
+  nextAttemptAt: null,
   remoteMissingAt: null,
   ...over,
 });
@@ -64,6 +65,7 @@ const plan = (over: Partial<Parameters<typeof planReconcile>[0]> = {}) =>
     direction: 'both',
     remoteTruncated: false,
     stableRemoteIds: true,
+    maxAttempts: 6,
     ...over,
   });
 
@@ -309,5 +311,91 @@ describe('backoffSeconds', () => {
 
   it('treats a zero failure count as the first step', () => {
     expect(backoffSeconds([60, 300], 0)).toBe(60);
+  });
+});
+
+/**
+ * The retry limit, read back out.
+ *
+ * Found in a live database at 46 attempts against a limit of 6: the counter and
+ * the backoff were written on every failure and never consulted when planning
+ * the next run, so a document a provider refuses — a file it reads as corrupt,
+ * a type it will not take, a full quota — was re-uploaded on every cron tick
+ * for as long as it existed.
+ */
+describe('planReconcile > shelving a row that keeps failing', () => {
+  const failing = (over: Partial<SyncItemState> = {}) =>
+    item({ id: 20, remoteId: null, remoteVersion: null, remoteName: null, contentSha256: null, state: 'error', ...over });
+
+  it('re-plans a failed push while attempts are left', () => {
+    const p = plan({
+      items: [failing({ attempts: 2 })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+    });
+    expect(p.actions.map(a => a.kind)).toContain('push');
+  });
+
+  it('stops re-planning once the attempts are used up', () => {
+    const p = plan({
+      items: [failing({ attempts: 6 })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+    });
+    expect(p.actions.map(a => a.kind)).not.toContain('push');
+  });
+
+  it('stops re-planning past the limit as well, not only exactly at it', () => {
+    const p = plan({
+      items: [failing({ attempts: 46 })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('holds off while the backoff window is still open', () => {
+    const p = plan({
+      items: [failing({ attempts: 1, nextAttemptAt: '2030-01-01 00:00:00' })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+      now: '2026-01-01 00:00:00',
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('tries again once the backoff window has passed', () => {
+    const p = plan({
+      items: [failing({ attempts: 1, nextAttemptAt: '2026-01-01 00:00:00' })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+      now: '2026-06-01 00:00:00',
+    });
+    expect(p.actions.map(a => a.kind)).toContain('push');
+  });
+
+  it('leaves a healthy row alone however high its old attempt count is', () => {
+    // attempts is not reset on success, so a row that failed twice and then
+    // went through must not be mistaken for a shelved one.
+    const p = plan({
+      items: [item({ attempts: 9, state: 'synced' })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v2' })],
+      local: [local({ fileId: 1 })],
+      maxAttempts: 6,
+    });
+    expect(p.actions.map(a => a.kind)).toContain('pull_update');
+  });
+
+  it('leaves a shelved row alone even when its provider copy is gone too', () => {
+    // "Vanished" is only said about a row that was synced last run, and a row is
+    // only shelved while it is in error, so these two never describe the same
+    // row — nothing is planned for it either way.
+    const p = plan({
+      items: [item({ id: 30, attempts: 99, state: 'error', remoteId: 'r-gone' })],
+      remote: [],
+      local: [],
+      maxAttempts: 6,
+    });
+    expect(p.actions).toEqual([]);
   });
 });

@@ -13,7 +13,7 @@ export default function FileManager(props: FileManagerProps) {
   const S = useFileManager(props)
   const { lightboxIndex, setLightboxIndex, mediaFiles, assignFileId, previewFile, handlePaste, showTrash } = S
   return (
-    <div className="relative flex flex-col h-full" style={{ fontFamily: "var(--font-system)" }} onPaste={handlePaste} tabIndex={-1}>
+    <div className="flex flex-col h-full" style={{ fontFamily: "var(--font-system)" }} onPaste={handlePaste} tabIndex={-1}>
       {/* Lightbox */}
       {lightboxIndex !== null && <ImageLightbox files={mediaFiles} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />}
 
@@ -25,13 +25,17 @@ export default function FileManager(props: FileManagerProps) {
         ? <MarkdownPreviewModal {...S} />
         : <PdfPreviewModal {...S} />)}
 
-      {/* Document sync, as an overlay rather than a route: it is configuration
-          for the documents on this screen, and sending someone to settings to
-          reach it loses the context that makes the folder choice obvious. */}
+      {/* Document sync opens as its own dialog: it is configuration for the
+          documents on this screen, so it belongs here rather than in settings,
+          but it is a task with a beginning and an end and does not belong
+          inside the list it configures. */}
       {S.showDocSync && (
-        <div className="absolute inset-0 z-20 overflow-y-auto bg-surface p-4">
-          <DocSyncPanel tripId={props.tripId} isOwner={S.isTripOwner} onClose={() => S.setShowDocSync(false)} />
-        </div>
+        <DocSyncPanel
+          tripId={props.tripId}
+          tripTitle={S.trip?.title}
+          isOwner={S.isTripOwner}
+          onClose={() => S.setShowDocSync(false)}
+        />
       )}
 
       {/* Toolbar */}

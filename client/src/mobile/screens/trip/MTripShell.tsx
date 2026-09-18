@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 
 import { findFocusDayId } from '../../../components/Planner/today'
 import {
   CalendarDays, ChevronDown, ChevronLeft, Download, FileDown, List, Map as MapIcon, MoreHorizontal,
-  Plane, Plus, Rows3, Route, SlidersHorizontal, Trash2, Upload,
+  FolderSync, Plane, Plus, Rows3, Route, SlidersHorizontal, Trash2, Upload,
 } from 'lucide-react'
 import { useTripPlanner } from '../../../pages/tripPlanner/useTripPlanner'
 import { pickDockTabs } from './dockTabs'
@@ -116,6 +116,7 @@ export interface MTripShellApi {
   exportCostsCsvSignal: number
   uploadFilesSignal: number
   openFilesTrashSignal: number
+  openDocSyncSignal: number
 }
 
 /**
@@ -226,6 +227,7 @@ export default function MTripShell({
   const [exportCostsCsvSignal, setExportCostsCsvSignal] = useState(0)
   const [uploadFilesSignal, setUploadFilesSignal] = useState(0)
   const [openFilesTrashSignal, setOpenFilesTrashSignal] = useState(0)
+  const [openDocSyncSignal, setOpenDocSyncSignal] = useState(0)
 
   // The mobile plan is single-day: make sure a day is active once days arrive.
   // Only seed once so an intentional deselect elsewhere is not fought. Open on
@@ -378,6 +380,7 @@ export default function MTripShell({
     listsTab, setListsTab, collabTab, setCollabTab,
     transportsCompact, bookingsCompact,
     addExpenseSignal, exportCostsCsvSignal, uploadFilesSignal, openFilesTrashSignal,
+    openDocSyncSignal,
   }
 
   // Splash — same gate as the desktop page, in the mobile design language.
@@ -672,6 +675,9 @@ export default function MTripShell({
         {trTab === 'dateien' && (
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-[7px]">
             <PrimaryPill icon={<Upload size={13} strokeWidth={2.2} />} label={t('common.upload')} onClick={() => setUploadFilesSignal(s => s + 1)} />
+            <MIconBtn ariaLabel={t('docsync.title')} onClick={() => setOpenDocSyncSignal(s => s + 1)} size={40} className="text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]">
+              <FolderSync size={15} strokeWidth={2} />
+            </MIconBtn>
             <MIconBtn ariaLabel={t('files.trash')} onClick={() => setOpenFilesTrashSignal(s => s + 1)} size={40} className="text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]">
               <Trash2 size={15} strokeWidth={2} />
             </MIconBtn>

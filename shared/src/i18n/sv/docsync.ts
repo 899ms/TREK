@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Dokumentsynkronisering',
-  'docsync.subtitle': 'Håll resans dokument i takt med ditt eget dokumentarkiv.',
   'docsync.noProviders': 'Inga dokumentleverantörer är tillgängliga',
   'docsync.noProvidersHint': 'En administratör för instansen slår på dem under Administration, Tillägg, Dokument.',
   'docsync.addProvider': 'Anslut en leverantör',
   'docsync.test': 'Testa anslutningen',
+  'docsync.connect.optional': 'Valfritt',
   'docsync.connected': 'Ansluten',
   'docsync.chooseFolder': 'Välj mapp',
-  'docsync.chooseFolderHint':
-    'Välj den mapp, tagg eller yta som hör till den här resan. Bara dokument i den synkroniseras.',
   'docsync.noFolders': 'Ingenting hittades på den här instansen än.',
   'docsync.newFolderPlaceholder': 'Namn på ny mapp',
-  'docsync.createFolder': 'Skapa',
   'docsync.syncNow': 'Synkronisera nu',
   'docsync.unlink': 'Koppla från',
+  'docsync.confirmUnlink': 'Dokumenten finns kvar i TREK och i arkivet. Bara kopplingen mellan dem försvinner.',
   'docsync.syncEnabled': 'Synkronisera automatiskt',
-  'docsync.direction': 'Riktning',
-  'docsync.directionBoth': 'Åt båda hållen',
-  'docsync.directionPull': 'Bara in till TREK',
-  'docsync.directionPush': 'Bara ut till leverantören',
   'docsync.deletePolicy': 'När ett dokument tas bort',
-  'docsync.deleteUnlink': 'Behåll båda kopiorna, släpp kopplingen',
-  'docsync.deleteTrash': 'Flytta den andra kopian till papperskorgen',
+  'docsync.deleteUnlink': 'Behåll båda kopiorna',
+  'docsync.deleteTrash': 'Flytta till papperskorgen',
   'docsync.webhookHint':
     'Klistra in den här URL:en hos din leverantör så kommer ändringar direkt. Utan den kontrollerar TREK med jämna mellanrum.',
 
@@ -96,6 +90,80 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Nästan alla dokument försvann på en gång, så ingenting ändrades. Kontrollera att mappen fortfarande är monterad.',
   'docsync.error.unknown': 'Något gick fel.',
+
+  // ── Dialogen ───────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Den här resan',
+  'docsync.addAnother': 'Lägg till en till',
+  'docsync.syncing': 'Synkroniserar',
+  'docsync.card.pickFolder': 'Ansluten, välj en mapp',
+
+  'docsync.empty.title': 'Inget anslutet än',
+  'docsync.empty.hintOwner':
+    'Välj ett arkiv till vänster. TREK behåller en egen kopia av allt, så inget går förlorat om arkivet försvinner.',
+  'docsync.empty.hintMember': 'Resans ägare ställer in det här. Dokumenten finns kvar i TREK oavsett.',
+
+  // Hur varje produkt sorterar sina filer. Visas innan någon ansluter, eftersom
+  // det är vad nästa steg kommer att fråga efter.
+  'docsync.model.paperless': 'Sorterar efter tagg',
+  'docsync.model.papra': 'Sorterar efter tagg, inom en organisation',
+  'docsync.model.nextcloud': 'Sorterar i en mapp',
+  'docsync.model.opencloud': 'Sorterar i en yta',
+  'docsync.model.synologydrive': 'Sorterar i en mapp på NAS:en',
+
+  // ── Flödesraden ────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Ut till arkivet',
+  'docsync.flow.toTrek': 'In från arkivet',
+  'docsync.flow.documents': 'dokument',
+  'docsync.flow.summary.both': 'Dokument går åt båda hållen.',
+  'docsync.flow.summary.pull': 'Dokument kommer bara in.',
+  'docsync.flow.summary.push': 'Dokument går bara ut.',
+  'docsync.flow.summaryEditable.both': 'Går åt båda hållen. Tryck på ett spår för att stoppa det.',
+  'docsync.flow.summaryEditable.pull': 'Kommer bara in. Tryck på andra spåret för att skicka ut också.',
+  'docsync.flow.summaryEditable.push': 'Går bara ut. Tryck på andra spåret för att hämta in också.',
+
+  // ── En koppling ────────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Inställningar',
+  'docsync.binding.folder': 'Mapp',
+  'docsync.binding.lastRun': 'Senaste körning',
+  'docsync.binding.autoOff': 'Pausad',
+  'docsync.binding.neverRun': 'inte körd än',
+  'docsync.binding.deleteHint': 'Vad som händer med kopian på andra sidan.',
+  'docsync.binding.autoHint': 'Leta efter ändringar i bakgrunden.',
+  'docsync.binding.webhookTitle': 'Direkta uppdateringar',
+  'docsync.binding.copy': 'Kopiera',
+  'docsync.binding.copied': 'Kopierad',
+
+  // ── Ansluta ────────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Anslut',
+  'docsync.connect.testing': 'Försöker nå den',
+  'docsync.connect.okAs': 'Nådde den, inloggad som {account}',
+  'docsync.connect.insecureHint': 'För en instans i ditt eget nätverk med ett självsignerat certifikat.',
+  'docsync.connect.about.paperless':
+    'TREK lägger den här resan under en egen tagg och rör aldrig resten av ditt arkiv.',
+  'docsync.connect.about.papra': 'Välj organisationen som resan hör till. TREK lägger den under en egen tagg där inne.',
+  'docsync.connect.about.nextcloud':
+    'Använd ett applösenord, inte ditt kontolösenord: det klarar tvåfaktor och kan återkallas för sig.',
+  'docsync.connect.about.opencloud': 'TREK får en egen yta för den här resan, skild från allt annat.',
+  'docsync.connect.about.synologydrive': 'Helst ett DSM-konto som bara når den delade mapp resan ska använda.',
+
+  // ── Välja behållaren ───────────────────────────────────────────────────────
+  'docsync.scope.title': 'Var ska den här resan ligga i {provider}?',
+  'docsync.scope.intro': 'Bara det som ligger här synkroniseras. Allt annat i ditt arkiv hålls utanför TREK.',
+  'docsync.scope.createTitle': 'Skapa en ny',
+  'docsync.scope.createAction': 'Skapa',
+  'docsync.scope.pickTitle': 'Eller använd en du redan har',
+  'docsync.scope.search': 'Sök',
+  'docsync.scope.noMatch': 'Inget matchar det.',
+
+  // ── Sådant någon måste ta ställning till ───────────────────────────────────
+  'docsync.issues.title': 'Behöver ses över',
+  'docsync.issues.conflict': 'Ändrad på båda ställena. Välj vilken som ska behållas.',
+  'docsync.issues.remote_missing': 'Borta från arkivet. TREK-kopian finns kvar.',
+  'docsync.issues.rejected_type': 'Den här filtypen tillåts inte här.',
+  'docsync.issues.too_large': 'Större än gränsen.',
+  'docsync.issues.error': 'Överföringen gick inte igenom.',
+
   'docsync.error.unknown_provider': 'Den här leverantören är inte tillgänglig på den här instansen.',
 };
 

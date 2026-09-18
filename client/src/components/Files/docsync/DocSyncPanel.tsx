@@ -1,343 +1,332 @@
-import { useState } from 'react'
-import { AlertTriangle, Check, Cloud, FolderSync, Loader2, Plus, RefreshCw, Trash2, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { AlertCircle, ArrowRight, Check, Loader2, Plus } from 'lucide-react'
+import Modal from '../../shared/Modal'
 import { useTranslation } from '../../../i18n/TranslationContext'
-import ToggleSwitch from '../../Settings/ToggleSwitch'
-import { useDocSync, type DocSyncProvider, type DocSyncScope } from './useDocSync'
+import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
+import { StateBadge } from './DocSyncBits'
+import { useDocSync, type DocSyncLink, type DocSyncProvider } from './useDocSync'
+import DocSyncBinding from './DocSyncBinding'
+import DocSyncConnectModal from './DocSyncConnectModal'
+import DocSyncScopeModal from './DocSyncScopeModal'
 
 /**
- * The trip's document sync, configured where the documents are.
+ * Document sync for one trip, as a dialog with the stores down one side and the
+ * selected one open beside it.
  *
- * It lives in the file manager rather than in settings because this is the one
- * screen where someone has the context "these documents belong in that folder".
- * Only the trip owner can change it — the credential usually reaches the
- * owner's whole archive — but every member can see where their documents go,
- * which is the minimum a shared folder owes the people sharing it.
+ * Two columns rather than a stack, because the two questions are different
+ * shapes: "which store" is a short list somebody scans, and "how does this one
+ * behave" is a screenful. Stacked, the second answer pushed the first one off
+ * the top every time a binding was added.
+ *
+ * It opens from the file manager rather than from settings: this is the one
+ * screen where a person has the context that makes the folder choice obvious.
+ * Only the trip owner can change a binding — the credential usually reaches
+ * their whole archive — but every member sees where their documents go, which
+ * is the minimum a shared folder owes the people sharing it.
  */
-export default function DocSyncPanel({ tripId, isOwner, onClose }: { tripId: number | string; isOwner: boolean; onClose: () => void }) {
-  const { t } = useTranslation()
-  const sync = useDocSync(tripId, true)
-  const [openProvider, setOpenProvider] = useState<string | null>(null)
-
-  if (sync.loading) {
-    return (
-      <div className="grid place-items-center py-10">
-        <Loader2 size={20} className="animate-spin text-content-faint" />
-      </div>
-    )
-  }
-
-  if (sync.providers.length === 0) {
-    return (
-      <div className="rounded-xl border border-edge bg-surface p-5 text-center">
-        <Cloud size={22} className="mx-auto text-content-faint" />
-        <p className="mt-2 text-body text-content">{t('docsync.noProviders')}</p>
-        <p className="mt-1 text-caption text-content-muted">{t('docsync.noProvidersHint')}</p>
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-subtitle font-semibold text-content">{t('docsync.title')}</h3>
-          <p className="mt-0.5 text-caption text-content-muted">{t('docsync.subtitle')}</p>
-        </div>
-        <button type="button" onClick={onClose} className="rounded-lg p-1.5 text-content-muted hover:bg-surface-hover" aria-label={t('common.close')}>
-          <X size={16} />
-        </button>
-      </div>
-
-      {sync.links.map(link => {
-        const provider = sync.providers.find(p => p.id === link.providerId)
-        return (
-          <div key={link.id} className="rounded-xl border border-edge bg-surface p-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <FolderSync size={16} className="text-accent" />
-                  <span className="truncate text-body font-medium text-content">{provider?.name || link.providerId}</span>
-                  <StateBadge state={link.lastSyncState} t={t} />
-                </div>
-                <p className="mt-1 truncate text-caption text-content-muted">
-                  {link.remoteLabel || link.remoteRootPath || link.scopeKey}
-                </p>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={sync.busy === `sync-${link.id}`}
-                  onClick={() => void sync.syncNow(link.id)}
-                  className="flex items-center gap-1.5 rounded-lg border border-edge px-2.5 py-1.5 text-caption text-content hover:bg-surface-hover disabled:opacity-50"
-                >
-                  {sync.busy === `sync-${link.id}`
-                    ? <Loader2 size={13} className="animate-spin" />
-                    : <RefreshCw size={13} />}
-                  {t('docsync.syncNow')}
-                </button>
-                {isOwner && (
-                  <button
-                    type="button"
-                    onClick={() => void sync.removeLink(link.id)}
-                    className="rounded-lg border border-edge p-1.5 text-content-muted hover:bg-surface-hover"
-                    aria-label={t('docsync.unlink')}
-                  >
-                    <Trash2 size={13} />
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {link.lastSyncError && (
-              <p className="mt-2 flex items-center gap-1.5 text-caption text-danger">
-                <AlertTriangle size={13} />
-                {t(`docsync.error.${link.lastSyncError}`)}
-              </p>
-            )}
-
-            {isOwner && (
-              <div className="mt-3 grid gap-3 border-t border-edge pt-3 sm:grid-cols-2">
-                <label className="text-caption text-content-muted">
-                  {t('docsync.direction')}
-                  <select
-                    value={link.direction}
-                    onChange={e => void sync.updateLink(link.id, { direction: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-edge bg-surface px-2 py-1.5 text-body text-content"
-                  >
-                    <option value="both">{t('docsync.directionBoth')}</option>
-                    <option value="pull">{t('docsync.directionPull')}</option>
-                    <option value="push">{t('docsync.directionPush')}</option>
-                  </select>
-                </label>
-                <label className="text-caption text-content-muted">
-                  {t('docsync.deletePolicy')}
-                  <select
-                    value={link.deletePolicy}
-                    onChange={e => void sync.updateLink(link.id, { deletePolicy: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-edge bg-surface px-2 py-1.5 text-body text-content"
-                  >
-                    <option value="unlink">{t('docsync.deleteUnlink')}</option>
-                    <option value="trash">{t('docsync.deleteTrash')}</option>
-                  </select>
-                </label>
-                <div className="flex items-center justify-between sm:col-span-2">
-                  <span className="text-caption text-content-muted">{t('docsync.syncEnabled')}</span>
-                  <ToggleSwitch
-                    on={link.syncEnabled}
-                    onToggle={() => void sync.updateLink(link.id, { syncEnabled: !link.syncEnabled })}
-                  />
-                </div>
-                {/* Shown only where TREK could not subscribe itself: Papra's
-                    webhook API is closed to API keys and Nextcloud's needs admin
-                    rights, so the user pastes this in by hand. Polling carries
-                    the binding either way. */}
-                {link.webhookUrl && (
-                  <div className="sm:col-span-2">
-                    <p className="text-caption text-content-muted">{t('docsync.webhookHint')}</p>
-                    <code className="mt-1 block overflow-x-auto rounded-lg bg-surface-subtle px-2 py-1.5 text-caption text-content">
-                      {link.webhookUrl}
-                    </code>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )
-      })}
-
-      {Object.keys(sync.itemCounts).length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {Object.entries(sync.itemCounts).map(([state, n]) => (
-            <span key={state} className="rounded-full border border-edge px-2.5 py-1 text-caption text-content-muted">
-              {t(`docsync.state.${state}`)}: {n}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {isOwner && (
-        <div className="space-y-2">
-          <p className="text-caption font-medium text-content-muted">{t('docsync.addProvider')}</p>
-          {sync.providers.map(p => (
-            <ProviderRow
-              key={p.id}
-              provider={p}
-              tripId={tripId}
-              sync={sync}
-              open={openProvider === p.id}
-              onOpen={() => setOpenProvider(openProvider === p.id ? null : p.id)}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StateBadge({ state, t }: { state: string; t: (k: string) => string }) {
-  const tone =
-    state === 'ok' ? 'text-success'
-    : state === 'never' ? 'text-content-faint'
-    : state === 'partial' ? 'text-warning'
-    : 'text-danger'
-  return <span className={`text-caption ${tone}`}>{t(`docsync.linkState.${state}`)}</span>
-}
-
-/** One provider: credentials, a probe, then a folder to bind the trip to. */
-function ProviderRow({
-  provider, tripId, sync, open, onOpen,
+export default function DocSyncPanel({
+  tripId,
+  tripTitle,
+  isOwner,
+  onClose,
 }: {
-  provider: DocSyncProvider
   tripId: number | string
-  sync: ReturnType<typeof useDocSync>
-  open: boolean
-  onOpen: () => void
+  tripTitle?: string
+  isOwner: boolean
+  onClose: () => void
 }) {
   const { t } = useTranslation()
-  const existing = sync.connectionFor(provider.id)
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [insecure, setInsecure] = useState(existing?.allowInsecureTls ?? false)
-  const [verdict, setVerdict] = useState<{ connected: boolean; account?: string; error?: string } | null>(null)
-  const [scopes, setScopes] = useState<DocSyncScope[] | null>(null)
-  const [newScopeName, setNewScopeName] = useState('')
+  const sync = useDocSync(tripId, true)
+  const [selected, setSelected] = useState<number | null>(null)
+  const [connecting, setConnecting] = useState<DocSyncProvider | null>(null)
+  const [scopeFor, setScopeFor] = useState<string | null>(null)
 
-  const baseUrl = values.base_url ?? existing?.baseUrl ?? ''
-  const field = (key: string) => values[key] ?? existing?.settings?.[key] ?? ''
+  const bound = useMemo(() => new Set(sync.links.map(l => l.providerId)), [sync.links])
+  const available = sync.providers.filter(p => !bound.has(p.id))
+  const active = sync.links.find(l => l.id === selected) ?? sync.links[0] ?? null
 
-  const runTest = async () => {
-    const res = await sync.testConnection(provider.id, baseUrl, values, insecure)
-    setVerdict(res)
-  }
+  // Follow the list: a freshly bound store should be the one on screen, and a
+  // removed one must not leave the detail column pointing at nothing.
+  useEffect(() => {
+    if (sync.links.length === 0) setSelected(null)
+    else if (!sync.links.some(l => l.id === selected)) setSelected(sync.links[0].id)
+  }, [sync.links, selected])
 
-  const save = async () => {
-    const ok = await sync.saveConnection(provider.id, baseUrl, values, insecure)
-    if (ok) setVerdict({ connected: true })
-  }
-
-  const loadScopes = async () => {
-    const conn = sync.connectionFor(provider.id)
-    if (!conn) return
-    const res = await sync.loadScopes(conn.id)
-    setScopes(res.scopes)
-  }
-
-  const bind = async (scope: DocSyncScope) => {
-    const conn = sync.connectionFor(provider.id)
-    if (!conn) return
-    await sync.createLink({
-      connectionId: conn.id,
-      scopeKey: scope.scopeKey,
-      remoteRootId: scope.remoteRootId,
-      remoteRootPath: scope.remoteRootPath,
-      remoteLabel: scope.label,
-      direction: 'both',
-      deletePolicy: 'unlink',
-      conflictPolicy: 'manual',
-      syncEnabled: true,
-    })
-    setScopes(null)
-  }
+  const attention = ATTENTION_STATES.reduce((n, k) => n + (sync.itemCounts[k] ?? 0), 0)
 
   return (
-    <div className="rounded-xl border border-edge bg-surface">
-      <button type="button" onClick={onOpen} className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left">
-        <span className="flex items-center gap-2">
-          <Cloud size={15} className="text-content-muted" />
-          <span className="text-body text-content">{provider.name}</span>
-          {existing && <Check size={13} className="text-success" />}
-        </span>
-        <Plus size={15} className={`text-content-faint transition-transform ${open ? 'rotate-45' : ''}`} />
-      </button>
+    <>
+      <Modal
+        isOpen
+        onClose={onClose}
+        size="4xl"
+        title={
+          <span className="flex flex-col">
+            <span>{t('docsync.title')}</span>
+            {tripTitle && (
+              <span className="mt-0.5 truncate text-caption font-normal text-content-muted">{tripTitle}</span>
+            )}
+          </span>
+        }
+      >
+        {sync.loading ? (
+          <div className="grid place-items-center py-20">
+            <Loader2 size={22} className="animate-spin text-content-faint" />
+          </div>
+        ) : sync.providers.length === 0 ? (
+          <Empty />
+        ) : (
+          <div className="grid gap-5 md:grid-cols-[17rem_minmax(0,1fr)] md:gap-6">
+            <Sidebar
+              links={sync.links}
+              providers={sync.providers}
+              available={available}
+              activeId={active?.id ?? null}
+              isOwner={isOwner}
+              onSelect={setSelected}
+              onAdd={p => (sync.connectionFor(p.id) ? setScopeFor(p.id) : setConnecting(p))}
+            />
 
-      {open && (
-        <div className="space-y-3 border-t border-edge px-4 py-3">
-          {provider.fields.map(f => (
-            <label key={f.field_key} className="block text-caption text-content-muted">
-              {t(`docsync.${f.label}`)}{f.required && ' *'}
-              {f.input_type === 'checkbox' ? (
-                <div className="mt-1">
-                  <ToggleSwitch on={insecure} onToggle={() => setInsecure(!insecure)} />
+            <div className="min-w-0 md:border-l md:border-edge-faint md:pl-6">
+              {active ? (
+                <div className="space-y-5">
+                  <DocSyncBinding
+                    link={active}
+                    provider={sync.providers.find(p => p.id === active.providerId)}
+                    sync={sync}
+                    isOwner={isOwner}
+                  />
+                  {attention > 0 && <Attention counts={sync.itemCounts} />}
                 </div>
               ) : (
-                <input
-                  type={f.input_type === 'password' ? 'password' : 'text'}
-                  // A stored secret is never sent back, so the field stays empty
-                  // and an empty field means "keep what is stored".
-                  placeholder={f.secret && existing?.secrets?.[f.field_key] ? '••••••••' : f.placeholder || ''}
-                  value={f.secret ? (values[f.field_key] ?? '') : field(f.field_key)}
-                  onChange={e => setValues({ ...values, [f.field_key]: e.target.value })}
-                  className="mt-1 w-full rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-body text-content"
-                />
+                <NothingBound isOwner={isOwner} />
               )}
-              {f.hint && <span className="mt-0.5 block text-caption text-content-faint">{t(`docsync.${f.hint}`)}</span>}
-            </label>
-          ))}
-
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => void runTest()} disabled={sync.busy === 'test'}
-              className="rounded-lg border border-edge px-3 py-1.5 text-caption text-content hover:bg-surface-hover disabled:opacity-50">
-              {sync.busy === 'test' ? <Loader2 size={13} className="animate-spin" /> : t('docsync.test')}
-            </button>
-            <button type="button" onClick={() => void save()} disabled={sync.busy === 'save'}
-              className="rounded-lg bg-accent px-3 py-1.5 text-caption text-accent-contrast disabled:opacity-50">
-              {t('common.save')}
-            </button>
-            {existing && (
-              <button type="button" onClick={() => void loadScopes()}
-                className="rounded-lg border border-edge px-3 py-1.5 text-caption text-content hover:bg-surface-hover">
-                {t('docsync.chooseFolder')}
-              </button>
-            )}
-            {verdict && (
-              <span className={`text-caption ${verdict.connected ? 'text-success' : 'text-danger'}`}>
-                {verdict.connected
-                  ? t('docsync.connected') + (verdict.account ? ` (${verdict.account})` : '')
-                  : t(`docsync.error.${verdict.error || 'unknown'}`)}
-              </span>
-            )}
-          </div>
-
-          {scopes && (
-            <div className="space-y-2 rounded-lg border border-edge bg-surface-subtle p-3">
-              <p className="text-caption text-content-muted">{t('docsync.chooseFolderHint')}</p>
-              <div className="max-h-48 space-y-1 overflow-y-auto">
-                {scopes.map(s => (
-                  <button key={s.scopeKey} type="button" onClick={() => void bind(s)}
-                    className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-caption text-content hover:bg-surface-hover">
-                    {s.label}
-                    {s.remoteRootPath && <span className="ml-2 text-content-faint">{s.remoteRootPath}</span>}
-                  </button>
-                ))}
-                {scopes.length === 0 && <p className="text-caption text-content-faint">{t('docsync.noFolders')}</p>}
-              </div>
-              <div className="flex gap-2">
-                <input
-                  value={newScopeName}
-                  onChange={e => setNewScopeName(e.target.value)}
-                  placeholder={t('docsync.newFolderPlaceholder')}
-                  className="flex-1 rounded-lg border border-edge bg-surface px-2.5 py-1.5 text-caption text-content"
-                />
-                <button
-                  type="button"
-                  disabled={!newScopeName.trim() || sync.busy === 'scope'}
-                  onClick={async () => {
-                    const conn = sync.connectionFor(provider.id)
-                    if (!conn) return
-                    const created = await sync.createScope(conn.id, newScopeName.trim())
-                    setNewScopeName('')
-                    await bind(created)
-                  }}
-                  className="rounded-lg border border-edge px-3 py-1.5 text-caption text-content hover:bg-surface-hover disabled:opacity-50"
-                >
-                  {t('docsync.createFolder')}
-                </button>
-              </div>
             </div>
-          )}
+          </div>
+        )}
+      </Modal>
 
-          {sync.error && <p className="text-caption text-danger">{t(`docsync.error.${sync.error}`)}</p>}
+      {connecting && (
+        <DocSyncConnectModal
+          provider={connecting}
+          sync={sync}
+          onClose={() => setConnecting(null)}
+          onConnected={id => { setConnecting(null); setScopeFor(id) }}
+        />
+      )}
+
+      {scopeFor && sync.connectionFor(scopeFor) && (
+        <DocSyncScopeModal
+          connection={sync.connectionFor(scopeFor)!}
+          providerName={sync.providers.find(p => p.id === scopeFor)?.name ?? scopeFor}
+          suggestedName={slugFor(tripTitle, tripId)}
+          sync={sync}
+          onClose={() => setScopeFor(null)}
+          onBound={() => setScopeFor(null)}
+        />
+      )}
+    </>
+  )
+}
+
+const ATTENTION_STATES = ['conflict', 'remote_missing', 'rejected_type', 'too_large', 'error'] as const
+
+/** The stores: the ones this trip uses, then the ones it could. */
+function Sidebar({
+  links,
+  providers,
+  available,
+  activeId,
+  isOwner,
+  onSelect,
+  onAdd,
+}: {
+  links: DocSyncLink[]
+  providers: DocSyncProvider[]
+  available: DocSyncProvider[]
+  activeId: number | null
+  isOwner: boolean
+  onSelect: (id: number) => void
+  onAdd: (p: DocSyncProvider) => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <nav className="space-y-5">
+      {links.length > 0 && (
+        <div>
+          <h4 className="mb-2 px-1 text-caption font-medium text-content-muted">
+            {t('docsync.sidebar.connected')}
+          </h4>
+          <ul className="space-y-1.5">
+            {links.map(link => (
+              <li key={link.id}>
+                <StoreButton
+                  providerId={link.providerId}
+                  title={providers.find(p => p.id === link.providerId)?.name || link.providerId}
+                  subtitle={link.remoteLabel || link.remoteRootPath || link.scopeKey}
+                  state={link.lastSyncState}
+                  active={link.id === activeId}
+                  onClick={() => onSelect(link.id)}
+                />
+              </li>
+            ))}
+          </ul>
         </div>
       )}
+
+      {isOwner && available.length > 0 && (
+        <div>
+          <h4 className="mb-2 px-1 text-caption font-medium text-content-muted">
+            {links.length === 0 ? t('docsync.addProvider') : t('docsync.addAnother')}
+          </h4>
+          <ul className="space-y-1.5">
+            {available.map(p => (
+              <li key={p.id}>
+                <StoreButton
+                  providerId={p.id}
+                  title={p.name}
+                  subtitle={t(`docsync.model.${p.id}`)}
+                  onClick={() => onAdd(p)}
+                  addable
+                />
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </nav>
+  )
+}
+
+/**
+ * One row in the store list.
+ *
+ * The selected row is marked with the accent on a subtle fill rather than a
+ * heavy border, so a list of five does not turn into five competing boxes.
+ */
+function StoreButton({
+  providerId,
+  title,
+  subtitle,
+  state,
+  active,
+  addable,
+  onClick,
+}: {
+  providerId: string
+  title: string
+  subtitle: string
+  state?: string
+  active?: boolean
+  addable?: boolean
+  onClick: () => void
+}) {
+  const Icon = DOCUMENT_PROVIDER_ICONS[providerId]
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'true' : undefined}
+      className={[
+        'group flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors',
+        active
+          ? 'border-transparent bg-accent-subtle'
+          : 'border-edge bg-surface hover:bg-surface-hover',
+      ].join(' ')}
+    >
+      <span
+        className={[
+          'grid h-8 w-8 shrink-0 place-items-center rounded-lg',
+          active ? 'bg-surface' : 'bg-surface-secondary',
+        ].join(' ')}
+      >
+        {Icon ? <Icon className={`h-4 w-4 ${active ? 'text-accent-on' : 'text-content'}`} /> : null}
+      </span>
+
+      <span className="min-w-0 flex-1">
+        <span className={`block truncate text-body ${active ? 'font-medium text-accent-on' : 'text-content'}`}>
+          {title}
+        </span>
+        <span className="mt-0.5 block truncate text-caption text-content-muted">{subtitle}</span>
+      </span>
+
+      {addable ? (
+        <Plus size={14} className="shrink-0 text-content-faint transition-transform group-hover:scale-110" />
+      ) : state ? (
+        <StateBadge state={state} compact />
+      ) : null}
+    </button>
+  )
+}
+
+/** What a person still has to decide about, named rather than counted in a chip. */
+function Attention({ counts }: { counts: Record<string, number> }) {
+  const { t } = useTranslation()
+  const rows = ATTENTION_STATES.filter(k => (counts[k] ?? 0) > 0)
+  return (
+    <section className="rounded-xl border border-edge bg-surface">
+      <h4 className="flex items-center gap-2 border-b border-edge-faint px-4 py-2.5 text-body font-medium text-content">
+        <AlertCircle size={14} className="text-warning" />
+        {t('docsync.issues.title')}
+      </h4>
+      <ul className="divide-y divide-edge-faint">
+        {rows.map(k => (
+          <li key={k} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
+            <span className="min-w-0">
+              <span className="block text-body text-content">{t(`docsync.state.${k}`)}</span>
+              <span className="mt-0.5 block text-caption text-content-muted">{t(`docsync.issues.${k}`)}</span>
+            </span>
+            <span className="shrink-0 text-body font-medium tabular-nums text-content">{counts[k]}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+/** The detail column before anything is bound: an invitation, not a blank. */
+function NothingBound({ isOwner }: { isOwner: boolean }) {
+  const { t } = useTranslation()
+  return (
+    <div className="grid h-full min-h-[16rem] place-items-center rounded-xl border border-dashed border-edge px-6 py-12 text-center">
+      <div>
+        <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-edge bg-surface-secondary">
+          <ArrowRight size={18} className="text-content-faint" />
+        </span>
+        <p className="mt-3 text-body text-content">{t('docsync.empty.title')}</p>
+        <p className="mx-auto mt-1 max-w-xs text-caption text-content-muted">
+          {isOwner ? t('docsync.empty.hintOwner') : t('docsync.empty.hintMember')}
+        </p>
+      </div>
     </div>
   )
+}
+
+function Empty() {
+  const { t } = useTranslation()
+  return (
+    <div className="rounded-xl border border-dashed border-edge px-6 py-12 text-center">
+      <span className="mx-auto grid h-11 w-11 place-items-center rounded-xl border border-edge bg-surface-secondary">
+        <Check size={18} className="text-content-faint" />
+      </span>
+      <p className="mt-3 text-body text-content">{t('docsync.noProviders')}</p>
+      <p className="mx-auto mt-1 max-w-sm text-caption text-content-muted">{t('docsync.noProvidersHint')}</p>
+    </div>
+  )
+}
+
+/**
+ * A folder name from the trip's own title, so nobody has to invent one.
+ *
+ * The id is appended because two trips can share a title and a folder cannot.
+ */
+function slugFor(title: string | undefined, tripId: number | string): string {
+  const base = (title || 'trek')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+  return `${base || 'trek'}-${tripId}`
 }

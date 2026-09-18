@@ -2,27 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': '文档同步',
-  'docsync.subtitle': '让此行程的文档与你自己的文档存储保持一致。',
   'docsync.noProviders': '暂无可用的文档服务',
   'docsync.noProvidersHint': '实例管理员可在“管理 → 插件 → 文档”中启用。',
   'docsync.addProvider': '连接文档服务',
   'docsync.test': '测试连接',
+  'docsync.connect.optional': '可选',
   'docsync.connected': '已连接',
   'docsync.chooseFolder': '选择文件夹',
-  'docsync.chooseFolderHint': '选择属于此行程的文件夹、标签或空间。只有其中的文档会被同步。',
   'docsync.noFolders': '此实例上暂未找到任何内容。',
   'docsync.newFolderPlaceholder': '新文件夹名称',
-  'docsync.createFolder': '创建',
   'docsync.syncNow': '立即同步',
   'docsync.unlink': '断开连接',
+  'docsync.confirmUnlink': '文档会保留在 TREK 和文档服务中，消失的只是两者之间的配对。',
   'docsync.syncEnabled': '自动同步',
-  'docsync.direction': '方向',
-  'docsync.directionBoth': '双向',
-  'docsync.directionPull': '仅同步到 TREK',
-  'docsync.directionPush': '仅同步到文档服务',
   'docsync.deletePolicy': '当文档被删除时',
-  'docsync.deleteUnlink': '保留两份副本，只解除配对',
-  'docsync.deleteTrash': '把另一份副本移入其回收站',
+  'docsync.deleteUnlink': '两份副本都保留',
+  'docsync.deleteTrash': '移入回收站',
   'docsync.webhookHint': '把此 URL 粘贴到你的文档服务中，变更就会立即送达。不设置时，TREK 会定时检查。',
 
   // 连接表单的字段。这些键与 document_provider_fields 表的 `label` 列一一对应，
@@ -92,6 +87,76 @@ const docsync: TranslationStrings = {
   'docsync.error.ssrf_blocked': '不允许使用该地址。',
   'docsync.error.mass_delete_guard': '大量文档同时消失，因此未做任何改动。请检查该文件夹是否仍处于挂载状态。',
   'docsync.error.unknown': '出了点问题。',
+
+  // ── 对话框 ────────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': '本次行程',
+  'docsync.addAnother': '再添加一个',
+  'docsync.syncing': '同步中',
+  'docsync.card.pickFolder': '已连接，请选择文件夹',
+
+  'docsync.empty.title': '尚未连接任何服务',
+  'docsync.empty.hintOwner': '在左侧挑一个文档服务。TREK 自己也留有一份副本，所以即使它不在了也不会丢东西。',
+  'docsync.empty.hintMember': '这由行程所有者来设置。无论如何，文档都会保留在 TREK 中。',
+
+  // 每个产品各自的归档方式。在连接之前就显示出来，因为下一屏问的正是这些。
+  'docsync.model.paperless': '按标签归档',
+  'docsync.model.papra': '在组织内按标签归档',
+  'docsync.model.nextcloud': '归档到文件夹',
+  'docsync.model.opencloud': '归档到空间',
+  'docsync.model.synologydrive': '归档到 NAS 上的文件夹',
+
+  // ── 流向条 ────────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': '发往文档服务',
+  'docsync.flow.toTrek': '来自文档服务',
+  'docsync.flow.documents': '文档',
+  'docsync.flow.summary.both': '文档双向同步。',
+  'docsync.flow.summary.pull': '文档只进不出。',
+  'docsync.flow.summary.push': '文档只出不进。',
+  'docsync.flow.summaryEditable.both': '正在双向同步。点按某一向即可停用。',
+  'docsync.flow.summaryEditable.pull': '只接收。点按另一向也可发送。',
+  'docsync.flow.summaryEditable.push': '只发送。点按另一向也可接收。',
+
+  // ── 单个配对 ──────────────────────────────────────────────────────────────
+  'docsync.binding.settings': '设置',
+  'docsync.binding.folder': '文件夹',
+  'docsync.binding.lastRun': '上次运行',
+  'docsync.binding.autoOff': '已暂停',
+  'docsync.binding.neverRun': '尚未运行',
+  'docsync.binding.deleteHint': '另一侧的副本会怎样。',
+  'docsync.binding.autoHint': '在后台检查变更。',
+  'docsync.binding.webhookTitle': '即时更新',
+  'docsync.binding.copy': '复制',
+  'docsync.binding.copied': '已复制',
+
+  // ── 连接 ──────────────────────────────────────────────────────────────────
+  'docsync.connect.submit': '连接',
+  'docsync.connect.testing': '正在尝试连接',
+  'docsync.connect.okAs': '已连接，登录身份为 {account}',
+  'docsync.connect.insecureHint': '适用于自有网络中使用自签名证书的实例。',
+  'docsync.connect.about.paperless': 'TREK 会用专属标签归档此行程，绝不碰你归档库里的其他内容。',
+  'docsync.connect.about.papra': '选择此行程所属的组织。TREK 会在其中用专属标签归档。',
+  'docsync.connect.about.nextcloud': '请使用应用密码，而不是账户密码：它不受两步验证影响，也可以单独吊销。',
+  'docsync.connect.about.opencloud': 'TREK 会为此行程单独获得一个空间，与其他内容互不相干。',
+  'docsync.connect.about.synologydrive': '最好使用只能访问此行程所用共享文件夹的 DSM 账户。',
+
+  // ── 选择存放位置 ──────────────────────────────────────────────────────────
+  'docsync.scope.title': '此行程应存放在 {provider} 的什么位置？',
+  'docsync.scope.intro': '只有这里的内容会被同步。文档服务中的其他内容都不会进入 TREK。',
+  'docsync.scope.createTitle': '新建一个',
+  'docsync.scope.createAction': '创建',
+  'docsync.scope.pickTitle': '或使用已有的',
+  'docsync.scope.search': '搜索',
+  'docsync.scope.noMatch': '没有匹配的内容。',
+
+  // ── 需要人来决定的事 ──────────────────────────────────────────────────────
+  'docsync.issues.title': '需要查看',
+  'docsync.issues.conflict': '两边都有改动。请选择保留哪一份。',
+  'docsync.issues.remote_missing': '已从文档服务中消失。TREK 中的副本仍在。',
+  'docsync.issues.rejected_type': '这里不允许此文件类型。',
+  'docsync.issues.too_large': '超出大小上限。',
+  'docsync.issues.error': '传输未能完成。',
+
   'docsync.error.unknown_provider': '此实例不提供该文档服务。',
 };
 

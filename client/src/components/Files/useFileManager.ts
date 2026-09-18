@@ -7,6 +7,7 @@ import type { Place, Reservation, TripFile, Day, AssignmentsMap } from '../../ty
 import { useCanDo } from '../../store/permissionsStore'
 import { useTripStore } from '../../store/tripStore'
 import { useAuthStore } from '../../store/authStore'
+import { canManageDocSync } from './docsync/useDocSync'
 import { getAuthUrl } from '../../api/authUrl'
 import { isImage, isMedia, isWalletPass } from './FileManager.helpers'
 import { openFile as openFileInTab } from '../../utils/fileDownload'
@@ -41,16 +42,7 @@ export function useFileManager({ files = [], onUpload, onDelete, onUpdate, place
   const can = useCanDo()
   const trip = useTripStore((s) => s.trip)
   const currentUser = useAuthStore((s) => s.user)
-  /**
-   * Only the trip owner may change a sync binding: the credential it stores
-   * usually reaches that person's entire document archive, so letting any
-   * member repoint it would share a folder the owner never chose to share.
-   * Instance admins are included because they already override every other
-   * permission check in the client.
-   */
-  const isTripOwner = !!currentUser && (
-    currentUser.role === 'admin' || Number(trip?.user_id) === Number(currentUser.id)
-  )
+  const isTripOwner = canManageDocSync(currentUser, trip)
   const { t, locale } = useTranslation()
 
   const loadTrash = useCallback(async () => {

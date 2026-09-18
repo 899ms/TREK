@@ -115,6 +115,7 @@ const nextcloud = fakeProvider('nextcloud');
 
 const sync = {
   syncLink: vi.fn(async (_link: LinkRow, _opts?: { full?: boolean }) => ({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 })),
+  retryShelvedItems: vi.fn((_linkId: number) => {}),
   status: vi.fn(() => ({ links: [], items: {} })),
   resolveConflict: vi.fn(async () => true),
 };
@@ -663,5 +664,30 @@ describe('the callback origin a provider is given', () => {
     await linkedTrip();
     const [link] = controller.listLinks(String(tripId), makeReq()) as Array<{ webhookUrl: string | null }>;
     expect(link.webhookUrl).toBeNull();
+  });
+});
+
+/**
+ * A manual run is also a request to try the given-up rows once more.
+ *
+ * The scheduler must never do this: the attempt limit exists precisely so a
+ * document a provider refuses is not re-uploaded on every tick. A person
+ * pressing the button is the signal that something changed.
+ */
+describe('a manual run and the shelved rows', () => {
+  it('clears the attempt counters of the link it runs', async () => {
+    const conn = await storedPaperless();
+    const created = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq())) as { id: number };
+    sync.retryShelvedItems.mockClear();
+
+    await controller.syncNow(String(tripId), String(created.id), { full: false });
+
+    expect(sync.retryShelvedItems).toHaveBeenCalledWith(created.id);
+  });
+
+  it('does not clear them for a link the caller does not own', async () => {
+    sync.retryShelvedItems.mockClear();
+    await expect(controller.syncNow(String(tripId), '999999', { full: false })).rejects.toThrow();
+    expect(sync.retryShelvedItems).not.toHaveBeenCalled();
   });
 });

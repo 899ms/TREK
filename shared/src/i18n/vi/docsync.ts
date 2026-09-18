@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Đồng bộ tài liệu',
-  'docsync.subtitle': 'Giữ tài liệu của chuyến đi này khớp với kho tài liệu của riêng bạn.',
   'docsync.noProviders': 'Không có nhà cung cấp tài liệu nào khả dụng',
   'docsync.noProvidersHint': 'Quản trị viên hệ thống bật chúng trong Quản trị → Tiện ích bổ sung → Tài liệu.',
   'docsync.addProvider': 'Kết nối nhà cung cấp',
   'docsync.test': 'Kiểm tra kết nối',
+  'docsync.connect.optional': 'Tùy chọn',
   'docsync.connected': 'Đã kết nối',
   'docsync.chooseFolder': 'Chọn thư mục',
-  'docsync.chooseFolderHint':
-    'Chọn thư mục, thẻ hoặc không gian thuộc về chuyến đi này. Chỉ tài liệu bên trong mới được đồng bộ.',
   'docsync.noFolders': 'Chưa tìm thấy gì trên máy chủ này.',
   'docsync.newFolderPlaceholder': 'Tên thư mục mới',
-  'docsync.createFolder': 'Tạo',
   'docsync.syncNow': 'Đồng bộ ngay',
   'docsync.unlink': 'Ngắt kết nối',
+  'docsync.confirmUnlink': 'Tài liệu vẫn ở lại trong TREK và trong kho. Chỉ có liên kết giữa chúng bị gỡ.',
   'docsync.syncEnabled': 'Tự động đồng bộ',
-  'docsync.direction': 'Hướng',
-  'docsync.directionBoth': 'Cả hai chiều',
-  'docsync.directionPull': 'Chỉ vào TREK',
-  'docsync.directionPush': 'Chỉ ra nhà cung cấp',
   'docsync.deletePolicy': 'Khi một tài liệu bị xóa',
-  'docsync.deleteUnlink': 'Giữ cả hai bản, bỏ ghép cặp',
-  'docsync.deleteTrash': 'Chuyển bản còn lại vào thùng rác của nó',
+  'docsync.deleteUnlink': 'Giữ cả hai bản',
+  'docsync.deleteTrash': 'Chuyển vào thùng rác',
   'docsync.webhookHint':
     'Dán URL này vào nhà cung cấp của bạn để thay đổi đến ngay lập tức. Nếu không, TREK sẽ kiểm tra theo định kỳ.',
 
@@ -97,6 +91,82 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Phần lớn tài liệu biến mất cùng lúc, nên không có gì được thay đổi. Hãy kiểm tra xem thư mục còn được gắn kết không.',
   'docsync.error.unknown': 'Đã xảy ra lỗi.',
+
+  // ── Hộp thoại ──────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Chuyến đi này',
+  'docsync.addAnother': 'Thêm nữa',
+  'docsync.syncing': 'Đang đồng bộ',
+  'docsync.card.pickFolder': 'Đã kết nối, hãy chọn thư mục',
+
+  'docsync.empty.title': 'Chưa kết nối gì',
+  'docsync.empty.hintOwner':
+    'Hãy chọn một kho ở bên trái. TREK luôn giữ bản sao của riêng mình, nên không mất gì nếu kho đó biến mất.',
+  'docsync.empty.hintMember': 'Chủ chuyến đi là người thiết lập việc này. Dù sao thì tài liệu vẫn ở lại trong TREK.',
+
+  // Cách mỗi sản phẩm sắp xếp tài liệu. Hiển thị trước khi ai đó kết nối, vì đó
+  // chính là thứ màn hình kế tiếp sẽ hỏi.
+  'docsync.model.paperless': 'Lưu theo thẻ',
+  'docsync.model.papra': 'Lưu theo thẻ, bên trong một tổ chức',
+  'docsync.model.nextcloud': 'Lưu theo thư mục',
+  'docsync.model.opencloud': 'Lưu theo không gian',
+  'docsync.model.synologydrive': 'Lưu theo thư mục trên NAS',
+
+  // ── Thanh luồng ────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Gửi ra kho',
+  'docsync.flow.toTrek': 'Nhận từ kho',
+  'docsync.flow.documents': 'tài liệu',
+  'docsync.flow.summary.both': 'Tài liệu đi cả hai chiều.',
+  'docsync.flow.summary.pull': 'Tài liệu chỉ đi vào.',
+  'docsync.flow.summary.push': 'Tài liệu chỉ đi ra.',
+  'docsync.flow.summaryEditable.both': 'Đang đi cả hai chiều. Chạm một làn để dừng làn đó.',
+  'docsync.flow.summaryEditable.pull': 'Chỉ đi vào. Chạm làn kia để gửi ra nữa.',
+  'docsync.flow.summaryEditable.push': 'Chỉ đi ra. Chạm làn kia để nhận vào nữa.',
+
+  // ── Một liên kết ───────────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Cài đặt',
+  'docsync.binding.folder': 'Thư mục',
+  'docsync.binding.lastRun': 'Lần chạy cuối',
+  'docsync.binding.autoOff': 'Đã tạm dừng',
+  'docsync.binding.neverRun': 'chưa chạy lần nào',
+  'docsync.binding.deleteHint': 'Điều sẽ xảy ra với bản sao ở phía bên kia.',
+  'docsync.binding.autoHint': 'Kiểm tra thay đổi ở chế độ nền.',
+  'docsync.binding.webhookTitle': 'Cập nhật tức thì',
+  'docsync.binding.copy': 'Sao chép',
+  'docsync.binding.copied': 'Đã sao chép',
+
+  // ── Kết nối ────────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Kết nối',
+  'docsync.connect.testing': 'Đang thử kết nối',
+  'docsync.connect.okAs': 'Đã kết nối, đăng nhập với tư cách {account}',
+  'docsync.connect.insecureHint': 'Dành cho máy chủ trong mạng nội bộ của bạn dùng chứng chỉ tự ký.',
+  'docsync.connect.about.paperless':
+    'TREK lưu chuyến đi này dưới thẻ riêng của nó và không đụng tới phần còn lại trong kho của bạn.',
+  'docsync.connect.about.papra':
+    'Hãy chọn tổ chức mà chuyến đi này thuộc về. TREK sẽ lưu nó dưới thẻ riêng bên trong tổ chức đó.',
+  'docsync.connect.about.nextcloud':
+    'Hãy dùng mật khẩu ứng dụng, đừng dùng mật khẩu tài khoản: nó vẫn chạy được với xác thực hai yếu tố và bạn có thể thu hồi riêng.',
+  'docsync.connect.about.opencloud': 'TREK có không gian riêng cho chuyến đi này, tách khỏi mọi thứ khác.',
+  'docsync.connect.about.synologydrive':
+    'Tốt nhất là một tài khoản DSM chỉ truy cập được thư mục chia sẻ dành cho chuyến đi này.',
+
+  // ── Chọn nơi chứa ──────────────────────────────────────────────────────────
+  'docsync.scope.title': 'Chuyến đi này nên nằm ở đâu trong {provider}?',
+  'docsync.scope.intro': 'Chỉ những gì nằm trong đây mới được đồng bộ. Mọi thứ khác trong kho của bạn không vào TREK.',
+  'docsync.scope.createTitle': 'Tạo mục mới',
+  'docsync.scope.createAction': 'Tạo',
+  'docsync.scope.pickTitle': 'Hoặc dùng mục bạn đã có',
+  'docsync.scope.search': 'Tìm kiếm',
+  'docsync.scope.noMatch': 'Không có gì khớp.',
+
+  // ── Những việc cần người quyết định ────────────────────────────────────────
+  'docsync.issues.title': 'Cần xem lại',
+  'docsync.issues.conflict': 'Đã thay đổi ở cả hai nơi. Hãy chọn bản muốn giữ.',
+  'docsync.issues.remote_missing': 'Không còn trong kho. Bản trong TREK vẫn còn.',
+  'docsync.issues.rejected_type': 'Loại tệp này không được phép ở đây.',
+  'docsync.issues.too_large': 'Lớn hơn giới hạn cho phép.',
+  'docsync.issues.error': 'Việc truyền tệp không thành công.',
+
   'docsync.error.unknown_provider': 'Nhà cung cấp này không khả dụng trên máy chủ này.',
 };
 

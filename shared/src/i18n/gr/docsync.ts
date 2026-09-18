@@ -2,28 +2,23 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'Συγχρονισμός εγγράφων',
-  'docsync.subtitle': 'Κρατήστε τα έγγραφα αυτού του ταξιδιού στην ίδια κατάσταση με τον δικό σας χώρο εγγράφων.',
   'docsync.noProviders': 'Δεν υπάρχουν διαθέσιμοι πάροχοι εγγράφων',
   'docsync.noProvidersHint': 'Τους ενεργοποιεί ένας διαχειριστής της εγκατάστασης στο Διαχείριση → Πρόσθετα → Έγγραφα.',
   'docsync.addProvider': 'Σύνδεση παρόχου',
   'docsync.test': 'Δοκιμή σύνδεσης',
+  'docsync.connect.optional': 'Προαιρετικό',
   'docsync.connected': 'Συνδεδεμένο',
   'docsync.chooseFolder': 'Επιλογή φακέλου',
-  'docsync.chooseFolderHint':
-    'Επιλέξτε τον φάκελο, την ετικέτα ή τον χώρο που ανήκει σε αυτό το ταξίδι. Συγχρονίζονται μόνο τα έγγραφα που βρίσκονται εκεί.',
   'docsync.noFolders': 'Δεν βρέθηκε ακόμη τίποτα σε αυτή την εγκατάσταση.',
   'docsync.newFolderPlaceholder': 'Όνομα νέου φακέλου',
-  'docsync.createFolder': 'Δημιουργία',
   'docsync.syncNow': 'Συγχρονισμός τώρα',
   'docsync.unlink': 'Αποσύνδεση',
+  'docsync.confirmUnlink':
+    'Τα έγγραφα παραμένουν στο TREK και στον χώρο αποθήκευσης. Καταργείται μόνο η αντιστοίχισή τους.',
   'docsync.syncEnabled': 'Αυτόματος συγχρονισμός',
-  'docsync.direction': 'Κατεύθυνση',
-  'docsync.directionBoth': 'Και προς τις δύο κατευθύνσεις',
-  'docsync.directionPull': 'Μόνο προς το TREK',
-  'docsync.directionPush': 'Μόνο προς τον πάροχο',
   'docsync.deletePolicy': 'Όταν διαγράφεται ένα έγγραφο',
-  'docsync.deleteUnlink': 'Διατήρηση και των δύο αντιγράφων, κατάργηση της αντιστοίχισης',
-  'docsync.deleteTrash': 'Μετακίνηση του άλλου αντιγράφου στον κάδο του',
+  'docsync.deleteUnlink': 'Διατήρηση και των δύο αντιγράφων',
+  'docsync.deleteTrash': 'Μετακίνηση στον κάδο ανακύκλωσης',
   'docsync.webhookHint':
     'Επικολλήστε αυτό το URL στον πάροχό σας ώστε οι αλλαγές να φτάνουν αμέσως. Χωρίς αυτό, το TREK ελέγχει ανά τακτά διαστήματα.',
 
@@ -101,6 +96,83 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     'Τα περισσότερα έγγραφα εξαφανίστηκαν μονομιάς, οπότε δεν άλλαξε τίποτα. Ελέγξτε ότι ο φάκελος είναι ακόμη προσαρτημένος.',
   'docsync.error.unknown': 'Κάτι πήγε στραβά.',
+
+  // ── Ο διάλογος ─────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'Αυτό το ταξίδι',
+  'docsync.addAnother': 'Προσθήκη ακόμη ενός',
+  'docsync.syncing': 'Συγχρονίζεται',
+  'docsync.card.pickFolder': 'Συνδέθηκε, επιλέξτε φάκελο',
+
+  'docsync.empty.title': 'Δεν έχει συνδεθεί ακόμη τίποτα',
+  'docsync.empty.hintOwner':
+    'Επιλέξτε έναν χώρο αποθήκευσης στα αριστερά. Το TREK κρατά δικό του αντίγραφο για όλα, οπότε δεν χάνεται τίποτα αν εκείνος πάψει να υπάρχει.',
+  'docsync.empty.hintMember': 'Αυτό το ρυθμίζει ο κάτοχος του ταξιδιού. Τα έγγραφα παραμένουν έτσι κι αλλιώς στο TREK.',
+
+  // Πώς αρχειοθετεί το καθένα. Εμφανίζεται πριν συνδεθεί κανείς, γιατί είναι
+  // αυτό που θα ζητήσει η επόμενη οθόνη.
+  'docsync.model.paperless': 'Αρχειοθέτηση με ετικέτα',
+  'docsync.model.papra': 'Αρχειοθέτηση με ετικέτα, μέσα σε έναν οργανισμό',
+  'docsync.model.nextcloud': 'Αρχειοθέτηση σε φάκελο',
+  'docsync.model.opencloud': 'Αρχειοθέτηση σε χώρο',
+  'docsync.model.synologydrive': 'Αρχειοθέτηση σε φάκελο στο NAS',
+
+  // ── Η μπάρα ροής ───────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': 'Προς τον χώρο',
+  'docsync.flow.toTrek': 'Από τον χώρο',
+  'docsync.flow.documents': 'έγγραφα',
+  'docsync.flow.summary.both': 'Τα έγγραφα κινούνται και προς τις δύο πλευρές.',
+  'docsync.flow.summary.pull': 'Τα έγγραφα μόνο έρχονται.',
+  'docsync.flow.summary.push': 'Τα έγγραφα μόνο φεύγουν.',
+  'docsync.flow.summaryEditable.both': 'Κινούνται και προς τις δύο πλευρές. Πατήστε μια λωρίδα για να τη σταματήσετε.',
+  'docsync.flow.summaryEditable.pull': 'Μόνο έρχονται. Πατήστε την άλλη λωρίδα για να φεύγουν κιόλας.',
+  'docsync.flow.summaryEditable.push': 'Μόνο φεύγουν. Πατήστε την άλλη λωρίδα για να έρχονται κιόλας.',
+
+  // ── Μία αντιστοίχιση ───────────────────────────────────────────────────────
+  'docsync.binding.settings': 'Ρυθμίσεις',
+  'docsync.binding.folder': 'Φάκελος',
+  'docsync.binding.lastRun': 'Τελευταία εκτέλεση',
+  'docsync.binding.autoOff': 'Σε παύση',
+  'docsync.binding.neverRun': 'δεν έχει εκτελεστεί ακόμη',
+  'docsync.binding.deleteHint': 'Τι γίνεται με το αντίγραφο στην άλλη πλευρά.',
+  'docsync.binding.autoHint': 'Έλεγχος για αλλαγές στο παρασκήνιο.',
+  'docsync.binding.webhookTitle': 'Άμεσες ενημερώσεις',
+  'docsync.binding.copy': 'Αντιγραφή',
+  'docsync.binding.copied': 'Αντιγράφηκε',
+
+  // ── Η σύνδεση ──────────────────────────────────────────────────────────────
+  'docsync.connect.submit': 'Σύνδεση',
+  'docsync.connect.testing': 'Γίνεται προσπάθεια επικοινωνίας',
+  'docsync.connect.okAs': 'Επιτεύχθηκε επικοινωνία, σύνδεση ως {account}',
+  'docsync.connect.insecureHint': 'Για εγκατάσταση στο δικό σας δίκτυο με αυτο-υπογεγραμμένο πιστοποιητικό.',
+  'docsync.connect.about.paperless':
+    'Το TREK αρχειοθετεί αυτό το ταξίδι με δική του ετικέτα και δεν αγγίζει το υπόλοιπο αρχείο σας.',
+  'docsync.connect.about.papra':
+    'Επιλέξτε τον οργανισμό στον οποίο ανήκει αυτό το ταξίδι. Το TREK το αρχειοθετεί εκεί με δική του ετικέτα.',
+  'docsync.connect.about.nextcloud':
+    'Χρησιμοποιήστε κωδικό εφαρμογής, όχι τον κωδικό του λογαριασμού σας: αντέχει την ταυτοποίηση δύο παραγόντων και μπορείτε να τον ανακαλέσετε ξεχωριστά.',
+  'docsync.connect.about.opencloud': 'Το TREK αποκτά δικό του χώρο για αυτό το ταξίδι, ξεχωριστό από όλα τα άλλα.',
+  'docsync.connect.about.synologydrive':
+    'Καλύτερα ένας λογαριασμός DSM που φτάνει μόνο στον κοινόχρηστο φάκελο που θα χρησιμοποιεί αυτό το ταξίδι.',
+
+  // ── Η επιλογή του φακέλου ──────────────────────────────────────────────────
+  'docsync.scope.title': 'Πού θα βρίσκεται αυτό το ταξίδι στο {provider};',
+  'docsync.scope.intro':
+    'Συγχρονίζεται μόνο ό,τι βρίσκεται εδώ. Όλα τα υπόλοιπα στον χώρο αποθήκευσής σας μένουν έξω από το TREK.',
+  'docsync.scope.createTitle': 'Δημιουργία νέου',
+  'docsync.scope.createAction': 'Δημιουργία',
+  'docsync.scope.pickTitle': 'Ή χρησιμοποιήστε κάποιο που ήδη έχετε',
+  'docsync.scope.search': 'Αναζήτηση',
+  'docsync.scope.noMatch': 'Δεν ταιριάζει τίποτα με αυτό.',
+
+  // ── Όσα πρέπει να αποφασίσει κάποιος ───────────────────────────────────────
+  'docsync.issues.title': 'Χρειάζεται έλεγχο',
+  'docsync.issues.conflict': 'Άλλαξε και στις δύο πλευρές. Επιλέξτε ποιο θα κρατήσετε.',
+  'docsync.issues.remote_missing': 'Χάθηκε από τον χώρο αποθήκευσης. Το αντίγραφο του TREK είναι ακόμη εδώ.',
+  'docsync.issues.rejected_type': 'Αυτός ο τύπος αρχείου δεν επιτρέπεται εδώ.',
+  'docsync.issues.too_large': 'Μεγαλύτερο από το όριο.',
+  'docsync.issues.error': 'Η μεταφορά δεν ολοκληρώθηκε.',
+
   'docsync.error.unknown_provider': 'Αυτός ο πάροχος δεν είναι διαθέσιμος σε αυτή την εγκατάσταση.',
 };
 

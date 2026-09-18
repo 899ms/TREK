@@ -2,28 +2,22 @@ import type { TranslationStrings } from '../types';
 
 const docsync: TranslationStrings = {
   'docsync.title': 'ドキュメント同期',
-  'docsync.subtitle': 'この旅行のドキュメントを、自分のドキュメント保管先と同じ状態に保ちます。',
   'docsync.noProviders': '利用できる連携先がありません',
   'docsync.noProvidersHint': 'インスタンスの管理者が「管理 → アドオン → ドキュメント」で有効にします。',
   'docsync.addProvider': '連携先を接続',
   'docsync.test': '接続をテスト',
+  'docsync.connect.optional': '任意',
   'docsync.connected': '接続済み',
   'docsync.chooseFolder': 'フォルダーを選択',
-  'docsync.chooseFolderHint':
-    'この旅行に対応するフォルダー、タグ、スペースを選びます。その中のドキュメントだけが同期されます。',
   'docsync.noFolders': 'このインスタンスにはまだ何もありません。',
   'docsync.newFolderPlaceholder': '新しいフォルダー名',
-  'docsync.createFolder': '作成',
   'docsync.syncNow': '今すぐ同期',
   'docsync.unlink': '接続解除',
+  'docsync.confirmUnlink': 'ドキュメントは TREK にも保管先にも残ります。なくなるのは両者の対応付けだけです。',
   'docsync.syncEnabled': '自動で同期',
-  'docsync.direction': '方向',
-  'docsync.directionBoth': '双方向',
-  'docsync.directionPull': 'TREK に取り込むだけ',
-  'docsync.directionPush': '連携先へ送るだけ',
   'docsync.deletePolicy': 'ドキュメントが削除されたとき',
-  'docsync.deleteUnlink': '両方のコピーを残し、対応付けだけを解除する',
-  'docsync.deleteTrash': 'もう一方のコピーをゴミ箱へ移動する',
+  'docsync.deleteUnlink': '両方のコピーを残す',
+  'docsync.deleteTrash': 'ゴミ箱へ移動する',
   'docsync.webhookHint':
     'この URL を連携先に貼り付けると、変更がすぐに届きます。設定しない場合、TREK は一定間隔で確認します。',
 
@@ -97,6 +91,79 @@ const docsync: TranslationStrings = {
   'docsync.error.mass_delete_guard':
     '多数のドキュメントが一度に消えたため、何も変更しませんでした。フォルダーがまだマウントされているか確認してください。',
   'docsync.error.unknown': '問題が発生しました。',
+
+  // ── ダイアログ ─────────────────────────────────────────────────────────────
+  'docsync.sidebar.connected': 'この旅行',
+  'docsync.addAnother': '別の連携先を追加',
+  'docsync.syncing': '同期中',
+  'docsync.card.pickFolder': '接続済み。フォルダーを選んでください',
+
+  'docsync.empty.title': 'まだ何も接続されていません',
+  'docsync.empty.hintOwner':
+    '左から保管先を選んでください。TREK はすべてのコピーを自分で持つので、保管先がなくなっても失われるものはありません。',
+  'docsync.empty.hintMember': 'この設定は旅行の所有者が行います。どちらにしてもドキュメントは TREK に残ります。',
+
+  // それぞれの製品が何を単位に整理するか。接続する前に表示します。次の画面で
+  // 聞かれるのがまさにこれだからです。
+  'docsync.model.paperless': 'タグで整理',
+  'docsync.model.papra': '組織の中でタグごとに整理',
+  'docsync.model.nextcloud': 'フォルダーで整理',
+  'docsync.model.opencloud': 'スペースで整理',
+  'docsync.model.synologydrive': 'NAS 上のフォルダーで整理',
+
+  // ── フローバー ─────────────────────────────────────────────────────────────
+  'docsync.flow.trek': 'TREK',
+  'docsync.flow.toProvider': '保管先へ',
+  'docsync.flow.toTrek': '保管先から',
+  'docsync.flow.documents': 'ドキュメント',
+  'docsync.flow.summary.both': 'ドキュメントは双方向に流れます。',
+  'docsync.flow.summary.pull': 'ドキュメントは取り込むだけです。',
+  'docsync.flow.summary.push': 'ドキュメントは送り出すだけです。',
+  'docsync.flow.summaryEditable.both': '双方向に流れています。レーンをタップすると止まります。',
+  'docsync.flow.summaryEditable.pull': '取り込むだけです。もう一方のレーンをタップすると送信も行います。',
+  'docsync.flow.summaryEditable.push': '送り出すだけです。もう一方のレーンをタップすると取り込みも行います。',
+
+  // ── ひとつの対応付け ───────────────────────────────────────────────────────
+  'docsync.binding.settings': '設定',
+  'docsync.binding.folder': 'フォルダー',
+  'docsync.binding.lastRun': '最終実行',
+  'docsync.binding.autoOff': '一時停止中',
+  'docsync.binding.neverRun': '未実行',
+  'docsync.binding.deleteHint': 'もう一方に残るコピーをどう扱うかです。',
+  'docsync.binding.autoHint': 'バックグラウンドで変更を確認します。',
+  'docsync.binding.webhookTitle': '即時更新',
+  'docsync.binding.copy': 'コピー',
+  'docsync.binding.copied': 'コピーしました',
+
+  // ── 接続 ───────────────────────────────────────────────────────────────────
+  'docsync.connect.submit': '接続',
+  'docsync.connect.testing': '接続を確認しています',
+  'docsync.connect.okAs': '接続できました。{account} としてサインインしています',
+  'docsync.connect.insecureHint': '自己署名証明書を使う、自分のネットワーク上のインスタンス向けです。',
+  'docsync.connect.about.paperless': 'TREK はこの旅行を専用のタグで管理し、アーカイブのほかの部分には触れません。',
+  'docsync.connect.about.papra': 'この旅行が属する組織を選びます。TREK はその中に専用のタグを作って管理します。',
+  'docsync.connect.about.nextcloud':
+    'アカウントのパスワードではなくアプリパスワードを使ってください。二段階認証があっても使えて、単独で失効できます。',
+  'docsync.connect.about.opencloud': 'TREK はこの旅行のために専用のスペースを持ち、ほかとは分けて扱います。',
+  'docsync.connect.about.synologydrive': 'この旅行で使う共有フォルダーだけにアクセスできる DSM アカウントが最適です。',
+
+  // ── 置き場所を選ぶ ─────────────────────────────────────────────────────────
+  'docsync.scope.title': 'この旅行を {provider} のどこに置きますか？',
+  'docsync.scope.intro': 'ここに入っているものだけが同期されます。保管先のほかのものは TREK に入りません。',
+  'docsync.scope.createTitle': '新しく作る',
+  'docsync.scope.createAction': '作成',
+  'docsync.scope.pickTitle': 'または既にあるものを使う',
+  'docsync.scope.search': '検索',
+  'docsync.scope.noMatch': '一致するものがありません。',
+
+  // ── 人が判断する必要があるもの ─────────────────────────────────────────────
+  'docsync.issues.title': '確認が必要',
+  'docsync.issues.conflict': '両方で変更されました。どちらを残すか選んでください。',
+  'docsync.issues.remote_missing': '保管先から消えました。TREK のコピーは残っています。',
+  'docsync.issues.rejected_type': 'このファイル形式はここでは許可されていません。',
+  'docsync.issues.too_large': '上限を超えています。',
+  'docsync.issues.error': '転送できませんでした。',
+
   'docsync.error.unknown_provider': 'この連携先はこのインスタンスでは利用できません。',
 };
 
