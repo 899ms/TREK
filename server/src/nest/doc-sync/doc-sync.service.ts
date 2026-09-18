@@ -74,7 +74,17 @@ export class DocSyncService {
 
   // ── Entry points ───────────────────────────────────────────────────────────
 
-  /** Links the scheduler should look at now. */
+  /**
+   * Links the scheduler should look at now, longest-waiting first.
+   *
+   * The second sort key is what makes the limit fair. A successful run clears
+   * `next_attempt_at`, so on a healthy instance every binding sorts equal on the
+   * first key and SQLite falls back to insertion order — which means the twenty
+   * oldest bindings were picked on every tick and everything created after them
+   * was never synced automatically at all. Found on a dev database with 170
+   * bindings, where a freshly created one was still untouched minutes later
+   * while the first twenty ran again and again.
+   */
   dueLinks(limit = 20): LinkRow[] {
     return this.db.connection
       .prepare(
@@ -82,7 +92,9 @@ export class DocSyncService {
           WHERE sync_enabled = 1
             AND failure_count < ?
             AND (next_attempt_at IS NULL OR next_attempt_at <= CURRENT_TIMESTAMP)
-          ORDER BY COALESCE(next_attempt_at, '1970-01-01') ASC
+          ORDER BY COALESCE(next_attempt_at, '1970-01-01') ASC,
+                   COALESCE(last_sync_at, '1970-01-01') ASC,
+                   id ASC
           LIMIT ?`,
       )
       .all(LINK_CIRCUIT_OPEN_AFTER, limit) as LinkRow[];
@@ -161,6 +173,7 @@ export class DocSyncService {
       local,
       direction: link.direction as 'both' | 'pull' | 'push',
       remoteTruncated: listing.data.truncated,
+      remoteUnchanged: listing.data.cursorUnchanged === true,
       stableRemoteIds: provider.capabilities(ref).stableId,
       maxAttempts: ITEM_MAX_ATTEMPTS,
     });
@@ -659,11 +672,21 @@ export class DocSyncService {
    * overwriting either side, which is the only outcome that cannot lose work
    * and is therefore what the UI offers first.
    */
-  async resolveConflict(itemId: number, keep: 'trek' | 'provider' | 'both'): Promise<boolean> {
+  /**
+   * Decide a conflict.
+   *
+   * `tripId` is not decoration: the route authorises the caller against the trip
+   * in its URL, and without checking the row against the same trip an owner of
+   * any trip could resolve a conflict in somebody else's — the id is a plain
+   * integer and nothing else tied the two together. Same rule as everywhere in
+   * this codebase: every referenced id must exist AND belong to the same trip.
+   */
+  async resolveConflict(itemId: number, keep: 'trek' | 'provider' | 'both', tripId?: number): Promise<boolean> {
     const item = this.db.connection
       .prepare('SELECT * FROM document_sync_items WHERE id = ?')
       .get(itemId) as Record<string, unknown> | undefined;
     if (!item || item.state !== 'conflict') return false;
+    if (tripId !== undefined && Number(item.trip_id) !== Number(tripId)) return false;
     const link = this.config.getLink(Number(item.link_id));
     if (!link) return false;
 

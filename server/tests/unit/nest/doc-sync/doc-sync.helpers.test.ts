@@ -64,6 +64,7 @@ const plan = (over: Partial<Parameters<typeof planReconcile>[0]> = {}) =>
     local: [],
     direction: 'both',
     remoteTruncated: false,
+    remoteUnchanged: false,
     stableRemoteIds: true,
     maxAttempts: 6,
     ...over,
@@ -397,5 +398,94 @@ describe('planReconcile > shelving a row that keeps failing', () => {
       maxAttempts: 6,
     });
     expect(p.actions).toEqual([]);
+  });
+});
+
+/**
+ * An unchanged upstream, which the WebDAV adapters report by NOT fetching.
+ *
+ * Their root-ETag probe answers "nothing has happened here" in one request, and
+ * they then return an empty document list. The core ignored the flag and read
+ * that emptiness as a folder somebody had emptied: from the third run of every
+ * idle Nextcloud or OpenCloud binding onward, every run ended in the mass-delete
+ * guard — `partial`, `missing: 6`, forever, until the failure counter opened the
+ * circuit and the scheduler dropped the binding entirely. Reproduced against a
+ * live Nextcloud before this was written.
+ */
+describe('planReconcile > upstream reported as unchanged', () => {
+  it('does not read an empty listing as a mass deletion', () => {
+    const p = plan({
+      items: [item({ id: 1, remoteId: 'r1' }), item({ id: 2, fileId: 2, remoteId: 'r2' })],
+      remote: [],
+      local: [local({ fileId: 1 }), local({ fileId: 2 })],
+      remoteUnchanged: true,
+    });
+    expect(p.massDeleteGuardTripped).toBe(false);
+    expect(p.missingCount).toBe(0);
+  });
+
+  it('marks nothing as gone from the provider', () => {
+    const p = plan({
+      items: [item({ id: 1, remoteId: 'r1' })],
+      remote: [],
+      local: [local({ fileId: 1 })],
+      remoteUnchanged: true,
+    });
+    expect(p.actions.map(a => a.kind)).not.toContain('mark_remote_missing');
+  });
+
+  it('still pushes a document TREK gained in the meantime', () => {
+    const p = plan({
+      items: [],
+      remote: [],
+      local: [local({ fileId: 7, name: 'new.pdf' })],
+      remoteUnchanged: true,
+    });
+    expect(p.actions).toEqual([{ kind: 'push', local: expect.objectContaining({ fileId: 7 }), itemId: null, remoteId: null }]);
+  });
+
+  it('still reports a document TREK deleted in the meantime', () => {
+    const p = plan({
+      items: [item({ id: 5, fileId: 3, remoteId: 'r3' })],
+      remote: [],
+      local: [local({ fileId: 3, deletedAt: '2026-09-18 10:00:00' })],
+      remoteUnchanged: true,
+    });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 5, remoteId: 'r3' }]);
+  });
+
+  it('does not push out of a pull-only binding', () => {
+    const p = plan({
+      items: [],
+      remote: [],
+      local: [local({ fileId: 7 })],
+      direction: 'pull',
+      remoteUnchanged: true,
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('plans nothing at all when neither side moved', () => {
+    const p = plan({
+      items: [item({ id: 1, remoteId: 'r1' })],
+      remote: [],
+      local: [local({ fileId: 1 })],
+      remoteUnchanged: true,
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('works the old way when the provider does report a change', () => {
+    // The same shape with the flag off is exactly the case that used to break:
+    // an empty listing then really does mean everything vanished.
+    const many = Array.from({ length: 6 }, (_, i) =>
+      item({ id: i + 1, fileId: i + 1, remoteId: `r${i + 1}` }));
+    const p = plan({
+      items: many,
+      remote: [],
+      local: many.map((_, i) => local({ fileId: i + 1 })),
+      remoteUnchanged: false,
+    });
+    expect(p.massDeleteGuardTripped).toBe(true);
   });
 });

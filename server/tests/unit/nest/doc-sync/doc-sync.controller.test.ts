@@ -691,3 +691,20 @@ describe('a manual run and the shelved rows', () => {
     expect(sync.retryShelvedItems).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * The trip the route was authorised against is now passed on to the service.
+ *
+ * `assertOwner` proves the caller owns the trip in the URL and says nothing
+ * about whether the item id in the path belongs to that trip — the id is a
+ * plain integer, and nothing tied the two together. The check itself lives in
+ * the service (where the row is), so what belongs here is that the trip reaches
+ * it at all.
+ */
+describe('resolving a conflict carries its trip', () => {
+  it('passes the trip from the URL to the service', async () => {
+    sync.resolveConflict.mockClear();
+    await controller.resolve(String(tripId), '42', owner, { keep: 'trek' } as never);
+    expect(sync.resolveConflict).toHaveBeenCalledWith(42, 'trek', tripId);
+  });
+});

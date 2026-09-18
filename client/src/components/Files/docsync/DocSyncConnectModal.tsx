@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Loader2, ShieldAlert } from 'lucide-react'
 import Modal from '../../shared/Modal'
 import ToggleSwitch from '../../Settings/ToggleSwitch'
 import { useTranslation } from '../../../i18n/TranslationContext'
+import { useConnectForm } from './useConnectForm'
 import { Badge } from './DocSyncBits'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import type { DocSyncProvider, useDocSync } from './useDocSync'
@@ -30,35 +31,13 @@ export default function DocSyncConnectModal({
   const existing = sync.connectionFor(provider.id)
   const Icon = DOCUMENT_PROVIDER_ICONS[provider.id]
 
-  const [values, setValues] = useState<Record<string, string>>({})
-  const [insecure, setInsecure] = useState<boolean | null>(null)
+  const form = useConnectForm(provider, existing, sync)
   const [verdict, setVerdict] = useState<{ connected: boolean; account?: string; error?: string } | null>(null)
 
-  // Null until touched, so a connection that loads after the dialog opened is
-  // still reflected. Seeding the state at mount showed a stored "allow
-  // self-signed" as off and wrote that back on the next save — a security
-  // switch silently turning itself off is the worst version of this bug.
-  const insecureOn = insecure ?? existing?.allowInsecureTls ?? false
-
-  const baseUrl = values.base_url ?? existing?.baseUrl ?? ''
-  // The address is a column of its own, not a settings entry, so it has to be
-  // read from there — otherwise the field sits empty while the form submits the
-  // stored value behind it.
-  const shown = (key: string) =>
-    values[key] ?? (key === 'base_url' ? existing?.baseUrl : existing?.settings?.[key]) ?? ''
-  const required = provider.fields.filter(f => f.required)
-  const canSubmit = required.every(f =>
-    f.field_key === 'base_url'
-      ? baseUrl.trim().length > 0
-      : f.secret
-        ? (values[f.field_key] ?? '').length > 0 || !!existing?.secrets?.[f.field_key]
-        : shown(f.field_key).trim().length > 0,
-  )
-
-  const test = async () => setVerdict(await sync.testConnection(provider.id, baseUrl, values, insecureOn))
+  const test = async () => setVerdict(await form.probe())
 
   const save = async () => {
-    if (await sync.saveConnection(provider.id, baseUrl, values, insecureOn)) onConnected(provider.id)
+    if (await form.save()) onConnected(provider.id)
   }
 
   return (
@@ -79,7 +58,7 @@ export default function DocSyncConnectModal({
             <button
               type="button"
               onClick={() => void test()}
-              disabled={!canSubmit || sync.busy === 'test'}
+              disabled={!form.complete || sync.busy === 'test'}
               className="rounded-lg border border-edge px-3.5 py-2 text-body text-content-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
             >
               {t('docsync.test')}
@@ -87,7 +66,7 @@ export default function DocSyncConnectModal({
             <button
               type="button"
               onClick={() => void save()}
-              disabled={!canSubmit || sync.busy === 'save'}
+              disabled={!form.complete || sync.busy === 'save'}
               className="flex items-center gap-2 rounded-lg bg-accent px-3.5 py-2 text-body font-medium text-accent-text transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               {sync.busy === 'save' && <Loader2 size={14} className="animate-spin" />}
@@ -100,20 +79,18 @@ export default function DocSyncConnectModal({
       <div className="space-y-4">
         <p className="text-caption text-content-muted">{t(`docsync.connect.about.${provider.id}`)}</p>
 
-        {provider.fields.filter(f => f.field_key !== 'allow_insecure_tls').map(f => (
+        {form.fields.map(f => (
           <Field
             key={f.field_key}
-            label={t(`docsync.${f.label}`)}
-            hint={f.hint ? t(`docsync.${f.hint}`) : undefined}
+            label={t(form.labelKey(f))}
+            hint={form.hintKey(f) ? t(form.hintKey(f) as string) : undefined}
             required={f.required}
           >
             <input
               type={f.input_type === 'password' ? 'password' : 'text'}
-              value={f.secret ? (values[f.field_key] ?? '') : shown(f.field_key)}
-              // A stored secret never comes back, so an empty field with a dotted
-              // placeholder means "the one already saved" rather than "blank".
-              placeholder={f.secret && existing?.secrets?.[f.field_key] ? '••••••••' : f.placeholder || ''}
-              onChange={e => setValues({ ...values, [f.field_key]: e.target.value })}
+              value={form.valueOf(f.field_key)}
+              placeholder={form.placeholderOf(f)}
+              onChange={e => form.setValue(f.field_key, e.target.value)}
               className="w-full rounded-lg border border-edge bg-surface-input px-3 py-2.5 text-body text-content ring-accent transition-shadow placeholder:text-content-faint focus:outline-none focus:ring-2"
             />
           </Field>
@@ -127,7 +104,7 @@ export default function DocSyncConnectModal({
             </span>
           </span>
           <span className="shrink-0 pt-0.5">
-            <ToggleSwitch on={insecureOn} onToggle={() => setInsecure(!insecureOn)} />
+            <ToggleSwitch on={form.insecureTls} onToggle={() => form.setInsecureTls(!form.insecureTls)} />
           </span>
         </label>
       </div>

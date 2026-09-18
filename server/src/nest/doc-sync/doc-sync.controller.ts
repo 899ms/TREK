@@ -150,7 +150,13 @@ export class DocSyncController {
     const existing = this.config
       .listConnections(Number(tripId))
       .find((c) => c.provider_id === body.providerId);
-    const stored = existing ? this.config.toRef(existing) : null;
+    // Only for the address the credential was stored against. Merging it into a
+    // probe of an arbitrary baseUrl turns this route into a way to have TREK
+    // post a stored API token at a server of the caller's choosing — which is
+    // exactly what somebody who inherited a trip but not its credentials would
+    // reach for. Same host, same scheme, same port, or the caller types it in.
+    const sameTarget = !!existing && sameOrigin(existing.base_url, urlCheck.data.url);
+    const stored = sameTarget && existing ? this.config.toRef(existing) : null;
     const fields = this.config.providerFields(body.providerId);
     const secrets: Record<string, string> = { ...(stored?.secrets ?? {}) };
     const settings: Record<string, string> = { ...(stored?.settings ?? {}) };
@@ -356,9 +362,22 @@ export class DocSyncController {
     @Body() body: DocsyncResolveConflictDto,
   ) {
     this.assertOwner(tripId, user);
-    const ok = await this.sync.resolveConflict(Number(itemId), body.keep);
+    const ok = await this.sync.resolveConflict(Number(itemId), body.keep, Number(tripId));
     if (!ok) throw new HttpException('Item is not in conflict', 400);
     return { success: true };
+  }
+}
+
+
+/** Whether two URLs address the same server, for deciding if a stored secret may be reused. */
+function sameOrigin(a: string | null | undefined, b: string): boolean {
+  if (!a) return false;
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.protocol === y.protocol && x.host === y.host;
+  } catch {
+    return false;
   }
 }
 

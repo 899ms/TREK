@@ -14,9 +14,20 @@ import MDocSyncSheet from './MDocSyncSheet'
 
 const TRIP_ID = 3
 
+/**
+ * Shaped like a row of document_provider_fields, which matters more than it looks.
+ *
+ * `field_key` is snake_case and `label` already carries the full key suffix
+ * (`providerApiKey`, not `apiKey`) — see server/src/db/document-provider-seed.ts.
+ * An earlier version of this fixture invented both, which made a sheet that
+ * built label keys the wrong way look correct: the fixture's `apiKey` and the
+ * sheet's `docsync.provider${cap(...)}` happened to meet in the middle, while
+ * the real data produced `docsync.providerProviderApiKey` and rendered the raw
+ * key on screen.
+ */
 const field = (over: Partial<DocSyncProvider['fields'][number]>): DocSyncProvider['fields'][number] => ({
-  field_key: 'apiToken',
-  label: 'apiToken',
+  field_key: 'api_token',
+  label: 'providerApiToken',
   input_type: 'text',
   placeholder: null,
   hint: null,
@@ -32,7 +43,7 @@ const provider = (over: Partial<DocSyncProvider>): DocSyncProvider => ({
   icon: 'paperless',
   available: true,
   fields: [
-    field({ field_key: 'baseUrl', label: 'url', input_type: 'url', placeholder: 'https://paperless.example', secret: false }),
+    field({ field_key: 'base_url', label: 'providerUrl', input_type: 'url', placeholder: 'https://paperless.example', secret: false }),
     field({}),
   ],
   ...over,
@@ -102,8 +113,8 @@ beforeEach(() => {
   onClose.mockClear()
   providers = [
     provider({}),
-    provider({ id: 'nextcloud', name: 'Nextcloud', fields: [field({ field_key: 'appPassword', label: 'appPassword' })] }),
-    provider({ id: 'papra', name: 'Papra', fields: [field({ field_key: 'apiKey', label: 'apiKey' })] }),
+    provider({ id: 'nextcloud', name: 'Nextcloud', fields: [field({ field_key: 'app_password', label: 'providerAppPassword' })] }),
+    provider({ id: 'papra', name: 'Papra', fields: [field({ field_key: 'api_key', label: 'providerApiKey' })] }),
   ]
   connections = [connection({}), connection({ id: 6, providerId: 'nextcloud' })]
   links = [link()]

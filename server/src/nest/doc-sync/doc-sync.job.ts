@@ -30,6 +30,12 @@ import {
  * the Dawarich job on purpose: this one is driven by a per-trip binding an
  * ordinary user creates, and telling them "restart your server" is not an
  * answer.
+ *
+ * Which is why the cron itself runs every minute and the tick decides whether it
+ * is due: baking the interval into the cron expression at bootstrap — as this
+ * did until the claim above was checked against the code — meant a changed
+ * interval did nothing until a restart, quietly, while the admin screen said
+ * otherwise.
  */
 @Injectable()
 export class DocSyncJob implements OnApplicationBootstrap {
@@ -41,12 +47,30 @@ export class DocSyncJob implements OnApplicationBootstrap {
     private readonly registrar: CronRegistrarService,
   ) {}
 
+  /** When the last pass started; null until the first one, which is never skipped. */
+  private lastRunAt: number | null = null;
+
   onApplicationBootstrap(): void {
     if (!this.registrar.isEnabled()) return;
-    const seconds = this.intervalSeconds();
-    const minutes = Math.max(1, Math.round(seconds / 60));
-    logInfo(`Document sync: scheduled every ${minutes}m`);
-    this.registrar.register('docsync', `*/${minutes} * * * *`, () => this.tick());
+    logInfo(`Document sync: polling every ${this.intervalSeconds()}s`);
+    this.registrar.register('docsync', '* * * * *', () => this.tick());
+  }
+
+  /**
+   * Whether enough time has passed for another pass.
+   *
+   * The minute the cron wakes up on is not the unit the setting is in, so a
+   * 90-second interval must not become one minute or two depending on where the
+   * boundaries fall. Comparing against the last run keeps the setting's own
+   * resolution; the cost of the extra wake-ups is one read of app_settings.
+   */
+  private isDue(now: number): boolean {
+    // Null rather than 0: comparing against the epoch means "due" only once the
+    // clock has passed the interval since 1970, which is true in production and
+    // false for any test that picks a small timestamp — a difference that would
+    // have hidden here rather than in the behaviour it is supposed to describe.
+    if (this.lastRunAt === null) return true;
+    return now - this.lastRunAt >= this.intervalSeconds() * 1000;
   }
 
   private intervalSeconds(): number {
@@ -63,6 +87,10 @@ export class DocSyncJob implements OnApplicationBootstrap {
       // Unrecognised values mean ON here because the setting is absent by
       // default; only an explicit 'false' stops the sync.
       if (killSwitch === 'false') return;
+
+      const now = Date.now();
+      if (!this.isDue(now)) return;
+      this.lastRunAt = now;
 
       // Cheap, and it catches a binding whose owner left the trip through a
       // path that has no hook to attach to — a transfer, a direct DB edit.

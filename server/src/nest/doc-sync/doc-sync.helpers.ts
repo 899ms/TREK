@@ -156,6 +156,18 @@ export interface ReconcileInput {
   direction: 'both' | 'pull' | 'push';
   /** A truncated listing must never be read as "the rest was deleted". */
   remoteTruncated: boolean;
+  /**
+   * The provider says its side has not moved since the stored cursor.
+   *
+   * Every adapter derives that cursor from the scope's contents — a digest over
+   * the documents for Paperless, Papra and Synology, the root ETag for WebDAV —
+   * so the flag means "nothing changed upstream" for all of them. The WebDAV
+   * adapter acts on it by returning an EMPTY list instead of walking the folder,
+   * which is only safe if this is read: otherwise a quiet binding looks like a
+   * folder somebody emptied. It was not read, and the third run of every idle
+   * Nextcloud or OpenCloud binding tripped the mass-delete guard for good.
+   */
+  remoteUnchanged: boolean;
   /** Providers without stable ids need the rename heuristic. */
   stableRemoteIds: boolean;
   /** How many failures a row gets before it is shelved for a person to look at. */
@@ -221,6 +233,25 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
   for (const it of items) {
     if (it.remoteId) itemsByRemote.set(it.remoteId, it);
     if (it.fileId !== null) itemsByFile.set(it.fileId, it);
+  }
+
+  // Upstream is unchanged: only what happened in TREK can need doing, and the
+  // remote half of the plan would be reading a list the adapter did not fetch.
+  if (input.remoteUnchanged) {
+    for (const it of items) {
+      if (it.fileId === null || !it.remoteId) continue;
+      const l = localById.get(it.fileId);
+      if (l?.deletedAt) add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
+    }
+    if (direction !== 'pull') {
+      for (const l of local) {
+        if (l.deletedAt) continue;
+        const it = itemsByFile.get(l.fileId);
+        if (it?.remoteId) continue;
+        add({ kind: 'push', local: l, itemId: it?.id ?? null, remoteId: null });
+      }
+    }
+    return { actions, massDeleteGuardTripped: false, missingCount: 0 };
   }
 
   // A listing that lost most of what it had last time is far more likely to be

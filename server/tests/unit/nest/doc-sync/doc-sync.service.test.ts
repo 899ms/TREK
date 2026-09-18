@@ -185,6 +185,7 @@ function makeLink(over: {
   syncEnabled?: number;
   failureCount?: number;
   nextAttemptAt?: string | null;
+  lastSyncAt?: string | null;
 } = {}): LinkRow {
   scopeSeq += 1;
   const info = testDb
@@ -199,6 +200,10 @@ function makeLink(over: {
       over.direction ?? 'both', over.deletePolicy ?? 'unlink',
       over.syncEnabled ?? 1, over.failureCount ?? 0, over.nextAttemptAt ?? null, ownerId,
     );
+  if (over.lastSyncAt !== undefined) {
+    testDb.prepare('UPDATE trip_document_links SET last_sync_at = ? WHERE id = ?')
+      .run(over.lastSyncAt, Number(info.lastInsertRowid));
+  }
   return config.getLink(Number(info.lastInsertRowid));
 }
 
@@ -312,6 +317,36 @@ describe('DocSyncService', () => {
 
       const ids = service.dueLinks().map((l) => l.id).sort((a, b) => a - b);
       expect(ids).toEqual([dueNow.id, overdue.id].sort((a, b) => a - b));
+    });
+
+    it('puts the longest-waiting binding first, so the limit cannot starve the newer ones', () => {
+      // A successful run clears next_attempt_at, so on a healthy instance every
+      // binding ties on the first sort key. Without a second key SQLite answers
+      // in insertion order and the same oldest bindings win every tick: found on
+      // a dev database with 170 of them, where a binding created minutes earlier
+      // had never been synced while the first twenty ran over and over.
+      const recent = makeLink({ lastSyncAt: sqlTime('-1 minute') });
+      const stale = makeLink({ lastSyncAt: sqlTime('-2 hours') });
+      const never = makeLink({ lastSyncAt: null });
+
+      expect(service.dueLinks().map((l) => l.id)).toEqual([never.id, stale.id, recent.id]);
+    });
+
+    it('serves ordinary bindings before one that is only due again after a backoff', () => {
+      // COALESCE(next_attempt_at, '1970-01-01') is what orders these: a binding
+      // with no backoff counts as due since the epoch and therefore goes first,
+      // while one whose backoff has merely expired sorts by when it expired.
+      // Normal work ahead of a retry, which is the right way round.
+      const backedOff = makeLink({ nextAttemptAt: sqlTime('-1 hour'), lastSyncAt: sqlTime('-1 minute') });
+      const never = makeLink({ lastSyncAt: null });
+
+      expect(service.dueLinks().map((l) => l.id)).toEqual([never.id, backedOff.id]);
+    });
+
+    it('honours the limit', () => {
+      for (let i = 0; i < 25; i += 1) makeLink({ lastSyncAt: null });
+      expect(service.dueLinks().length).toBe(20);
+      expect(service.dueLinks(5).length).toBe(5);
     });
 
     it('lets a binding back in one failure before the circuit opens', () => {
@@ -912,6 +947,43 @@ describe('DocSyncService', () => {
 
       const states = service.issues(tripId).map((r) => r.state as string).sort();
       expect(states).toEqual([...decidable].sort());
+    });
+  });
+
+  /**
+   * A conflict may only be decided from the trip it belongs to.
+   *
+   * The route authorises the caller against the trip in its URL and then took the
+   * item id on trust, so the owner of any trip could resolve a conflict in
+   * somebody else's: both are plain integers and nothing compared them. Found by
+   * an audit rather than by a failing test, which is why the check lives here,
+   * next to the row it is about.
+   */
+  describe('resolveConflict across trips', () => {
+    function conflictedItem(linkId: number, tripOfItem: number): number {
+      return Number(testDb.prepare(
+        `INSERT INTO document_sync_items (link_id, trip_id, trek_doc_uid, remote_id, state)
+         VALUES (?, ?, 'uid-conflict', 'r-conflict', 'conflict')`,
+      ).run(linkId, tripOfItem).lastInsertRowid);
+    }
+    it('refuses when the row belongs to another trip', async () => {
+      const link = makeLink();
+      const itemId = conflictedItem(link.id, link.trip_id);
+      expect(await service.resolveConflict(itemId, 'trek', link.trip_id + 999)).toBe(false);
+      const after = testDb.prepare('SELECT state FROM document_sync_items WHERE id = ?').get(itemId) as { state: string };
+      expect(after.state).toBe('conflict');
+    });
+    it('resolves when the row belongs to the trip', async () => {
+      const link = makeLink();
+      const itemId = conflictedItem(link.id, link.trip_id);
+      expect(await service.resolveConflict(itemId, 'trek', link.trip_id)).toBe(true);
+      const after = testDb.prepare('SELECT state FROM document_sync_items WHERE id = ?').get(itemId) as { state: string };
+      expect(after.state).not.toBe('conflict');
+    });
+    it('still works for a caller that names no trip, so nothing else breaks', async () => {
+      const link = makeLink();
+      const itemId = conflictedItem(link.id, link.trip_id);
+      expect(await service.resolveConflict(itemId, 'trek')).toBe(true);
     });
   });
 });

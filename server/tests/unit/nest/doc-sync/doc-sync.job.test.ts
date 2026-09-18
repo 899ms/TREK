@@ -10,7 +10,7 @@
  * '5' and '999999' both have to land somewhere the cron parser accepts. And one
  * unreachable NAS must not take the other trips' bindings down with it.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const log = vi.hoisted(() => ({
   LOG_LEVEL: 'error',
@@ -102,43 +102,22 @@ describe('DocSyncJob bootstrap', () => {
     expect(log.logInfo).not.toHaveBeenCalled();
   });
 
-  it('registers one cron under a name of its own and announces the cadence', () => {
+  it('registers one cron under a name of its own, on the minute', () => {
+    // Every minute, with the tick deciding whether it is due. Baking the
+    // interval into the expression at bootstrap meant a changed setting did
+    // nothing until a restart — which is the opposite of what this job's own
+    // comment promises, and nothing re-registers it (auto-backup has a start()
+    // its settings save calls; this has no such path).
     const { job, registrar } = makeJob();
     job.onApplicationBootstrap();
-    expect(registrar.register).toHaveBeenCalledWith('docsync', '*/5 * * * *', expect.any(Function));
-    expect(log.logInfo).toHaveBeenCalledWith('Document sync: scheduled every 5m');
+    expect(registrar.register).toHaveBeenCalledWith('docsync', '* * * * *', expect.any(Function));
+    expect(log.logInfo).toHaveBeenCalledWith('Document sync: polling every 300s');
   });
 
   it('reads the interval from its own app_settings key', () => {
     const { job, db } = makeJob({ interval: '600' });
     job.onApplicationBootstrap();
     expect(db.get).toHaveBeenCalledWith('SELECT value FROM app_settings WHERE key = ?', SETTING_POLL_INTERVAL);
-  });
-
-  it('clamps a hand-typed interval to between a minute and an hour', () => {
-    for (const [setting, minutes] of [
-      [undefined, 5], // no row: the 300s default
-      ['', 5],
-      ['not-a-number', 5],
-      ['0', 1], // below the floor, and a `*/0` expression the parser would reject
-      ['10', 1],
-      ['60', 1], // the floor itself
-      ['600', 10],
-      ['3600', 60], // the ceiling itself
-      ['86400', 60],
-      ['-300', 1], // a minus sign parses fine and must not become a negative cron
-    ] as const) {
-      vi.clearAllMocks();
-      const { job, registrar } = makeJob({ interval: setting });
-      job.onApplicationBootstrap();
-      expect(registrar.register).toHaveBeenCalledWith('docsync', `*/${minutes} * * * *`, expect.any(Function));
-    }
-  });
-
-  it('rounds a sub-minute remainder to the nearest whole minute rather than down to nothing', () => {
-    const { job, registrar } = makeJob({ interval: '90' });
-    job.onApplicationBootstrap();
-    expect(registrar.register).toHaveBeenCalledWith('docsync', '*/2 * * * *', expect.any(Function));
   });
 
   it('hands the registrar the tick itself, so a fired cron reaches the sync', async () => {
@@ -202,11 +181,11 @@ describe('DocSyncJob tick', () => {
   });
 
   it('re-reads the kill switch per tick instead of remembering the first answer', async () => {
-    const { job, db, sync } = makeJob({ links: [link(1)] });
+    const { job, db } = makeJob({ links: [link(1)] });
     await job.tick();
     await job.tick();
-    expect(db.get).toHaveBeenCalledTimes(2);
-    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+    const killSwitchReads = db.get.mock.calls.filter((c) => c[1] === SETTING_SYNC_ENABLED).length;
+    expect(killSwitchReads).toBe(2);
   });
 
   it('sweeps bindings whose credential owner left the trip before it syncs anything', async () => {
@@ -261,15 +240,27 @@ describe('DocSyncJob tick', () => {
     expect(log.logError).toHaveBeenCalledWith('Document sync tick failed: SQLITE_BUSY');
   });
 
-  it('recovers on the next tick after a failed one', async () => {
-    const { job, sync } = makeJob({ links: [link(1)] });
-    sync.dueLinks.mockImplementationOnce(() => {
-      throw new Error('down');
-    });
-    await job.tick();
-    await job.tick();
-    expect(sync.syncLink).toHaveBeenCalledTimes(1);
-    expect(log.logError).toHaveBeenCalledTimes(1);
+  it('recovers on the next due tick after a failed one', async () => {
+    // A failed pass still spends its interval, on purpose: a tick that throws
+    // every time would otherwise run on every minute the cron fires. It does not
+    // block anything permanently — the next due tick works normally.
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(10_000_000));
+      const { job, sync } = makeJob({ links: [link(1)], interval: '300' });
+      sync.dueLinks.mockImplementationOnce(() => {
+        throw new Error('down');
+      });
+      await job.tick();
+      expect(sync.syncLink).not.toHaveBeenCalled();
+      expect(log.logError).toHaveBeenCalledTimes(1);
+
+      vi.setSystemTime(new Date(10_300_000));
+      await job.tick();
+      expect(sync.syncLink).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('leaves the choice of what is due to the sync service', async () => {
@@ -280,5 +271,110 @@ describe('DocSyncJob tick', () => {
     const { job, sync } = makeJob({ links });
     await job.tick();
     expect(sync.syncLink.mock.calls.map((c) => c[0])).toEqual(links);
+  });
+});
+
+/**
+ * The interval, now that the cron fires every minute.
+ *
+ * It used to be baked into the cron expression at bootstrap, so the setting did
+ * nothing until a restart while this file's own header said otherwise. The tick
+ * now decides, which also means the clamp has to hold here instead of in the
+ * expression: an interval of 0 must not turn the minute cron into a run every
+ * minute, and a huge one must not park the job for a day.
+ */
+describe('DocSyncJob due-ness', () => {
+  // Fake system time rather than a Date.now spy: the spy has to be re-applied
+  // after the suite-wide clearAllMocks, and a cleared spy answers undefined,
+  // which reads as "no time has passed" and fails the case for the wrong reason.
+  const at = (ms: number) => vi.setSystemTime(new Date(ms));
+
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  it('runs the first tick it is given', async () => {
+    const { job, sync } = makeJob({ links: [link(1)] });
+    at(1_000_000);
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('does nothing on a tick inside the interval', async () => {
+    const { job, sync } = makeJob({ links: [link(1)], interval: '300' });
+    at(1_000_000);
+    await job.tick();
+    at(1_000_000 + 299_000);
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs again once the interval has passed', async () => {
+    const { job, sync } = makeJob({ links: [link(1)], interval: '300' });
+    at(1_000_000);
+    await job.tick();
+    at(1_000_000 + 300_000);
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the floor: a zero or negative setting still waits a minute', async () => {
+    for (const setting of ['0', '-300', '10']) {
+      const { job, sync } = makeJob({ links: [link(1)], interval: setting });
+      at(2_000_000);
+      await job.tick();
+      at(2_000_000 + 59_000);
+      await job.tick();
+      expect(sync.syncLink, `interval=${setting} ran again inside the floor`).toHaveBeenCalledTimes(1);
+      at(2_000_000 + 60_000);
+      await job.tick();
+      expect(sync.syncLink, `interval=${setting} did not run at the floor`).toHaveBeenCalledTimes(2);
+    }
+  });
+
+  it('keeps the ceiling: an absurd setting waits an hour, not a day', async () => {
+    const { job, sync } = makeJob({ links: [link(1)], interval: '86400' });
+    at(3_000_000);
+    await job.tick();
+    at(3_000_000 + 3_600_000);
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('takes a changed setting without a restart, which is the whole point', async () => {
+    const settings = new Map<string, string>([[SETTING_POLL_INTERVAL, '3600']]);
+    const db = {
+      get: vi.fn((_sql: string, key?: unknown) => {
+        const value = settings.get(String(key));
+        return value === undefined ? undefined : { value };
+      }),
+    };
+    const sync = {
+      dueLinks: vi.fn(() => [link(1)]),
+      syncLink: vi.fn(async () => RUN),
+    };
+    const job = new DocSyncJob(
+      db as unknown as DatabaseService,
+      sync as unknown as DocSyncService,
+      { markOrphanedLinks: vi.fn(() => 0) } as unknown as DocSyncConfigService,
+      { isAddonEnabled: vi.fn(() => true) } as unknown as AddonsService,
+      { isEnabled: vi.fn(() => true), register: vi.fn(), unregister: vi.fn() } as unknown as CronRegistrarService,
+    );
+
+    at(4_000_000);
+    await job.tick();
+    at(4_000_000 + 120_000);
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1); // still inside the hour
+
+    settings.set(SETTING_POLL_INTERVAL, '60');
+    await job.tick();
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not count a tick the kill switch stopped, so switching back on runs at once', async () => {
+    const { job, sync } = makeJob({ links: [link(1)], interval: '3600', killSwitch: 'false' });
+    at(5_000_000);
+    await job.tick();
+    expect(sync.syncLink).not.toHaveBeenCalled();
   });
 });

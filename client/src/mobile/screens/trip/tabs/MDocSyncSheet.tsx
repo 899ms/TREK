@@ -14,6 +14,7 @@ import TrekMark from '../../../../components/shared/TrekMark'
 import {
   useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
+import { useConnectForm } from '../../../../components/Files/docsync/useConnectForm'
 import { relativeTime } from '../../../../utils/relativeTime'
 
 /**
@@ -344,7 +345,14 @@ function DetailView({
   )
 }
 
-/** Credentials for a store this instance offers but the trip has not used yet. */
+/**
+ * Credentials for a store this instance offers but the trip has not used yet.
+ *
+ * The rules — which field is the address, which one is a switch, how a label
+ * becomes a key — live in `useConnectForm`, the same one the desktop dialog
+ * uses. Written out here a second time they came out wrong in four separate
+ * ways, including an address this form never actually sent.
+ */
 function ConnectView({
   provider,
   sync,
@@ -355,44 +363,48 @@ function ConnectView({
   onDone: () => void
 }) {
   const { t } = useTranslation()
-  const [values, setValues] = useState<Record<string, string>>({})
+  const form = useConnectForm(provider, sync.connectionFor(provider.id), sync)
   const [verdict, setVerdict] = useState<{ connected: boolean; account?: string; error?: string } | null>(null)
-
-  const baseUrl = values.baseUrl ?? ''
-  const credentials = Object.fromEntries(Object.entries(values).filter(([k]) => k !== 'baseUrl'))
-  const missing = provider.fields.some(f => f.required && !(values[f.field_key] || '').trim())
-
-  const probe = async () => {
-    setVerdict(await sync.testConnection(provider.id, baseUrl, credentials, false))
-  }
-
-  const save = async () => {
-    if (await sync.saveConnection(provider.id, baseUrl, credentials, false)) onDone()
-  }
 
   return (
     <div className="mt-3 flex flex-col gap-3">
       <p className="font-geist text-[0.71875rem] leading-snug text-m-muted">{t(`docsync.connect.about.${provider.id}`)}</p>
 
-      {provider.fields.map(f => (
+      {form.fields.map(f => (
         <label key={f.field_key} className="flex flex-col gap-[6px]">
           <span className="font-geist text-[0.6875rem] font-bold text-m-muted">
-            {t(`docsync.provider${cap(f.label)}`)}
+            {t(form.labelKey(f))}
             {f.required && <span className="text-[color:var(--m-st-danger)]"> *</span>}
           </span>
           <input
-            type={f.secret ? 'password' : f.input_type === 'url' ? 'url' : 'text'}
-            value={values[f.field_key] ?? ''}
-            onChange={e => { setValues(v => ({ ...v, [f.field_key]: e.target.value })); setVerdict(null) }}
-            placeholder={f.placeholder ?? ''}
+            type={f.input_type === 'password' ? 'password' : 'text'}
+            value={form.valueOf(f.field_key)}
+            onChange={e => { form.setValue(f.field_key, e.target.value); setVerdict(null) }}
+            placeholder={form.placeholderOf(f)}
             autoCapitalize="none"
             autoCorrect="off"
             spellCheck={false}
             className="h-11 rounded-2xl border border-[color:var(--m-inbr)] bg-[color:var(--m-inner)] px-3 text-[0.8125rem] text-m-ink outline-none"
           />
-          {f.hint && <span className="font-geist text-[0.625rem] text-m-faint">{f.hint}</span>}
+          {form.hintKey(f) && (
+            <span className="font-geist text-[0.625rem] text-m-faint">{t(form.hintKey(f) as string)}</span>
+          )}
         </label>
       ))}
+
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-[color:var(--m-rowbr)] bg-m-sheetop px-3 py-[9px]">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[0.78125rem] font-semibold text-m-ink">{t('docsync.allowInsecureTls')}</span>
+          <span className="mt-[2px] block font-geist text-[0.625rem] leading-snug text-m-faint">
+            {t('docsync.connect.insecureHint')}
+          </span>
+        </span>
+        <MToggle
+          checked={form.insecureTls}
+          ariaLabel={t('docsync.allowInsecureTls')}
+          onChange={form.setInsecureTls}
+        />
+      </div>
 
       {verdict && (
         <p
@@ -408,19 +420,25 @@ function ConnectView({
         </p>
       )}
 
+      {sync.error && !verdict && (
+        <p className="rounded-2xl bg-[color:var(--m-ic)] px-3 py-2 font-geist text-[0.6875rem] text-[color:var(--m-st-danger)]">
+          {t(`docsync.error.${sync.error}`)}
+        </p>
+      )}
+
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => void probe()}
-          disabled={missing || sync.busy === 'test'}
+          onClick={() => void form.probe().then(setVerdict)}
+          disabled={!form.complete || sync.busy === 'test'}
           className="h-11 flex-1 rounded-2xl border border-[color:var(--m-rowbr)] text-[0.8125rem] font-bold text-m-ink disabled:opacity-50"
         >
           {sync.busy === 'test' ? <Loader2 size={15} className="mx-auto animate-spin" /> : t('docsync.test')}
         </button>
         <button
           type="button"
-          onClick={() => void save()}
-          disabled={missing || sync.busy === 'save'}
+          onClick={() => void form.save().then(ok => { if (ok) onDone() })}
+          disabled={!form.complete || sync.busy === 'save'}
           className="h-11 flex-1 rounded-2xl bg-m-act text-[0.8125rem] font-bold text-m-actfg disabled:opacity-50"
         >
           {sync.busy === 'save' ? <Loader2 size={15} className="mx-auto animate-spin" /> : t('common.save')}
@@ -699,11 +717,6 @@ function Empty({ text, hint }: { text: string; hint?: string }) {
       {hint && <div className="mx-auto mt-1 max-w-[16rem] font-geist text-[0.625rem] leading-snug text-m-faint">{hint}</div>}
     </div>
   )
-}
-
-/** `apiToken` → `ApiToken`, so the field's stored label suffix becomes its key. */
-function cap(s: string): string {
-  return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
 /** A folder name from the trip's own title, so nobody has to invent one. */
