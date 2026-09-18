@@ -329,12 +329,27 @@ function escapeFormValue(value: string): string {
   return value.replace(/\r/g, '%0D').replace(/\n/g, '%0A').replace(/"/g, '%22');
 }
 
+/**
+ * A media type that is safe to put in a header.
+ *
+ * The value comes from `trip_files.mime_type`, which an upload can influence,
+ * and it went into the part header untouched while the filename beside it was
+ * escaped. A CR or LF in it ends the header early and lets whatever follows be
+ * read as headers of its own. Anything that is not a plain media type is
+ * replaced rather than repaired: a mangled type is not worth guessing at, and
+ * the generic one is what an unknown file gets anyway.
+ */
+function safeMimeType(raw: string): string {
+  const TOKEN = /^[A-Za-z0-9!#$&^_.+-]+\/[A-Za-z0-9!#$&^_.+-]+$/;
+  return TOKEN.test(raw) ? raw : 'application/octet-stream';
+}
+
 /** The bytes before the file in a one-field multipart body. Exported so the tests can read them. */
 export function multipartHeader(boundary: string, fileName: string, mimeType: string): Buffer {
   return Buffer.from(
     `--${boundary}\r\n` +
       `Content-Disposition: form-data; name="file"; filename="${escapeFormValue(fileName)}"\r\n` +
-      `Content-Type: ${mimeType}\r\n\r\n`,
+      `Content-Type: ${safeMimeType(mimeType)}\r\n\r\n`,
     'utf8',
   );
 }

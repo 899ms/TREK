@@ -363,6 +363,14 @@ export class DocSyncService {
       return 'provider_error';
     }
 
+    // What this row pointed at before, if anything: a pull_update replaces a
+    // document TREK already holds, and `createFile` only ever inserts.
+    const supersededId = itemId === null
+      ? null
+      : (this.db.connection
+          .prepare('SELECT file_id FROM document_sync_items WHERE id = ?')
+          .get(itemId) as { file_id: number | null } | undefined)?.file_id ?? null;
+
     const created = this.files.createFile(
       ctx.link.trip_id,
       { filename: storageKey, originalname: name, size: bytes, mimetype: remote.mimeType || 'application/octet-stream' },
@@ -371,6 +379,22 @@ export class DocSyncService {
       this.config.getConnection(ctx.link.connection_id)?.owner_user_id ?? 0,
       {},
     );
+
+    /**
+     * Retire the copy this one replaces.
+     *
+     * Into the trash rather than out of existence: the bytes it holds are a
+     * version somebody may still want, and TREK's own delete works the same way.
+     * Leaving it in place was worse than untidy — the row's pairing moves to the
+     * new file, so the old one is left with no sync item at all, and the very
+     * next run reads it as a document TREK gained and pushes the superseded
+     * version back up. One upstream edit then ends as two documents on both
+     * sides, and it grows with every further edit.
+     */
+    if (supersededId !== null && Number(supersededId) !== Number(created.id)) {
+      this.files.softDeleteFile(supersededId);
+      this.realtime.broadcast(ctx.link.trip_id, 'file:deleted', { fileId: supersededId });
+    }
 
     this.upsertItem(ctx.link, {
       itemId,
@@ -407,6 +431,11 @@ export class DocSyncService {
 
     const file = this.files.getFileById(local.fileId, ctx.link.trip_id);
     if (!file) return 'not_found';
+    // Re-read rather than trust the plan: a run walks a whole folder, and a
+    // document somebody deleted in the meantime would otherwise still be
+    // uploaded — a delete that looks ignored, and a document that reappears
+    // upstream after the person watched it go.
+    if ((file as { deleted_at?: string | null }).deleted_at) return 'not_found';
 
     let sha256 = local.sha256;
     let stream: Readable;
@@ -573,22 +602,38 @@ export class DocSyncService {
     const failed = patch.state === 'error';
 
     if (patch.itemId !== null) {
-      const attempts = failed ? 1 : 0;
+      /**
+       * The attempt counter, read before it is written.
+       *
+       * Two things needed it. The backoff was computed as
+       * `backoffSeconds(curve, 1)` — always the first step, so three of the
+       * four steps in the curve were unreachable and a provider that was down
+       * got asked again at the same short interval. And the counter only ever
+       * grew: a row that failed once a month reached the limit after six months
+       * of otherwise healthy syncing and was shelved for good. A successful
+       * pass now clears it, which is what makes the limit mean "six failures in
+       * a row" rather than "six failures ever".
+       */
+      const before = (this.db.connection
+        .prepare('SELECT attempts FROM document_sync_items WHERE id = ?')
+        .get(patch.itemId) as { attempts: number } | undefined)?.attempts ?? 0;
+      const attempts = failed ? before + 1 : 0;
+
       this.db.connection
         .prepare(
           `UPDATE document_sync_items
               SET state = ?, error_code = ?, file_id = COALESCE(?, file_id),
-                  -- see the giveUp() note below: a row that has run out of
-                  -- attempts stops retrying and waits for a person
-
                   remote_id = COALESCE(?, remote_id), remote_version = COALESCE(?, remote_version),
                   remote_name = COALESCE(?, remote_name), remote_size = COALESCE(?, remote_size),
                   remote_modified_at = COALESCE(?, remote_modified_at),
                   content_sha256 = COALESCE(?, content_sha256),
                   pushed_sha256 = COALESCE(?, pushed_sha256),
-                  attempts = attempts + ?,
+                  attempts = ?,
+                  -- A row that has used up its attempts stops retrying and waits
+                  -- for a person; planReconcile skips it and a manual run clears
+                  -- the counter (see retryShelvedItems).
                   next_attempt_at = CASE
-                    WHEN ? = 1 AND attempts + 1 < ? THEN datetime('now', '+' || ? || ' seconds')
+                    WHEN ? = 1 AND ? < ? THEN datetime('now', '+' || ? || ' seconds')
                     ELSE NULL
                   END,
                   remote_missing_at = NULL,
@@ -601,7 +646,9 @@ export class DocSyncService {
           remoteId, remoteVersion,
           patch.remote?.name ?? null, patch.remote?.size ?? null, patch.remote?.remoteModifiedAt ?? null,
           patch.contentSha256 ?? null, patch.pushedSha256 ?? null,
-          attempts, failed ? 1 : 0, ITEM_MAX_ATTEMPTS, backoffSeconds(ITEM_BACKOFF_SECONDS, 1), patch.state,
+          attempts,
+          failed ? 1 : 0, attempts, ITEM_MAX_ATTEMPTS,
+          backoffSeconds(ITEM_BACKOFF_SECONDS, attempts), patch.state,
           patch.itemId,
         );
       return;
@@ -633,7 +680,7 @@ export class DocSyncService {
         remoteId, patch.remote?.name ?? null, remoteVersion, patch.remote?.size ?? null,
         patch.remote?.remoteModifiedAt ?? null, patch.contentSha256 ?? null, patch.pushedSha256 ?? null,
         patch.state, patch.errorCode ?? null, failed ? 1 : 0,
-        failed ? 1 : 0, backoffSeconds(ITEM_BACKOFF_SECONDS, 1),
+        failed ? 1 : 0, backoffSeconds(ITEM_BACKOFF_SECONDS, 1),   // a new row is always at its first failure
         patch.state,
       );
   }
@@ -681,6 +728,28 @@ export class DocSyncService {
    * integer and nothing else tied the two together. Same rule as everywhere in
    * this codebase: every referenced id must exist AND belong to the same trip.
    */
+
+  /**
+   * Rename the provider's copy, outside a run.
+   *
+   * Only `resolveConflict` needs this: every other rename is planned and
+   * executed by a run. A failure is not fatal here — the row is left for the
+   * next run to sort out rather than the owner's choice being refused.
+   */
+  private async renameRemoteTo(link: LinkRow, remoteId: string, name: string, itemId: number): Promise<void> {
+    const conn = this.config.getConnection(link.connection_id);
+    const provider = this.registry.get(link.provider_id);
+    if (!conn || !provider) return;
+    const res = await provider.rename(this.config.toRef(conn), this.config.toScopeRef(link), remoteId, name);
+    if (docFailed(res)) {
+      this.logger.warn(`link ${link.id}: renaming ${remoteId} to "${name}" failed: ${res.error.code}`);
+      return;
+    }
+    this.db.connection
+      .prepare('UPDATE document_sync_items SET remote_name = ?, remote_version = ?, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?')
+      .run(name, res.data.remoteVersion, itemId);
+  }
+
   async resolveConflict(itemId: number, keep: 'trek' | 'provider' | 'both', tripId?: number): Promise<boolean> {
     const item = this.db.connection
       .prepare('SELECT * FROM document_sync_items WHERE id = ?')
@@ -690,6 +759,27 @@ export class DocSyncService {
     const link = this.config.getLink(Number(item.link_id));
     if (!link) return false;
 
+    /**
+     * The name has to be decided too, not only the bytes.
+     *
+     * The only conflict the planner can actually raise today is a double
+     * rename, and that is arbitrated entirely by `remote_name` — the name both
+     * sides last agreed on. Clearing a version marker leaves all three names
+     * exactly as they were, so the next run compared them again, found both
+     * sides changed again, and wrote the conflict straight back. Whatever the
+     * owner picked, the issue reappeared within minutes, forever.
+     *
+     * So each choice moves the arbiter to the side that won: keeping TREK's
+     * name makes the agreed name TREK's (the provider then reads as the one
+     * that renamed, and gets renamed back), keeping the provider's takes the
+     * local rename back (TREK then reads as unchanged, and follows).
+     */
+    const localName = item.file_id === null
+      ? null
+      : (this.db.connection
+          .prepare('SELECT original_name FROM trip_files WHERE id = ?')
+          .get(item.file_id) as { original_name: string } | undefined)?.original_name ?? null;
+
     if (keep === 'trek') {
       // Forget the provider's version marker, so the next run sees no upstream
       // change and pushes TREK's copy. Clearing content_sha256 instead would do
@@ -698,10 +788,25 @@ export class DocSyncService {
       this.db.connection
         .prepare("UPDATE document_sync_items SET state = 'pending', remote_version = NULL, error_code = NULL WHERE id = ?")
         .run(itemId);
+      // Carry the name over as well, here rather than by moving the arbiter:
+      // TREK winning means the provider's copy takes TREK's name, and the only
+      // way to say that through `remote_name` would be to write the provider's
+      // CURRENT name into it — which this method does not know without asking.
+      if (localName && item.remote_id && localName !== item.remote_name) {
+        await this.renameRemoteTo(link, String(item.remote_id), localName, itemId);
+      }
     } else if (keep === 'provider') {
       this.db.connection
         .prepare("UPDATE document_sync_items SET state = 'pending', content_sha256 = NULL, error_code = NULL WHERE id = ?")
         .run(itemId);
+      // Take the local rename back to the agreed name. Only the provider's
+      // rename is then left standing, and the next run follows it the ordinary
+      // way — through the planner, with no special case in it.
+      if (item.file_id !== null && item.remote_name && localName !== item.remote_name) {
+        this.db.connection
+          .prepare('UPDATE trip_files SET original_name = ? WHERE id = ?')
+          .run(item.remote_name, item.file_id);
+      }
     } else {
       // Detach the pairing and let the next run pull the provider copy as a new
       // document. Both versions survive, under two rows.

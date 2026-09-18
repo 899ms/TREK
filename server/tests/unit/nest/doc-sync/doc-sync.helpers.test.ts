@@ -489,3 +489,84 @@ describe('planReconcile > upstream reported as unchanged', () => {
     expect(p.massDeleteGuardTripped).toBe(true);
   });
 });
+
+/**
+ * A download that failed once must be tried again.
+ *
+ * `pull()` records the failure together with the remote's current version, so
+ * the next run computed `remoteChanged = false`; with no local file the other
+ * branches had nothing to compare and the row fell through to `touch`. Nothing
+ * in the planner ever planned a second attempt, so the document never arrived,
+ * the attempt counter never grew past one, and "Sync now" produced the same
+ * plan. The asymmetry was visible in these tests: a failed PUSH was covered,
+ * because the TREK-only branch re-plans it; a failed PULL was not.
+ */
+describe('planReconcile > a pairing whose download never landed', () => {
+  const failedPull = (over: Partial<SyncItemState> = {}) =>
+    item({ id: 40, fileId: null, remoteId: 'r1', remoteVersion: 'v1', contentSha256: null, state: 'error', ...over });
+
+  it('plans another download', () => {
+    const p = plan({
+      items: [failedPull()],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [],
+    });
+    expect(p.actions).toEqual([{ kind: 'pull_update', remote: expect.objectContaining({ remoteId: 'r1' }), itemId: 40 }]);
+  });
+
+  it('does not on a push-only binding, which has no business pulling', () => {
+    const p = plan({
+      items: [failedPull()],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [],
+      direction: 'push',
+    });
+    expect(p.actions.map(a => a.kind)).not.toContain('pull_update');
+  });
+
+  it('leaves a rejected type alone: that answer does not change by trying again', () => {
+    const p = plan({
+      items: [failedPull({ state: 'rejected_type' })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [],
+    });
+    expect(p.actions.map(a => a.kind)).not.toContain('pull_update');
+  });
+
+  it('leaves an oversized document alone for the same reason', () => {
+    const p = plan({
+      items: [failedPull({ state: 'too_large' })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [],
+    });
+    expect(p.actions.map(a => a.kind)).not.toContain('pull_update');
+  });
+
+  it('does try a rejected one again once the document upstream changes', () => {
+    const p = plan({
+      items: [failedPull({ state: 'rejected_type' })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v2' })],
+      local: [],
+    });
+    expect(p.actions.map(a => a.kind)).toContain('pull_update');
+  });
+
+  it('gives up with the rest once the attempts are spent', () => {
+    const p = plan({
+      items: [failedPull({ attempts: 6 })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [],
+      maxAttempts: 6,
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('leaves a healthy pairing on touch, not on a pointless re-download', () => {
+    const p = plan({
+      items: [item({ remoteId: 'r1', remoteVersion: 'v1' })],
+      remote: [remote({ remoteId: 'r1', remoteVersion: 'v1' })],
+      local: [local({ fileId: 1 })],
+    });
+    expect(p.actions.map(a => a.kind)).toEqual(['touch']);
+  });
+});

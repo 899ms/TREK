@@ -55,8 +55,16 @@ const WEBHOOK_EVENTS = [
   'OCP\\Files\\Events\\Node\\NodeRenamedEvent',
 ] as const;
 
-/** Header the subscription carries the shared secret in; the core verifies it. */
-const WEBHOOK_SECRET_HEADER = 'X-TREK-Docsync-Signature';
+/**
+ * Header the subscription carries the shared secret in.
+ *
+ * It has to be the one the endpoint reads — `doc-sync-webhook.controller.ts`
+ * looks for `x-trek-docsync-secret`. It used to say `X-TREK-Docsync-Signature`
+ * here, so every webhook Nextcloud actually sent arrived without a secret the
+ * controller could find and was silently dropped: the subscription existed, the
+ * calls arrived, and nothing ever came of them.
+ */
+const WEBHOOK_SECRET_HEADER = 'x-trek-docsync-secret';
 
 /** Where a Nextcloud connection looks for trip folders when nobody said otherwise. */
 const DEFAULT_BASE_PATH = '/TREK';
@@ -554,6 +562,11 @@ export class WebdavDocumentProvider implements DocumentProvider {
         mtimeSeconds: req.mtimeSeconds,
         sha256: req.sha256,
         ifMatch: req.expectedRemoteVersion,
+        // Creating means creating: an unconditional PUT to a name that is
+        // already taken overwrites somebody else's document without a word.
+        // Two trips bound to one folder, or a person who put a `receipt.pdf`
+        // there by hand, are enough for that to happen.
+        ifNoneMatch: req.remoteId ? undefined : '*',
       });
 
       // Best effort, and deliberately not fatal: the bytes are already stored,
@@ -796,7 +809,12 @@ export class WebdavDocumentProvider implements DocumentProvider {
   ): Promise<string | null> {
     if (remoteId.startsWith(PATH_ID_PREFIX)) {
       const relative = remoteId.slice(PATH_ID_PREFIX.length);
-      return relative ? `${resolved.rootPath}/${encodePath(relative)}` : null;
+      // The path comes out of a listing, which is the provider's word and not
+      // TREK's. A `..` in it would address a file outside the folder the trip is
+      // bound to — every other id here is opaque, this one is a path and has to
+      // be treated like one.
+      if (!relative || relative.split('/').some(seg => seg === '..' || seg === '.')) return null;
+      return `${resolved.rootPath}/${encodePath(relative)}`;
     }
 
     const cached = this.hrefCache.get(this.cacheKey(conn, scope))?.get(remoteId);

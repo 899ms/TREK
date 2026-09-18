@@ -92,12 +92,6 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
   const [connections, setConnections] = useState<DocSyncConnection[]>([])
   const [links, setLinks] = useState<DocSyncLink[]>([])
   const [itemCounts, setItemCounts] = useState<Record<string, number>>({})
-  /**
-   * What the last run of each binding moved, so the flow bar can show numbers
-   * on its lanes. Kept in memory rather than persisted: it describes one run,
-   * and after a reload "nothing moved since you got here" is the honest answer.
-   */
-  const [lastRun, setLastRun] = useState<Record<number, { pulled: number; pushed: number }>>({})
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -111,8 +105,21 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
    */
   const loadedOnce = useRef(false)
 
+  /**
+   * Which load is the current one.
+   *
+   * Four requests go out per load and several loads overlap — every mutation
+   * starts one, and so does every ping. Without a generation stamp the slowest
+   * response wins, which on a binding somebody just changed means the screen
+   * settles on the state from before the change.
+   */
+  const generation = useRef(0)
+  /** Whether the last failure came from loading rather than from a write. */
+  const loadFailed = useRef(false)
+
   const load = useCallback(async () => {
     if (!enabled) return
+    const mine = ++generation.current
     if (!loadedOnce.current) setLoading(true)
     try {
       const [p, c, l, s] = await Promise.all([
@@ -121,6 +128,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
         docsyncApi.listLinks(tripId),
         docsyncApi.status(tripId),
       ])
+      if (mine !== generation.current) return
       setProviders(p as DocSyncProvider[])
       setConnections(c as DocSyncConnection[])
       // The status route carries the holdings; the links route does not, so the
@@ -129,14 +137,28 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
       const holdingsById = new Map((status.links ?? []).map(x => [x.id, x.holdings]))
       setLinks((l as DocSyncLink[]).map(x => ({ ...x, holdings: holdingsById.get(x.id) })))
       setItemCounts(status.items || {})
-      setError(null)
+      // Only a load failure is cleared here. A write that just failed reloads to
+      // put the server's answer back on screen, and clearing unconditionally
+      // wiped the reason it had set a moment earlier.
+      setError(prev => (prev !== null && loadFailed.current ? null : prev))
+      loadFailed.current = false
       loadedOnce.current = true
-    } catch {
-      // A failure here means the addon is off or the user lost access, both of
-      // which the panel renders as "nothing to configure" rather than an alarm.
-      setProviders([])
+    } catch (e: unknown) {
+      // A 403 or 404 really does mean "nothing to configure here" — the addon is
+      // off or this person lost access — and blanking the panel is the honest
+      // answer. Anything else is a failure to say so: blanking on a dropped
+      // connection told the user their provider list was empty.
+      if (mine !== generation.current) return
+      const status = (e as { response?: { status?: number } })?.response?.status
+      loadFailed.current = true
+      if (status === 403 || status === 404) {
+        setProviders([])
+        setError(null)
+      } else {
+        setError(readError(e))
+      }
     } finally {
-      setLoading(false)
+      if (mine === generation.current) setLoading(false)
     }
   }, [tripId, enabled])
 
@@ -228,20 +250,40 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
     }
   }, [tripId, load])
 
+  /**
+   * Change one binding, optimistically.
+   *
+   * The reload in `finally` puts the server's answer back either way, so a
+   * refused change corrects itself on screen — but it used to do that in
+   * silence, with the rejection escaping into a `void` call site. The switch
+   * simply flipped back and nobody said why.
+   */
   const updateLink = useCallback(async (linkId: number, patch: Record<string, unknown>) => {
     setLinks(prev => prev.map(l => (l.id === linkId ? { ...l, ...patch } as DocSyncLink : l)))
+    setError(null)
     try {
       await docsyncApi.updateLink(tripId, linkId, patch)
-    } finally {
       await load()
+      return true
+    } catch (e: unknown) {
+      // Reload first, so the optimistic value is corrected, then say why —
+      // the other way round the reload cleared the message again.
+      await load()
+      setError(readError(e))
+      return false
     }
   }, [tripId, load])
 
   const removeLink = useCallback(async (linkId: number) => {
     setBusy('link')
+    setError(null)
     try {
       await docsyncApi.deleteLink(tripId, linkId)
       await load()
+      return true
+    } catch (e: unknown) {
+      setError(readError(e))
+      return false
     } finally {
       setBusy(null)
     }
@@ -249,22 +291,25 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
 
   const syncNow = useCallback(async (linkId: number, full = false) => {
     setBusy(`sync-${linkId}`)
+    setError(null)
     try {
       const res = await docsyncApi.syncNow(tripId, linkId, full) as {
         state: string; pulled: number; pushed: number; conflicts: number; missing: number
       }
-      setLastRun(prev => ({ ...prev, [linkId]: { pulled: res.pulled ?? 0, pushed: res.pushed ?? 0 } }))
       await load()
       return res
+    } catch (e: unknown) {
+      // A refused run is a thing the person asked for and did not get — an
+      // orphaned binding answers 409 here — so it has to be said out loud
+      // rather than escaping into the `void` at the call site. After the
+      // reload, which would otherwise clear the message.
+      await load()
+      setError(readError(e))
+      return null
     } finally {
       setBusy(null)
     }
   }, [tripId, load])
-
-  const lastRunFor = useCallback(
-    (linkId: number) => lastRun[linkId] ?? { pulled: 0, pushed: 0 },
-    [lastRun],
-  )
 
   const resolveConflict = useCallback(async (itemId: number, keep: 'trek' | 'provider' | 'both') => {
     await docsyncApi.resolve(tripId, itemId, keep)
@@ -281,7 +326,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
     connectionFor, load,
     saveConnection, testConnection,
     loadScopes, createScope,
-    createLink, updateLink, removeLink, syncNow, resolveConflict, lastRunFor,
+    createLink, updateLink, removeLink, syncNow, resolveConflict,
   }
 }
 

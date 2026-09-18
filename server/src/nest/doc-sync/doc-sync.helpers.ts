@@ -288,6 +288,27 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
       continue;
     }
 
+    /**
+     * Paired upstream, absent in TREK: the download never landed.
+     *
+     * A failed pull stores the remote's version alongside the error, so on the
+     * next run `remoteChanged` is false, there is no local file for the other
+     * branches to compare against, and the row fell through to `touch` — which
+     * refreshes it and changes nothing. Nothing anywhere planned a second
+     * attempt: the document never arrived, no retry ever happened, and pressing
+     * "Sync now" did not help either, because the plan was the same.
+     *
+     * A rejected type and an oversized file are left out on purpose. Those are
+     * not transport failures; they are answers, and they stay true until the
+     * document upstream changes — which the `remoteChanged` branch below picks
+     * up on its own.
+     */
+    if (!l && it.fileId === null && direction !== 'push'
+        && it.state !== 'rejected_type' && it.state !== 'too_large') {
+      add({ kind: 'pull_update', remote: r, itemId: it.id });
+      continue;
+    }
+
     if (remoteChanged && !isEcho && localChanged) {
       add({ kind: 'conflict', itemId: it.id, remote: r, local: l ?? null });
       continue;

@@ -16,6 +16,8 @@ vi.mock('../../../../src/db/database', () => ({
 import { DocSyncWebhookController } from '../../../../src/nest/doc-sync/doc-sync-webhook.controller';
 import type { DocSyncConfigService, LinkRow } from '../../../../src/nest/doc-sync/doc-sync-config.service';
 import type { DocSyncService } from '../../../../src/nest/doc-sync/doc-sync.service';
+import type { AddonsService } from '../../../../src/nest/addons/addons.service';
+import type { DatabaseService } from '../../../../src/nest/database/database.service';
 
 /**
  * The webhook endpoint, with both services stubbed.
@@ -69,6 +71,15 @@ const config = {
   webhookSecret: vi.fn(() => SECRET),
 };
 
+const settings = new Map<string, string>();
+const addons = { isAddonEnabled: vi.fn(() => true) };
+const db = {
+  get: vi.fn((_sql: string, key?: unknown) => {
+    const value = settings.get(String(key));
+    return value === undefined ? undefined : { value };
+  }),
+};
+
 const sync = {
   syncLink: vi.fn(async (_link: LinkRow) => ({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 })),
 };
@@ -76,6 +87,8 @@ const sync = {
 const controller = new DocSyncWebhookController(
   config as unknown as DocSyncConfigService,
   sync as unknown as DocSyncService,
+  addons as unknown as AddonsService,
+  db as unknown as DatabaseService,
 );
 
 /** Only what the handler reads: headers, the parsed body, and the raw bytes. */
@@ -105,6 +118,8 @@ function papraReq(payload: string, signature: string, sent = payload): Request {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
+  settings.clear();
+  addons.isAddonEnabled.mockReturnValue(true);
   config.getLinkByToken.mockImplementation((token: string) => (token === 'tok-live' ? link() : undefined));
   config.getLink.mockImplementation((id: number) => (id === 4 ? link() : undefined));
   config.webhookSecret.mockReturnValue(SECRET);
@@ -318,5 +333,41 @@ describe('a burst of nudges', () => {
     controller.onModuleDestroy();
     settle();
     expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The switches an admin expects to mean "off".
+ *
+ * The scheduler obeys both the Documents addon and the app_settings kill
+ * switch; the webhook obeyed neither, so switching document sync off stopped
+ * the poll while every provider holding a webhook carried on driving full runs.
+ */
+describe('the admin switches', () => {
+  it('does nothing while the Documents addon is off', () => {
+    addons.isAddonEnabled.mockReturnValue(false);
+    expect(controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }))).toEqual({ received: true });
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while the kill switch is set', () => {
+    settings.set('docsync_sync_enabled', 'false');
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('drops a scheduled run when the addon goes off inside the window', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    addons.isAddonEnabled.mockReturnValue(false);
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('runs normally while both are on', () => {
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 });

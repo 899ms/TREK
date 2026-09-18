@@ -28,6 +28,7 @@ import {
   tagSearchQuery,
 } from '../../../../src/nest/doc-sync/providers/papra.client';
 import { PapraProvider, buildScopeKey, parseScopeKey } from '../../../../src/nest/doc-sync/providers/papra.provider';
+import { multipartHeader } from '../../../../src/nest/doc-sync/providers/papra.client';
 
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
@@ -1057,5 +1058,32 @@ describe('the version marker', () => {
   it('survives a missing hash and a missing timestamp', () => {
     const sparse = { ...base, originalSha256Hash: null, updatedAt: null, createdAt: null, originalName: null };
     expect(snapshotVersion(sparse)).toMatch(/^[0-9a-f]{64}$/);
+  });
+});
+
+/**
+ * The media type goes into a header, so it has to survive being one.
+ *
+ * It comes from `trip_files.mime_type` — influenced by an upload — and went in
+ * untouched while the filename beside it was escaped. A CR or LF ends the
+ * header early and lets what follows be read as headers of its own.
+ */
+describe('multipart part header', () => {
+  it('keeps an ordinary media type', () => {
+    expect(multipartHeader('B', 'a.pdf', 'application/pdf').toString())
+      .toContain('Content-Type: application/pdf');
+  });
+
+  it('refuses one carrying a newline instead of writing it into the header', () => {
+    const header = multipartHeader('B', 'a.pdf', 'application/pdf\r\nX-Evil: 1').toString();
+    expect(header).not.toContain('X-Evil');
+    expect(header).toContain('Content-Type: application/octet-stream');
+  });
+
+  it('falls back for anything that is not a media type at all', () => {
+    for (const bad of ['', 'nonsense', 'a/b/c', 'a b/c']) {
+      expect(multipartHeader('B', 'a.pdf', bad).toString())
+        .toContain('Content-Type: application/octet-stream');
+    }
   });
 });

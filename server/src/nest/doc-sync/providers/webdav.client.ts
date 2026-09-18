@@ -126,6 +126,8 @@ export interface WebdavPutOptions {
   sha256: string;
   /** Optimistic concurrency. Both products answer a mismatch with 412. */
   ifMatch?: string;
+  /** `*` refuses to create over an existing resource (RFC 9110 §13.1.2). */
+  ifNoneMatch?: string;
 }
 
 export interface WebdavPutResult {
@@ -624,6 +626,9 @@ export class WebdavClient {
     };
     if (creds.flavor === 'nextcloud' && /^[0-9a-f]{64}$/i.test(options.sha256)) {
       headers['OC-Checksum'] = `SHA256:${options.sha256.toLowerCase()}`;
+    }
+    if (options.ifNoneMatch) {
+      headers['If-None-Match'] = options.ifNoneMatch;
     }
     if (options.ifMatch) {
       headers['If-Match'] = options.ifMatch;

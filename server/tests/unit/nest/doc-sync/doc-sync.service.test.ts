@@ -165,6 +165,11 @@ const files = {
       .run(tripId, file.filename, file.originalname, file.size, file.mimetype, uploadedBy || null);
     return testDb.prepare('SELECT * FROM trip_files WHERE id = ?').get(info.lastInsertRowid);
   }),
+  // Writes for real, like the two above: a double that answers but changes
+  // nothing lets a missing call pass as a passing test.
+  softDeleteFile: vi.fn((id: string | number) => {
+    testDb.prepare('UPDATE trip_files SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?').run(id);
+  }),
 } as unknown as FilesService;
 
 const realtime = { broadcast: vi.fn() } as unknown as RealtimeService;
@@ -927,6 +932,69 @@ describe('DocSyncService', () => {
       expect(itemRow(itemId).state).toBe('synced');
     });
 
+    /**
+     * The double rename is the only conflict a person can actually produce, and
+     * it is arbitrated by `remote_name` alone. Clearing a version marker left
+     * all three names untouched, so the next run raised the same conflict again
+     * — whatever the owner chose, the issue came back within minutes, forever.
+     */
+    describe('a double rename', () => {
+      function seedRenameConflict(link: LinkRow) {
+        const fileId = makeFile({ name: 'Invoice.pdf' });   // renamed in TREK
+        const itemId = seedItem(link, {
+          remoteId: 'r1',
+          remoteName: 'Bill.pdf',                            // what both agreed on
+          remoteVersion: 'v1',
+          fileId,
+          state: 'conflict',
+          contentSha256: 'agreed-hash',
+        });
+        return { itemId, fileId };
+      }
+
+      it('renames the provider copy to TREK name when TREK wins', async () => {
+        const link = makeLink();
+        const { itemId } = seedRenameConflict(link);
+        provider.list.mockResolvedValue(ok(listing([
+          remoteDoc({ remoteId: 'r1', name: 'Invoice.pdf', remoteVersion: 'v2' }),
+        ])));
+
+        await service.resolveConflict(itemId, 'trek');
+
+        expect(provider.rename).toHaveBeenCalledWith(
+          expect.anything(), expect.anything(), 'r1', 'Invoice.pdf',
+        );
+        expect(itemRow(itemId).remote_name).toBe('Invoice.pdf');
+      });
+
+      it('takes the local rename back when the provider wins, so TREK follows next run', async () => {
+        const link = makeLink();
+        const { itemId, fileId } = seedRenameConflict(link);
+        provider.list.mockResolvedValue(ok(listing([
+          remoteDoc({ remoteId: 'r1', name: 'Rechnung.pdf', remoteVersion: 'v1' }),
+        ])));
+
+        await service.resolveConflict(itemId, 'provider');
+
+        const file = testDb.prepare('SELECT original_name FROM trip_files WHERE id = ?').get(fileId) as { original_name: string };
+        expect(file.original_name).toBe('Rechnung.pdf');
+      });
+
+      it('does not leave the row in conflict either way', async () => {
+        for (const keep of ['trek', 'provider'] as const) {
+          const link = makeLink();
+          const { itemId } = seedRenameConflict(link);
+          provider.list.mockResolvedValue(ok(listing([
+            remoteDoc({ remoteId: 'r1', name: 'Rechnung.pdf', remoteVersion: 'v1' }),
+          ])));
+
+          await service.resolveConflict(itemId, keep);
+
+          expect(itemRow(itemId).state, `keep=${keep} left the row in conflict`).not.toBe('conflict');
+        }
+      });
+    });
+
     it('refuses to resolve a pairing that is not in conflict', async () => {
       const link = makeLink();
       const itemId = seedItem(link, { remoteId: 'r1', state: 'synced' });
@@ -959,6 +1027,165 @@ describe('DocSyncService', () => {
    * an audit rather than by a failing test, which is why the check lives here,
    * next to the row it is about.
    */
+  /**
+   * An upstream edit replaces TREK's copy instead of joining it.
+   *
+   * `pull_update` routes into the same `pull()` as a first download, and
+   * `FilesService.createFile` only inserts — so the edit arrived as a SECOND
+   * document while the first stayed in the file manager holding the old bytes.
+   * Worse, the pairing moves to the new row, which leaves the old one with no
+   * sync item: the next run reads it as a document TREK gained and pushes the
+   * superseded version back up. One edit, two documents on each side, growing
+   * with every further edit.
+   */
+  describe('pull_update replaces rather than accumulates', () => {
+    function seedSynced(link: LinkRow): { itemId: number; fileId: number } {
+      const fileId = makeFile({ name: 'invoice.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1',
+        remoteName: 'invoice.pdf',
+        remoteVersion: 'v1',
+        fileId,
+        state: 'synced',
+        contentSha256: 'agreed-hash',
+      });
+      return { itemId, fileId };
+    }
+
+    it('puts the superseded copy in the trash instead of leaving it beside the new one', async () => {
+      const link = makeLink();
+      const { fileId } = seedSynced(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      await service.syncLink(link);
+
+      const rows = fileRows();
+      const old = rows.find(r => Number(r.id) === fileId) as Record<string, unknown>;
+      const fresh = rows.find(r => Number(r.id) !== fileId) as Record<string, unknown>;
+      expect(old.deleted_at).not.toBeNull();
+      expect(fresh).toBeDefined();
+      expect(fresh.deleted_at).toBeNull();
+    });
+
+    it('leaves exactly one live document, so the file manager does not show two', async () => {
+      const link = makeLink();
+      seedSynced(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      await service.syncLink(link);
+
+      expect(fileRows().filter(r => r.deleted_at === null)).toHaveLength(1);
+    });
+
+    it('does not push the superseded copy back on the next run', async () => {
+      const link = makeLink();
+      seedSynced(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2' }),
+      ])));
+      await service.syncLink(link);
+
+      provider.push.mockClear();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2' }),
+      ])));
+      await service.syncLink(link);
+
+      expect(provider.push).not.toHaveBeenCalled();
+    });
+
+    it('leaves a first download alone: there is nothing to supersede', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-new', name: 'fresh.pdf', remoteVersion: 'v1' }),
+      ])));
+
+      await service.syncLink(link);
+
+      expect(fileRows().filter(r => r.deleted_at === null)).toHaveLength(1);
+    });
+  });
+
+  /**
+   * The attempt counter and the backoff curve, which were both stuck.
+   *
+   * The backoff was always computed at step 1, so three of the curve's four
+   * steps were unreachable and a provider that was down got asked again at the
+   * same short interval. And the counter only ever grew: a row that failed once
+   * a month reached the limit after six months of otherwise healthy syncing and
+   * was shelved permanently. Driven here through real runs, since the write is
+   * private and a test hatch would only prove the hatch works.
+   */
+  describe('retry bookkeeping', () => {
+    /**
+     * One run in which the download fails, with the backoff window skipped.
+     *
+     * The window is real and the planner honours it, so without clearing it the
+     * second run would correctly skip the row and this would be measuring the
+     * backoff rather than the counter.
+     */
+    async function failingRun(link: LinkRow) {
+      testDb.prepare("UPDATE document_sync_items SET next_attempt_at = NULL WHERE remote_id = 'r-flaky'").run();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-flaky', name: 'flaky.pdf', remoteVersion: 'v1' }),
+      ])));
+      provider.fetch.mockResolvedValueOnce(fail('provider_error'));
+      await service.syncLink(link);
+    }
+
+    /** One run in which it works. */
+    async function goodRun(link: LinkRow) {
+      testDb.prepare("UPDATE document_sync_items SET next_attempt_at = NULL WHERE remote_id = 'r-flaky'").run();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-flaky', name: 'flaky.pdf', remoteVersion: 'v1' }),
+      ])));
+      await service.syncLink(link);
+    }
+
+    const flakyRow = () => testDb
+      .prepare("SELECT * FROM document_sync_items WHERE remote_id = 'r-flaky'")
+      .get() as Record<string, unknown>;
+
+    it('counts consecutive failures', async () => {
+      const link = makeLink();
+      await failingRun(link);
+      expect(flakyRow().attempts).toBe(1);
+      await failingRun(link);
+      expect(flakyRow().attempts).toBe(2);
+    });
+
+    it('clears the counter once a pass succeeds, so the limit means six in a row', async () => {
+      const link = makeLink();
+      await failingRun(link);
+      await failingRun(link);
+      expect(flakyRow().attempts).toBe(2);
+
+      await goodRun(link);
+
+      expect(flakyRow().attempts).toBe(0);
+    });
+
+    it('schedules each failure further out than the last', async () => {
+      const link = makeLink();
+      const waits: number[] = [];
+      for (let i = 0; i < 3; i += 1) {
+        await failingRun(link);
+        const row = flakyRow();
+        const secs = (testDb
+          .prepare("SELECT CAST((julianday(?) - julianday('now')) * 86400 AS INTEGER) AS s")
+          .get(row.next_attempt_at) as { s: number }).s;
+        waits.push(secs);
+      }
+      // Rising rather than flat: the curve used to be indexed at 1 every time.
+      expect(waits[1]).toBeGreaterThan(waits[0]);
+      expect(waits[2]).toBeGreaterThan(waits[1]);
+    });
+  });
+
   describe('resolveConflict across trips', () => {
     function conflictedItem(linkId: number, tripOfItem: number): number {
       return Number(testDb.prepare(

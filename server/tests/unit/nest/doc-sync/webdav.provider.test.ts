@@ -786,7 +786,11 @@ describe('webhooks', () => {
     expect(bodies[0].get('httpMethod')).toBe('POST');
     expect(bodies[0].get('uri')).toBe('https://trek.example/hook');
     expect(bodies[0].get('authMethod')).toBe('header');
-    expect(bodies[0].get('authData[X-TREK-Docsync-Signature]')).toBe('s3cret');
+    // The header the endpoint actually reads. It used to be registered as
+    // `X-TREK-Docsync-Signature` while doc-sync-webhook.controller looks for
+    // `x-trek-docsync-secret`, so every webhook Nextcloud sent was dropped
+    // without a trace: the subscription existed and the calls arrived.
+    expect(bodies[0].get('authData[x-trek-docsync-secret]')).toBe('s3cret');
     // A $regex filter is not merely ignored upstream: it throws inside the
     // listener and stops delivery for every other webhook on that event.
     expect(bodies.every((body) => [...body.keys()].every((key) => !key.startsWith('eventFilter')))).toBe(true);

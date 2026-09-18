@@ -212,7 +212,7 @@ describe('useDocSync spinner', () => {
     listLinksApi.mockReturnValueOnce(gate.promise)
     seenLoading.length = 0
 
-    let pending!: Promise<void>
+    let pending!: Promise<boolean>
     await act(async () => { pending = result.current.updateLink(1, { syncEnabled: false }) })
     expect(result.current.loading).toBe(false)
 
@@ -235,7 +235,7 @@ describe('useDocSync updateLink', () => {
     const gate = deferred<unknown>()
     updateLinkApi.mockReturnValueOnce(gate.promise)
 
-    let pending!: Promise<void>
+    let pending!: Promise<boolean>
     await act(async () => { pending = result.current.updateLink(1, { direction: 'pull' }) })
 
     expect(result.current.links[0].direction).toBe('pull')
@@ -257,14 +257,18 @@ describe('useDocSync updateLink', () => {
 
   it('FE-DOCSYNC-HOOK-011: a rejected update does not leave the optimistic value standing', async () => {
     const { result } = await mountLoaded()
-    updateLinkApi.mockRejectedValueOnce(new Error('conflict'))
+    updateLinkApi.mockRejectedValueOnce({ response: { data: { error: 'forbidden' } } })
+    listLinksApi.mockResolvedValueOnce([link({ direction: 'both' })])
 
-    await act(async () => {
-      await expect(result.current.updateLink(1, { syncEnabled: false })).rejects.toThrow('conflict')
-    })
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.updateLink(1, { direction: 'pull' }) })
 
-    expect(listLinksApi).toHaveBeenCalledTimes(2)
-    expect(result.current.links[0].syncEnabled).toBe(true)
+    // Reported rather than thrown: both shells call this as `void`, so a
+    // rejection reached nobody. The reload puts the server's answer back and
+    // the reason stays on screen.
+    expect(ok).toBe(false)
+    expect(result.current.links[0].direction).toBe('both')
+    expect(result.current.error).toBe('forbidden')
   })
 })
 
@@ -333,19 +337,24 @@ describe('useDocSync run and save feedback', () => {
     await act(async () => { await result.current.syncNow(1) })
 
     expect(syncNowApi).toHaveBeenCalledWith(TRIP, 1, false)
-    expect(result.current.lastRunFor(1)).toEqual({ pulled: 4, pushed: 2 })
-    // a binding nobody ran in this session reports zeros, not someone else numbers
-    expect(result.current.lastRunFor(2)).toEqual({ pulled: 0, pushed: 0 })
+    // What a run moved is no longer kept: the flow bar shows standing holdings,
+    // which is the question somebody opening the dialog actually has. The run's
+    // own numbers were only ever on screen for the moment after pressing it.
+    expect(result.current.links).toHaveLength(1)
   })
 
-  it('FE-DOCSYNC-HOOK-017: a run that reports no numbers counts as nothing moved', async () => {
-    syncNowApi.mockResolvedValue({ state: 'ok' })
+  it('FE-DOCSYNC-HOOK-017: a refused run says so instead of vanishing into a void call', async () => {
+    // syncNow is called as `void sync.syncNow(...)` from both shells, so a
+    // rejection that escaped the hook reached nobody. An orphaned binding
+    // answers 409 here, and the person pressing the button deserves the reason.
+    syncNowApi.mockRejectedValueOnce({ response: { data: { error: 'link_orphaned' } } })
     const { result } = await mountLoaded()
 
-    await act(async () => { await result.current.syncNow(1, true) })
+    let outcome: unknown
+    await act(async () => { outcome = await result.current.syncNow(1) })
 
-    expect(syncNowApi).toHaveBeenCalledWith(TRIP, 1, true)
-    expect(result.current.lastRunFor(1)).toEqual({ pulled: 0, pushed: 0 })
+    expect(outcome).toBeNull()
+    expect(result.current.error).toBe('link_orphaned')
   })
 
   it('FE-DOCSYNC-HOOK-018: a refused save reports failure and surfaces the server reason', async () => {

@@ -2,7 +2,10 @@ import { Controller, HttpCode, OnModuleDestroy, Param, Post, Req } from '@nestjs
 import type { Request } from 'express';
 import crypto from 'crypto';
 import { Public } from '../auth/public.decorator';
-import { WEBHOOK_NUDGE_DEBOUNCE_SECONDS } from './doc-sync.constants';
+import { ADDON_IDS } from '../../addons';
+import { AddonsService } from '../addons/addons.service';
+import { DatabaseService } from '../database/database.service';
+import { SETTING_SYNC_ENABLED, WEBHOOK_NUDGE_DEBOUNCE_SECONDS } from './doc-sync.constants';
 import { DocSyncConfigService } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 
@@ -39,7 +42,28 @@ export class DocSyncWebhookController implements OnModuleDestroy {
   constructor(
     private readonly config: DocSyncConfigService,
     private readonly sync: DocSyncService,
+    private readonly addons: AddonsService,
+    private readonly db: DatabaseService,
   ) {}
+
+  /**
+   * The same two switches the scheduler obeys.
+   *
+   * Without them "switch document sync off" meant "stop the poll", while every
+   * provider holding a webhook kept driving full runs — an admin turning the
+   * addon off would have watched it carry on. Checked when the timer fires as
+   * well as on arrival, so a switch thrown during the debounce window still
+   * takes effect.
+   */
+  private syncIsOn(): boolean {
+    if (!this.addons.isAddonEnabled(ADDON_IDS.DOCUMENTS)) return false;
+    const killSwitch = this.db.get<{ value: string }>(
+      'SELECT value FROM app_settings WHERE key = ?', SETTING_SYNC_ENABLED,
+    )?.value;
+    // Unrecognised values mean ON: the setting is absent by default, and only an
+    // explicit 'false' stops the sync. Same rule as the job.
+    return killSwitch !== 'false';
+  }
 
   onModuleDestroy(): void {
     for (const timer of this.pending.values()) clearTimeout(timer);
@@ -54,6 +78,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
     // Always 200, even for an unknown token: a 404 here would let anyone probe
     // which tokens exist, and a provider that gets an error will retry anyway.
     if (!link || link.sync_enabled !== 1) return { received: true };
+    if (!this.syncIsOn()) return { received: true };
 
     const secret = this.config.webhookSecret(link);
     if (secret && !this.secretMatches(req, secret)) return { received: true };
@@ -81,6 +106,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
       this.pending.delete(linkId);
       const fresh = reload();
       if (!fresh || fresh.sync_enabled !== 1) return;
+      if (!this.syncIsOn()) return;
       void this.sync.syncLink(fresh);
     }, WEBHOOK_NUDGE_DEBOUNCE_SECONDS * 1000);
     // A pending nudge must not hold the process open at shutdown.
