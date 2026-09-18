@@ -86,6 +86,26 @@ export const CORRIDOR_CATEGORY_BY_KEY: Record<string, CorridorCategory> = Object
 /** The keys the corridor search offers, in the order the panel shows them. */
 export const CORRIDOR_CATEGORY_KEYS = CORRIDOR_CATEGORIES.map(c => c.key)
 
+/**
+ * The kind a stop added by hand opens on, read off what the corridor is looking for.
+ *
+ * The categories are what the traveller has just told the search to find, so they are
+ * also the best reading of what they are about to add themselves, and on an electric
+ * car the panel seeds itself to charging, which is precisely the case where a form
+ * opening on a fuel pump read as a fault.
+ *
+ * The picker is multi-select, so the first category the panel LISTS wins. Falling back
+ * instead would open on a kind that is not among the ones switched on, which is a worse
+ * answer than any of them. Null only when nothing is selected at all; the caller decides
+ * what that means, because a form must never open on no kind (see `DEFAULT_SERVICE_KIND`).
+ */
+export function manualStopKindFor(categories: readonly string[]): RoadtripStopType | null {
+  for (const category of CORRIDOR_CATEGORIES) {
+    if (categories.includes(category.key) && category.stopKind) return category.stopKind
+  }
+  return null
+}
+
 /** Categories whose hit becomes a night rather than a pause. */
 export function isOvernightCategory(category: string | null | undefined): boolean {
   // Campsite is both: it is a service stop today and stays one, but a night can be

@@ -244,8 +244,16 @@ export class RoadtripRouterService {
         const origin =
           base ||
           `https://routing.openstreetmap.de/routed-${mode === 'walking' ? 'foot' : mode === 'cycling' ? 'bike' : 'car'}`;
+        // `continue_straight=false` because a stop is somewhere the traveller stops, not a
+        // shape hint. OSRM's car profile otherwise forbids a u-turn at an INTERMEDIATE
+        // waypoint, and it refuses the WHOLE request rather than the one leg it cannot
+        // obey on: a single stop on a dead end (Gouffre de Padirac snaps onto a cave
+        // access road that leads nowhere else) turned a whole routed day into a 400. The
+        // browser sends the same thing, see `uTurnParam` in client RouteCalculator.ts.
+        // Only with something in the middle to turn round at.
+        const uTurn = points.length > 2 ? '&continue_straight=false' : '';
         const payload = await this.request(
-          `${origin}/route/v1/${path}/${points.map((p) => `${p.lng},${p.lat}`).join(';')}?overview=full&geometries=geojson&steps=false`,
+          `${origin}/route/v1/${path}/${points.map((p) => `${p.lng},${p.lat}`).join(';')}?overview=full&geometries=geojson&steps=false${uTurn}`,
         );
         const parsed = osrmSchema.parse(payload);
         const route = parsed.routes[0];

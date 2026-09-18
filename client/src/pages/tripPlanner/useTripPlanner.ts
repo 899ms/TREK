@@ -316,6 +316,14 @@ export function useTripPlanner() {
    */
   const [serviceStopForm, setServiceStopForm] = useState(false)
   /**
+   * The kind that form opens on, taken from what the corridor panel was looking for.
+   *
+   * Beside the flag rather than inside it, because it is written by the same click and
+   * read by the same memo, and a second piece of state is cheaper to follow than a flag
+   * that is sometimes a boolean and sometimes an object.
+   */
+  const [serviceStopKind, setServiceStopKind] = useState<RoadtripStopType | null>(null)
+  /**
    * The corridor hit waiting to become a stop, while the small popup is open.
    *
    * The full place form is the wrong question for a petrol station — category, price,
@@ -1628,7 +1636,7 @@ export function useTripPlanner() {
    * typed-ahead search, which is the whole reason to use it, and where the stop belongs
    * is worked out at the save, from what the save carries.
    */
-  const openManualRoadtripStop = useCallback(() => {
+  const openManualRoadtripStop = useCallback((kind: RoadtripStopType | null = null) => {
     if (!can('place_edit', trip)) return
     setEditingPlace(null)
     setEditingAssignmentId(null)
@@ -1637,6 +1645,9 @@ export function useTripPlanner() {
     // form opens; this one cannot, because nothing has been chosen yet.
     setPlaceFormDayId(null)
     setPlaceFormPosition(null)
+    // Set in the same batch as the flag below, so the kind is already there when the
+    // form's opening effect reads the mode out of its closure.
+    setServiceStopKind(kind)
     setServiceStopForm(true)
     setShowPlaceForm(true)
   }, [can, trip])
@@ -1653,6 +1664,7 @@ export function useTripPlanner() {
     if (!serviceStopForm) return null
     const panelDay = roadtripCorridor.day
     return {
+      defaultKind: serviceStopKind,
       // A day that has not routed has no order to place anything in.
       days: roadtripRoutes.days
         .filter(day => day.geometry.length > 1)
@@ -1680,7 +1692,7 @@ export function useTripPlanner() {
         : null,
       targetFor: manualStopTargetFor,
     }
-  }, [serviceStopForm, roadtripRoutes.days, roadtripCorridor.day, manualStopTargetFor])
+  }, [serviceStopForm, serviceStopKind, roadtripRoutes.days, roadtripCorridor.day, manualStopTargetFor])
 
   const addRoadtripVia = useCallback(async (lat: number, lng: number) => {
     if (!can('day_edit', trip)) return

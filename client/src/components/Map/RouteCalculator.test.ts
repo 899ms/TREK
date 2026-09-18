@@ -975,3 +975,77 @@ describe('calculateAlternatives', () => {
       .rejects.toMatchObject({ name: 'RoutingRefusedError', status: 429 })
   })
 })
+
+// ── turning round at a stop ────────────────────────────────────────────────────
+
+/**
+ * Gouffre de Padirac snaps onto `Route du Puits au Salvage`, which leads nowhere else.
+ * OSRM's car profile forbids a u-turn at an INTERMEDIATE waypoint unless asked, and it
+ * refuses the ENTIRE request when it cannot obey, so a road-trip day lost every leg it
+ * had over one cave car park, while each of its pairs routed perfectly on its own.
+ */
+describe('turning round at a stop', () => {
+  const askedFor = async (
+    call: (points: { lat: number; lng: number }[]) => Promise<unknown>,
+    count: number,
+  ): Promise<string> => {
+    let asked = ''
+    server.use(http.get(`${FOSSGIS.driving}/:coords`, ({ request }) => {
+      asked = request.url
+      return HttpResponse.json(buildOsrmRouteResponse())
+    }))
+    await call(freshWaypoints(count))
+    return asked
+  }
+
+  it('FE-COMP-ROUTECALCULATOR-055: a drive that stops on the way may turn round where it stopped', async () => {
+    expect(await askedFor(p => calculateRoute(p), 3)).toContain('continue_straight=false')
+    expect(await askedFor(p => calculateRouteWithLegs(p), 3)).toContain('continue_straight=false')
+    expect(await askedFor(p => calculateSegments(p), 3)).toContain('continue_straight=false')
+  })
+
+  it('FE-COMP-ROUTECALCULATOR-056: two points have no middle, so the request is the one it always was', async () => {
+    expect(await askedFor(p => calculateRoute(p), 2)).not.toContain('continue_straight')
+    expect(await askedFor(p => calculateRouteWithLegs(p), 2)).not.toContain('continue_straight')
+    expect(await askedFor(p => calculateSegments(p), 2)).not.toContain('continue_straight')
+  })
+
+  it('FE-COMP-ROUTECALCULATOR-057: a router that has never heard of the permission is asked without it, once and then always', async () => {
+    // OSRM refuses an unknown parameter outright instead of ignoring it, and says which
+    // it is refusing: `InvalidQuery` names the query string, `NoRoute` names the road.
+    // Without this a router that predates the parameter would refuse every drive with a
+    // stop in the middle, which is a far worse fault than the one it fixes.
+    useSettingsStore.setState(st => ({ settings: { ...st.settings, routing_base_url: 'https://old-osrm.example.org' } }))
+    const asked: string[] = []
+    server.use(http.get('https://old-osrm.example.org/route/v1/driving/:coords', ({ request }) => {
+      asked.push(request.url)
+      return new URL(request.url).searchParams.has('continue_straight')
+        ? HttpResponse.json({ code: 'InvalidQuery', message: 'Query string malformed' }, { status: 400 })
+        : HttpResponse.json(buildOsrmRouteResponse())
+    }))
+
+    const first = await calculateRoute(freshWaypoints(3))
+    expect(first.coordinates).toHaveLength(2)
+    expect(asked).toHaveLength(2)
+    expect(asked[1]).not.toContain('continue_straight')
+
+    // Remembered per host, so the second drive costs one request rather than two.
+    await calculateRoute(freshWaypoints(3))
+    expect(asked).toHaveLength(3)
+    expect(asked[2]).not.toContain('continue_straight')
+    useSettingsStore.setState(st => ({ settings: { ...st.settings, routing_base_url: '' } }))
+  })
+
+  it('FE-COMP-ROUTECALCULATOR-058: a refusal about the road is still a refusal, not a second request', async () => {
+    useSettingsStore.setState(st => ({ settings: { ...st.settings, routing_base_url: 'https://noroute-osrm.example.org' } }))
+    let calls = 0
+    server.use(http.get('https://noroute-osrm.example.org/route/v1/driving/:coords', () => {
+      calls += 1
+      return HttpResponse.json({ code: 'NoRoute', message: 'No route found between points' }, { status: 400 })
+    }))
+
+    await expect(calculateRoute(freshWaypoints(3))).rejects.toThrow()
+    expect(calls).toBe(1)
+    useSettingsStore.setState(st => ({ settings: { ...st.settings, routing_base_url: '' } }))
+  })
+})

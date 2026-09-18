@@ -54,6 +54,31 @@ function routeBaseFor(profile: 'driving' | 'walking' | 'cycling'): string {
 }
 
 /**
+ * Permission to turn around at a stop, for requests that have stops to turn around at.
+ *
+ * OSRM's car profile forbids a u-turn at an INTERMEDIATE waypoint unless asked otherwise,
+ * and a refusal is not local: the whole request comes back `400 NoRoute`, every leg of it,
+ * however many were fine. A stop on a dead end is enough. Gouffre de Padirac snaps onto
+ * `Route du Puits au Salvage`, which goes nowhere else, so a day that visits it in the
+ * middle lost all its legs at once while each of its pairs routed perfectly on its own.
+ * That is also why the fault looked like it depended on how the stops were spread across
+ * days: a pair on a day boundary is asked for on its own, and a request with nothing in
+ * the middle has nothing to refuse.
+ *
+ * Correct as well as convenient here. TREK's waypoints are places somebody stops at, not
+ * shape hints, and the way out of a dead end IS the way back in, and the constraint was
+ * buying a detour even where it did not refuse outright.
+ *
+ * Empty for two waypoints, which have no middle, so the many two-point callers
+ * (alternatives, the day connectors, booking geometry) keep the URL they had.
+ */
+const U_TURN_PARAM = '&continue_straight=false'
+
+function uTurnParam(waypoints: readonly Waypoint[]): string {
+  return waypoints.length > 2 ? U_TURN_PARAM : ''
+}
+
+/**
  * `fetch`, with the request counted.
  *
  * Every route TREK draws goes out from here, and nowhere else, which makes this the one
@@ -79,16 +104,65 @@ async function routedFetch(
   let km = 0
   for (let i = 1; i < waypoints.length; i++) km += haversineKm(waypoints[i - 1], waypoints[i])
   const sample = { profile, surface: kind, selfHosted, waypoints: waypoints.length, km }
+  const asked = withoutUTurnIfRefused(url)
   try {
-    const response = await fetch(url, { signal })
+    const response = await fetch(asked, { signal })
     countRoute({ ...sample, failed: !response.ok })
-    return response
+    if (response.ok || !asked.includes(U_TURN_PARAM)) return response
+    const plain = await droppedUTurn(asked, response)
+    if (!plain) return response
+    const second = await fetch(plain, { signal })
+    countRoute({ ...sample, failed: !second.ok })
+    return second
   } catch (err) {
     if (!(err instanceof DOMException && err.name === 'AbortError')) {
       countRoute({ ...sample, failed: true })
     }
     throw err
   }
+}
+
+/**
+ * Hosts that answered `InvalidQuery` to `continue_straight`, by origin.
+ *
+ * OSRM refuses an unknown query parameter outright rather than ignoring it, so a router
+ * that has never heard of this one would refuse EVERY request with a stop in the middle,
+ * which is a far worse fault than the one it fixes. `osrm-routed` has understood it
+ * since 5.6, so this is about something else answering under `routing_base_url`, and the
+ * first real request is the probe: there is no separate one.
+ *
+ * By origin rather than per profile, because a router either knows the parameter or does
+ * not; and in a Set rather than a setting, so pointing the instance at a router that does
+ * know it starts asking again without a reload. Same shape and the same reasoning as
+ * `excludeUnsupported` below.
+ */
+const uTurnUnsupported = new Set<string>()
+
+const originOf = (url: string): string => {
+  try { return new URL(url).origin } catch { return url }
+}
+
+/** The url as it should go out, with the permission dropped for a host that refused it. */
+function withoutUTurnIfRefused(url: string): string {
+  if (!url.includes(U_TURN_PARAM)) return url
+  return uTurnUnsupported.has(originOf(url)) ? url.replace(U_TURN_PARAM, '') : url
+}
+
+/**
+ * The same url without the u-turn permission, once it is clear the host objects to the
+ * PARAMETER and not to the route. Null when the refusal was about the route itself.
+ *
+ * OSRM says which it is: `InvalidQuery` names the query string, `NoRoute` names the road.
+ * Reading the body is safe here because this response is about to be thrown away either
+ * way, and it only happens on a 400 for a request that carried the parameter.
+ */
+async function droppedUTurn(url: string, response: Response): Promise<string | null> {
+  if (response.status !== 400) return null
+  let code: unknown
+  try { code = (await response.clone().json())?.code } catch { return null }
+  if (code !== 'InvalidQuery') return null
+  uTurnUnsupported.add(originOf(url))
+  return url.replace(U_TURN_PARAM, '')
 }
 
 /**
@@ -153,7 +227,7 @@ export async function calculateRoute(
   }
 
   const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';')
-  const url = `${routeBaseFor(profile)}/${coords}?overview=full&geometries=geojson&steps=false`
+  const url = `${routeBaseFor(profile)}/${coords}?overview=full&geometries=geojson&steps=false${uTurnParam(waypoints)}`
 
   const response = await routedFetch(url, signal, 'route', profile, waypoints)
   if (!response.ok) {
@@ -360,7 +434,7 @@ export async function calculateSegments(
   if (!waypoints || waypoints.length < 2) return []
 
   const coords = waypoints.map((p) => `${p.lng},${p.lat}`).join(';')
-  const url = `${routeBaseFor('driving')}/${coords}?overview=false&geometries=geojson&steps=false&annotations=distance,duration`
+  const url = `${routeBaseFor('driving')}/${coords}?overview=false&geometries=geojson&steps=false&annotations=distance,duration${uTurnParam(waypoints)}`
 
   const response = await routedFetch(url, signal, 'segments', 'driving', waypoints)
   if (!response.ok) throw new RoutingRefusedError(response.status, retryAfterMs(response))
@@ -488,7 +562,7 @@ export async function calculateRouteWithLegs(
   // (plugins name their own modes), which no comparison narrows to the three OSRM knows.
   const osrmProfile: 'driving' | 'walking' | 'cycling' =
     profile === 'walking' ? 'walking' : profile === 'cycling' ? 'cycling' : 'driving'
-  const url = `${routeBaseFor(osrmProfile)}/${coords}?overview=full&geometries=geojson&annotations=distance,duration`
+  const url = `${routeBaseFor(osrmProfile)}/${coords}?overview=full&geometries=geojson&annotations=distance,duration${uTurnParam(waypoints)}`
   const response = await routedFetch(url, signal, 'legs', osrmProfile, waypoints)
   if (!response.ok) throw new RoutingRefusedError(response.status, retryAfterMs(response))
 

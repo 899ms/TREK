@@ -744,7 +744,7 @@ describe('CostsPanel — settlements in the ledger', () => {
 
 type Flow = { from: { user_id: number; username: string }; to: { user_id: number; username: string }; amount: number }
 type Balance = { user_id: number; username: string; avatar_url: string | null; balance: number }
-type Payment = { id: number; from_user_id: number; to_user_id: number; amount: number; currency?: string | null; created_at?: string; settled_at?: string | null }
+type Payment = { id: number; from_user_id: number; to_user_id: number; amount: number; currency?: string | null; exchange_rate?: number; created_at?: string; settled_at?: string | null }
 
 // `members` here is the wire shape the panel reads; `paid` is only set by the server.
 type MemberFixture = { user_id: number; username?: string; amount?: number; paid?: number }

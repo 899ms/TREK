@@ -105,6 +105,31 @@ describe('server Roadtrip router', () => {
     expect((await pending).avoidMissed).toEqual(['ferry']);
     expect(safeFetchAdminConfigured).toHaveBeenCalledTimes(2);
   });
+  it('lets a drive turn round at a stop it passes through, and asks nothing extra of a single leg', async () => {
+    // OSRM's car profile forbids a u-turn at an INTERMEDIATE waypoint unless asked, and
+    // refuses the WHOLE request when it cannot obey: one stop on a dead end used to
+    // cost a routed day all of its legs at once.
+    const { router } = setup();
+    await router.route(1, 1, 1, points, 'driving', []);
+    expect(safeFetchAdminConfigured).toHaveBeenCalledWith(
+      expect.stringContaining('continue_straight=false'),
+      expect.anything(),
+    );
+
+    vi.mocked(safeFetchAdminConfigured).mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        code: 'Ok',
+        routes: [{ distance: 1000, duration: 100, geometry: { coordinates: [[10, 48], [11, 49]] }, legs: [{ distance: 1000, duration: 100 }] }],
+      })),
+    );
+    const pair = router.route(2, 1, 1, points.slice(0, 2), 'driving', []);
+    await vi.runAllTimersAsync();
+    await pair;
+    expect(safeFetchAdminConfigured).toHaveBeenLastCalledWith(
+      expect.not.stringContaining('continue_straight'),
+      expect.anything(),
+    );
+  });
   it('does not apply car avoidance to walking routes', async () => {
     const route = await setup().router.route(1, 1, 1, points, 'walking', ['toll']);
     expect(route.avoidMissed).toEqual([]);
