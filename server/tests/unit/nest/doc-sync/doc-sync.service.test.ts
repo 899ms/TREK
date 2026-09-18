@@ -1,0 +1,917 @@
+/**
+ * DocSyncService against a real in-memory database.
+ *
+ * The planner is tested as plain data next door. This file is about the half
+ * that cannot be: what the reconciler writes, what it refuses to do, and what
+ * it never asks a provider for. Those are statements about SQL and about call
+ * order, so the schema comes from the real migration array and every row is
+ * read back with plain SQL rather than through the service that wrote it.
+ *
+ * The provider is a fake because a unit test must not open a socket. Storage
+ * and the files domain are fakes because the bytes are not what is under test —
+ * but the fake files service writes real `trip_files` rows, so "nothing was
+ * downloaded" is asserted against the table the file manager reads, not against
+ * a spy alone.
+ */
+import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { Readable } from 'node:stream';
+
+const { testDb, dbMock } = vi.hoisted(() => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const Database = require('better-sqlite3');
+  const db = new Database(':memory:');
+  db.exec('PRAGMA journal_mode = WAL');
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('PRAGMA busy_timeout = 5000');
+  return {
+    testDb: db,
+    dbMock: {
+      db,
+      closeDb: () => {},
+      reinitialize: () => {},
+      getPlaceWithTags: () => null,
+      canAccessTrip: () => null,
+      isOwner: () => false,
+    },
+  };
+});
+
+vi.mock('../../../../src/db/database', () => dbMock);
+
+import type { DocsyncErrorCode } from '@trek/shared';
+import { createTables } from '../../../../src/db/schema';
+import { runMigrations } from '../../../../src/db/migrations';
+import { createTrip, createUser } from '../../../helpers/factories';
+import { DatabaseService } from '../../../../src/nest/database/database.service';
+import { AllowedFileTypesService } from '../../../../src/nest/files/allowed-file-types.service';
+import { MAX_FILE_SIZE } from '../../../../src/nest/files/files.constants';
+import { DocSyncConfigService, type LinkRow } from '../../../../src/nest/doc-sync/doc-sync-config.service';
+import { DocumentProviderRegistry } from '../../../../src/nest/doc-sync/document-provider.registry';
+import { DocSyncService } from '../../../../src/nest/doc-sync/doc-sync.service';
+import { LINK_CIRCUIT_OPEN_AFTER, MAX_TRANSFERS_PER_RUN } from '../../../../src/nest/doc-sync/doc-sync.constants';
+import type {
+  DocFailure,
+  DocResult,
+  DocumentConnectionRef,
+  DocumentProvider,
+  DocumentProviderCapabilities,
+  DocumentScopeOption,
+  DocumentScopeRef,
+  FetchResult,
+  PushRequest,
+  PushResult,
+  RemoteDocument,
+} from '../../../../src/nest/doc-sync/document-provider';
+import type { FilesService } from '../../../../src/nest/files/files.service';
+import type { StorageService } from '../../../../src/nest/storage/storage.service';
+import type { RealtimeService } from '../../../../src/nest/realtime/realtime.service';
+
+// ── Fixtures ─────────────────────────────────────────────────────────────────
+
+const FILE_BYTES = Buffer.from('trek-document-bytes');
+const FILE_SHA = crypto.createHash('sha256').update(FILE_BYTES).digest('hex');
+
+type Listing = { documents: RemoteDocument[]; cursor: string | null; cursorUnchanged: boolean; truncated: boolean };
+
+const ok = <T>(data: T): DocResult<T> => ({ success: true, data });
+const fail = (code: DocsyncErrorCode, status?: number): DocFailure => ({ success: false, error: { code, status } });
+
+const SCOPE: DocumentScopeOption = {
+  scopeKey: 'tag:1',
+  label: 'Japan 2026',
+  remoteRootId: '1',
+  remoteRootPath: '/TREK/japan',
+};
+
+const BASE_CAPABILITIES: DocumentProviderCapabilities = {
+  push: 'none',
+  stableId: true,
+  remoteTrash: true,
+  replaceInPlace: true,
+  contentHashInListing: true,
+  maxUploadBytes: null,
+  acceptedMimeTypes: null,
+  canCreateScope: true,
+};
+
+let capabilities: DocumentProviderCapabilities = { ...BASE_CAPABILITIES };
+
+const remoteDoc = (over: Partial<RemoteDocument> = {}): RemoteDocument => ({
+  remoteId: 'r1',
+  name: 'boarding.pdf',
+  size: 1024,
+  mimeType: 'application/pdf',
+  remoteVersion: 'v1',
+  contentHash: null,
+  remoteModifiedAt: '2026-09-18T10:00:00Z',
+  isDeleted: false,
+  ...over,
+});
+
+const listing = (documents: RemoteDocument[] = [], over: Partial<Listing> = {}): Listing => ({
+  documents,
+  cursor: 'cursor-1',
+  cursorUnchanged: false,
+  truncated: false,
+  ...over,
+});
+
+const provider = {
+  id: 'paperless',
+  capabilities: vi.fn((): DocumentProviderCapabilities => capabilities),
+  probe: vi.fn(async (): Promise<DocResult<{ account: string; capabilities: DocumentProviderCapabilities }>> =>
+    ok({ account: 'test', capabilities })),
+  listScopes: vi.fn(async (): Promise<DocResult<DocumentScopeOption[]>> => ok([SCOPE])),
+  createScope: vi.fn(async (): Promise<DocResult<DocumentScopeOption>> => ok(SCOPE)),
+  resolveScope: vi.fn(async (): Promise<DocResult<DocumentScopeOption>> => ok(SCOPE)),
+  list: vi.fn(async (): Promise<DocResult<Listing>> => ok(listing())),
+  fetch: vi.fn(async (): Promise<DocResult<FetchResult>> =>
+    ok({ body: Readable.from([FILE_BYTES]), size: FILE_BYTES.length, mimeType: 'application/pdf', remoteVersion: 'v9' })),
+  push: vi.fn(async (
+    _conn: DocumentConnectionRef,
+    _scope: DocumentScopeRef,
+    _req: PushRequest,
+  ): Promise<DocResult<PushResult>> =>
+    ok({ remoteId: 'r-pushed', remoteVersion: 'v1', remoteModifiedAt: null, deduplicated: false })),
+  rename: vi.fn(async (): Promise<DocResult<{ remoteVersion: string }>> => ok({ remoteVersion: 'v2' })),
+  trash: vi.fn(async (): Promise<DocResult<void>> => ok(undefined)),
+};
+
+const storage = {
+  spoolDirFor: vi.fn((): string => spoolDir),
+  put: vi.fn(async (): Promise<void> => undefined),
+  // A fresh stream per call: the push path reads the object twice, once to hash
+  // and once to send, and a shared Readable would arrive already consumed.
+  getStream: vi.fn(async () => ({ stream: Readable.from([FILE_BYTES]), stat: { size: FILE_BYTES.length } })),
+} as unknown as StorageService;
+
+const files = {
+  getFileById: vi.fn((id: string | number, tripId: string | number) =>
+    testDb.prepare('SELECT * FROM trip_files WHERE id = ? AND trip_id = ?').get(id, tripId)),
+  createFile: vi.fn((
+    tripId: string | number,
+    file: { filename: string; originalname: string; size: number; mimetype: string },
+    uploadedBy: number,
+  ) => {
+    const info = testDb
+      .prepare(
+        `INSERT INTO trip_files (trip_id, filename, original_name, file_size, mime_type, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+      )
+      .run(tripId, file.filename, file.originalname, file.size, file.mimetype, uploadedBy || null);
+    return testDb.prepare('SELECT * FROM trip_files WHERE id = ?').get(info.lastInsertRowid);
+  }),
+} as unknown as FilesService;
+
+const realtime = { broadcast: vi.fn() } as unknown as RealtimeService;
+
+let spoolDir: string;
+let ownerId: number;
+let tripId: number;
+let connectionId: number;
+let service: DocSyncService;
+let config: DocSyncConfigService;
+
+// ── Row builders ─────────────────────────────────────────────────────────────
+
+let scopeSeq = 0;
+function makeLink(over: {
+  direction?: string;
+  deletePolicy?: string;
+  syncEnabled?: number;
+  failureCount?: number;
+  nextAttemptAt?: string | null;
+} = {}): LinkRow {
+  scopeSeq += 1;
+  const info = testDb
+    .prepare(
+      `INSERT INTO trip_document_links
+         (trip_id, connection_id, provider_id, remote_scope_key, remote_root_id, remote_root_path, remote_label,
+          direction, delete_policy, conflict_policy, sync_enabled, failure_count, next_attempt_at, created_by)
+       VALUES (?, ?, 'paperless', ?, '1', '/TREK/japan', 'Japan 2026', ?, ?, 'manual', ?, ?, ?, ?)`,
+    )
+    .run(
+      tripId, connectionId, `tag:${scopeSeq}`,
+      over.direction ?? 'both', over.deletePolicy ?? 'unlink',
+      over.syncEnabled ?? 1, over.failureCount ?? 0, over.nextAttemptAt ?? null, ownerId,
+    );
+  return config.getLink(Number(info.lastInsertRowid));
+}
+
+let uidSeq = 0;
+function seedItem(link: LinkRow, over: {
+  remoteId?: string;
+  remoteName?: string;
+  remoteVersion?: string;
+  fileId?: number;
+  state?: string;
+  contentSha256?: string;
+  pushedSha256?: string;
+} = {}): number {
+  uidSeq += 1;
+  const info = testDb
+    .prepare(
+      `INSERT INTO document_sync_items
+         (link_id, trip_id, file_id, trek_doc_uid, remote_id, remote_name, remote_version,
+          content_sha256, pushed_sha256, state)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      link.id, link.trip_id, over.fileId ?? null, `uid-${uidSeq}`,
+      over.remoteId ?? null, over.remoteName ?? null, over.remoteVersion ?? null,
+      over.contentSha256 ?? null, over.pushedSha256 ?? null, over.state ?? 'synced',
+    );
+  return Number(info.lastInsertRowid);
+}
+
+function makeFile(over: {
+  name?: string;
+  storageKey?: string;
+  mime?: string;
+  messageId?: number;
+  noteId?: number;
+  deletedAt?: string;
+} = {}): number {
+  const info = testDb
+    .prepare(
+      `INSERT INTO trip_files (trip_id, filename, original_name, file_size, mime_type, uploaded_by, message_id, note_id, deleted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      tripId, over.storageKey ?? `key-${over.name ?? 'boarding.pdf'}`, over.name ?? 'boarding.pdf',
+      FILE_BYTES.length, over.mime ?? 'application/pdf', ownerId,
+      over.messageId ?? null, over.noteId ?? null, over.deletedAt ?? null,
+    );
+  return Number(info.lastInsertRowid);
+}
+
+const itemRow = (id: number) =>
+  testDb.prepare('SELECT * FROM document_sync_items WHERE id = ?').get(id) as Record<string, unknown>;
+const itemRows = () =>
+  testDb.prepare('SELECT * FROM document_sync_items ORDER BY id').all() as Array<Record<string, unknown>>;
+const linkRow = (id: number) =>
+  testDb.prepare('SELECT * FROM trip_document_links WHERE id = ?').get(id) as Record<string, unknown>;
+const fileRows = () =>
+  testDb.prepare('SELECT * FROM trip_files ORDER BY id').all() as Array<Record<string, unknown>>;
+
+/** SQLite's own clock and format, so a comparison against CURRENT_TIMESTAMP means something. */
+const sqlTime = (modifier: string): string =>
+  (testDb.prepare("SELECT datetime('now', ?) AS t").get(modifier) as { t: string }).t;
+
+// ── Suite ────────────────────────────────────────────────────────────────────
+
+describe('DocSyncService', () => {
+  beforeAll(() => {
+    createTables(testDb);
+    runMigrations(testDb);
+    spoolDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trek-docsync-'));
+
+    ownerId = createUser(testDb, { username: 'owner', email: 'owner@docsync.test' }).user.id;
+    tripId = createTrip(testDb, ownerId, { title: 'Japan' }).id;
+    const info = testDb
+      .prepare(
+        `INSERT INTO document_connections (trip_id, provider_id, owner_user_id, base_url, secrets, settings)
+         VALUES (?, 'paperless', ?, 'https://paperless.example.com', NULL, '{}')`,
+      )
+      .run(tripId, ownerId);
+    connectionId = Number(info.lastInsertRowid);
+
+    const dbs = new DatabaseService(testDb);
+    const registry = new DocumentProviderRegistry([provider as unknown as DocumentProvider]);
+    config = new DocSyncConfigService(dbs, registry);
+    service = new DocSyncService(dbs, config, registry, storage, files, new AllowedFileTypesService(dbs), realtime);
+  });
+
+  afterAll(() => {
+    testDb.close();
+    fs.rmSync(spoolDir, { recursive: true, force: true });
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+    capabilities = { ...BASE_CAPABILITIES };
+    testDb.prepare('DELETE FROM document_sync_items').run();
+    testDb.prepare('DELETE FROM trip_document_links').run();
+    testDb.prepare('DELETE FROM trip_files').run();
+    testDb.prepare('DELETE FROM collab_messages').run();
+    testDb.prepare('DELETE FROM collab_notes').run();
+    for (const entry of fs.readdirSync(spoolDir)) fs.rmSync(path.join(spoolDir, entry), { force: true });
+  });
+
+  describe('dueLinks', () => {
+    it('offers only bindings that are switched on, uncircuited and actually due', () => {
+      const dueNow = makeLink();
+      const overdue = makeLink({ nextAttemptAt: sqlTime('-1 hour') });
+      makeLink({ nextAttemptAt: sqlTime('+1 hour') });
+      makeLink({ syncEnabled: 0 });
+      makeLink({ failureCount: LINK_CIRCUIT_OPEN_AFTER });
+
+      const ids = service.dueLinks().map((l) => l.id).sort((a, b) => a - b);
+      expect(ids).toEqual([dueNow.id, overdue.id].sort((a, b) => a - b));
+    });
+
+    it('lets a binding back in one failure before the circuit opens', () => {
+      const nearly = makeLink({ failureCount: LINK_CIRCUIT_OPEN_AFTER - 1 });
+      expect(service.dueLinks().map((l) => l.id)).toEqual([nearly.id]);
+    });
+  });
+
+  describe('syncLink', () => {
+    it('answers busy instead of running the same binding twice at once', async () => {
+      const link = makeLink();
+      let release: () => void;
+      provider.resolveScope.mockImplementationOnce(
+        () => new Promise((resolve) => { release = () => resolve(ok(SCOPE)); }),
+      );
+
+      const first = service.syncLink(link);
+      const second = await service.syncLink(link);
+      expect(second.state).toBe('busy');
+
+      release();
+      await first;
+      expect(provider.list).toHaveBeenCalledTimes(1);
+    });
+
+    it('parks a binding whose scope is gone as scope_lost rather than as a failure', async () => {
+      const link = makeLink();
+      provider.resolveScope.mockResolvedValueOnce(fail('scope_missing'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('scope_lost');
+      expect(res.errorCode).toBe('scope_missing');
+      expect(linkRow(link.id).last_sync_state).toBe('scope_lost');
+      // Nothing is enumerated once the container is known to be gone, so a
+      // deleted folder cannot be re-created and refilled.
+      expect(provider.list).not.toHaveBeenCalled();
+    });
+
+    it('treats a not-found scope the same as a missing one', async () => {
+      const link = makeLink();
+      provider.resolveScope.mockResolvedValueOnce(fail('not_found'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('scope_lost');
+      expect(res.errorCode).toBe('scope_missing');
+    });
+
+    it('asks for fresh credentials when the listing comes back unauthorized', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(fail('unauthorized', 401));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('needs_reauth');
+      const row = linkRow(link.id);
+      expect(row.last_sync_state).toBe('needs_reauth');
+      expect(row.last_sync_error).toBe('unauthorized');
+    });
+
+    it('does not mistake an unreachable instance for a credential problem', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(fail('unreachable'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('failed');
+      expect(linkRow(link.id).last_sync_state).toBe('failed');
+    });
+
+    /**
+     * The most expensive mistake this domain could make. An unmounted share, a
+     * revoked token and a moved folder all answer with a short listing, and
+     * acting on it would empty a trip. The run is abandoned whole: not the
+     * vanished documents only, but the parts of the listing that look fine too,
+     * because a listing that cannot be trusted cannot be trusted in pieces.
+     */
+    it('abandons the entire run when most known documents vanish from one listing', async () => {
+      const link = makeLink();
+      const itemIds = Array.from({ length: 10 }, (_, i) =>
+        seedItem(link, { remoteId: `r${i}`, remoteName: `doc-${i}.pdf`, state: 'synced' }));
+      makeFile({ name: 'local-only.pdf' });
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r0', name: 'doc-0.pdf' })])));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('partial');
+      expect(res.errorCode).toBe('mass_delete_guard');
+      expect(res.missing).toBe(9);
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(provider.trash).not.toHaveBeenCalled();
+      expect(provider.rename).not.toHaveBeenCalled();
+      expect(files.createFile).not.toHaveBeenCalled();
+
+      for (const id of itemIds) {
+        const row = itemRow(id);
+        expect(row.state).toBe('synced');
+        expect(row.remote_missing_at).toBeNull();
+      }
+      expect(fileRows()).toHaveLength(1);
+      expect(linkRow(link.id).last_sync_error).toBe('mass_delete_guard');
+    });
+
+    /**
+     * TREK serves a download inline with a Content-Type derived from its
+     * extension, so an .svg or .html out of somebody's Nextcloud folder would
+     * be stored XSS. It becomes a visible row rather than a silent skip, and
+     * the bytes are never asked for.
+     */
+    it('refuses a document whose extension TREK would serve inline', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-svg', name: 'floorplan.svg' }),
+        remoteDoc({ remoteId: 'r-html', name: 'itinerary.html' }),
+      ])));
+
+      const res = await service.syncLink(link);
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(fileRows()).toHaveLength(0);
+      expect(itemRows().map((r) => [r.remote_id, r.state, r.error_code])).toEqual([
+        ['r-svg', 'rejected_type', 'unsupported_type'],
+        ['r-html', 'rejected_type', 'unsupported_type'],
+      ]);
+      expect(res.state).toBe('partial');
+    });
+
+    it('refuses a document larger than an upload would be allowed to be', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-big', name: 'scan.pdf', size: MAX_FILE_SIZE + 1 }),
+      ])));
+
+      await service.syncLink(link);
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      const row = itemRows()[0];
+      expect(row.state).toBe('too_large');
+      expect(row.error_code).toBe('too_large');
+    });
+
+    /**
+     * Paperless answers 400 for anything outside its parser list. Asking the
+     * capabilities first turns a failure that repeats every run into one row
+     * that says why.
+     */
+    it('never uploads a document whose type the provider has said it will not take', async () => {
+      const link = makeLink();
+      capabilities = { ...BASE_CAPABILITIES, acceptedMimeTypes: ['application/pdf'] };
+      const fileId = makeFile({ name: 'sunset.png', mime: 'image/png' });
+
+      await service.syncLink(link);
+
+      expect(provider.push).not.toHaveBeenCalled();
+      const row = itemRows()[0];
+      expect(row.file_id).toBe(fileId);
+      expect(row.state).toBe('rejected_type');
+      expect(row.error_code).toBe('unsupported_type');
+    });
+
+    /**
+     * The echo guard, end to end through the service rather than through the
+     * planner. A provider reports TREK's own upload as a change on the next
+     * run; without the hash it pushed, the file would be pulled back down,
+     * re-uploaded, and bounce forever.
+     */
+    it('does not pull back the bytes it uploaded itself', async () => {
+      const link = makeLink();
+      makeFile({ name: 'boarding.pdf' });
+      provider.list.mockResolvedValueOnce(ok(listing([])));
+
+      const firstRun = await service.syncLink(link);
+      expect(firstRun.pushed).toBe(1);
+      const afterPush = itemRows()[0];
+      expect(afterPush.pushed_sha256).toBe(FILE_SHA);
+      expect(afterPush.content_sha256).toBe(FILE_SHA);
+      expect(afterPush.remote_id).toBe('r-pushed');
+
+      // Same bytes back, under a new version marker — which is what a provider
+      // reports for TREK's own write.
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-pushed', name: 'boarding.pdf', remoteVersion: 'v2', contentHash: FILE_SHA }),
+      ])));
+
+      const secondRun = await service.syncLink(link);
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(provider.push).toHaveBeenCalledTimes(1);
+      expect(secondRun.pulled).toBe(0);
+      expect(fileRows()).toHaveLength(1);
+      expect(itemRows()[0].state).toBe('synced');
+    });
+
+    it('counts a failure and puts the binding off until later', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(fail('unreachable'));
+
+      await service.syncLink(link);
+
+      const after = testDb
+        .prepare('SELECT failure_count, next_attempt_at > CURRENT_TIMESTAMP AS in_future FROM trip_document_links WHERE id = ?')
+        .get(link.id) as { failure_count: number; in_future: number };
+      expect(after.failure_count).toBe(1);
+      expect(after.in_future).toBe(1);
+
+      provider.list.mockResolvedValueOnce(fail('unreachable'));
+      await service.syncLink(config.getLink(link.id));
+      expect(linkRow(link.id).failure_count).toBe(2);
+    });
+
+    it('clears the failure count and the wait as soon as a run succeeds', async () => {
+      const link = makeLink({ failureCount: 3, nextAttemptAt: sqlTime('+1 hour') });
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('ok');
+      const row = linkRow(link.id);
+      expect(row.failure_count).toBe(0);
+      expect(row.next_attempt_at).toBeNull();
+      expect(row.remote_cursor).toBe('cursor-1');
+    });
+
+    /**
+     * A chat screenshot and a note attachment live in `trip_files` like every
+     * other document, but they belong to a conversation rather than to the
+     * trip's paperwork — pushing them would put someone's chat into a shared
+     * Paperless.
+     */
+    it('leaves chat and note attachments out of the upload entirely', async () => {
+      const link = makeLink();
+      const messageId = Number(testDb
+        .prepare("INSERT INTO collab_messages (trip_id, user_id, text) VALUES (?, ?, 'hi')")
+        .run(tripId, ownerId).lastInsertRowid);
+      const noteId = Number(testDb
+        .prepare("INSERT INTO collab_notes (trip_id, user_id, title) VALUES (?, ?, 'note')")
+        .run(tripId, ownerId).lastInsertRowid);
+
+      makeFile({ name: 'boarding.pdf' });
+      makeFile({ name: 'chat-screenshot.pdf', storageKey: 'key-chat', messageId });
+      makeFile({ name: 'note-attachment.pdf', storageKey: 'key-note', noteId });
+
+      await service.syncLink(link);
+
+      expect(provider.push).toHaveBeenCalledTimes(1);
+      expect(provider.push.mock.calls[0][2].fileName).toBe('boarding.pdf');
+      expect(itemRows()).toHaveLength(1);
+    });
+
+    /**
+     * The other half of the mass-delete rule, below the threshold: a document
+     * that is gone upstream is written down and left to a person. An unmounted
+     * share answers with an empty listing, and a trip is not a cache.
+     */
+    it('records a document that vanished upstream without removing anything locally', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'boarding.pdf' });
+      const itemId = seedItem(link, { remoteId: 'r1', remoteName: 'boarding.pdf', fileId, state: 'synced' });
+
+      const res = await service.syncLink(link);
+
+      expect(res.missing).toBe(1);
+      const row = itemRow(itemId);
+      expect(row.state).toBe('remote_missing');
+      expect(row.remote_missing_at).not.toBeNull();
+      expect(fileRows().map((f) => f.id)).toEqual([fileId]);
+      expect(provider.trash).not.toHaveBeenCalled();
+    });
+
+    it('moves a deleted document to the provider recycle bin only when the binding says trash', async () => {
+      const trashing = makeLink({ deletePolicy: 'trash' });
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(trashing, { remoteId: 'r1', remoteName: 'boarding.pdf', fileId, state: 'synced' });
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+
+      await service.syncLink(trashing);
+      expect(provider.trash).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'r1');
+      expect(itemRow(itemId).state).toBe('local_deleted');
+
+      const unlinking = makeLink({ deletePolicy: 'unlink' });
+      const otherFileId = makeFile({ name: 'other.pdf', storageKey: 'key-other', deletedAt: '2026-09-18 08:00:00' });
+      seedItem(unlinking, { remoteId: 'r1', remoteName: 'boarding.pdf', fileId: otherFileId, state: 'synced' });
+      provider.trash.mockClear();
+
+      await service.syncLink(unlinking);
+      expect(provider.trash).not.toHaveBeenCalled();
+    });
+
+    it('carries a rename made in TREK over to the provider', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'new.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'old.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1', name: 'old.pdf' })])));
+
+      await service.syncLink(link);
+
+      expect(provider.rename).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'r1', 'new.pdf');
+      const row = itemRow(itemId);
+      expect(row.remote_name).toBe('new.pdf');
+      expect(row.remote_version).toBe('v2');
+    });
+
+    it('carries a rename made at the provider over to the trip file', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'old.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'old.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1', name: 'new-upstream.pdf' })])));
+
+      await service.syncLink(link);
+
+      expect(provider.rename).not.toHaveBeenCalled();
+      expect(fileRows()[0].original_name).toBe('new-upstream.pdf');
+      expect(itemRow(itemId).remote_name).toBe('new-upstream.pdf');
+      expect(realtime.broadcast).toHaveBeenCalledWith(tripId, 'file:updated', expect.anything());
+    });
+
+    it('hands a document both sides renamed to a person instead of picking one', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'mine.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'old.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1', name: 'theirs.pdf' })])));
+
+      const res = await service.syncLink(link);
+
+      expect(res.conflicts).toBe(1);
+      expect(provider.rename).not.toHaveBeenCalled();
+      expect(itemRow(itemId).state).toBe('conflict');
+      expect(service.issues(tripId).map((r) => r.id)).toContain(itemId);
+    });
+
+    /**
+     * The size a listing claims is not a promise. The transfer is cut off at
+     * the cap while it is still being written, so an oversized body can never
+     * become a `trip_files` row, and the half-written spool file goes with it.
+     */
+    it('cuts off a download that outgrows the cap the listing promised to stay under', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r-lying', name: 'scan.pdf', size: null })])));
+      provider.fetch.mockResolvedValueOnce(ok({
+        body: Readable.from([Buffer.allocUnsafe(MAX_FILE_SIZE + 1)]),
+        size: null,
+        mimeType: 'application/pdf',
+        remoteVersion: 'v1',
+      }));
+
+      await service.syncLink(link);
+
+      expect(storage.put).not.toHaveBeenCalled();
+      expect(fileRows()).toHaveLength(0);
+      expect(itemRows()[0].state).toBe('too_large');
+      expect(fs.readdirSync(spoolDir)).toHaveLength(0);
+    });
+
+    it('turns a failed download into a visible error row rather than losing it', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc()])));
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('partial');
+      const row = itemRows()[0];
+      expect(row.state).toBe('error');
+      expect(row.error_code).toBe('timeout');
+      expect(row.attempts).toBe(1);
+      expect(row.file_id).toBeNull();
+      expect(fileRows()).toHaveLength(0);
+      expect(service.issues(tripId)).toHaveLength(1);
+    });
+
+    /**
+     * Pins what happens today, and it is wrong. The failed pull already wrote
+     * the provider's version marker into the pairing, so the next run sees no
+     * change and emits `touch` — and `touch` promotes `error` to `synced`. The
+     * document is then booked as synced with no `file_id`, out of the issues
+     * list and never retried. Reported rather than fixed here; this is the test
+     * that turns red once it is.
+     */
+    it('keeps a failed download visible as an error instead of booking it as synced', async () => {
+      // The failure path used to write the provider's version marker, so the
+      // next run saw no change, produced a `touch`, and touch lifted `error` to
+      // `synced`. The document then had no bytes in TREK, was gone from the
+      // issues list, and nothing ever fetched it again.
+      const link = makeLink();
+      provider.list.mockResolvedValue(ok(listing([remoteDoc()])));
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+
+      await service.syncLink(link);
+      await service.syncLink(link);
+
+      const row = itemRows()[0];
+      expect(row.state).toBe('error');
+      expect(row.file_id).toBeNull();
+      expect(service.issues(tripId)).toHaveLength(1);
+    });
+
+    it('creates no trip file when storage refuses the finished download', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc()])));
+      (storage.put as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('disk full'));
+
+      await service.syncLink(link);
+
+      expect(files.createFile).not.toHaveBeenCalled();
+      expect(fileRows()).toHaveLength(0);
+      expect(itemRows()[0].state).toBe('error');
+    });
+
+    it('keeps the document anchor when an upload fails, so the retry is not a second document', async () => {
+      const link = makeLink();
+      makeFile({ name: 'boarding.pdf' });
+      provider.push.mockResolvedValueOnce(fail('quota_exceeded'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.errorCode).toBe('quota_exceeded');
+      const row = itemRows()[0];
+      expect(row.state).toBe('error');
+      expect(row.error_code).toBe('quota_exceeded');
+      expect(row.trek_doc_uid).toBeTruthy();
+    });
+
+    it('refuses an upload the provider has told TREK is over its size limit', async () => {
+      const link = makeLink();
+      capabilities = { ...BASE_CAPABILITIES, maxUploadBytes: 10 };
+      makeFile({ name: 'boarding.pdf' });
+
+      await service.syncLink(link);
+
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(itemRows()[0].state).toBe('too_large');
+    });
+
+    it('records an upload whose bytes are missing from storage instead of throwing', async () => {
+      const link = makeLink();
+      makeFile({ name: 'boarding.pdf' });
+      (storage.getStream as unknown as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('gone'));
+
+      const res = await service.syncLink(link);
+
+      expect(res.errorCode).toBe('provider_error');
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(itemRows()[0].state).toBe('error');
+    });
+
+    /**
+     * One enormous trip must not hold the worker while every other binding on
+     * the instance waits. The rest is simply left for the next run.
+     */
+    it('stops after the per-run transfer budget and leaves the rest for next time', async () => {
+      const link = makeLink();
+      const many = Array.from({ length: MAX_TRANSFERS_PER_RUN + 5 }, (_, i) =>
+        remoteDoc({ remoteId: `r${i}`, name: `doc-${i}.pdf` }));
+      provider.list.mockResolvedValueOnce(ok(listing(many)));
+
+      const res = await service.syncLink(link);
+
+      expect(res.pulled).toBe(MAX_TRANSFERS_PER_RUN);
+      expect(provider.fetch).toHaveBeenCalledTimes(MAX_TRANSFERS_PER_RUN);
+      expect(fileRows()).toHaveLength(MAX_TRANSFERS_PER_RUN);
+    });
+
+    it('records an unexpected crash as a failed run instead of letting it escape', async () => {
+      const link = makeLink();
+      provider.list.mockImplementationOnce(() => { throw new Error('adapter blew up'); });
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('failed');
+      expect(res.errorCode).toBe('unknown');
+      expect(linkRow(link.id).failure_count).toBe(1);
+    });
+
+    it('fails a binding for a provider this build does not have', async () => {
+      const link = makeLink();
+      testDb.prepare("UPDATE trip_document_links SET provider_id = 'papra' WHERE id = ?").run(link.id);
+
+      const res = await service.syncLink(config.getLink(link.id));
+
+      expect(res.state).toBe('failed');
+      expect(res.errorCode).toBe('provider_error');
+      expect(provider.resolveScope).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('status', () => {
+    it('reports the trip bindings together with a count per item state', () => {
+      const link = makeLink();
+      seedItem(link, { remoteId: 'r1', state: 'synced' });
+      seedItem(link, { remoteId: 'r2', state: 'synced' });
+      seedItem(link, { remoteId: 'r3', state: 'conflict' });
+
+      const status = service.status(tripId);
+
+      expect(status.links).toHaveLength(1);
+      expect(status.items).toEqual({ synced: 2, conflict: 1 });
+    });
+  });
+
+  describe('resolveConflict', () => {
+    /** A conflicted pairing: the provider moved on, and TREK holds its own copy. */
+    function seedConflict(link: LinkRow): { itemId: number; fileId: number } {
+      const fileId = makeFile({ name: 'boarding.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1',
+        remoteName: 'boarding.pdf',
+        remoteVersion: 'v1',
+        fileId,
+        state: 'conflict',
+        contentSha256: 'agreed-hash',
+      });
+      return { itemId, fileId };
+    }
+
+    it('keeps both copies and gives each its own pairing when the user asks for both', async () => {
+      const link = makeLink();
+      const { itemId, fileId } = seedConflict(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'boarding.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      expect(await service.resolveConflict(itemId, 'both')).toBe(true);
+
+      // The provider's copy arrives as a second TREK document, and TREK's copy
+      // goes up as a second provider document. Neither side loses anything.
+      expect(provider.fetch).toHaveBeenCalledTimes(1);
+      expect(provider.push).toHaveBeenCalledTimes(1);
+      const filesAfter = fileRows();
+      expect(filesAfter).toHaveLength(2);
+      expect(filesAfter.map((f) => f.id)).toContain(fileId);
+      expect(itemRows()).toHaveLength(2);
+    });
+
+    /**
+     * `keep` names the side that becomes the agreed state, and the run that
+     * resolveConflict triggers is where that takes effect. The two tests below
+     * pin what the code does TODAY, and it is the wrong way round: 'trek'
+     * clears `content_sha256`, which is the only record that TREK's copy ever
+     * moved, so the run pulls the provider's version instead of sending TREK's.
+     * Reported rather than fixed here — these are the tests that turn red when
+     * the two branches are put back.
+     */
+    it('does not pull the provider copy when the conflict was resolved in TREK favour', async () => {
+      // Keeping TREK's copy means forgetting the provider's version marker, not
+      // forgetting the agreed bytes: clearing the latter reads as "TREK never
+      // agreed to this", and the provider's copy comes down over the one the
+      // user just chose to keep.
+      const link = makeLink();
+      const { itemId } = seedConflict(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'boarding.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      await service.resolveConflict(itemId, 'trek');
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(fileRows()).toHaveLength(1);
+    });
+
+    it('pulls the provider copy when the conflict was resolved in its favour', async () => {
+      const link = makeLink();
+      const { itemId } = seedConflict(link);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'boarding.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      await service.resolveConflict(itemId, 'provider');
+
+      expect(provider.fetch).toHaveBeenCalledTimes(1);
+      expect(itemRow(itemId).state).toBe('synced');
+    });
+
+    it('refuses to resolve a pairing that is not in conflict', async () => {
+      const link = makeLink();
+      const itemId = seedItem(link, { remoteId: 'r1', state: 'synced' });
+
+      expect(await service.resolveConflict(itemId, 'both')).toBe(false);
+      expect(provider.list).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('issues', () => {
+    it('lists only the rows a person has to decide about, never the ones still waiting', () => {
+      const link = makeLink();
+      const decidable = ['conflict', 'rejected_type', 'too_large', 'remote_missing', 'error'];
+      const waiting = ['pending', 'synced', 'local_deleted'];
+      for (const state of [...decidable, ...waiting]) {
+        seedItem(link, { remoteId: `r-${state}`, state });
+      }
+
+      const states = service.issues(tripId).map((r) => r.state as string).sort();
+      expect(states).toEqual([...decidable].sort());
+    });
+  });
+});

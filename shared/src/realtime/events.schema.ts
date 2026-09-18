@@ -233,6 +233,13 @@ export const TREK_WS_EVENTS = {
   'file:created': { scope: 'trip', payload: z.object({ file: entity }) },
   'file:updated': { scope: 'trip', payload: z.object({ file: entity }) },
   'file:deleted': { scope: 'trip', payload: z.object({ fileId: id }) },
+  // A sync run moved documents. Carries counts rather than the documents
+  // themselves: the client already learns about each one through file:created,
+  // and this is what tells the sync panel to refresh its status line.
+  'docsync:changed': {
+    scope: 'trip',
+    payload: z.object({ linkId: id, pulled: z.number(), pushed: z.number() }),
+  },
 
   // ── Collab ───────────────────────────────────────────────────────────────
   'collab:note:created': { scope: 'trip', payload: z.object({ note: entity }) },

@@ -6,6 +6,7 @@ import { filesApi } from '../../api/client'
 import type { Place, Reservation, TripFile, Day, AssignmentsMap } from '../../types'
 import { useCanDo } from '../../store/permissionsStore'
 import { useTripStore } from '../../store/tripStore'
+import { useAuthStore } from '../../store/authStore'
 import { getAuthUrl } from '../../api/authUrl'
 import { isImage, isMedia, isWalletPass } from './FileManager.helpers'
 import { openFile as openFileInTab } from '../../utils/fileDownload'
@@ -30,6 +31,7 @@ export interface FileManagerProps {
  */
 export function useFileManager({ files = [], onUpload, onDelete, onUpdate, places, days = [], assignments = {}, reservations = [], tripId, allowedFileTypes }: FileManagerProps) {
   const [uploading, setUploading] = useState(false)
+  const [showDocSync, setShowDocSync] = useState(false)
   const [filterType, setFilterType] = useState('all')
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
   const [showTrash, setShowTrash] = useState(false)
@@ -38,6 +40,17 @@ export function useFileManager({ files = [], onUpload, onDelete, onUpdate, place
   const toast = useToast()
   const can = useCanDo()
   const trip = useTripStore((s) => s.trip)
+  const currentUser = useAuthStore((s) => s.user)
+  /**
+   * Only the trip owner may change a sync binding: the credential it stores
+   * usually reaches that person's entire document archive, so letting any
+   * member repoint it would share a folder the owner never chose to share.
+   * Instance admins are included because they already override every other
+   * permission check in the client.
+   */
+  const isTripOwner = !!currentUser && (
+    currentUser.role === 'admin' || Number(trip?.user_id) === Number(currentUser.id)
+  )
   const { t, locale } = useTranslation()
 
   const loadTrash = useCallback(async () => {
@@ -210,6 +223,7 @@ export function useFileManager({ files = [], onUpload, onDelete, onUpdate, place
     previewFile, setPreviewFile, previewFileUrl, assignFileId, setAssignFileId,
     getRootProps, getInputProps, isDragActive, handlePaste, filteredFiles, handleDelete,
     handleAssign, mediaFiles, openFile,
+    showDocSync, setShowDocSync, isTripOwner,
   }
 }
 
