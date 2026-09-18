@@ -278,6 +278,110 @@ export function useRoadtripRoutes(
     const collectedMisses: Record<number, RouteAvoidClass[]> = {}
     const tasks: (() => Promise<void>)[] = []
 
+    /**
+     * Ask for one run, and when the router refuses the whole of it, ask for its legs
+     * one at a time instead.
+     *
+     * A run travels as a single request because the answer carries a leg per waypoint
+     * pair, which is exactly what the rail wants, and one request is one slot of a
+     * host that allows about one a second. What that thrift costs is that a refusal is
+     * never local: OSRM answers `400 NoRoute` for the entire chain when one stop in the
+     * MIDDLE of it sits where it may not turn around, so a day lost every leg it had
+     * over a single cave car park while each of its pairs routed perfectly alone.
+     * `uTurnParam` in RouteCalculator removes the usual cause; this removes the SHAPE of
+     * the failure, so a stop that really cannot be reached costs its own two legs and
+     * not the day around them.
+     *
+     * The split is enqueued, not awaited, so the pairs queue up behind everything else
+     * and keep the same spacing as any other request: a day falling back must not turn
+     * into a burst at the one host that refused it.
+     */
+    const enqueueRun = (day: PlanDay, dayLegs: Record<string, RoutedLeg>, run: RoadtripStop[], mode: string): void => {
+      /** The same stops, as one request per pair. A pair has nothing left to split. */
+      const splitIntoPairs = (): void => {
+        if (run.length <= 2) return
+        for (let i = 0; i < run.length - 1; i++) enqueueRun(day, dayLegs, [run[i], run[i + 1]], mode)
+      }
+      tasks.push(async () => {
+        // Waypoints are the stops with this day's vias threaded in between them, so the
+        // router draws the road the traveller picked. `stopAt` remembers which waypoint
+        // each stop became, because the answer has a leg per waypoint PAIR and the rail
+        // wants one leg per stop pair.
+        const waypoints: { lat: number; lng: number }[] = []
+        const stopAt: number[] = []
+        run.forEach((stop, i) => {
+          stopAt.push(waypoints.length)
+          waypoints.push({ lat: stop.lat, lng: stop.lng })
+          if (i === run.length - 1) return
+          // A via is filed against the day it was dropped on and the position it sits
+          // after IN THAT DAY. Since a chain can hold stops from an earlier day (see
+          // `nightSpill.ts`), the lookup has to be the stop's own day and its own
+          // index — this used to be the position within the chain, so on any day that
+          // received a night drive every via matched nothing and quietly stopped
+          // shaping the road.
+          ;(viasByDay[stop.ownerDayId ?? day.dayId] ?? [])
+            .filter(v => v.after_order_index === (stop.ownerIndex ?? i))
+            .sort((a, b) => a.sequence - b.sequence)
+            .forEach(v => waypoints.push({ lat: v.lat, lng: v.lng }))
+        })
+
+        for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+          if (controller.signal.aborted) return
+          try {
+            const r = await calculateRouteWithLegs(
+              waypoints,
+              { signal: controller.signal, profile: mode, tripId: tripId ?? null, dayId: day.dayId, avoid },
+            )
+            // Where each stop ended up. stopAt[i] is that stop's waypoint index, so the
+            // vias threaded in between are skipped: a via is a shape handle, not a
+            // destination, and a dashed spur hanging off one reads as a fault.
+            if (r.snapped) {
+              const daySnaps = (collectedSnaps[day.dayId] ??= {})
+              run.forEach((stop, i) => {
+                const s = r.snapped?.[stopAt[i]]
+                if (s) daySnaps[stopKey(stop)] = s
+              })
+            }
+            // What was asked for against what the road turned out to be. Only
+            // the second engine reports it, and only when it answered: an OSRM
+            // fallback leaves `avoidance` absent, which is the honest reading
+            // of "the weighting never happened". Collected here because the
+            // rail plans in the browser and never sees the server's own copy
+            // of this field — without it the "not honoured" badge could not
+            // appear at all, and a motorway-free drive that is not one read as
+            // if the setting had held.
+            if (r.avoidance) {
+              const missed = r.avoidance.asked.filter(cls => !r.avoidance!.achieved.includes(cls))
+              if (missed.length) {
+                collectedMisses[day.dayId] = [...new Set([...(collectedMisses[day.dayId] ?? []), ...missed])]
+              }
+            }
+            Object.assign(dayLegs, foldRouteRun(run, stopAt, r, mode))
+            return
+          } catch (err) {
+            if (controller.signal.aborted) return
+            const refusal = err instanceof RoutingRefusedError ? err : null
+            // Almost always a rate limit on the shared routing host, or a connection
+            // that dropped: back off and try again. A refusal the host MEANT is the
+            // one thing not worth repeating: it objects to these coordinates, and
+            // asking twice more only spends five seconds earning the same 400.
+            const delay = refusal && !refusal.isRateLimit ? undefined : RETRY_DELAYS_MS[attempt]
+            if (delay !== undefined) {
+              // When the host says how long to wait, waiting less is just a second refusal.
+              await sleep(Math.max(delay, (refusal?.isRateLimit ? refusal.retryAfterMs : null) ?? 0), controller.signal)
+              continue
+            }
+            // Nothing left to try. A run of three or more stops asks again one pair at
+            // a time, so a stop the router will not route THROUGH costs its own two
+            // legs instead of every leg of the day around it. Never after a rate limit:
+            // the answer to a host asking for less traffic is not four more requests.
+            if (!refusal?.isRateLimit) splitIntoPairs()
+            return
+          }
+        }
+      })
+    }
+
     for (const day of plan) {
       const dayLegs: Record<string, RoutedLeg> = {}
       collected[day.dayId] = dayLegs
@@ -290,77 +394,7 @@ export function useRoadtripRoutes(
           dfMode,
         ))
 
-
-      for (const { stops: run, mode } of runs) {
-        tasks.push(async () => {
-          // Waypoints are the stops with this day's vias threaded in between them, so the
-          // router draws the road the traveller picked. `stopAt` remembers which waypoint
-          // each stop became, because the answer has a leg per waypoint PAIR and the rail
-          // wants one leg per stop pair.
-          const waypoints: { lat: number; lng: number }[] = []
-          const stopAt: number[] = []
-          run.forEach((stop, i) => {
-            stopAt.push(waypoints.length)
-            waypoints.push({ lat: stop.lat, lng: stop.lng })
-            if (i === run.length - 1) return
-            // A via is filed against the day it was dropped on and the position it sits
-            // after IN THAT DAY. Since a chain can hold stops from an earlier day (see
-            // `nightSpill.ts`), the lookup has to be the stop's own day and its own
-            // index — this used to be the position within the chain, so on any day that
-            // received a night drive every via matched nothing and quietly stopped
-            // shaping the road.
-            ;(viasByDay[stop.ownerDayId ?? day.dayId] ?? [])
-              .filter(v => v.after_order_index === (stop.ownerIndex ?? i))
-              .sort((a, b) => a.sequence - b.sequence)
-              .forEach(v => waypoints.push({ lat: v.lat, lng: v.lng }))
-          })
-
-          for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
-            if (controller.signal.aborted) return
-            try {
-              const r = await calculateRouteWithLegs(
-                waypoints,
-                { signal: controller.signal, profile: mode, tripId: tripId ?? null, dayId: day.dayId, avoid },
-              )
-              // Where each stop ended up. stopAt[i] is that stop's waypoint index, so the
-              // vias threaded in between are skipped: a via is a shape handle, not a
-              // destination, and a dashed spur hanging off one reads as a fault.
-              if (r.snapped) {
-                const daySnaps = (collectedSnaps[day.dayId] ??= {})
-                run.forEach((stop, i) => {
-                  const s = r.snapped?.[stopAt[i]]
-                  if (s) daySnaps[stopKey(stop)] = s
-                })
-              }
-              // What was asked for against what the road turned out to be. Only
-              // the second engine reports it, and only when it answered: an OSRM
-              // fallback leaves `avoidance` absent, which is the honest reading
-              // of "the weighting never happened". Collected here because the
-              // rail plans in the browser and never sees the server's own copy
-              // of this field — without it the "not honoured" badge could not
-              // appear at all, and a motorway-free drive that is not one read as
-              // if the setting had held.
-              if (r.avoidance) {
-                const missed = r.avoidance.asked.filter(cls => !r.avoidance!.achieved.includes(cls))
-                if (missed.length) {
-                  collectedMisses[day.dayId] = [...new Set([...(collectedMisses[day.dayId] ?? []), ...missed])]
-                }
-              }
-              Object.assign(dayLegs, foldRouteRun(run, stopAt, r, mode))
-              return
-            } catch (err) {
-              // Almost always a rate limit on the shared routing host. Back off and try
-              // again; a run that still won't route (island hop, dead router) simply stays
-              // blank, and the totals say so by being partial rather than wrong.
-              const delay = RETRY_DELAYS_MS[attempt]
-              if (delay === undefined) return
-              // When the host says how long to wait, waiting less is just a second refusal.
-              const asked = err instanceof RoutingRefusedError && err.isRateLimit ? err.retryAfterMs : null
-              await sleep(Math.max(delay, asked ?? 0), controller.signal)
-            }
-          }
-        })
-      }
+      for (const { stops: run, mode } of runs) enqueueRun(day, dayLegs, run, mode)
     }
 
     // One at a time, spaced out. The day sidebar can afford a small pool because it
@@ -402,7 +436,12 @@ export function useRoadtripRoutes(
   const allLegs = useMemo(() => {
     const out: Record<string, RoutedLeg> = {}
     for (const day of plan) Object.assign(out, legsByDay[day.dayId] ?? {})
-    return { ...out, ...seamLegs }
+    // Seams first, this day's own runs over the top. `legsByDay` is replaced whole on
+    // every routing round while `seamLegs` only ever grows, so a pair that used to sit on
+    // a day boundary and now sits inside one day keeps an answer nobody re-asks for, and
+    // that older answer was shaped by the vias of a stop that has since moved. Where both
+    // exist the day run is the newer of the two, so it is the one to believe.
+    return { ...seamLegs, ...out }
   }, [plan, legsByDay, seamLegs])
 
   // Which date each stop is actually reached on. Nothing is written to make it so; see

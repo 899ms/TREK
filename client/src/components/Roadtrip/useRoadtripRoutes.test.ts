@@ -278,6 +278,42 @@ describe('useRoadtripRoutes', () => {
     expect(result.current.totalDistance).toBe(100000)
   })
 
+  it('FE-ROADTRIP-ROUTES-028: a day the router refuses outright is asked for again one pair at a time', async () => {
+    const days = [day(1, 1)]
+    const stops: StopSpec[] = [{ id: 1, at: HAMBURG }, { id: 2, at: LUENEBURG }, { id: 3, at: BERLIN }]
+    // The Padirac case: one stop in the middle the router will not turn round at, and
+    // what comes back is a refusal of the WHOLE chain rather than of that one leg.
+    calculateRouteWithLegs
+      .mockRejectedValueOnce(new RoutingRefusedError(400, null))
+      .mockResolvedValue(routed(1))
+
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, map(1, stops)))
+    await waitFor(() => expect(result.current.loading).toBe(false), { timeout: 5000 })
+
+    // The run once, refused, then a request per pair, and no retry of the run, because
+    // the same coordinates earn the same refusal.
+    expect(calculateRouteWithLegs).toHaveBeenCalledTimes(3)
+    expect(calculateRouteWithLegs.mock.calls[1][0]).toHaveLength(2)
+    expect(calculateRouteWithLegs.mock.calls[2][0]).toHaveLength(2)
+    expect(result.current.days[0].legs.filter(Boolean)).toHaveLength(2)
+    expect(result.current.totalDistance).toBe(200000)
+  })
+
+  it('FE-ROADTRIP-ROUTES-029: a rate limit is waited out, never split into more requests', async () => {
+    vi.useFakeTimers()
+    const days = [day(1, 1)]
+    const stops: StopSpec[] = [{ id: 1, at: HAMBURG }, { id: 2, at: LUENEBURG }, { id: 3, at: BERLIN }]
+    calculateRouteWithLegs.mockRejectedValue(new RoutingRefusedError(429, null))
+
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, map(1, stops)))
+    await act(async () => { await vi.advanceTimersByTimeAsync(20000) })
+
+    // Three attempts at the run and nothing after them: answering a host that asked for
+    // less traffic with two more requests would be the opposite of backing off.
+    expect(calculateRouteWithLegs).toHaveBeenCalledTimes(3)
+    expect(result.current.days[0].legs).toEqual([undefined, undefined])
+  })
+
   it('FE-ROADTRIP-ROUTES-009: renaming a place does not re-ask the router', async () => {
     const days = [day(1, 1)]
     const stops: StopSpec[] = [{ id: 1, at: HAMBURG }, { id: 2, at: BERLIN }]
