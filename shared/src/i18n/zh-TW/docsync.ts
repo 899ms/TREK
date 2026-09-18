@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': '當文件被刪除時',
   'docsync.deleteUnlink': '兩份都保留',
   'docsync.deleteTrash': '移到回收桶',
+  'docsync.conflictPolicy': '當兩邊都有變更時',
+  'docsync.onConflict.manual': '詢問我',
+  'docsync.onConflict.trek_wins': '保留 TREK 的副本',
+  'docsync.onConflict.provider_wins': '保留儲存端的副本',
   'docsync.webhookHint': '把這個 URL 貼到你的提供者，變更就會立刻送達。沒有它，TREK 只會定時檢查。',
 
   // 連線表單欄位。這些鍵對應 document_provider_fields 的 `label` 欄，
@@ -62,6 +66,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': '提供者上找不到',
   'docsync.state.local_deleted': '已在 TREK 中刪除',
   'docsync.state.scope_drift': '已移出資料夾',
+
+  'docsync.conflict.resolve': "處理 {count} 個",
 
   'docsync.conflict.title': '兩份都有變更',
   'docsync.conflict.keepTrek': '保留 TREK 版本',
@@ -125,6 +131,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': '已暫停',
   'docsync.binding.neverRun': '尚未執行',
   'docsync.binding.deleteHint': '另一邊那份副本會怎麼處理。',
+  'docsync.binding.conflictHint': '當文件在兩邊都被修改時，保留哪一份副本。',
   'docsync.binding.autoHint': '在背景檢查是否有變更。',
   'docsync.binding.webhookTitle': '即時更新',
   'docsync.binding.copy': '複製',

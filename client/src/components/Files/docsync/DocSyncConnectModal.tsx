@@ -53,7 +53,7 @@ export default function DocSyncConnectModal({
       }
       footer={
         <div className="flex items-center justify-between gap-3">
-          <Verdict verdict={verdict} busy={sync.busy === 'test'} />
+          <Verdict verdict={verdict} busy={sync.busy === 'test'} failure={sync.error} />
           <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
@@ -140,9 +140,12 @@ function Field({
 function Verdict({
   verdict,
   busy,
+  failure,
 }: {
   verdict: { connected: boolean; account?: string; error?: string } | null
   busy: boolean
+  /** A call that failed outside the connection test — saving, most of all. */
+  failure: string | null
 }) {
   const { t } = useTranslation()
   if (busy) {
@@ -150,6 +153,18 @@ function Verdict({
       <span className="flex min-w-0 items-center gap-2 text-caption text-content-muted">
         <Loader2 size={14} className="animate-spin" />
         {t('docsync.connect.testing')}
+      </span>
+    )
+  }
+  // A save that the server refused left the dialog open with the button back to
+  // normal and nothing else said, which reads as nothing having happened. The
+  // test verdict wins the space when there is one: it is the more specific
+  // answer and the one the person just asked for.
+  if (!verdict && failure) {
+    return (
+      <span className="flex min-w-0 items-center gap-2 text-caption text-danger">
+        <AlertTriangle size={14} />
+        <span className="truncate">{t(`docsync.error.${failure}`)}</span>
       </span>
     )
   }

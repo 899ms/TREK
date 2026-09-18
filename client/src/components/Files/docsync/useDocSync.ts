@@ -330,7 +330,23 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
   }
 }
 
+/**
+ * The error code a failed call carries, or `unknown`.
+ *
+ * Both shells render this as `docsync.error.<code>`, so anything that is not
+ * one of the codes reaches the screen as a raw translation key — and the server
+ * answers plenty of routes with a sentence ("Link not found") rather than a
+ * code. A general message is worse than a specific one and far better than
+ * `docsync.error.Link not found`.
+ */
 function readError(e: unknown): string {
   const res = (e as { response?: { data?: { error?: string; message?: string } } })?.response
-  return res?.data?.error || res?.data?.message || 'unknown'
+  const raw = res?.data?.error || res?.data?.message || ''
+  // A code passes through — the sync codes and the handful of keys the routes
+  // answer with are all of this shape. A sentence does not: several routes
+  // answer with prose ("Link not found"), and both shells render this as
+  // `docsync.error.<value>`, so that reached the screen as a raw translation
+  // key. A general message is worse than a specific one and far better than
+  // `docsync.error.Link not found`.
+  return /^[a-z0-9_.]+$/i.test(raw) ? raw : 'unknown'
 }

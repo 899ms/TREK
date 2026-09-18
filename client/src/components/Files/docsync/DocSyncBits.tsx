@@ -83,3 +83,25 @@ export function LastRun({ at }: { at: string | null }) {
   if (Number.isNaN(ms)) return null
   return <span title={new Date(ms).toLocaleString(locale)}>{relativeTime(ms, language)}</span>
 }
+
+/**
+ * The three answers to "both sides changed", in the order they are offered.
+ *
+ * Shared because the phone offers them as one cycling button and the desktop as
+ * a dropdown: two lists would drift, and a binding would then say one thing on
+ * a laptop and another on a phone.
+ */
+export const CONFLICT_POLICIES = ['manual', 'trek_wins', 'provider_wins'] as const
+
+export type ConflictPolicy = (typeof CONFLICT_POLICIES)[number]
+
+/** The next answer in that ring, for the phone's single button. */
+export function nextConflictPolicy(current: string): ConflictPolicy {
+  const at = (CONFLICT_POLICIES as readonly string[]).indexOf(current)
+  return CONFLICT_POLICIES[(at + 1) % CONFLICT_POLICIES.length]
+}
+
+/** The label key for one answer. */
+export function conflictPolicyKey(policy: string): string {
+  return `docsync.onConflict.${(CONFLICT_POLICIES as readonly string[]).includes(policy) ? policy : 'manual'}`
+}

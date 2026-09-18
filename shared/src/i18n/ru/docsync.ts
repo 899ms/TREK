@@ -19,6 +19,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Когда документ удалён',
   'docsync.deleteUnlink': 'Оставить обе копии',
   'docsync.deleteTrash': 'Переместить в корзину',
+  'docsync.conflictPolicy': 'Когда изменились обе стороны',
+  'docsync.onConflict.manual': 'Спросить меня',
+  'docsync.onConflict.trek_wins': 'Оставить копию TREK',
+  'docsync.onConflict.provider_wins': 'Оставить копию хранилища',
   'docsync.webhookHint':
     'Вставьте этот URL у своего провайдера, чтобы изменения приходили сразу. Без него TREK проверяет по таймеру.',
 
@@ -67,6 +71,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Отсутствует у провайдера',
   'docsync.state.local_deleted': 'Удалено в TREK',
   'docsync.state.scope_drift': 'Перемещено за пределы папки',
+
+  'docsync.conflict.resolve': "Решить: {count}",
 
   'docsync.conflict.title': 'Изменились обе копии',
   'docsync.conflict.keepTrek': 'Оставить версию TREK',
@@ -133,6 +139,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Приостановлено',
   'docsync.binding.neverRun': 'ещё не запускалась',
   'docsync.binding.deleteHint': 'Что происходит с копией на другой стороне.',
+  'docsync.binding.conflictHint': 'Какая копия останется, если документ изменили в обоих местах.',
   'docsync.binding.autoHint': 'Проверять изменения в фоне.',
   'docsync.binding.webhookTitle': 'Мгновенные обновления',
   'docsync.binding.copy': 'Копировать',

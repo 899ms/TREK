@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'عند حذف مستند',
   'docsync.deleteUnlink': 'الإبقاء على النسختين',
   'docsync.deleteTrash': 'النقل إلى سلة المهملات',
+  'docsync.conflictPolicy': 'عند تغيير الجانبين',
+  'docsync.onConflict.manual': 'اسألني',
+  'docsync.onConflict.trek_wins': 'الاحتفاظ بنسخة TREK',
+  'docsync.onConflict.provider_wins': 'الاحتفاظ بنسخة المخزن',
   'docsync.webhookHint': 'الصق هذا الـ URL في المزوّد لتصل التغييرات فوراً. بدونه يتحقق TREK على فترات زمنية.',
 
   // حقول نموذج الاتصال. تطابق المفاتيح عمود `label` في
@@ -63,6 +67,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'غير موجود لدى المزوّد',
   'docsync.state.local_deleted': 'محذوف في TREK',
   'docsync.state.scope_drift': 'نُقل خارج المجلد',
+
+  'docsync.conflict.resolve': "حلّ {count}",
 
   'docsync.conflict.title': 'تغيّرت النسختان',
   'docsync.conflict.keepTrek': 'الإبقاء على نسخة TREK',
@@ -127,6 +133,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'متوقفة مؤقتاً',
   'docsync.binding.neverRun': 'لم تُشغَّل بعد',
   'docsync.binding.deleteHint': 'ما الذي يحدث للنسخة في الجهة الأخرى.',
+  'docsync.binding.conflictHint': 'أي نسخة تبقى عند تحرير مستند في المكانين.',
   'docsync.binding.autoHint': 'التحقق من التغييرات في الخلفية.',
   'docsync.binding.webhookTitle': 'تحديثات فورية',
   'docsync.binding.copy': 'نسخ',

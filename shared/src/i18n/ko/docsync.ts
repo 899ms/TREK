@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': '문서가 삭제될 때',
   'docsync.deleteUnlink': '양쪽 사본 유지',
   'docsync.deleteTrash': '휴지통으로 이동',
+  'docsync.conflictPolicy': '양쪽이 모두 바뀌었을 때',
+  'docsync.onConflict.manual': '물어보기',
+  'docsync.onConflict.trek_wins': 'TREK 사본 유지',
+  'docsync.onConflict.provider_wins': '저장소 사본 유지',
   'docsync.webhookHint':
     '이 URL을 저장소에 붙여넣으면 변경 사항이 바로 전달됩니다. 설정하지 않으면 TREK이 주기적으로 확인합니다.',
 
@@ -64,6 +68,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': '저장소에 없음',
   'docsync.state.local_deleted': 'TREK에서 삭제됨',
   'docsync.state.scope_drift': '폴더 밖으로 이동됨',
+
+  'docsync.conflict.resolve': "{count}건 해결",
 
   'docsync.conflict.title': '양쪽 사본이 모두 바뀌었습니다',
   'docsync.conflict.keepTrek': 'TREK 버전 유지',
@@ -129,6 +135,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': '일시 중지됨',
   'docsync.binding.neverRun': '아직 실행 안 함',
   'docsync.binding.deleteHint': '반대쪽 사본을 어떻게 할지 정합니다.',
+  'docsync.binding.conflictHint': '양쪽에서 편집된 문서 중 어느 사본을 남길지.',
   'docsync.binding.autoHint': '백그라운드에서 변경 사항을 확인합니다.',
   'docsync.binding.webhookTitle': '즉시 업데이트',
   'docsync.binding.copy': '복사',

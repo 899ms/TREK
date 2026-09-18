@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Коли документ видалено',
   'docsync.deleteUnlink': 'Залишити обидві копії',
   'docsync.deleteTrash': 'Перемістити до кошика',
+  'docsync.conflictPolicy': 'Коли змінилися обидві сторони',
+  'docsync.onConflict.manual': 'Запитати мене',
+  'docsync.onConflict.trek_wins': 'Залишити копію TREK',
+  'docsync.onConflict.provider_wins': 'Залишити копію сховища',
   'docsync.webhookHint':
     'Вставте цю URL-адресу у свого постачальника, щоб зміни надходили одразу. Без цього TREK перевіряє їх за таймером.',
 
@@ -66,6 +70,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Відсутній у постачальника',
   'docsync.state.local_deleted': 'Видалено в TREK',
   'docsync.state.scope_drift': 'Переміщено за межі теки',
+
+  'docsync.conflict.resolve': "Розв'язати {count}",
 
   'docsync.conflict.title': 'Змінилися обидві копії',
   'docsync.conflict.keepTrek': 'Залишити версію TREK',
@@ -132,6 +138,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Призупинено',
   'docsync.binding.neverRun': 'ще не запускалося',
   'docsync.binding.deleteHint': 'Що станеться з копією на іншому боці.',
+  'docsync.binding.conflictHint': 'Яка копія лишиться, якщо документ змінили в обох місцях.',
   'docsync.binding.autoHint': 'Перевіряти зміни у фоновому режимі.',
   'docsync.binding.webhookTitle': 'Миттєві оновлення',
   'docsync.binding.copy': 'Копіювати',

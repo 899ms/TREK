@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Když se dokument smaže',
   'docsync.deleteUnlink': 'Zachovat obě kopie',
   'docsync.deleteTrash': 'Přesunout do koše',
+  'docsync.conflictPolicy': 'Když se změnily obě strany',
+  'docsync.onConflict.manual': 'Zeptat se',
+  'docsync.onConflict.trek_wins': 'Ponechat kopii z TREKu',
+  'docsync.onConflict.provider_wins': 'Ponechat kopii z úložiště',
   'docsync.webhookHint':
     'Vložte tuto URL k poskytovateli, aby změny přicházely okamžitě. Bez toho se TREK ptá v pravidelných intervalech.',
 
@@ -64,6 +68,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Chybí u poskytovatele',
   'docsync.state.local_deleted': 'Smazáno v TREKu',
   'docsync.state.scope_drift': 'Přesunuto mimo složku',
+
+  'docsync.conflict.resolve': "Vyřešit {count}",
 
   'docsync.conflict.title': 'Změnily se obě kopie',
   'docsync.conflict.keepTrek': 'Ponechat verzi z TREKu',
@@ -130,6 +136,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Pozastaveno',
   'docsync.binding.neverRun': 'zatím neproběhlo',
   'docsync.binding.deleteHint': 'Co se stane s kopií na druhé straně.',
+  'docsync.binding.conflictHint': 'Která kopie zůstane, když byl dokument upraven na obou místech.',
   'docsync.binding.autoHint': 'Kontrolovat změny na pozadí.',
   'docsync.binding.webhookTitle': 'Okamžité aktualizace',
   'docsync.binding.copy': 'Kopírovat',

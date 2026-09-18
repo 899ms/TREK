@@ -65,6 +65,7 @@ const plan = (over: Partial<Parameters<typeof planReconcile>[0]> = {}) =>
     direction: 'both',
     remoteTruncated: false,
     remoteUnchanged: false,
+    conflictPolicy: 'manual',
     stableRemoteIds: true,
     maxAttempts: 6,
     ...over,
@@ -193,6 +194,43 @@ describe('planReconcile', () => {
       local: [local({ name: 'old.pdf' })],
     });
     expect(p.actions[0]).toMatchObject({ kind: 'rename_local', name: 'new-upstream.pdf' });
+  });
+
+  it('lets the provider win when the binding says so', () => {
+    // The answer was stored at setup and never read: every conflict was manual
+    // whatever the binding said, so a person who had already picked a side was
+    // asked to pick it again, for good.
+    const p = plan({
+      conflictPolicy: 'provider_wins',
+      items: [item({ contentSha256: 'old', remoteVersion: 'v1' })],
+      remote: [remote({ remoteVersion: 'v2' })],
+      local: [local({ sha256: 'newer' })],
+    });
+    expect(p.actions.map((a) => a.kind)).toEqual(['pull_update']);
+  });
+
+  it('lets TREK win when the binding says so', () => {
+    const p = plan({
+      conflictPolicy: 'trek_wins',
+      items: [item({ contentSha256: 'old', remoteVersion: 'v1' })],
+      remote: [remote({ remoteVersion: 'v2' })],
+      local: [local({ sha256: 'newer' })],
+    });
+    expect(p.actions.map((a) => a.kind)).toEqual(['push_update']);
+  });
+
+  it('will not resolve a conflict by doing what the direction forbids', () => {
+    // A pull-only binding cannot push, so "TREK wins" cannot mean "upload it".
+    // Parking is the honest answer; the alternative is silently doing the
+    // opposite of one of the two settings.
+    const p = plan({
+      conflictPolicy: 'trek_wins',
+      direction: 'pull',
+      items: [item({ contentSha256: 'old', remoteVersion: 'v1' })],
+      remote: [remote({ remoteVersion: 'v2' })],
+      local: [local({ sha256: 'newer' })],
+    });
+    expect(p.actions.map((a) => a.kind)).toEqual(['conflict']);
   });
 
   it('asks a person when both sides renamed', () => {

@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'När ett dokument tas bort',
   'docsync.deleteUnlink': 'Behåll båda kopiorna',
   'docsync.deleteTrash': 'Flytta till papperskorgen',
+  'docsync.conflictPolicy': 'När båda sidor ändrats',
+  'docsync.onConflict.manual': 'Fråga mig',
+  'docsync.onConflict.trek_wins': 'Behåll TREK-kopian',
+  'docsync.onConflict.provider_wins': 'Behåll lagrets kopia',
   'docsync.webhookHint':
     'Klistra in den här URL:en hos din leverantör så kommer ändringar direkt. Utan den kontrollerar TREK med jämna mellanrum.',
 
@@ -63,6 +67,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Saknas hos leverantören',
   'docsync.state.local_deleted': 'Borttagen i TREK',
   'docsync.state.scope_drift': 'Flyttad ut ur mappen',
+
+  'docsync.conflict.resolve': "Lös {count}",
 
   'docsync.conflict.title': 'Båda kopiorna har ändrats',
   'docsync.conflict.keepTrek': 'Behåll TREK-versionen',
@@ -129,6 +135,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Pausad',
   'docsync.binding.neverRun': 'inte körd än',
   'docsync.binding.deleteHint': 'Vad som händer med kopian på andra sidan.',
+  'docsync.binding.conflictHint': 'Vilken kopia som blir kvar när ett dokument redigerats på båda ställena.',
   'docsync.binding.autoHint': 'Leta efter ändringar i bakgrunden.',
   'docsync.binding.webhookTitle': 'Direkta uppdateringar',
   'docsync.binding.copy': 'Kopiera',

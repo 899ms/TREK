@@ -347,7 +347,9 @@ describe('DocSyncPanel — what needs a look', () => {
     expect(rows).toHaveLength(2)
     expect(within(rows[0]).getByText(t('docsync.state.conflict'))).toBeInTheDocument()
     expect(within(rows[0]).getByText(t('docsync.issues.conflict'))).toBeInTheDocument()
-    expect(within(rows[0]).getByText('2')).toBeInTheDocument()
+    // The conflict row carries a button rather than a bare count: it is the one
+    // of these a person can act on.
+    expect(within(rows[0]).getByRole('button', { name: /Resolve/ })).toBeInTheDocument()
     expect(within(rows[1]).getByText(t('docsync.state.too_large'))).toBeInTheDocument()
     expect(within(rows[1]).getByText('1')).toBeInTheDocument()
     expect(panel.queryByText(t('docsync.state.pending'))).not.toBeInTheDocument()

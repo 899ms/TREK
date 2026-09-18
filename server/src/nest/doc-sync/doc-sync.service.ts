@@ -186,6 +186,7 @@ export class DocSyncService {
       remoteUnchanged: listing.data.cursorUnchanged === true,
       stableRemoteIds: provider.capabilities(ref).stableId,
       maxAttempts: ITEM_MAX_ATTEMPTS,
+      conflictPolicy: link.conflict_policy as 'manual' | 'trek_wins' | 'provider_wins',
     });
 
     if (plan.massDeleteGuardTripped) {

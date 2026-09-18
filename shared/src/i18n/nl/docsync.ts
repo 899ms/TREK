@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Als een document wordt verwijderd',
   'docsync.deleteUnlink': 'Beide kopieën behouden',
   'docsync.deleteTrash': 'Naar de prullenbak verplaatsen',
+  'docsync.conflictPolicy': 'Als beide kanten zijn gewijzigd',
+  'docsync.onConflict.manual': 'Vraag het mij',
+  'docsync.onConflict.trek_wins': 'De TREK-kopie behouden',
+  'docsync.onConflict.provider_wins': 'De kopie in de opslag behouden',
   'docsync.webhookHint':
     'Plak deze URL bij je aanbieder, dan komen wijzigingen meteen binnen. Zonder die URL kijkt TREK op vaste tijden.',
 
@@ -66,6 +70,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Ontbreekt bij de aanbieder',
   'docsync.state.local_deleted': 'Verwijderd in TREK',
   'docsync.state.scope_drift': 'Buiten de map verplaatst',
+
+  'docsync.conflict.resolve': "{count} oplossen",
 
   'docsync.conflict.title': 'Beide kopieën zijn gewijzigd',
   'docsync.conflict.keepTrek': 'De TREK-versie behouden',
@@ -132,6 +138,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Gepauzeerd',
   'docsync.binding.neverRun': 'nog niet uitgevoerd',
   'docsync.binding.deleteHint': 'Wat er met de kopie aan de andere kant gebeurt.',
+  'docsync.binding.conflictHint': 'Welke kopie blijft als een document op beide plekken is bewerkt.',
   'docsync.binding.autoHint': 'Op de achtergrond op wijzigingen controleren.',
   'docsync.binding.webhookTitle': 'Directe updates',
   'docsync.binding.copy': 'Kopiëren',

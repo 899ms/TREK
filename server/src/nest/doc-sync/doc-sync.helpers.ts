@@ -168,6 +168,15 @@ export interface ReconcileInput {
    * Nextcloud or OpenCloud binding tripped the mass-delete guard for good.
    */
   remoteUnchanged: boolean;
+  /**
+   * What to do when both sides moved since they last agreed.
+   *
+   * `manual` parks the row for a person. The other two are the reason this
+   * field exists: the binding was asked at setup, the answer was stored, and
+   * nothing ever read it — so every conflict was manual whatever the binding
+   * said, and a person who had chosen a side still had to pick it again.
+   */
+  conflictPolicy: 'manual' | 'trek_wins' | 'provider_wins';
   /** Providers without stable ids need the rename heuristic. */
   stableRemoteIds: boolean;
   /** How many failures a row gets before it is shelved for a person to look at. */
@@ -186,7 +195,7 @@ export interface ReconcileInput {
  * or ping-pong forever.
  */
 export function planReconcile(input: ReconcileInput): ReconcilePlan {
-  const { items, remote, local, direction, remoteTruncated, stableRemoteIds, maxAttempts } = input;
+  const { items, remote, local, direction, remoteTruncated, stableRemoteIds, maxAttempts, conflictPolicy } = input;
   const now = input.now ?? new Date().toISOString().replace('T', ' ').slice(0, 19);
   const actions: PlanAction[] = [];
 
@@ -221,6 +230,29 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     const itemId = 'itemId' in action ? action.itemId : null;
     if (itemId !== null && blocked.has(itemId)) return;
     actions.push(action);
+  };
+
+  /**
+   * Both sides moved. The binding's answer decides, and `manual` parks it.
+   *
+   * A side that wins takes the whole document, name and bytes together, because
+   * the two halves of one document coming from different sides is not a state
+   * anybody asked for. Direction still has the last word: a pull-only binding
+   * cannot push even when TREK is meant to win, so it parks instead of doing
+   * the opposite of what was chosen.
+   */
+  const settle = (it: SyncItemState, r: RemoteDocument, l: LocalDocument | null): void => {
+    // Only the two answers that name a winner act; anything else — `manual`, a
+    // value from a future version, a column somebody edited by hand — parks the
+    // row. Overwriting one side is the destructive move, so it needs a yes.
+    const park = (): void => { add({ kind: 'conflict', itemId: it.id, remote: r, local: l }); };
+    if (conflictPolicy === 'provider_wins' && direction !== 'push') {
+      return add({ kind: 'pull_update', remote: r, itemId: it.id });
+    }
+    if (conflictPolicy === 'trek_wins' && direction !== 'pull' && l !== null) {
+      return add({ kind: 'push_update', local: l, itemId: it.id, remoteId: it.remoteId });
+    }
+    return park();
   };
 
   const remoteById = new Map<string, RemoteDocument>();
@@ -310,7 +342,7 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     }
 
     if (remoteChanged && !isEcho && localChanged) {
-      add({ kind: 'conflict', itemId: it.id, remote: r, local: l ?? null });
+      settle(it, r, l ?? null);
       continue;
     }
     if (remoteChanged && !isEcho) {
@@ -347,9 +379,10 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
         continue;
       }
       if (providerRenamed && localRenamed) {
-        // Both sides renamed. Nothing here can pick the right one, and picking
-        // wrong loses a name somebody chose, so it goes to a person.
-        add({ kind: 'conflict', itemId: it.id, remote: r, local: l });
+        // Both sides renamed. Nothing here can pick the right one on its own,
+        // and picking wrong loses a name somebody chose — so it follows the
+        // binding's answer, and goes to a person when there is none.
+        settle(it, r, l);
         continue;
       }
       // No stored name to arbitrate with (a row from before this column, or a

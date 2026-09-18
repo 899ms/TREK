@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': '当文档被删除时',
   'docsync.deleteUnlink': '两份副本都保留',
   'docsync.deleteTrash': '移入回收站',
+  'docsync.conflictPolicy': '当两边都有改动时',
+  'docsync.onConflict.manual': '询问我',
+  'docsync.onConflict.trek_wins': '保留 TREK 的副本',
+  'docsync.onConflict.provider_wins': '保留存储端的副本',
   'docsync.webhookHint': '把此 URL 粘贴到你的文档服务中，变更就会立即送达。不设置时，TREK 会定时检查。',
 
   // 连接表单的字段。这些键与 document_provider_fields 表的 `label` 列一一对应，
@@ -62,6 +66,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': '文档服务中不存在',
   'docsync.state.local_deleted': '已在 TREK 中删除',
   'docsync.state.scope_drift': '已移出该文件夹',
+
+  'docsync.conflict.resolve': "处理 {count} 个",
 
   'docsync.conflict.title': '两份副本都有改动',
   'docsync.conflict.keepTrek': '保留 TREK 版本',
@@ -124,6 +130,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': '已暂停',
   'docsync.binding.neverRun': '尚未运行',
   'docsync.binding.deleteHint': '另一侧的副本会怎样。',
+  'docsync.binding.conflictHint': '当文档在两边都被修改时，保留哪一份副本。',
   'docsync.binding.autoHint': '在后台检查变更。',
   'docsync.binding.webhookTitle': '即时更新',
   'docsync.binding.copy': '复制',

@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Quando un documento viene eliminato',
   'docsync.deleteUnlink': 'Mantieni entrambe le copie',
   'docsync.deleteTrash': 'Sposta nel cestino',
+  'docsync.conflictPolicy': 'Quando entrambi i lati sono cambiati',
+  'docsync.onConflict.manual': 'Chiedimelo',
+  'docsync.onConflict.trek_wins': 'Tieni la copia di TREK',
+  'docsync.onConflict.provider_wins': "Tieni la copia dell'archivio",
   'docsync.webhookHint':
     'Incolla questo URL nel tuo provider per ricevere subito le modifiche. Senza, TREK controlla a intervalli regolari.',
 
@@ -65,6 +69,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Assente sul provider',
   'docsync.state.local_deleted': 'Eliminato in TREK',
   'docsync.state.scope_drift': 'Spostato fuori dalla cartella',
+
+  'docsync.conflict.resolve': "Risolvi {count}",
 
   'docsync.conflict.title': 'Entrambe le copie sono cambiate',
   'docsync.conflict.keepTrek': 'Mantieni la versione di TREK',
@@ -132,6 +138,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'In pausa',
   'docsync.binding.neverRun': 'mai eseguita',
   'docsync.binding.deleteHint': 'Che cosa succede alla copia dall’altra parte.',
+  'docsync.binding.conflictHint': 'Quale copia resta quando un documento è stato modificato in entrambi i posti.',
   'docsync.binding.autoHint': 'Controlla le modifiche in background.',
   'docsync.binding.webhookTitle': 'Aggiornamenti immediati',
   'docsync.binding.copy': 'Copia',

@@ -8,7 +8,7 @@ import Tooltip from '../../shared/Tooltip'
 import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import DocSyncFlow, { type SyncDirection } from './DocSyncFlow'
-import { Badge, LastRun, StateBadge } from './DocSyncBits'
+import { Badge, CONFLICT_POLICIES, conflictPolicyKey, LastRun, StateBadge } from './DocSyncBits'
 import type { DocSyncLink, DocSyncProvider, useDocSync } from './useDocSync'
 
 /**
@@ -157,6 +157,15 @@ export default function DocSyncBinding({
                     { value: 'unlink', label: t('docsync.deleteUnlink') },
                     { value: 'trash', label: t('docsync.deleteTrash') },
                   ]}
+                />
+              </Row>
+
+              <Row label={t('docsync.conflictPolicy')} hint={t('docsync.binding.conflictHint')}>
+                <CustomSelect
+                  size="sm"
+                  value={link.conflictPolicy}
+                  onChange={v => void sync.updateLink(link.id, { conflictPolicy: String(v) })}
+                  options={CONFLICT_POLICIES.map(p => ({ value: p, label: t(conflictPolicyKey(p)) }))}
                 />
               </Row>
 

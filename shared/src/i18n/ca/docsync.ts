@@ -19,6 +19,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Quan s’elimina un document',
   'docsync.deleteUnlink': 'Conserva les dues còpies',
   'docsync.deleteTrash': 'Mou a la paperera',
+  'docsync.conflictPolicy': 'Quan han canviat les dues bandes',
+  'docsync.onConflict.manual': "Pregunta-m'ho",
+  'docsync.onConflict.trek_wins': 'Conserva la còpia del TREK',
+  'docsync.onConflict.provider_wins': 'Conserva la còpia del magatzem',
   'docsync.webhookHint':
     'Enganxa aquesta URL al teu proveïdor perquè els canvis arribin de seguida. Sense això, TREK ho comprova cada cert temps.',
 
@@ -66,6 +70,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'No hi és, al proveïdor',
   'docsync.state.local_deleted': 'Eliminat a TREK',
   'docsync.state.scope_drift': 'Ha sortit de la carpeta',
+
+  'docsync.conflict.resolve': "Resol {count}",
 
   'docsync.conflict.title': 'Han canviat totes dues còpies',
   'docsync.conflict.keepTrek': 'Conserva la versió de TREK',
@@ -133,6 +139,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'En pausa',
   'docsync.binding.neverRun': 'encara no s’ha executat',
   'docsync.binding.deleteHint': 'Què passa amb la còpia de l’altra banda.',
+  'docsync.binding.conflictHint': "Quina còpia es manté quan un document s'ha editat als dos llocs.",
   'docsync.binding.autoHint': 'Comprova si hi ha canvis en segon pla.',
   'docsync.binding.webhookTitle': 'Actualitzacions instantànies',
   'docsync.binding.copy': 'Copia',

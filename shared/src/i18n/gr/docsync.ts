@@ -19,6 +19,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Όταν διαγράφεται ένα έγγραφο',
   'docsync.deleteUnlink': 'Διατήρηση και των δύο αντιγράφων',
   'docsync.deleteTrash': 'Μετακίνηση στον κάδο ανακύκλωσης',
+  'docsync.conflictPolicy': 'Όταν άλλαξαν και οι δύο πλευρές',
+  'docsync.onConflict.manual': 'Να με ρωτάει',
+  'docsync.onConflict.trek_wins': 'Διατήρηση του αντιγράφου TREK',
+  'docsync.onConflict.provider_wins': 'Διατήρηση του αντιγράφου του χώρου',
   'docsync.webhookHint':
     'Επικολλήστε αυτό το URL στον πάροχό σας ώστε οι αλλαγές να φτάνουν αμέσως. Χωρίς αυτό, το TREK ελέγχει ανά τακτά διαστήματα.',
 
@@ -68,6 +72,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Λείπει από τον πάροχο',
   'docsync.state.local_deleted': 'Διαγράφηκε στο TREK',
   'docsync.state.scope_drift': 'Μετακινήθηκε εκτός του φακέλου',
+
+  'docsync.conflict.resolve': "Επίλυση {count}",
 
   'docsync.conflict.title': 'Άλλαξαν και τα δύο αντίγραφα',
   'docsync.conflict.keepTrek': 'Διατήρηση της έκδοσης του TREK',
@@ -135,6 +141,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Σε παύση',
   'docsync.binding.neverRun': 'δεν έχει εκτελεστεί ακόμη',
   'docsync.binding.deleteHint': 'Τι γίνεται με το αντίγραφο στην άλλη πλευρά.',
+  'docsync.binding.conflictHint': 'Ποιο αντίγραφο μένει όταν ένα έγγραφο άλλαξε και στα δύο σημεία.',
   'docsync.binding.autoHint': 'Έλεγχος για αλλαγές στο παρασκήνιο.',
   'docsync.binding.webhookTitle': 'Άμεσες ενημερώσεις',
   'docsync.binding.copy': 'Αντιγραφή',

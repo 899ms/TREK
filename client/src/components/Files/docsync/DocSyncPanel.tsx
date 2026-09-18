@@ -4,6 +4,7 @@ import Modal from '../../shared/Modal'
 import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import { StateBadge } from './DocSyncBits'
+import { useConflicts } from './useConflicts'
 import { useDocSync, type DocSyncLink, type DocSyncProvider } from './useDocSync'
 import DocSyncBinding from './DocSyncBinding'
 import DocSyncConnectModal from './DocSyncConnectModal'
@@ -96,7 +97,7 @@ export default function DocSyncPanel({
                     sync={sync}
                     isOwner={isOwner}
                   />
-                  {attention > 0 && <Attention counts={sync.itemCounts} />}
+                  {attention > 0 && <Attention counts={sync.itemCounts} tripId={tripId} sync={sync} />}
                 </div>
               ) : (
                 <NothingBound isOwner={isOwner} />
@@ -260,9 +261,20 @@ function StoreButton({
 }
 
 /** What a person still has to decide about, named rather than counted in a chip. */
-function Attention({ counts }: { counts: Record<string, number> }) {
+function Attention({
+  counts,
+  tripId,
+  sync,
+}: {
+  counts: Record<string, number>
+  tripId: number | string
+  sync: ReturnType<typeof useDocSync>
+}) {
   const { t } = useTranslation()
   const rows = ATTENTION_STATES.filter(k => (counts[k] ?? 0) > 0)
+  const [showConflicts, setShowConflicts] = useState(false)
+  const conflicts = useConflicts(tripId, sync, showConflicts)
+
   return (
     <section className="rounded-xl border border-edge bg-surface">
       <h4 className="flex items-center gap-2 border-b border-edge-faint px-4 py-2.5 text-body font-medium text-content">
@@ -271,12 +283,55 @@ function Attention({ counts }: { counts: Record<string, number> }) {
       </h4>
       <ul className="divide-y divide-edge-faint">
         {rows.map(k => (
-          <li key={k} className="flex items-baseline justify-between gap-3 px-4 py-2.5">
-            <span className="min-w-0">
-              <span className="block text-body text-content">{t(`docsync.state.${k}`)}</span>
-              <span className="mt-0.5 block text-caption text-content-muted">{t(`docsync.issues.${k}`)}</span>
-            </span>
-            <span className="shrink-0 text-body font-medium tabular-nums text-content">{counts[k]}</span>
+          <li key={k} className="px-4 py-2.5">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="min-w-0">
+                <span className="block text-body text-content">{t(`docsync.state.${k}`)}</span>
+                <span className="mt-0.5 block text-caption text-content-muted">{t(`docsync.issues.${k}`)}</span>
+              </span>
+              {/* A conflict is the one of these a person can act on, so it is
+                  the one that opens. The rest are a state to read. */}
+              {k === 'conflict' ? (
+                <button
+                  type="button"
+                  onClick={() => setShowConflicts(v => !v)}
+                  className="shrink-0 rounded-lg border border-edge px-2.5 py-1 text-caption font-medium text-content transition-colors hover:bg-surface-hover"
+                >
+                  {showConflicts ? t('common.close') : t('docsync.conflict.resolve', { count: counts[k] })}
+                </button>
+              ) : (
+                <span className="shrink-0 text-body font-medium tabular-nums text-content">{counts[k]}</span>
+              )}
+            </div>
+
+            {k === 'conflict' && showConflicts && (
+              <ul className="mt-3 space-y-2">
+                {conflicts.items === null && (
+                  <li className="flex justify-center py-2">
+                    <Loader2 size={14} className="animate-spin text-content-muted" />
+                  </li>
+                )}
+                {conflicts.items?.map(item => (
+                  <li key={item.id} className="rounded-lg bg-surface-secondary px-3 py-2.5">
+                    <p className="truncate text-body text-content" title={item.name}>{item.name}</p>
+                    <p className="mt-0.5 text-caption text-content-muted">{t('docsync.conflict.title')}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {(['trek', 'provider', 'both'] as const).map(keep => (
+                        <button
+                          key={keep}
+                          type="button"
+                          disabled={conflicts.working === item.id}
+                          onClick={() => void conflicts.resolve(item.id, keep)}
+                          className="rounded-lg border border-edge px-2.5 py-1 text-caption text-content-secondary transition-colors hover:bg-surface-hover disabled:opacity-50"
+                        >
+                          {t(`docsync.conflict.${keep === 'trek' ? 'keepTrek' : keep === 'provider' ? 'keepProvider' : 'keepBoth'}`)}
+                        </button>
+                      ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </li>
         ))}
       </ul>

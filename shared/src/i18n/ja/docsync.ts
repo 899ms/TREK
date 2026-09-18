@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'ドキュメントが削除されたとき',
   'docsync.deleteUnlink': '両方のコピーを残す',
   'docsync.deleteTrash': 'ゴミ箱へ移動する',
+  'docsync.conflictPolicy': '両方が変更された場合',
+  'docsync.onConflict.manual': '確認する',
+  'docsync.onConflict.trek_wins': 'TREK のコピーを残す',
+  'docsync.onConflict.provider_wins': '保存先のコピーを残す',
   'docsync.webhookHint':
     'この URL を連携先に貼り付けると、変更がすぐに届きます。設定しない場合、TREK は一定間隔で確認します。',
 
@@ -64,6 +68,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': '連携先に見つかりません',
   'docsync.state.local_deleted': 'TREK で削除済み',
   'docsync.state.scope_drift': 'フォルダー外へ移動',
+
+  'docsync.conflict.resolve': "{count} 件を解決",
 
   'docsync.conflict.title': '両方のコピーが変更されました',
   'docsync.conflict.keepTrek': 'TREK のバージョンを残す',
@@ -130,6 +136,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': '一時停止中',
   'docsync.binding.neverRun': '未実行',
   'docsync.binding.deleteHint': 'もう一方に残るコピーをどう扱うかです。',
+  'docsync.binding.conflictHint': '両方で編集された文書のうち、どちらのコピーを残すか。',
   'docsync.binding.autoHint': 'バックグラウンドで変更を確認します。',
   'docsync.binding.webhookTitle': '即時更新',
   'docsync.binding.copy': 'コピー',

@@ -38,6 +38,10 @@ export default function DocSyncScopeModal({
   const [working, setWorking] = useState<string | null>(null)
 
   useEffect(() => {
+    // `sync.loadScopes`, not `sync`: the hook hands back a fresh object on
+    // every render of the panel above, so depending on it re-listed the
+    // provider's folders each time anything up there changed. The callback
+    // itself is stable.
     let cancelled = false
     void (async () => {
       const res = await sync.loadScopes(connection.id)
@@ -46,7 +50,7 @@ export default function DocSyncScopeModal({
       setError(res.error ?? null)
     })()
     return () => { cancelled = true }
-  }, [connection.id, sync])
+  }, [connection.id, sync.loadScopes])
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()

@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Bir belge silindiğinde',
   'docsync.deleteUnlink': 'İki kopyayı da tut',
   'docsync.deleteTrash': 'Geri dönüşüm kutusuna taşı',
+  'docsync.conflictPolicy': 'İki taraf da değiştiğinde',
+  'docsync.onConflict.manual': 'Bana sor',
+  'docsync.onConflict.trek_wins': 'TREK kopyasını tut',
+  'docsync.onConflict.provider_wins': 'Depodaki kopyayı tut',
   'docsync.webhookHint':
     'Değişikliklerin hemen ulaşması için bu URL’yi sağlayıcınıza yapıştırın. Bu olmadan TREK belirli aralıklarla denetler.',
 
@@ -64,6 +68,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Sağlayıcıda yok',
   'docsync.state.local_deleted': 'TREK’te silindi',
   'docsync.state.scope_drift': 'Klasörün dışına taşındı',
+
+  'docsync.conflict.resolve': "{count} tanesini çöz",
 
   'docsync.conflict.title': 'İki kopya da değişti',
   'docsync.conflict.keepTrek': 'TREK sürümünü tut',
@@ -131,6 +137,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Duraklatıldı',
   'docsync.binding.neverRun': 'henüz çalışmadı',
   'docsync.binding.deleteHint': 'Karşı taraftaki kopyaya ne olacağı.',
+  'docsync.binding.conflictHint': 'Belge iki yerde de düzenlendiğinde hangi kopyanın kalacağı.',
   'docsync.binding.autoHint': 'Değişiklikleri arka planda denetler.',
   'docsync.binding.webhookTitle': 'Anında güncelleme',
   'docsync.binding.copy': 'Kopyala',

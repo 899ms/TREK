@@ -19,6 +19,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Ha egy dokumentumot törölnek',
   'docsync.deleteUnlink': 'Mindkét példány megtartása',
   'docsync.deleteTrash': 'Áthelyezés a kukába',
+  'docsync.conflictPolicy': 'Ha mindkét oldal változott',
+  'docsync.onConflict.manual': 'Kérdezzen rá',
+  'docsync.onConflict.trek_wins': 'A TREK-példány megtartása',
+  'docsync.onConflict.provider_wins': 'A tároló példányának megtartása',
   'docsync.webhookHint':
     'Illeszd be ezt az URL-t a szolgáltatódnál, hogy a változások azonnal megérkezzenek. Enélkül a TREK időzítve ellenőriz.',
 
@@ -67,6 +71,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Hiányzik a szolgáltatónál',
   'docsync.state.local_deleted': 'Törölve a TREK-ben',
   'docsync.state.scope_drift': 'Kikerült a mappából',
+
+  'docsync.conflict.resolve': "{count} megoldása",
 
   'docsync.conflict.title': 'Mindkét példány megváltozott',
   'docsync.conflict.keepTrek': 'A TREK-verzió megtartása',
@@ -134,6 +140,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Szüneteltetve',
   'docsync.binding.neverRun': 'még nem futott',
   'docsync.binding.deleteHint': 'Mi történjen a másik oldalon lévő példánnyal.',
+  'docsync.binding.conflictHint': 'Melyik példány marad, ha a dokumentumot mindkét helyen szerkesztették.',
   'docsync.binding.autoHint': 'Változások keresése a háttérben.',
   'docsync.binding.webhookTitle': 'Azonnali frissítések',
   'docsync.binding.copy': 'Másolás',

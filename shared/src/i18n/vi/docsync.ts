@@ -18,6 +18,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Khi một tài liệu bị xóa',
   'docsync.deleteUnlink': 'Giữ cả hai bản',
   'docsync.deleteTrash': 'Chuyển vào thùng rác',
+  'docsync.conflictPolicy': 'Khi cả hai bên đều thay đổi',
+  'docsync.onConflict.manual': 'Hỏi tôi',
+  'docsync.onConflict.trek_wins': 'Giữ bản của TREK',
+  'docsync.onConflict.provider_wins': 'Giữ bản của kho',
   'docsync.webhookHint':
     'Dán URL này vào nhà cung cấp của bạn để thay đổi đến ngay lập tức. Nếu không, TREK sẽ kiểm tra theo định kỳ.',
 
@@ -64,6 +68,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Không có ở nhà cung cấp',
   'docsync.state.local_deleted': 'Đã xóa trong TREK',
   'docsync.state.scope_drift': 'Đã chuyển ra khỏi thư mục',
+
+  'docsync.conflict.resolve': "Giải quyết {count}",
 
   'docsync.conflict.title': 'Cả hai bản đều thay đổi',
   'docsync.conflict.keepTrek': 'Giữ bản TREK',
@@ -130,6 +136,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Đã tạm dừng',
   'docsync.binding.neverRun': 'chưa chạy lần nào',
   'docsync.binding.deleteHint': 'Điều sẽ xảy ra với bản sao ở phía bên kia.',
+  'docsync.binding.conflictHint': 'Bản nào được giữ lại khi tài liệu bị sửa ở cả hai nơi.',
   'docsync.binding.autoHint': 'Kiểm tra thay đổi ở chế độ nền.',
   'docsync.binding.webhookTitle': 'Cập nhật tức thì',
   'docsync.binding.copy': 'Sao chép',

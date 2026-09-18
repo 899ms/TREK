@@ -19,6 +19,10 @@ const docsync: TranslationStrings = {
   'docsync.deletePolicy': 'Saat sebuah dokumen dihapus',
   'docsync.deleteUnlink': 'Simpan kedua salinan',
   'docsync.deleteTrash': 'Pindahkan ke tempat sampah',
+  'docsync.conflictPolicy': 'Saat kedua sisi berubah',
+  'docsync.onConflict.manual': 'Tanya saya',
+  'docsync.onConflict.trek_wins': 'Simpan salinan TREK',
+  'docsync.onConflict.provider_wins': 'Simpan salinan penyimpanan',
   'docsync.webhookHint':
     'Tempelkan URL ini di penyediamu agar perubahan langsung tiba. Tanpa itu, TREK memeriksa secara berkala.',
 
@@ -66,6 +70,8 @@ const docsync: TranslationStrings = {
   'docsync.state.remote_missing': 'Tidak ada di penyedia',
   'docsync.state.local_deleted': 'Dihapus di TREK',
   'docsync.state.scope_drift': 'Dipindahkan keluar folder',
+
+  'docsync.conflict.resolve': "Selesaikan {count}",
 
   'docsync.conflict.title': 'Kedua salinan berubah',
   'docsync.conflict.keepTrek': 'Pertahankan versi TREK',
@@ -133,6 +139,7 @@ const docsync: TranslationStrings = {
   'docsync.binding.autoOff': 'Dijeda',
   'docsync.binding.neverRun': 'belum pernah dijalankan',
   'docsync.binding.deleteHint': 'Apa yang terjadi pada salinan di sisi satunya.',
+  'docsync.binding.conflictHint': 'Salinan mana yang bertahan saat dokumen diubah di kedua tempat.',
   'docsync.binding.autoHint': 'Periksa perubahan di latar belakang.',
   'docsync.binding.webhookTitle': 'Pembaruan seketika',
   'docsync.binding.copy': 'Salin',

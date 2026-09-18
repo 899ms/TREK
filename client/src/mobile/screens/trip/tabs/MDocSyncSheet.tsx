@@ -15,6 +15,8 @@ import {
   useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
 import { useConnectForm } from '../../../../components/Files/docsync/useConnectForm'
+import { conflictPolicyKey, nextConflictPolicy } from '../../../../components/Files/docsync/DocSyncBits'
+import { useConflicts } from '../../../../components/Files/docsync/useConflicts'
 import { relativeTime } from '../../../../utils/relativeTime'
 
 /**
@@ -123,6 +125,7 @@ export default function MDocSyncSheet({
             />
           ) : view === 'detail' && link ? (
             <DetailView
+              tripId={tripId}
               link={link}
               providerName={sync.providers.find(p => p.id === link.providerId)?.name ?? link.providerId}
               sync={sync}
@@ -224,12 +227,14 @@ function ListView({
 /** One binding: the flow, a run button, its settings. */
 function DetailView({
   link,
+  tripId,
   providerName,
   sync,
   isOwner,
   onUnlink,
 }: {
   link: DocSyncLink
+  tripId: number | string
   providerName: string
   sync: ReturnType<typeof useDocSync>
   isOwner: boolean
@@ -299,6 +304,8 @@ function DetailView({
         </p>
       )}
 
+      <MConflicts tripId={tripId} sync={sync} count={sync.itemCounts.conflict ?? 0} />
+
       <button
         type="button"
         onClick={() => void sync.syncNow(link.id)}
@@ -328,6 +335,18 @@ function DetailView({
               className="rounded-full bg-[color:var(--m-ic)] px-3 py-[6px] font-geist text-[0.6875rem] font-bold text-m-ink"
             >
               {link.deletePolicy === 'unlink' ? t('docsync.deleteUnlink') : t('docsync.deleteTrash')}
+            </button>
+          </SettingRow>
+
+          <SettingRow label={t('docsync.conflictPolicy')} hint={t('docsync.binding.conflictHint')}>
+            <button
+              type="button"
+              onClick={() =>
+                void sync.updateLink(link.id, { conflictPolicy: nextConflictPolicy(link.conflictPolicy) })
+              }
+              className="rounded-full bg-[color:var(--m-ic)] px-3 py-[6px] font-geist text-[0.6875rem] font-bold text-m-ink"
+            >
+              {t(conflictPolicyKey(link.conflictPolicy))}
             </button>
           </SettingRow>
 
@@ -467,6 +486,10 @@ function ScopeView({
   const [working, setWorking] = useState<string | null>(null)
 
   useEffect(() => {
+    // `sync.loadScopes`, not `sync`: the hook hands back a fresh object on
+    // every render of the panel above, so depending on it re-listed the
+    // provider's folders each time anything up there changed. The callback
+    // itself is stable.
     let cancelled = false
     void (async () => {
       const res = await sync.loadScopes(connectionId)
@@ -475,7 +498,7 @@ function ScopeView({
       setError(res.error ?? null)
     })()
     return () => { cancelled = true }
-  }, [connectionId, sync])
+  }, [connectionId, sync.loadScopes])
 
   const bind = async (scope: { scopeKey: string; label: string; remoteRootId: string | null; remoteRootPath: string | null }) => {
     setWorking(scope.scopeKey)
@@ -729,4 +752,71 @@ function slugFor(title: string | undefined, tripId: number | string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 40)
   return `${base || 'trek'}-${tripId}`
+}
+
+/**
+ * The documents that changed in both places, with the way out.
+ *
+ * The same three answers the panel offers, through the same hook — only the
+ * markup is a phone's.
+ */
+function MConflicts({
+  tripId,
+  sync,
+  count,
+}: {
+  tripId: number | string
+  sync: ReturnType<typeof useDocSync>
+  count: number
+}) {
+  const { t } = useTranslation()
+  const [open, setOpen] = useState(false)
+  const conflicts = useConflicts(tripId, sync, open)
+  if (count === 0) return null
+
+  return (
+    <section className="rounded-2xl bg-[color:var(--m-ic)] px-3 py-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="flex w-full items-center justify-between gap-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block font-geist text-[0.75rem] font-bold text-m-ink">{t('docsync.conflict.title')}</span>
+          <span className="mt-0.5 block font-geist text-[0.6875rem] text-m-muted">{t('docsync.issues.conflict')}</span>
+        </span>
+        <span className="shrink-0 font-geist text-[0.6875rem] font-bold text-m-ink">
+          {open ? t('common.close') : t('docsync.conflict.resolve', { count })}
+        </span>
+      </button>
+
+      {open && (
+        <ul className="mt-2.5 space-y-2">
+          {conflicts.items === null && (
+            <li className="flex justify-center py-2">
+              <Loader2 size={14} className="animate-spin text-m-muted" />
+            </li>
+          )}
+          {conflicts.items?.map(item => (
+            <li key={item.id} className="rounded-2xl bg-m-card px-3 py-2.5">
+              <p className="truncate font-geist text-[0.75rem] text-m-ink">{item.name}</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {(['trek', 'provider', 'both'] as const).map(keep => (
+                  <button
+                    key={keep}
+                    type="button"
+                    disabled={conflicts.working === item.id}
+                    onClick={() => void conflicts.resolve(item.id, keep)}
+                    className="rounded-full bg-[color:var(--m-ic)] px-3 py-[6px] font-geist text-[0.6875rem] font-bold text-m-ink disabled:opacity-60"
+                  >
+                    {t(`docsync.conflict.${keep === 'trek' ? 'keepTrek' : keep === 'provider' ? 'keepProvider' : 'keepBoth'}`)}
+                  </button>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
 }
