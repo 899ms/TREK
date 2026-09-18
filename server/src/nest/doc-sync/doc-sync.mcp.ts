@@ -97,6 +97,11 @@ export class DocSyncMcp {
     }
     const results = [];
     for (const link of links) {
+      // Asking for a run by hand means "try again", including the documents
+      // that were shelved after too many failures. The REST route does the
+      // same thing before its run; a tool that skipped it would answer "in
+      // sync" while leaving them shelved.
+      this.sync.retryShelvedItems(link.id);
       results.push({ linkId: link.id, provider: link.provider_id, ...(await this.sync.syncLink(link, { full: full === true })) });
     }
     return ok({ runs: results });

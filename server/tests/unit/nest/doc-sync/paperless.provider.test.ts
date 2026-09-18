@@ -743,6 +743,20 @@ describe('PaperlessProvider — pushing bytes', () => {
     expect(lastRequest('GET /api/documents/').url.searchParams.get('checksum__iexact')).toBe(HASH_A);
   });
 
+  it('PAPERLESS-057a: a document with the same bytes but another tag is not adopted', async () => {
+    // The tag goes on at upload, so only a tagged document can be the one this
+    // push made. Taking the untagged twin instead put a stranger's document in
+    // the trip — and delete-through would have trashed it on a later run.
+    vi.spyOn(client, 'awaitConsume').mockRejectedValue(
+      new PaperlessError('timeout', 'Paperless is still processing the uploaded file'),
+    );
+    on('GET /api/custom_fields/', reply(page([{ id: 1, name: TRIP_UID_FIELD_NAME, data_type: 'string' }])));
+    on('POST /api/documents/post_document/', reply('"task-uuid-1"'));
+    on('GET /api/documents/', reply(page([docRow({ id: 21, tags: [99] })])));
+    expect(expectFail(await provider.push(CONN, SCOPE, pushRequest())).code).toBe('timeout');
+    expect(requests('GET /api/documents/21/')).toHaveLength(0);
+  });
+
   it('PAPERLESS-057: when the checksum finds nothing either, the timeout is reported', async () => {
     vi.spyOn(client, 'awaitConsume').mockRejectedValue(
       new PaperlessError('timeout', 'Paperless is still processing the uploaded file'),

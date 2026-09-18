@@ -371,3 +371,40 @@ describe('the admin switches', () => {
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * A nudge that lands on a run already in flight.
+ *
+ * `syncLink` answers `busy` and returns, so the nudge was thrown away — and the
+ * changes it was about may well have landed after the running pass read the
+ * folder, which means waiting out a whole poll interval for them. Asked again
+ * once, and only once, so two clients cannot keep each other going.
+ */
+describe('a nudge that arrives mid-run', () => {
+  it('asks again once when the run was busy', async () => {
+    sync.syncLink.mockResolvedValueOnce({ state: 'busy', pulled: 0, pushed: 0, conflicts: 0, missing: 0 });
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    await Promise.resolve();
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('gives up after that one retry rather than chasing itself', async () => {
+    sync.syncLink.mockResolvedValue({ state: 'busy', pulled: 0, pushed: 0, conflicts: 0, missing: 0 });
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    for (let i = 0; i < 5; i += 1) { settle(); await Promise.resolve(); }
+    expect(sync.syncLink).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not retry a run that worked', async () => {
+    // Set explicitly: clearAllMocks drops the calls but keeps the
+    // implementation the previous case installed.
+    sync.syncLink.mockResolvedValue({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 });
+    controller.nudge('tok-live', makeReq({ 'x-trek-docsync-secret': SECRET }));
+    settle();
+    await Promise.resolve();
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+});

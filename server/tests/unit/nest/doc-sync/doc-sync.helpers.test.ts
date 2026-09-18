@@ -570,3 +570,31 @@ describe('planReconcile > a pairing whose download never landed', () => {
     expect(p.actions.map(a => a.kind)).toEqual(['touch']);
   });
 });
+
+/**
+ * Names are compared through the same sanitiser the local one went through.
+ *
+ * A provider name TREK had to clean up — a slash, a control character, a
+ * leading dot — otherwise reads as "TREK renamed this document" on the very
+ * next run, and the provider's copy is renamed to the cleaned version without
+ * anybody asking for it.
+ */
+describe('planReconcile > a provider name TREK had to clean up', () => {
+  it('does not read the cleaning as a local rename', () => {
+    const p = plan({
+      items: [item({ remoteName: 'a/b.pdf', contentSha256: 'aaa' })],
+      remote: [remote({ remoteId: 'r1', name: 'a/b.pdf', remoteVersion: 'v1' })],
+      local: [local({ fileId: 1, name: 'b.pdf' })],   // what sanitizeIncomingName made of it
+    });
+    expect(p.actions.map(a => a.kind)).toEqual(['touch']);
+  });
+
+  it('still follows a real rename at the provider', () => {
+    const p = plan({
+      items: [item({ remoteName: 'b.pdf', contentSha256: 'aaa' })],
+      remote: [remote({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v1' })],
+      local: [local({ fileId: 1, name: 'b.pdf' })],
+    });
+    expect(p.actions.map(a => a.kind)).toEqual(['rename_local']);
+  });
+});

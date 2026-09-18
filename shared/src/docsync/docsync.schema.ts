@@ -149,7 +149,16 @@ export const docsyncLinkInputSchema = z.object({
 });
 export type DocsyncLinkInput = z.infer<typeof docsyncLinkInputSchema>;
 
-export const docsyncLinkUpdateSchema = docsyncLinkInputSchema.omit({ connectionId: true, scopeKey: true }).partial();
+/**
+ * Which folder or tag a binding points at is fixed once it exists: every
+ * pairing in `document_sync_items` was made against that container, and moving
+ * it would leave them all pointing somewhere else. The root fields are left out
+ * rather than ignored — they were accepted and silently dropped, so a client
+ * sending one was told the move had happened.
+ */
+export const docsyncLinkUpdateSchema = docsyncLinkInputSchema
+  .omit({ connectionId: true, scopeKey: true, remoteRootId: true, remoteRootPath: true })
+  .partial();
 
 // ── Sync state ───────────────────────────────────────────────────────────────
 

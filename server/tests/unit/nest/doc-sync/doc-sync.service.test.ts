@@ -66,6 +66,7 @@ import type {
   PushResult,
   RemoteDocument,
 } from '../../../../src/nest/doc-sync/document-provider';
+import type { AddonsService } from '../../../../src/nest/addons/addons.service';
 import type { FilesService } from '../../../../src/nest/files/files.service';
 import type { StorageService } from '../../../../src/nest/storage/storage.service';
 import type { RealtimeService } from '../../../../src/nest/realtime/realtime.service';
@@ -272,6 +273,12 @@ const fileRows = () =>
 const sqlTime = (modifier: string): string =>
   (testDb.prepare("SELECT datetime('now', ?) AS t").get(modifier) as { t: string }).t;
 
+/**
+ * The provider's own addon switch. Every binding asks it before it runs, so a
+ * double that always says yes would hide the one case worth a test.
+ */
+const addons = { isAddonEnabled: vi.fn(() => true) };
+
 // ── Suite ────────────────────────────────────────────────────────────────────
 
 describe('DocSyncService', () => {
@@ -293,7 +300,16 @@ describe('DocSyncService', () => {
     const dbs = new DatabaseService(testDb);
     const registry = new DocumentProviderRegistry([provider as unknown as DocumentProvider]);
     config = new DocSyncConfigService(dbs, registry);
-    service = new DocSyncService(dbs, config, registry, storage, files, new AllowedFileTypesService(dbs), realtime);
+    service = new DocSyncService(
+      dbs,
+      config,
+      registry,
+      storage,
+      files,
+      new AllowedFileTypesService(dbs),
+      realtime,
+      addons as unknown as AddonsService,
+    );
   });
 
   afterAll(() => {
@@ -546,6 +562,49 @@ describe('DocSyncService', () => {
       expect(secondRun.pulled).toBe(0);
       expect(fileRows()).toHaveLength(1);
       expect(itemRows()[0].state).toBe('synced');
+    });
+
+    it('refuses to move a pairing onto a document another file already owns', async () => {
+      // Papra answers a push of bytes it already holds with the document that
+      // has them. Two trip files with the same content therefore push to ONE
+      // document — and the unique index on (link_id, remote_id) turned that
+      // into a constraint error that aborted this run and every run after it.
+      const link = makeLink();
+      makeFile({ name: 'boarding.pdf' });
+      makeFile({ name: 'boarding-copy.pdf', storageKey: 'key-copy' });
+      provider.list.mockResolvedValue(ok(listing([])));
+
+      const run = await service.syncLink(link);
+
+      // Counted as a conflict, which is what it is — a document two files want
+      // — and reported the same way as any other conflict rather than as a
+      // failed run.
+      expect(run.pushed).toBe(1);
+      expect(run.conflicts).toBe(1);
+
+      const rows = itemRows();
+      expect(rows).toHaveLength(2);
+      // The first file keeps the document. The second is on record as the one
+      // that could not have it, with its bytes still in TREK.
+      expect(rows.filter((r) => r.remote_id === 'r-pushed')).toHaveLength(1);
+      const blocked = rows.find((r) => r.state === 'error');
+      expect(blocked?.error_code).toBe('conflict');
+      expect(blocked?.remote_id).toBeNull();
+    });
+
+    it('stands down while the provider is switched off in the admin panel', async () => {
+      // Switching a provider off stopped new connections and left every
+      // existing binding running, which is not what "off" means to the person
+      // who switched it. Not a failure either: nothing is wrong with the
+      // binding, an admin has closed the door.
+      const link = makeLink();
+      addons.isAddonEnabled.mockReturnValueOnce(false);
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('disabled');
+      expect(provider.list).not.toHaveBeenCalled();
+      expect(linkRow(link.id).failure_count).toBe(0);
     });
 
     it('counts a failure and puts the binding off until later', async () => {

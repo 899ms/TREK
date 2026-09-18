@@ -542,7 +542,12 @@ export class PaperlessDocumentProvider implements DocumentProvider {
       // because Paperless accepts duplicate bytes. So the checksum decides.
       if (err instanceof PaperlessError && err.code === 'timeout') {
         const existing = await this.client.findByChecksum(creds, req.sha256);
-        const mine = existing.find((doc) => doc.tagIds.includes(tagId)) ?? existing[0];
+        // Only a document carrying this scope's tag can be the one this push
+        // made: the tag goes on at upload. Anything else with the same bytes
+        // belongs to someone else's filing, and adopting it would put a
+        // stranger's document in the trip — and delete it on the next
+        // delete-through.
+        const mine = existing.find((doc) => doc.tagIds.includes(tagId));
         if (mine !== undefined) return mine.id;
       }
       throw err;

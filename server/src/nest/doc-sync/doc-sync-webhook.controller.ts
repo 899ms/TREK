@@ -100,14 +100,20 @@ export class DocSyncWebhookController implements OnModuleDestroy {
    * up again when the timer fires, so a binding switched off or deleted in the
    * meantime does not get one last run out of a stale row.
    */
-  private schedule(linkId: number, reload: () => ReturnType<DocSyncConfigService['getLink']>): void {
+  private schedule(linkId: number, reload: () => ReturnType<DocSyncConfigService['getLink']>, isRetry = false): void {
     if (this.pending.has(linkId)) return;
     const timer = setTimeout(() => {
       this.pending.delete(linkId);
       const fresh = reload();
       if (!fresh || fresh.sync_enabled !== 1) return;
       if (!this.syncIsOn()) return;
-      void this.sync.syncLink(fresh);
+      void this.sync.syncLink(fresh).then((res) => {
+        // A run that was already in flight answers `busy`, and the changes this
+        // nudge was about may have landed after that run read the folder. Ask
+        // again once rather than waiting out a whole poll interval — once, and
+        // only for `busy`, so this cannot become a loop.
+        if (res?.state === 'busy' && !isRetry) this.schedule(linkId, reload, true);
+      });
     }, WEBHOOK_NUDGE_DEBOUNCE_SECONDS * 1000);
     // A pending nudge must not hold the process open at shutdown.
     if (typeof timer.unref === 'function') timer.unref();

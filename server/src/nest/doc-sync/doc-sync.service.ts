@@ -7,6 +7,8 @@ import { Transform } from 'node:stream';
 import { Readable } from 'node:stream';
 import type { DocsyncErrorCode } from '@trek/shared';
 import { DatabaseService } from '../database/database.service';
+import { AddonsService } from '../addons/addons.service';
+import type { AddonId } from '../../addons';
 import { StorageService } from '../storage/storage.service';
 import { FilesService } from '../files/files.service';
 import { AllowedFileTypesService } from '../files/allowed-file-types.service';
@@ -70,6 +72,7 @@ export class DocSyncService {
     private readonly files: FilesService,
     private readonly allowedTypes: AllowedFileTypesService,
     private readonly realtime: RealtimeService,
+    private readonly addons: AddonsService,
   ) {}
 
   // ── Entry points ───────────────────────────────────────────────────────────
@@ -142,6 +145,13 @@ export class DocSyncService {
     if (!provider) {
       this.recordLinkFailure(link, 'provider_error');
       return { state: 'failed', pulled: 0, pushed: 0, conflicts: 0, missing: 0, errorCode: 'provider_error' };
+    }
+    // Switching a provider off in the admin panel stopped new connections and
+    // left every existing binding running, which is not what "off" means to the
+    // person who switched it. Not recorded as a failure: nothing is wrong with
+    // the binding, an admin has closed the door.
+    if (!this.addons.isAddonEnabled(link.provider_id as AddonId)) {
+      return { state: 'disabled', pulled: 0, pushed: 0, conflicts: 0, missing: 0 };
     }
 
     const ref = this.config.toRef(conn);
@@ -371,39 +381,42 @@ export class DocSyncService {
           .prepare('SELECT file_id FROM document_sync_items WHERE id = ?')
           .get(itemId) as { file_id: number | null } | undefined)?.file_id ?? null;
 
-    const created = this.files.createFile(
-      ctx.link.trip_id,
-      { filename: storageKey, originalname: name, size: bytes, mimetype: remote.mimeType || 'application/octet-stream' },
-      // Attributed to the person whose connection brought it in, which is the
-      // only honest answer: nobody in TREK uploaded it.
-      this.config.getConnection(ctx.link.connection_id)?.owner_user_id ?? 0,
-      {},
-    );
-
     /**
-     * Retire the copy this one replaces.
+     * The file row, the retirement of the copy it replaces and the pairing are
+     * one fact, so they are one transaction. Written separately, a crash
+     * between them leaves a trip file with no sync item — which the next run
+     * reads as a document TREK gained and pushes straight back up, turning one
+     * upstream edit into two documents on both sides.
      *
-     * Into the trash rather than out of existence: the bytes it holds are a
-     * version somebody may still want, and TREK's own delete works the same way.
-     * Leaving it in place was worse than untidy — the row's pairing moves to the
-     * new file, so the old one is left with no sync item at all, and the very
-     * next run reads it as a document TREK gained and pushes the superseded
-     * version back up. One upstream edit then ends as two documents on both
-     * sides, and it grows with every further edit.
+     * The superseded copy goes to the trash rather than out of existence: the
+     * bytes it holds are a version somebody may still want, and TREK's own
+     * delete works the same way.
      */
-    if (supersededId !== null && Number(supersededId) !== Number(created.id)) {
-      this.files.softDeleteFile(supersededId);
-      this.realtime.broadcast(ctx.link.trip_id, 'file:deleted', { fileId: supersededId });
-    }
-
-    this.upsertItem(ctx.link, {
-      itemId,
-      remote,
-      state: 'synced',
-      fileId: Number(created.id),
-      contentSha256: sha256,
-      errorCode: null,
+    const { created, retired } = this.db.transaction(() => {
+      const file = this.files.createFile(
+        ctx.link.trip_id,
+        { filename: storageKey, originalname: name, size: bytes, mimetype: remote.mimeType || 'application/octet-stream' },
+        // Attributed to the person whose connection brought it in, which is the
+        // only honest answer: nobody in TREK uploaded it.
+        this.config.getConnection(ctx.link.connection_id)?.owner_user_id ?? 0,
+        {},
+      );
+      const gone = supersededId !== null && Number(supersededId) !== Number(file.id);
+      if (gone) this.files.softDeleteFile(supersededId as number);
+      this.upsertItem(ctx.link, {
+        itemId,
+        remote,
+        state: 'synced',
+        fileId: Number(file.id),
+        contentSha256: sha256,
+        errorCode: null,
+      });
+      return { created: file, retired: gone ? (supersededId as number) : null };
     });
+
+    // Announced only once it is committed — a rolled-back transaction that had
+    // already told every client the file exists cannot be taken back.
+    if (retired !== null) this.realtime.broadcast(ctx.link.trip_id, 'file:deleted', { fileId: retired });
     this.realtime.broadcast(ctx.link.trip_id, 'file:created', { file: created });
     return 'pulled';
   }
@@ -469,6 +482,24 @@ export class DocSyncService {
       return res.error.code;
     }
 
+    // A provider may answer a push with a document it already held rather than
+    // a new one: Papra deduplicates identical bytes, and `deduplicated` says so.
+    // Two trip files with the same content therefore push to ONE document, and
+    // the unique index on (link_id, remote_id) would abort this run — and every
+    // run after it — with a constraint error. The upload happened, so nothing is
+    // lost; what must not happen is the pairing moving off the file that owns it.
+    const heldBy = this.pairingOwner(ctx.link.id, res.data.remoteId, itemId);
+    if (heldBy !== null) {
+      this.upsertItem(ctx.link, {
+        itemId,
+        fileId: local.fileId,
+        state: 'error',
+        errorCode: 'conflict',
+        trekDocUid: uid,
+      });
+      return 'conflict';
+    }
+
     this.upsertItem(ctx.link, {
       itemId,
       fileId: local.fileId,
@@ -477,6 +508,12 @@ export class DocSyncService {
       remoteVersion: res.data.remoteVersion,
       contentSha256: sha256,
       pushedSha256: sha256,
+      // The name both sides now agree on. Leaving it null meant the first
+      // `touch` filled the arbiter with whatever the provider had made of the
+      // name — Paperless stores a title and keeps its own filename — and the
+      // run after that read the difference as TREK having renamed the document
+      // and renamed the provider's copy to match, unasked.
+      remoteNameOverride: local.name,
       trekDocUid: uid,
       errorCode: null,
     });
@@ -567,6 +604,15 @@ export class DocSyncService {
     }));
   }
 
+  /** The item already paired with this remote document, if it is a different one. */
+  private pairingOwner(linkId: number, remoteId: string, itemId: number | null): number | null {
+    const row = this.db.connection
+      .prepare('SELECT id FROM document_sync_items WHERE link_id = ? AND remote_id = ?')
+      .get(linkId, remoteId) as { id?: number } | undefined;
+    if (row?.id === undefined) return null;
+    return itemId !== null && Number(row.id) === Number(itemId) ? null : Number(row.id);
+  }
+
   private existingUid(linkId: number, itemId: number | null): string | null {
     if (itemId === null) return null;
     const row = this.db.connection
@@ -588,6 +634,8 @@ export class DocSyncService {
       itemId: number | null;
       remote?: RemoteDocument;
       remoteIdOverride?: string;
+      /** The agreed name, where the caller knows it better than the listing does. */
+      remoteNameOverride?: string;
       remoteVersion?: string;
       fileId?: number;
       state: string;
@@ -599,6 +647,7 @@ export class DocSyncService {
   ): void {
     const remoteId = patch.remoteIdOverride ?? patch.remote?.remoteId ?? null;
     const remoteVersion = patch.remoteVersion ?? patch.remote?.remoteVersion ?? null;
+    const remoteName = patch.remoteNameOverride ?? patch.remote?.name ?? null;
     const failed = patch.state === 'error';
 
     if (patch.itemId !== null) {
@@ -644,7 +693,7 @@ export class DocSyncService {
         .run(
           patch.state, patch.errorCode ?? null, patch.fileId ?? null,
           remoteId, remoteVersion,
-          patch.remote?.name ?? null, patch.remote?.size ?? null, patch.remote?.remoteModifiedAt ?? null,
+          remoteName, patch.remote?.size ?? null, patch.remote?.remoteModifiedAt ?? null,
           patch.contentSha256 ?? null, patch.pushedSha256 ?? null,
           attempts,
           failed ? 1 : 0, attempts, ITEM_MAX_ATTEMPTS,
@@ -677,7 +726,7 @@ export class DocSyncService {
       )
       .run(
         link.id, link.trip_id, patch.fileId ?? null, patch.trekDocUid ?? newTrekDocUid(),
-        remoteId, patch.remote?.name ?? null, remoteVersion, patch.remote?.size ?? null,
+        remoteId, remoteName, remoteVersion, patch.remote?.size ?? null,
         patch.remote?.remoteModifiedAt ?? null, patch.contentSha256 ?? null, patch.pushedSha256 ?? null,
         patch.state, patch.errorCode ?? null, failed ? 1 : 0,
         failed ? 1 : 0, backoffSeconds(ITEM_BACKOFF_SECONDS, 1),   // a new row is always at its first failure

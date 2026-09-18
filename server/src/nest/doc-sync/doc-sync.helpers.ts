@@ -329,9 +329,14 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     // `both` as "TREK always wins" silently renamed the provider's copy back
     // every time somebody tidied up a folder, which is the opposite of a
     // two-way sync.
-    if (l && r.name !== l.name) {
-      const providerRenamed = it.remoteName !== null && r.name !== it.remoteName;
-      const localRenamed = it.remoteName !== null && l.name !== it.remoteName;
+    if (l && sanitizeIncomingName(r.name) !== l.name) {
+      // Compared through the same sanitiser the local name went through, or a
+      // provider name TREK had to clean up (a slash, a control character, a
+      // leading dot) reads as "TREK renamed this" on the very next run — and
+      // the provider's copy gets renamed to the cleaned version, unasked.
+      const agreed = it.remoteName === null ? null : sanitizeIncomingName(it.remoteName);
+      const providerRenamed = agreed !== null && sanitizeIncomingName(r.name) !== agreed;
+      const localRenamed = agreed !== null && l.name !== agreed;
 
       if (providerRenamed && !localRenamed && direction !== 'push') {
         add({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: r.name });

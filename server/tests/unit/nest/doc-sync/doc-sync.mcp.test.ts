@@ -49,6 +49,7 @@ function makeMcp(over: Partial<Setup> = {}) {
     status: vi.fn(() => setup.status),
     issues: vi.fn(() => setup.issues),
     syncLink: vi.fn(async () => RUN),
+    retryShelvedItems: vi.fn(),
   };
   const addons = { isAddonEnabled: vi.fn(() => setup.addonOn) };
   const mcp = new DocSyncMcp(
@@ -218,6 +219,16 @@ describe('sync_trip_documents', () => {
       { linkId: 1, provider: 'paperless', ...RUN },
       { linkId: 2, provider: 'nextcloud', ...RUN },
     ]);
+  });
+
+  it('un-shelves the documents that gave up before running, as the REST route does', async () => {
+    // "Run it now" means "try again", including the items parked after too many
+    // failures. A tool that skipped this reported "in sync" while leaving them
+    // parked, and the only way out was the button in the web UI.
+    const links = [link(1, 'paperless'), link(2, 'nextcloud')];
+    const { mcp, sync } = makeMcp({ links });
+    await mcp.syncNow({ tripId: 3 }, ctx);
+    expect(sync.retryShelvedItems.mock.calls).toEqual([[1], [2]]);
   });
 
   it('asks for the cheap incremental run unless the caller says otherwise', async () => {
