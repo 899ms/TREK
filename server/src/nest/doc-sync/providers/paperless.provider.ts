@@ -23,6 +23,7 @@ import {
   type PaperlessDocument,
   type PaperlessTag,
 } from './paperless.client';
+import { DOWNLOAD_MAX_BYTES, guardDownload } from './provider-http';
 
 /**
  * Paperless-ngx as a document scope.
@@ -412,12 +413,20 @@ export class PaperlessDocumentProvider implements DocumentProvider {
       // alongside the bytes, and it fails cheaply when the document is gone.
       const doc = await this.client.getDocument(creds, documentId);
       const response = await this.client.downloadOriginal(creds, documentId);
-      if (response.body === null) {
-        return docFail('provider_error', 'Paperless sent no body for the document');
-      }
+      const download = guardDownload(response, {
+        maxBytes: DOWNLOAD_MAX_BYTES,
+        tooLarge: (declared) =>
+          new PaperlessError(
+            'too_large',
+            'The document is larger than TREK will transfer',
+            undefined,
+            `content_length=${declared}`,
+          ),
+        noBody: () => new PaperlessError('provider_error', 'Paperless sent no body for the document'),
+      });
       return docOk({
-        body: Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
-        size: declaredLength(response.headers.get('content-length')),
+        body: download.body,
+        size: download.size,
         mimeType: response.headers.get('content-type') ?? doc.mimeType,
         remoteVersion: doc.modified ?? doc.added ?? String(doc.id),
       });
@@ -686,19 +695,6 @@ function credsOf(conn: DocumentConnectionRef): PaperlessCreds | null {
     token: token.trim(),
     allowInsecureTls: conn.allowInsecureTls,
   };
-}
-
-/**
- * The byte count a download announced, or null.
- *
- * An absent header must not become 0: `Number('')` is 0, and a size of zero
- * reads as "an empty file" to everything downstream. Paperless omits the header
- * whenever the response is compressed on the way out.
- */
-function declaredLength(header: string | null): number | null {
-  if (header === null || header.trim().length === 0) return null;
-  const value = Number(header);
-  return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
 function parseRemoteId(remoteId: string): number | null {

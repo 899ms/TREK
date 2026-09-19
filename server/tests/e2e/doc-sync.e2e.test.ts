@@ -76,8 +76,8 @@ import { DatabaseModule } from '../../src/nest/database/database.module';
 import { AddonsService } from '../../src/nest/addons/addons.service';
 import { DOCUMENT_PROVIDERS } from '../../src/nest/doc-sync/document-provider';
 import { PaperlessDocumentProvider } from '../../src/nest/doc-sync/providers/paperless.provider';
-import { PapraProvider } from '../../src/nest/doc-sync/providers/papra.provider';
-import { SynologyDriveProvider } from '../../src/nest/doc-sync/providers/synology-drive.provider';
+import { PapraDocumentProvider } from '../../src/nest/doc-sync/providers/papra.provider';
+import { SynologyDriveDocumentProvider } from '../../src/nest/doc-sync/providers/synology-drive.provider';
 import { NextcloudDocumentProvider, OpencloudDocumentProvider } from '../../src/nest/doc-sync/providers/webdav.provider';
 import { TrekExceptionFilter } from '../../src/nest/common/trek-exception.filter';
 import { ZodValidationPipe } from '../../src/nest/common/zod-validation.pipe';
@@ -129,10 +129,10 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
   async function build() {
     const providers = [
       [PaperlessDocumentProvider, 'paperless'],
-      [PapraProvider, 'papra'],
+      [PapraDocumentProvider, 'papra'],
       [NextcloudDocumentProvider, 'nextcloud'],
       [OpencloudDocumentProvider, 'opencloud'],
-      [SynologyDriveProvider, 'synologydrive'],
+      [SynologyDriveDocumentProvider, 'synologydrive'],
     ] as const;
     let builder = Test.createTestingModule({ imports: [DatabaseModule, DocSyncModule] })
       .overrideProvider(AddonsService)

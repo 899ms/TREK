@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type { DocsyncErrorCode } from '@trek/shared';
-import { safeFetch, SsrfBlockedError } from '../../../utils/ssrfGuard';
 import { readCappedJson, readCappedText, discardBody } from '../../../utils/cappedFetch';
+import {
+  providerFetch,
+  statusErrorCode,
+  type TransportFailure,
+  type TransportFailureCode,
+} from './provider-http';
 import {
   PROVIDER_JSON_MAX_BYTES,
   PROVIDER_MAX_PAGES,
@@ -325,67 +330,15 @@ export function sha256OrNull(value: string | null): string | null {
   return value !== null && /^[0-9a-f]{64}$/i.test(value) ? value.toLowerCase() : null;
 }
 
-/**
- * Whether a thrown error is a timeout rather than a dead host.
- *
- * `AbortSignal.timeout` rejects with a DOMException named `TimeoutError`; an
- * aborted request surfaces as `AbortError`. Both mean the instance did not
- * answer in time, which is a different thing for the user to fix than a host
- * that refused the connection.
- */
-function isTimeout(err: unknown): boolean {
-  if (!(err instanceof Error)) return false;
-  return err.name === 'TimeoutError' || err.name === 'AbortError';
-}
+const TRANSPORT_MESSAGES: Record<TransportFailureCode, string> = {
+  ssrf_blocked: 'The address is blocked',
+  timeout: 'Paperless did not answer in time',
+  tls_untrusted: 'The certificate of this Paperless instance is not trusted',
+  unreachable: 'Could not reach Paperless',
+};
 
-const TLS_ERROR_CODES = new Set([
-  'DEPTH_ZERO_SELF_SIGNED_CERT',
-  'SELF_SIGNED_CERT_IN_CHAIN',
-  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
-  'CERT_HAS_EXPIRED',
-  'ERR_TLS_CERT_ALTNAME_INVALID',
-  'CERT_SIGNATURE_FAILURE',
-]);
-
-/**
- * A self-signed or otherwise untrusted certificate, anywhere in the cause chain.
- *
- * undici wraps the TLS failure in a `TypeError: fetch failed`, so the code that
- * says what actually went wrong is one or two `cause` levels down. Telling this
- * apart from "unreachable" is what lets the settings UI offer the "this
- * instance uses a self-signed certificate" switch instead of a dead end.
- */
-function isTlsFailure(err: unknown): boolean {
-  let current: unknown = err;
-  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
-    const code = 'code' in current ? String((current as { code?: unknown }).code) : '';
-    if (TLS_ERROR_CODES.has(code)) return true;
-    current = (current as { cause?: unknown }).cause;
-  }
-  return false;
-}
-
-function transportError(err: unknown): PaperlessError {
-  if (err instanceof SsrfBlockedError) {
-    return new PaperlessError('ssrf_blocked', 'The address is blocked', undefined, err.message);
-  }
-  if (isTimeout(err)) {
-    return new PaperlessError('timeout', 'Paperless did not answer in time');
-  }
-  if (isTlsFailure(err)) {
-    return new PaperlessError(
-      'tls_untrusted',
-      'The certificate of this Paperless instance is not trusted',
-      undefined,
-      err instanceof Error ? err.message : undefined,
-    );
-  }
-  return new PaperlessError(
-    'unreachable',
-    'Could not reach Paperless',
-    undefined,
-    err instanceof Error ? err.message : undefined,
-  );
+function transportError(failure: TransportFailure): PaperlessError {
+  return new PaperlessError(failure.code, TRANSPORT_MESSAGES[failure.code], undefined, failure.detail);
 }
 
 /**
@@ -400,14 +353,7 @@ function classify(status: number, body: string): DocsyncErrorCode {
     if (/unique constraint|already exists/i.test(body)) return 'conflict';
     return 'provider_error';
   }
-  if (status === 401) return 'unauthorized';
-  if (status === 403) return 'forbidden';
-  if (status === 404) return 'not_found';
-  if (status === 409) return 'conflict';
-  if (status === 413) return 'too_large';
-  if (status === 429) return 'rate_limited';
-  if (status === 507) return 'quota_exceeded';
-  return 'provider_error';
+  return statusErrorCode(status);
 }
 
 /** Trim an upstream message to something a log line can hold. */
@@ -513,21 +459,15 @@ export class PaperlessClient {
       // as a bare `TypeError: fetch failed` two layers up.
     }
 
-    let response: Response;
-    try {
-      response = await safeFetch(
-        url.toString(),
-        {
-          method: options.method ?? 'GET',
-          headers,
-          body,
-          signal: AbortSignal.timeout(options.timeoutMs ?? PROVIDER_TIMEOUT_MS) as AbortSignal,
-        },
-        { rejectUnauthorized: !creds.allowInsecureTls },
-      );
-    } catch (err: unknown) {
-      throw transportError(err);
-    }
+    const response = await providerFetch(
+      url.toString(),
+      { method: options.method ?? 'GET', headers, body },
+      {
+        timeoutMs: options.timeoutMs ?? PROVIDER_TIMEOUT_MS,
+        allowInsecureTls: creds.allowInsecureTls,
+        onTransportFailure: transportError,
+      },
+    );
 
     if (!response.ok) {
       // The body is what separates "wrong file type" from "wrong request", so it

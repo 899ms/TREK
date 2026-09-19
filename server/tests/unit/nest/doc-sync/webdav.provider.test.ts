@@ -29,7 +29,8 @@ vi.mock('../../../../src/utils/ssrfGuard', () => ({
   },
 }));
 
-vi.mock('../../../../src/utils/cappedFetch', () => ({
+vi.mock('../../../../src/utils/cappedFetch', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../../src/utils/cappedFetch')>()),
   readCappedText: async (res: Response) => {
     const text = await res.text();
     return { text: text.slice(0, capBytes), truncated: text.length > capBytes };
@@ -728,6 +729,24 @@ describe('fetch, rename and trash', () => {
     await nextcloud.fetch(ncConn, ncScope, '61');
 
     expect(requests('PROPFIND')).toHaveLength(1);
+  });
+
+  it('refuses a download announcing more than TREK transfers, and one that arrives without a body', async () => {
+    route(`PROPFIND ${NC_ROOT}/TREK/trip%2042`, folder());
+    route(
+      `GET ${NC_ROOT}/TREK/trip%2042/pass%20scan.pdf`,
+      reply('x', { headers: { 'content-length': String(3 * 1024 ** 3) } }),
+      reply(null, { status: 200 }),
+    );
+
+    expect(await nextcloud.fetch(ncConn, ncScope, '61')).toMatchObject({
+      success: false,
+      error: { code: 'too_large', status: 200 },
+    });
+    expect(await nextcloud.fetch(ncConn, ncScope, '61')).toMatchObject({
+      success: false,
+      error: { code: 'provider_error', status: 200 },
+    });
   });
 
   it('says not_found for an id the folder no longer holds', async () => {

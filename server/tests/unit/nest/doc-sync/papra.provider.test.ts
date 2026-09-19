@@ -1,6 +1,6 @@
 /**
- * PapraProvider — what it puts on the wire, and what it makes of what comes
- * back.
+ * PapraDocumentProvider: what it puts on the wire, and what it makes of what
+ * comes back.
  *
  * Papra is the provider whose answers lie the most: an upload that stores
  * nothing and restores a trashed twin instead still answers 200, a missing key
@@ -27,7 +27,7 @@ import {
   snapshotVersion,
   tagSearchQuery,
 } from '../../../../src/nest/doc-sync/providers/papra.client';
-import { PapraProvider, buildScopeKey, parseScopeKey } from '../../../../src/nest/doc-sync/providers/papra.provider';
+import { PapraDocumentProvider, buildScopeKey, parseScopeKey } from '../../../../src/nest/doc-sync/providers/papra.provider';
 import { multipartHeader } from '../../../../src/nest/doc-sync/providers/papra.client';
 
 import crypto from 'node:crypto';
@@ -189,12 +189,12 @@ function err(result: { success: boolean; error?: { code: string; detail?: string
   return result.error!;
 }
 
-let provider: PapraProvider;
+let provider: PapraDocumentProvider;
 
 beforeEach(() => {
   calls = [];
   safeFetchMock.mockReset();
-  provider = new PapraProvider();
+  provider = new PapraDocumentProvider();
 });
 
 describe('capabilities', () => {
@@ -563,6 +563,11 @@ describe('fetch', () => {
       }),
     );
     expect(requested(1).pathname.endsWith('/file')).toBe(true);
+  });
+
+  it('reads a download without a length as the size the record lists, not as an empty file', async () => {
+    answerWith(reply({ body: { document: doc() } }), reply({ stream: Buffer.from('bordkarte bytes') }));
+    expect(ok(await provider.fetch(CONN, SCOPE, 'doc_mm5jovmyfbe4podpho983esv')).size).toBe(4096);
   });
 
   it('refuses a body the instance declares as larger than TREK will transfer', async () => {

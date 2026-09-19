@@ -2,13 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { Readable } from 'node:stream';
 import { XMLParser } from 'fast-xml-parser';
 import type { DocsyncErrorCode } from '@trek/shared';
-import { safeFetch, SsrfBlockedError } from '../../../utils/ssrfGuard';
 import { readCappedJson, readCappedText } from '../../../utils/cappedFetch';
 import {
   PROVIDER_JSON_MAX_BYTES,
   PROVIDER_TIMEOUT_MS,
   PROVIDER_TRANSFER_TIMEOUT_MS,
 } from '../doc-sync.constants';
+import { DOWNLOAD_MAX_BYTES, guardDownload, providerFetch, statusErrorCode } from './provider-http';
 
 /**
  * HTTP client for Nextcloud and OpenCloud. This is the ONLY place that talks to
@@ -260,56 +260,19 @@ function decodeHrefPath(href: string): string {
   }
 }
 
+/**
+ * 405 is MKCOL on an existing collection, 412 a failed If-Match, 423 a locked
+ * node: with 409, four ways of saying the caller's picture of the remote is
+ * stale.
+ */
+const STALE_STATUSES: Readonly<Record<number, DocsyncErrorCode>> = {
+  405: 'conflict',
+  412: 'conflict',
+  423: 'conflict',
+};
+
 function classifyStatus(status: number): DocsyncErrorCode {
-  if (status === 401) return 'unauthorized';
-  if (status === 403) return 'forbidden';
-  if (status === 404) return 'not_found';
-  // 405 is MKCOL on an existing collection, 412 a failed If-Match, 423 a locked
-  // node: three ways of saying the caller's picture of the remote is stale.
-  if (status === 405 || status === 409 || status === 412 || status === 423) return 'conflict';
-  if (status === 413) return 'too_large';
-  if (status === 415) return 'unsupported_type';
-  if (status === 429) return 'rate_limited';
-  if (status === 507) return 'quota_exceeded';
-  return status >= 500 ? 'provider_error' : 'unknown';
-}
-
-/** Every `cause` in the chain, because undici hides the real reason two deep. */
-function causeChain(err: unknown): unknown[] {
-  const chain: unknown[] = [];
-  let current: unknown = err;
-  for (let depth = 0; depth < 5 && current !== undefined && current !== null; depth++) {
-    chain.push(current);
-    current = current instanceof Error ? (current as Error & { cause?: unknown }).cause : undefined;
-  }
-  return chain;
-}
-
-function classifyTransport(err: unknown): { code: DocsyncErrorCode; detail: string } {
-  if (err instanceof SsrfBlockedError) {
-    return { code: 'ssrf_blocked', detail: err.message };
-  }
-  const chain = causeChain(err);
-  const markers = chain.map((entry) => {
-    const named = entry instanceof Error ? entry.name : '';
-    const coded =
-      typeof entry === 'object' && entry !== null && 'code' in entry
-        ? String((entry as { code: unknown }).code)
-        : '';
-    return `${named}|${coded}`;
-  });
-  const detail = chain
-    .map((entry) => (entry instanceof Error ? entry.message : String(entry)))
-    .filter((message) => message.length > 0)
-    .join(': ');
-
-  if (markers.some((marker) => /TimeoutError|ABORT_ERR|HEADERS_TIMEOUT|BODY_TIMEOUT/i.test(marker))) {
-    return { code: 'timeout', detail };
-  }
-  if (markers.some((marker) => /CERT|SELF_SIGNED|ERR_TLS|ERR_SSL/i.test(marker))) {
-    return { code: 'tls_untrusted', detail };
-  }
-  return { code: 'unreachable', detail };
+  return statusErrorCode(status, STALE_STATUSES, status >= 500 ? 'provider_error' : 'unknown');
 }
 
 /**
@@ -434,33 +397,6 @@ function escapeXmlText(value: string): string {
     .replace(/>/g, '&gt;');
 }
 
-/**
- * A web stream as a Node stream, by hand rather than through `Readable.fromWeb`,
- * because the two `ReadableStream` declarations in scope — the platform's and
- * `node:stream/web`'s — are different types and bridging them needs a cast this
- * avoids. Cancelling the reader on destroy matters: undici keeps the connection
- * reserved until the body ends.
- */
-function toNodeStream(stream: ReadableStream<Uint8Array>): Readable {
-  const reader = stream.getReader();
-  return new Readable({
-    read() {
-      reader.read().then(
-        ({ done, value }) => {
-          this.push(done || !value ? null : Buffer.from(value));
-        },
-        (err: unknown) => {
-          this.destroy(err instanceof Error ? err : new Error(String(err)));
-        },
-      );
-    },
-    destroy(err, callback) {
-      void reader.cancel().catch(() => {});
-      callback(err);
-    },
-  });
-}
-
 @Injectable()
 export class WebdavClient {
   /**
@@ -478,20 +414,12 @@ export class WebdavClient {
     const headers = new Headers(init.headers);
     headers.set('Authorization', `Basic ${auth}`);
 
-    try {
-      return await safeFetch(
-        `${creds.origin}${path}`,
-        {
-          ...init,
-          headers,
-          signal: AbortSignal.timeout(timeoutMs) as AbortSignal,
-        },
-        { rejectUnauthorized: !creds.allowInsecureTls },
-      );
-    } catch (err: unknown) {
-      const { code, detail } = classifyTransport(err);
-      throw new WebdavError(code, 'Could not reach the WebDAV instance', undefined, detail);
-    }
+    return providerFetch(`${creds.origin}${path}`, { ...init, headers }, {
+      timeoutMs,
+      allowInsecureTls: creds.allowInsecureTls,
+      onTransportFailure: ({ code, detail }) =>
+        new WebdavError(code, 'Could not reach the WebDAV instance', undefined, detail),
+    });
   }
 
   /** The error for a response nobody wanted, with a bounded slice of its body as detail. */
@@ -654,25 +582,31 @@ export class WebdavClient {
   /**
    * GET, handed back as a stream.
    *
-   * Deliberately not read through the size cap: the caller pipes it into
-   * storage, and buffering a trip's scanned passport in memory to count its
-   * bytes is the opposite of what the cap is for. The declared length is
-   * reported so the core can refuse an oversized document before writing it.
+   * Never buffered: the caller pipes it into storage, and holding a trip's
+   * scanned passport in memory to count its bytes is the opposite of what a
+   * cap is for. The guard counts them on the way through instead.
    */
   async get(creds: WebdavCreds, path: string): Promise<WebdavDownload> {
     const response = await this.send(creds, path, { method: 'GET' }, PROVIDER_TRANSFER_TIMEOUT_MS);
     if (!response.ok) {
       throw await this.failed(response, 'GET');
     }
-    const stream = response.body;
-    if (!stream) {
-      throw new WebdavError('provider_error', 'The instance answered a download without a body', response.status);
-    }
-    const length = response.headers.get('content-length');
+    const { body, size } = guardDownload(response, {
+      maxBytes: DOWNLOAD_MAX_BYTES,
+      tooLarge: (declared) =>
+        new WebdavError(
+          'too_large',
+          'The document is larger than TREK will transfer',
+          response.status,
+          `content_length=${declared}`,
+        ),
+      noBody: () =>
+        new WebdavError('provider_error', 'The instance answered a download without a body', response.status),
+    });
     const mimeType = response.headers.get('content-type');
     return {
-      body: toNodeStream(stream),
-      size: length !== null && length !== '' && Number.isFinite(Number(length)) ? Number(length) : null,
+      body,
+      size,
       mimeType: mimeType ? mimeType.split(';')[0].trim() : null,
       etag: response.headers.get('oc-etag') ?? response.headers.get('etag') ?? '',
     };

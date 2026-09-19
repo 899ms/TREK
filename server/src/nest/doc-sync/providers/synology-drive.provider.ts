@@ -153,7 +153,7 @@ function scopeOption(path: string, label?: string): DocumentScopeOption {
 }
 
 @Injectable()
-export class SynologyDriveProvider implements DocumentProvider {
+export class SynologyDriveDocumentProvider implements DocumentProvider {
   readonly id = PROVIDER_ID;
 
   /**
@@ -540,6 +540,7 @@ export class SynologyDriveProvider implements DocumentProvider {
     if (!username || !password || !conn.baseUrl.trim()) return null;
     const otpCode = (conn.secrets.otp_code ?? '').trim();
     return {
+      connectionId: conn.connectionId,
       baseUrl: conn.baseUrl,
       username,
       password,

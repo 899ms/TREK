@@ -42,7 +42,7 @@ import crypto from 'node:crypto';
  * an existing document at all.
  */
 @Injectable()
-export class PapraProvider implements DocumentProvider {
+export class PapraDocumentProvider implements DocumentProvider {
   readonly id = 'papra';
 
   private readonly client = new PapraClient();

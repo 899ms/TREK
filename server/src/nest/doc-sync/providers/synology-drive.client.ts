@@ -1,14 +1,20 @@
 import { Readable } from 'node:stream';
 import { createHash } from 'node:crypto';
 import type { DocsyncErrorCode } from '@trek/shared';
-import { safeFetch, SsrfBlockedError } from '../../../utils/ssrfGuard';
-import { discardBody, exceedsDeclaredLength, readCappedJson } from '../../../utils/cappedFetch';
+import { discardBody, readCappedJson } from '../../../utils/cappedFetch';
 import {
   PROVIDER_JSON_MAX_BYTES,
   PROVIDER_MAX_PAGES,
   PROVIDER_TIMEOUT_MS,
   PROVIDER_TRANSFER_TIMEOUT_MS,
 } from '../doc-sync.constants';
+import {
+  guardDownload,
+  providerFetch,
+  statusErrorCode,
+  type TransportFailure,
+  type TransportFailureCode,
+} from './provider-http';
 
 /**
  * Thin HTTP client for the Synology DSM Web API (SYNO.API.Auth + FileStation).
@@ -89,6 +95,14 @@ export const MAX_FILE_PATH_LENGTH = 1024;
 
 /** Session-level codes: the SID is gone, and exactly one fresh login may fix it. */
 const SESSION_CODES = new Set([105, 106, 107, 119]);
+
+/**
+ * What SYNO.API.Auth answers when a login carried a device token and DSM still
+ * wants the second factor (403) or rejects it (404): the token is no longer
+ * trusted, because someone removed TREK from the account's trusted devices or
+ * it expired.
+ */
+const DEVICE_TOKEN_REFUSED_CODES = new Set([403, 404]);
 
 /**
  * Generic Web API codes, identical on every endpoint.
@@ -182,20 +196,19 @@ const FILE_CODES: Record<number, DocsyncErrorCode> = {
   1805: 'conflict',
 };
 
-/** OpenSSL / Node verdicts that mean "the certificate, not the connection". */
-const TLS_ERROR_CODES = new Set([
-  'SELF_SIGNED_CERT_IN_CHAIN',
-  'DEPTH_ZERO_SELF_SIGNED_CERT',
-  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
-  'UNABLE_TO_GET_ISSUER_CERT',
-  'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
-  'CERT_HAS_EXPIRED',
-  'CERT_NOT_YET_VALID',
-  'ERR_TLS_CERT_ALTNAME_INVALID',
-  'HOSTNAME_MISMATCH',
-]);
+const TRANSPORT_MESSAGES: Record<TransportFailureCode, string> = {
+  ssrf_blocked: 'Blocked by the SSRF guard',
+  timeout: 'The NAS did not answer in time',
+  tls_untrusted: 'The certificate the NAS presented is not trusted',
+  unreachable: 'Could not reach the NAS',
+};
 
 export interface SynologyDriveCreds {
+  /**
+   * The TREK connection these credentials belong to, or 0 for a form that has
+   * not been saved yet. It keys the device token; see `deviceTokens`.
+   */
+  connectionId: number;
   /** Instance origin including the DSM port, e.g. `https://nas.example.com:5001`. */
   baseUrl: string;
   username: string;
@@ -203,7 +216,7 @@ export interface SynologyDriveCreds {
   /**
    * A TOTP code from the connection form. Single-use by construction, so it can
    * only ever serve the first login; the device token that login returns is what
-   * keeps later logins working, and it lives in this process's session cache.
+   * keeps later logins working, and it lives in this process's memory only.
    */
   otpCode?: string;
   allowInsecureTls: boolean;
@@ -400,37 +413,12 @@ function parseEntryList(value: unknown, key: string): SynoEntry[] {
   return entries;
 }
 
-function transportError(error: unknown): SynologyDriveError {
-  if (error instanceof SsrfBlockedError) {
-    return new SynologyDriveError('ssrf_blocked', 'Blocked by the SSRF guard', { detail: error.message });
-  }
-  const name = error instanceof Error ? error.name : '';
-  if (name === 'TimeoutError' || name === 'AbortError') {
-    return new SynologyDriveError('timeout', 'The NAS did not answer in time');
-  }
-  const cause = error instanceof Error && 'cause' in error ? (error as { cause?: unknown }).cause : undefined;
-  const codes = [error, cause]
-    .map((candidate) => (isRecord(candidate) && typeof candidate.code === 'string' ? candidate.code : null))
-    .filter((code): code is string => code !== null);
-  if (codes.some((code) => TLS_ERROR_CODES.has(code))) {
-    return new SynologyDriveError('tls_untrusted', 'The certificate the NAS presented is not trusted', {
-      detail: codes.join(','),
-    });
-  }
-  return new SynologyDriveError('unreachable', 'Could not reach the NAS', {
-    detail: error instanceof Error ? error.message : String(error),
-  });
+function transportError(failure: TransportFailure): SynologyDriveError {
+  return new SynologyDriveError(failure.code, TRANSPORT_MESSAGES[failure.code], { detail: failure.detail });
 }
 
 function httpError(status: number): SynologyDriveError {
-  const code: DocsyncErrorCode =
-    status === 401 ? 'unauthorized'
-      : status === 403 ? 'forbidden'
-        : status === 404 ? 'not_found'
-          : status === 413 ? 'too_large'
-            : status === 429 ? 'rate_limited'
-              : 'provider_error';
-  return new SynologyDriveError(code, `The NAS answered HTTP ${status}`, { status });
+  return new SynologyDriveError(statusErrorCode(status), `The NAS answered HTTP ${status}`, { status });
 }
 
 function appError(synoCode: number, isAuth: boolean): SynologyDriveError {
@@ -464,12 +452,23 @@ export class SynologyDriveClient {
   private readonly lockouts = new Map<string, CredentialLockout>();
 
   /**
-   * DSM's trusted-device tokens, keyed by instance and account only.
+   * DSM's trusted-device tokens, one per TREK connection.
    *
-   * Deliberately not by credential: the token belongs to the account and the
-   * device, not to the password, so it has to survive a password edit and the
-   * moment the single-use OTP is cleared out of the form. Losing it would mean
-   * the next session expiry needs a human with an authenticator app.
+   * The token is DSM's record that somebody passed the second factor, and that
+   * somebody is whoever typed the code into this connection's form. Keyed by
+   * instance and account alone, a second trip's owner who knew the password but
+   * never had the authenticator could point a connection at the same account
+   * and log in on the first trip's token.
+   *
+   * Not keyed by the password or the code: the token has to survive a password
+   * edit and the single-use OTP going stale in the form, or the next session
+   * expiry needs a human with an authenticator app. An edit keeps the
+   * connection id, so it keeps the token. Instance and account stay in the key
+   * so a connection repointed at another NAS or account starts without one.
+   *
+   * A form that has not been saved has no id to file a token under (every
+   * unsaved form is connection 0), so what its probe earns rides on the session
+   * only, and the saved connection adopts it from there; see `session()`.
    */
   private readonly deviceTokens = new Map<string, string>();
 
@@ -484,16 +483,22 @@ export class SynologyDriveClient {
     return `${normalizeBaseUrl(creds.baseUrl)}\u0000${creds.username}`;
   }
 
+  /** Where this connection's device token lives, or null for a form not saved yet. */
+  private deviceKey(creds: SynologyDriveCreds): string | null {
+    return creds.connectionId > 0 ? `${creds.connectionId}\u0000${this.accountKey(creds)}` : null;
+  }
+
   private async request(
     url: string,
     init: RequestInit,
     creds: SynologyDriveCreds,
+    timeoutMs: number,
   ): Promise<Response> {
-    try {
-      return await safeFetch(url, init, { rejectUnauthorized: !creds.allowInsecureTls });
-    } catch (error: unknown) {
-      throw transportError(error);
-    }
+    return providerFetch(url, init, {
+      timeoutMs,
+      allowInsecureTls: creds.allowInsecureTls,
+      onTransportFailure: transportError,
+    });
   }
 
   /**
@@ -528,13 +533,9 @@ export class SynologyDriveClient {
 
     const response = await this.request(
       normalizeBaseUrl(creds.baseUrl) + cgi,
-      {
-        method: 'POST',
-        headers,
-        body,
-        signal: AbortSignal.timeout(opts.timeoutMs ?? PROVIDER_TIMEOUT_MS) as AbortSignal,
-      },
+      { method: 'POST', headers, body },
       creds,
+      opts.timeoutMs ?? PROVIDER_TIMEOUT_MS,
     );
 
     if (!response.ok) {
@@ -583,22 +584,39 @@ export class SynologyDriveClient {
     }
   }
 
+  /**
+   * The cached session for this credential, or a fresh login.
+   *
+   * A cached session hands its device token to a saved connection that has
+   * none yet. That is how the code typed into a form that was tested before it
+   * was saved reaches the saved connection: the session is keyed by the whole
+   * credential, code included, so only a connection presenting that same code
+   * can find it.
+   */
   private async session(creds: SynologyDriveCreds): Promise<SynoSession> {
     const cached = this.sessions.get(this.sessionKey(creds));
-    if (cached && Date.now() - cached.createdAt < SESSION_MAX_AGE_MS) return cached;
-    return await this.login(creds, this.deviceTokens.get(this.accountKey(creds)) ?? null);
+    if (cached && Date.now() - cached.createdAt < SESSION_MAX_AGE_MS) {
+      const deviceKey = this.deviceKey(creds);
+      if (deviceKey && cached.deviceId && !this.deviceTokens.has(deviceKey)) {
+        this.deviceTokens.set(deviceKey, cached.deviceId);
+      }
+      return cached;
+    }
+    return await this.login(creds);
   }
 
   /**
    * Log in, honouring the lockout.
    *
-   * The device token from a previous login is reused when there is one: the
-   * connection form's OTP is a single TOTP code that expires in thirty seconds,
-   * so it can only ever serve the first login of a process. Without the device
-   * token, every session expiry would need a human to type a new code.
+   * The connection's device token is reused when there is one: the form's OTP
+   * is a single TOTP code that expires in thirty seconds, so it can only ever
+   * serve the first login of a process. Without the device token, every session
+   * expiry would need a human to type a new code.
    */
-  private async login(creds: SynologyDriveCreds, deviceId: string | null): Promise<SynoSession> {
+  private async login(creds: SynologyDriveCreds): Promise<SynoSession> {
     const key = this.sessionKey(creds);
+    const deviceKey = this.deviceKey(creds);
+    const deviceId = deviceKey ? this.deviceTokens.get(deviceKey) ?? null : null;
     const lockout = this.lockouts.get(key);
     if (lockout && lockout.until > Date.now()) {
       throw new SynologyDriveError(lockout.code, 'The NAS rejected these credentials; not retrying yet', {
@@ -633,6 +651,12 @@ export class SynologyDriveClient {
       data = await this.call(creds, params, { cgi: AUTH_CGI });
     } catch (error: unknown) {
       if (error instanceof SynologyDriveError && error.synoCode && error.synoCode >= 400) {
+        // A token DSM no longer trusts would otherwise go out ahead of any fresh
+        // code typed into the form, on every attempt, until the process restarts.
+        if (deviceKey && deviceId && DEVICE_TOKEN_REFUSED_CODES.has(error.synoCode)
+          && this.deviceTokens.get(deviceKey) === deviceId) {
+          this.deviceTokens.delete(deviceKey);
+        }
         this.lockouts.set(key, {
           until: Date.now() + (error.synoCode === 407 ? AUTOBLOCK_LOCKOUT_MS : CREDENTIAL_LOCKOUT_MS),
           code: error.code,
@@ -647,7 +671,7 @@ export class SynologyDriveClient {
       throw new SynologyDriveError('provider_error', 'The NAS accepted the login but returned no session id');
     }
     const issuedDeviceId = isRecord(data) && typeof data.did === 'string' ? data.did : deviceId;
-    if (issuedDeviceId) this.deviceTokens.set(this.accountKey(creds), issuedDeviceId);
+    if (deviceKey && issuedDeviceId) this.deviceTokens.set(deviceKey, issuedDeviceId);
     const session: SynoSession = {
       sid,
       synoToken: isRecord(data) && typeof data.synotoken === 'string' ? data.synotoken : null,
@@ -847,9 +871,9 @@ export class SynologyDriveClient {
         // undici refuses a streaming body without it, and a stream is the point:
         // nothing here ever holds the whole file.
         duplex: 'half',
-        signal: AbortSignal.timeout(PROVIDER_TRANSFER_TIMEOUT_MS) as AbortSignal,
       },
       creds,
+      PROVIDER_TRANSFER_TIMEOUT_MS,
     );
 
     if (!response.ok) {
@@ -871,8 +895,7 @@ export class SynologyDriveClient {
    *
    * A GET, because Download is the one FileStation method documented as one and
    * the session travels in the cookie, so nothing secret reaches the query
-   * string. The declared length is checked before the body is handed on: past
-   * this point nobody counts the bytes any more.
+   * string.
    */
   async download(creds: SynologyDriveCreds, path: string, maxBytes: number): Promise<SynoDownload> {
     const session = await this.session(creds);
@@ -888,12 +911,9 @@ export class SynologyDriveClient {
 
     const response = await this.request(
       url.toString(),
-      {
-        method: 'GET',
-        headers,
-        signal: AbortSignal.timeout(PROVIDER_TRANSFER_TIMEOUT_MS) as AbortSignal,
-      },
+      { method: 'GET', headers },
       creds,
+      PROVIDER_TRANSFER_TIMEOUT_MS,
     );
 
     if (!response.ok) {
@@ -908,22 +928,15 @@ export class SynologyDriveClient {
       const error = isRecord(parsed) && isRecord(parsed.error) ? parsed.error : undefined;
       throw appError(typeof error?.code === 'number' ? error.code : 0, false);
     }
-    if (exceedsDeclaredLength(response, maxBytes)) {
-      discardBody(response);
-      throw new SynologyDriveError('too_large', 'The file is larger than this install allows', {
-        detail: `content_length=${response.headers.get('content-length')}`,
-      });
-    }
-    if (!response.body) {
-      throw new SynologyDriveError('provider_error', 'The NAS answered the download with an empty body');
-    }
-
-    const declared = Number(response.headers.get('content-length') ?? '');
-    return {
-      body: Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0]),
-      size: Number.isFinite(declared) && declared > 0 ? declared : null,
-      mimeType: contentType,
-    };
+    const { body, size } = guardDownload(response, {
+      maxBytes,
+      tooLarge: (declared) =>
+        new SynologyDriveError('too_large', 'The file is larger than this install allows', {
+          detail: `content_length=${declared}`,
+        }),
+      noBody: () => new SynologyDriveError('provider_error', 'The NAS answered the download with an empty body'),
+    });
+    return { body, size, mimeType: contentType };
   }
 
   /** Rename in place. The path is the identity here, so this also moves it. */

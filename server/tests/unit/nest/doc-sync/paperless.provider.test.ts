@@ -614,6 +614,25 @@ describe('PaperlessProvider — fetching bytes', () => {
     expect(expectFail(await provider.fetch(CONN, SCOPE, '../../etc/passwd')).code).toBe('not_found');
     expect(calls).toHaveLength(before);
   });
+
+  it('PAPERLESS-043: a download without a body is a provider error, not an empty file', async () => {
+    on('GET /api/documents/11/', reply(docRow()));
+    on('GET /api/documents/11/download/', reply(''));
+    expect(expectFail(await provider.fetch(CONN, SCOPE, '11'))).toMatchObject({
+      code: 'provider_error',
+      detail: 'Paperless sent no body for the document',
+    });
+  });
+
+  it('PAPERLESS-044: a download announcing more than TREK transfers is refused before it is read', async () => {
+    on('GET /api/documents/11/', reply(docRow()));
+    on('GET /api/documents/11/download/', streamReply('%PDF', { 'content-length': String(3 * 1024 ** 3) }));
+    expect(expectFail(await provider.fetch(CONN, SCOPE, '11'))).toMatchObject({
+      code: 'too_large',
+      detail: `content_length=${3 * 1024 ** 3}`,
+    });
+    expect(discardBodyMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('PaperlessProvider — pushing bytes', () => {

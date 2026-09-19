@@ -1,9 +1,15 @@
-import { exceedsDeclaredLength, discardBody, readCappedJson } from '../../../utils/cappedFetch';
-import { safeFetch, SsrfBlockedError } from '../../../utils/ssrfGuard';
+import { readCappedJson } from '../../../utils/cappedFetch';
 import type { DocsyncErrorCode } from '@trek/shared';
+import {
+  guardDownload,
+  providerFetch,
+  statusErrorCode,
+  type TransportFailure,
+  type TransportFailureCode,
+} from './provider-http';
 
 import crypto from 'node:crypto';
-import { Readable, Transform } from 'node:stream';
+import { Readable } from 'node:stream';
 
 /**
  * Thin HTTP client for the Papra REST API (github.com/papra-hq/papra).
@@ -262,66 +268,19 @@ export function tagSearchQuery(tagName: string): string | null {
 function classify(status: number, papraCode: string | null): DocsyncErrorCode {
   if (papraCode === 'tags.not_found') return 'scope_missing';
   if (status === 400) return papraCode === 'server.invalid_request.params' ? 'not_found' : 'provider_error';
-  if (status === 401) return 'unauthorized';
-  if (status === 403) return 'forbidden';
-  if (status === 404) return 'not_found';
-  if (status === 409) return 'conflict';
-  if (status === 413) return 'too_large';
-  if (status === 415) return 'unsupported_type';
-  if (status === 429) return 'rate_limited';
-  if (status === 507) return 'quota_exceeded';
-  return 'provider_error';
+  return statusErrorCode(status);
 }
+
+const TRANSPORT_MESSAGES: Record<TransportFailureCode, string> = {
+  ssrf_blocked: 'The Papra URL is not allowed',
+  timeout: 'Papra did not answer in time',
+  tls_untrusted: 'Papra presented a certificate that is not trusted',
+  unreachable: 'Could not reach Papra',
+};
 
 /** Why a request never produced a response at all. */
-function classifyTransport(err: unknown): PapraError {
-  if (err instanceof SsrfBlockedError) {
-    return new PapraError('ssrf_blocked', 'The Papra URL is not allowed', undefined, err.message);
-  }
-  const detail = err instanceof Error ? err.message : String(err);
-  const name = err instanceof Error ? err.name : '';
-  if (name === 'TimeoutError' || name === 'AbortError') {
-    return new PapraError('timeout', 'Papra did not answer in time', undefined, detail);
-  }
-  // undici buries the certificate verdict in a cause chain, so the whole chain
-  // is searched rather than the top-level message, which is a bare "fetch failed".
-  if (/self-signed|self signed|CERT_|ERR_TLS|unable to verify|certificate/i.test(causeChain(err))) {
-    return new PapraError('tls_untrusted', 'Papra presented a certificate that is not trusted', undefined, detail);
-  }
-  return new PapraError('unreachable', 'Could not reach Papra', undefined, detail);
-}
-
-function causeChain(err: unknown): string {
-  const parts: string[] = [];
-  let current: unknown = err;
-  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
-    parts.push(current.message, String((current as { code?: unknown }).code ?? ''));
-    current = current.cause;
-  }
-  return parts.join(' ');
-}
-
-/**
- * A stream that fails instead of growing past `maxBytes`.
- *
- * The download is handed to the caller as a stream rather than buffered, so the
- * declared-length check is only half a cap: a chunked answer declares nothing.
- * This is the other half.
- */
-function capStream(source: Readable, maxBytes: number): Readable {
-  let seen = 0;
-  const limiter = new Transform({
-    transform(chunk: Buffer, _encoding, done) {
-      seen += chunk.length;
-      if (seen > maxBytes) {
-        done(new Error(`Papra document exceeded ${maxBytes} bytes`));
-        return;
-      }
-      done(null, chunk);
-    },
-  });
-  source.on('error', (err) => limiter.destroy(err));
-  return source.pipe(limiter);
+function transportError(failure: TransportFailure): PapraError {
+  return new PapraError(failure.code, TRANSPORT_MESSAGES[failure.code], undefined, failure.detail);
 }
 
 /** RFC 7578 as undici's own FormData writes it: UTF-8 bytes, three characters escaped. */
@@ -380,21 +339,11 @@ export class PapraClient {
     };
     if (options.json !== undefined) headers['Content-Type'] = 'application/json';
 
-    let response: Response;
-    try {
-      response = await safeFetch(
-        url.toString(),
-        {
-          method,
-          headers,
-          body: options.json === undefined ? undefined : JSON.stringify(options.json),
-          signal: AbortSignal.timeout(TIMEOUT_MS) as AbortSignal,
-        },
-        { rejectUnauthorized: !creds.allowInsecureTls },
-      );
-    } catch (err: unknown) {
-      throw classifyTransport(err);
-    }
+    const response = await providerFetch(
+      url.toString(),
+      { method, headers, body: options.json === undefined ? undefined : JSON.stringify(options.json) },
+      { timeoutMs: TIMEOUT_MS, allowInsecureTls: creds.allowInsecureTls, onTransportFailure: transportError },
+    );
 
     return this.readBody(response, `${method} ${path}`, options.expectEmpty === true);
   }
@@ -564,20 +513,11 @@ export class PapraClient {
   async downloadDocument(creds: PapraCreds, documentId: string): Promise<PapraDownload> {
     const url = `${papraApiBase(creds.baseUrl) + this.orgPath(creds)}/documents/${encodeURIComponent(documentId)}/file`;
 
-    let response: Response;
-    try {
-      response = await safeFetch(
-        url,
-        {
-          method: 'GET',
-          headers: { Authorization: `Bearer ${creds.apiKey}` },
-          signal: AbortSignal.timeout(TRANSFER_TIMEOUT_MS) as AbortSignal,
-        },
-        { rejectUnauthorized: !creds.allowInsecureTls },
-      );
-    } catch (err: unknown) {
-      throw classifyTransport(err);
-    }
+    const response = await providerFetch(
+      url,
+      { method: 'GET', headers: { Authorization: `Bearer ${creds.apiKey}` } },
+      { timeoutMs: TRANSFER_TIMEOUT_MS, allowInsecureTls: creds.allowInsecureTls, onTransportFailure: transportError },
+    );
 
     if (!response.ok) {
       const body = await readCappedJson<unknown>(response, MAX_JSON_BYTES);
@@ -590,19 +530,12 @@ export class PapraClient {
         code ?? undefined,
       );
     }
-    if (exceedsDeclaredLength(response, MAX_DOWNLOAD_BYTES)) {
-      discardBody(response);
-      throw new PapraError('too_large', 'The Papra document is larger than TREK will transfer', response.status);
-    }
-    if (!response.body) {
-      throw new PapraError('provider_error', 'Papra answered the document file with no body', response.status);
-    }
-
-    const declared = Number(response.headers.get('content-length') ?? '');
-    return {
-      body: capStream(Readable.fromWeb(response.body), MAX_DOWNLOAD_BYTES),
-      size: Number.isFinite(declared) && declared >= 0 ? declared : null,
-    };
+    return guardDownload(response, {
+      maxBytes: MAX_DOWNLOAD_BYTES,
+      tooLarge: () =>
+        new PapraError('too_large', 'The Papra document is larger than TREK will transfer', response.status),
+      noBody: () => new PapraError('provider_error', 'Papra answered the document file with no body', response.status),
+    });
   }
 
   /**
@@ -635,28 +568,22 @@ export class PapraClient {
     }
 
     const sentAt = Date.now();
-    let response: Response;
-    try {
-      response = await safeFetch(
-        `${papraApiBase(creds.baseUrl) + this.orgPath(creds)}/documents`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${creds.apiKey}`,
-            Accept: 'application/json',
-            'Content-Type': `multipart/form-data; boundary=${boundary}`,
-          },
-          body: Readable.toWeb(Readable.from(frame())),
-          // Required by undici for a streamed request body; the platform types
-          // carry the field, the DOM lib this project does not load does not.
-          duplex: 'half',
-          signal: AbortSignal.timeout(TRANSFER_TIMEOUT_MS) as AbortSignal,
+    const response = await providerFetch(
+      `${papraApiBase(creds.baseUrl) + this.orgPath(creds)}/documents`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${creds.apiKey}`,
+          Accept: 'application/json',
+          'Content-Type': `multipart/form-data; boundary=${boundary}`,
         },
-        { rejectUnauthorized: !creds.allowInsecureTls },
-      );
-    } catch (err: unknown) {
-      throw classifyTransport(err);
-    }
+        body: Readable.toWeb(Readable.from(frame())),
+        // Required by undici for a streamed request body; the platform types
+        // carry the field, the DOM lib this project does not load does not.
+        duplex: 'half',
+      },
+      { timeoutMs: TRANSFER_TIMEOUT_MS, allowInsecureTls: creds.allowInsecureTls, onTransportFailure: transportError },
+    );
     const elapsedMs = Date.now() - sentAt;
 
     const body = await this.readBody(response, 'POST /documents', false);

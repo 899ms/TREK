@@ -18,8 +18,8 @@ import { DocSyncService } from './doc-sync.service';
 import { DOCUMENT_PROVIDERS, type DocumentProvider } from './document-provider';
 import { DocumentProviderRegistry } from './document-provider.registry';
 import { PaperlessDocumentProvider } from './providers/paperless.provider';
-import { PapraProvider } from './providers/papra.provider';
-import { SynologyDriveProvider } from './providers/synology-drive.provider';
+import { PapraDocumentProvider } from './providers/papra.provider';
+import { SynologyDriveDocumentProvider } from './providers/synology-drive.provider';
 import { NextcloudDocumentProvider, OpencloudDocumentProvider } from './providers/webdav.provider';
 import { PaperlessClient } from './providers/paperless.client';
 import { PapraClient } from './providers/papra.client';
@@ -68,25 +68,25 @@ import { WebdavClient } from './providers/webdav.client';
     SynologyDriveClient,
     WebdavClient,
     PaperlessDocumentProvider,
-    PapraProvider,
+    PapraDocumentProvider,
     NextcloudDocumentProvider,
     OpencloudDocumentProvider,
-    SynologyDriveProvider,
+    SynologyDriveDocumentProvider,
     {
       provide: DOCUMENT_PROVIDERS,
       useFactory: (
         paperless: PaperlessDocumentProvider,
-        papra: PapraProvider,
+        papra: PapraDocumentProvider,
         nextcloud: NextcloudDocumentProvider,
         opencloud: OpencloudDocumentProvider,
-        synology: SynologyDriveProvider,
+        synology: SynologyDriveDocumentProvider,
       ): readonly DocumentProvider[] => [paperless, papra, nextcloud, opencloud, synology],
       inject: [
         PaperlessDocumentProvider,
-        PapraProvider,
+        PapraDocumentProvider,
         NextcloudDocumentProvider,
         OpencloudDocumentProvider,
-        SynologyDriveProvider,
+        SynologyDriveDocumentProvider,
       ],
     },
   ],
