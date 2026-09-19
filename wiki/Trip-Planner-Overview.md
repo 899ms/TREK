@@ -134,9 +134,9 @@ The Add as a stop dialog offers trivago and CHECK24 for hotels, or PiNCAMP and P
 
 All Looking for categories, including accommodation, are added as Roadtrip service stops. In Roadtrip mode, Edit in a planned place's details opens the stop dialog with its saved duration and overnight dates and times. Saving updates the existing stop; More details still opens the full place editor. The shared stop-type contract also accepts hotel through MCP.
 
-A booked check-out time controls departure from an overnight stop on its check-out day. STAY is calculated from arrival until check-out, including multiple nights, and updates with the route. Explicit arrival times remain authoritative. Clicking STAY for a booking with check-out opens the overnight editor. Browser planning and MCP use the same scheduling logic.
+A booked night uses its check-in as the earliest arrival and the place's STAY as its length. The drive never reads the check-out: it is the latest the room has to be handed back, not the time anybody drives on, so it stays a booking detail under Days. To leave at a set hour, give the visit an End, see [Road-Trip](Road-Trip#leaving-at-a-set-time). Explicit arrival times remain authoritative. Browser planning and MCP use the same scheduling logic.
 
-The overnight dialog prefills check-in from the calculated arrival when available; existing manual check-in values take priority. Before adding a corridor result, the suggested arrival is estimated along the current routed leg. Without any known arrival, checkout still anchors the onward drive, but STAY remains unknown instead of displaying the old default duration.
+The overnight dialog prefills check-in from the calculated arrival when available; existing manual check-in values take priority. Before adding a corridor result, the suggested arrival is estimated along the current routed leg.
 
 Ordinary places retain the full place editor in Roadtrip mode. The compact stop editor is used for service stops and accommodation. When visits move into another day, their calculated departure continues into that day's following stops, including midnight offsets.
 
