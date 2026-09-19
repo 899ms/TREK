@@ -33,7 +33,7 @@ export default function FileManager(props: FileManagerProps) {
         <DocSyncPanel
           tripId={props.tripId}
           tripTitle={S.trip?.title}
-          isOwner={S.isTripOwner}
+          canManage={S.canManageSync}
           onClose={() => S.setShowDocSync(false)}
         />
       )}

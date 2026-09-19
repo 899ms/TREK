@@ -12,7 +12,7 @@ import type { Request } from 'express';
  * form field that must not lose a secret it never saw, and a webhook whose
  * callback URL is derived from the request rather than from configuration.
  *
- * The config service and the provider registry are the real ones — the merge
+ * The config service and the provider registry are the real ones: the merge
  * this file pins runs through actual encryption and actual provider-field rows,
  * and a stub of either would only be a restatement of the controller. The
  * reconciler is a spy: a run is a side effect here, not the subject.
@@ -71,6 +71,7 @@ import type {
 } from '../../../../src/nest/doc-sync/document-provider';
 import type { LinkRow } from '../../../../src/nest/doc-sync/doc-sync-config.service';
 import type { DocSyncService } from '../../../../src/nest/doc-sync/doc-sync.service';
+import type { RealtimeService } from '../../../../src/nest/realtime/realtime.service';
 import type {
   DocsyncConnectionDto,
   DocsyncConnectionTestDto,
@@ -123,7 +124,8 @@ const sync = {
 const registry = new DocumentProviderRegistry([paperless, nextcloud] as unknown as DocumentProvider[]);
 const dbs = new DatabaseService(testDb);
 const config = new DocSyncConfigService(dbs, registry);
-const controller = new DocSyncController(config, sync as unknown as DocSyncService, registry, dbs);
+const realtime = { broadcast: vi.fn() };
+const controller = new DocSyncController(config, sync as unknown as DocSyncService, registry, dbs, realtime as unknown as RealtimeService);
 
 /** Only what publicOrigin reads: header lookup plus the connection's own scheme. */
 function makeReq(headers: Record<string, string> = {}, protocol = 'http'): Request {
@@ -368,8 +370,6 @@ describe('probing form values', () => {
   });
 });
 
-describe('reading the trip state', () => {
-  it('asks the reconciler with a number, because the path hands the handler a string', () => {
 describe('a secret the adapter earned itself', () => {
   const EARNED = 'a1b2c3:DEVICE-SECRET';
 
@@ -416,6 +416,8 @@ describe('a secret the adapter earned itself', () => {
   });
 });
 
+describe('reading the trip state', () => {
+  it('asks the reconciler with a number, because the path hands the handler a string', () => {
     controller.status(String(tripId));
     expect(sync.status).toHaveBeenCalledWith(tripId);
   });
@@ -439,6 +441,32 @@ describe('removing a connection', () => {
     const err = await thrown(() => controller.deleteConnection(String(otherTripId), String(conn.id), admin));
     expect(err.getStatus()).toBe(404);
     expect(config.getConnection(conn.id)).toBeTruthy();
+    expect(realtime.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('pings the trip once for every binding that went with it, and for no other', async () => {
+    const conn = await storedPaperless();
+    const cloud = await config.upsertConnection(tripId, Number(owner.id), connBody({
+      providerId: 'nextcloud',
+      baseUrl: 'https://cloud.example.com',
+      credentials: { login_name: 'alice', app_password: 'app-pw', base_path: '/TREK' },
+    }));
+    if ('error' in cloud) throw new Error(`fixture failed: ${cloud.error.code}`);
+    const bind = (connectionId: number, scopeKey: string) => {
+      const res = config.createLink(tripId, Number(owner.id), linkBody(connectionId, { scopeKey }));
+      if ('error' in res) throw new Error(`fixture failed: ${res.error.code}`);
+      return res.data.id;
+    };
+    const first = bind(conn.id, 'tag:1');
+    const second = bind(conn.id, 'tag:2');
+    bind(cloud.data.id, 'folder:1');
+
+    controller.deleteConnection(String(tripId), String(conn.id), owner);
+
+    expect(realtime.broadcast.mock.calls).toEqual([
+      [tripId, 'docsync:changed', { linkId: first, pulled: 0, pushed: 0 }],
+      [tripId, 'docsync:changed', { linkId: second, pulled: 0, pushed: 0 }],
+    ]);
   });
 });
 
@@ -556,6 +584,14 @@ describe('creating a binding', () => {
     expect(sync.syncLink.mock.calls[0][1]).toEqual({ full: true });
   });
 
+  it('pings the whole trip, so a member already on the Files tab gets the sync button', async () => {
+    const conn = await storedPaperless();
+    const link = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq())) as { id: number };
+
+    // Three arguments: no socket is skipped, the owner's own button reads it too.
+    expect(realtime.broadcast).toHaveBeenCalledWith(tripId, 'docsync:changed', { linkId: link.id, pulled: 0, pushed: 0 });
+  });
+
   it('refuses a binding for a connection that belongs to a different trip', async () => {
     const conn = await storedPaperless();
     const err = await thrown(() =>
@@ -563,6 +599,7 @@ describe('creating a binding', () => {
     );
     expect(err.getStatus()).toBe(400);
     expect(sync.syncLink).not.toHaveBeenCalled();
+    expect(realtime.broadcast).not.toHaveBeenCalled();
   });
 });
 
@@ -682,12 +719,26 @@ describe('removing a binding', () => {
     expect(testDb.prepare('SELECT id FROM trip_files WHERE id = ?').get(fileId)).toBeTruthy();
   });
 
+  it('pings the trip that the binding is gone', async () => {
+    const conn = await storedPaperless();
+    const created = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq())) as { id: number };
+    realtime.broadcast.mockClear();
+
+    await controller.deleteLink(String(tripId), String(created.id), owner);
+
+    expect(realtime.broadcast.mock.calls).toEqual([
+      [tripId, 'docsync:changed', { linkId: created.id, pulled: 0, pushed: 0 }],
+    ]);
+  });
+
   it('refuses a link that belongs to a different trip', async () => {
     const conn = await storedPaperless();
     const created = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq())) as { id: number };
+    realtime.broadcast.mockClear();
     const err = await thrown(() => controller.deleteLink(String(otherTripId), String(created.id), admin));
     expect(err.getStatus()).toBe(404);
     expect(config.getLink(created.id)).toBeTruthy();
+    expect(realtime.broadcast).not.toHaveBeenCalled();
   });
 });
 

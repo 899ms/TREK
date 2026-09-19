@@ -8,6 +8,7 @@ import { useCanDo } from '../../store/permissionsStore'
 import { useTripStore } from '../../store/tripStore'
 import { useAuthStore } from '../../store/authStore'
 import { canManageDocSync } from './docsync/useDocSync'
+import { useDocSyncOffered } from './docsync/useDocSyncOffered'
 import { getAuthUrl } from '../../api/authUrl'
 import { isImage, isMedia, isWalletPass } from './FileManager.helpers'
 import { openFile as openFileInTab } from '../../utils/fileDownload'
@@ -42,7 +43,8 @@ export function useFileManager({ files = [], onUpload, onDelete, onUpdate, place
   const can = useCanDo()
   const trip = useTripStore((s) => s.trip)
   const currentUser = useAuthStore((s) => s.user)
-  const isTripOwner = canManageDocSync(currentUser, trip)
+  const canManageSync = canManageDocSync(currentUser, trip)
+  const docSyncOffered = useDocSyncOffered(tripId, canManageSync)
   const { t, locale } = useTranslation()
 
   const loadTrash = useCallback(async () => {
@@ -215,7 +217,7 @@ export function useFileManager({ files = [], onUpload, onDelete, onUpdate, place
     previewFile, setPreviewFile, previewFileUrl, assignFileId, setAssignFileId,
     getRootProps, getInputProps, isDragActive, handlePaste, filteredFiles, handleDelete,
     handleAssign, mediaFiles, openFile,
-    showDocSync, setShowDocSync, isTripOwner,
+    showDocSync, setShowDocSync, canManageSync, docSyncOffered,
   }
 }
 

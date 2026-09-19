@@ -228,7 +228,7 @@ export default function MFilesTab({ planner, shell }: MTabScreenProps) {
       <MDocSyncSheet
         tripId={planner.tripId}
         tripTitle={planner.trip?.title}
-        isOwner={canManageDocSync(currentUser, planner.trip)}
+        canManage={canManageDocSync(currentUser, planner.trip)}
         open={docSyncOpen}
         onClose={() => setDocSyncOpen(false)}
       />

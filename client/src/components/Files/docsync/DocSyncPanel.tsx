@@ -5,7 +5,7 @@ import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import { StateBadge } from './DocSyncBits'
 import { useConflicts } from './useConflicts'
-import { useDocSync, type DocSyncLink, type DocSyncProvider } from './useDocSync'
+import { storeName, useDocSync, type DocSyncLink, type DocSyncProvider } from './useDocSync'
 import DocSyncBinding from './DocSyncBinding'
 import DocSyncConnectModal from './DocSyncConnectModal'
 import DocSyncScopeModal from './DocSyncScopeModal'
@@ -21,19 +21,19 @@ import DocSyncScopeModal from './DocSyncScopeModal'
  *
  * It opens from the file manager rather than from settings: this is the one
  * screen where a person has the context that makes the folder choice obvious.
- * Only the trip owner can change a binding — the credential usually reaches
- * their whole archive — but every member sees where their documents go, which
+ * Only the trip owner can change a binding (the credential usually reaches
+ * their whole archive), but every member sees where their documents go, which
  * is the minimum a shared folder owes the people sharing it.
  */
 export default function DocSyncPanel({
   tripId,
   tripTitle,
-  isOwner,
+  canManage,
   onClose,
 }: {
   tripId: number | string
   tripTitle?: string
-  isOwner: boolean
+  canManage: boolean
   onClose: () => void
 }) {
   const { t } = useTranslation()
@@ -74,7 +74,9 @@ export default function DocSyncPanel({
           <div className="grid place-items-center py-20">
             <Loader2 size={22} className="animate-spin text-content-faint" />
           </div>
-        ) : sync.providers.length === 0 ? (
+        ) : sync.providers.length === 0 && sync.links.length === 0 ? (
+          // Only with nothing bound: a binding outlives the admin switching its
+          // provider off, and the people sharing it still need to see it.
           <Empty />
         ) : (
           <div className="grid gap-5 md:grid-cols-[17rem_minmax(0,1fr)] md:gap-6">
@@ -83,7 +85,7 @@ export default function DocSyncPanel({
               providers={sync.providers}
               available={available}
               activeId={active?.id ?? null}
-              isOwner={isOwner}
+              canManage={canManage}
               onSelect={setSelected}
               onAdd={p => (sync.connectionFor(p.id) ? setScopeFor(p.id) : setConnecting(p))}
             />
@@ -93,14 +95,14 @@ export default function DocSyncPanel({
                 <div className="space-y-5">
                   <DocSyncBinding
                     link={active}
-                    provider={sync.providers.find(p => p.id === active.providerId)}
+                    providerName={storeName(active, sync.providers)}
                     sync={sync}
-                    isOwner={isOwner}
+                    canManage={canManage}
                   />
                   {attention > 0 && <Attention counts={sync.itemCounts} tripId={tripId} sync={sync} />}
                 </div>
               ) : (
-                <NothingBound isOwner={isOwner} />
+                <NothingBound canManage={canManage} />
               )}
             </div>
           </div>
@@ -138,7 +140,7 @@ function Sidebar({
   providers,
   available,
   activeId,
-  isOwner,
+  canManage,
   onSelect,
   onAdd,
 }: {
@@ -146,7 +148,7 @@ function Sidebar({
   providers: DocSyncProvider[]
   available: DocSyncProvider[]
   activeId: number | null
-  isOwner: boolean
+  canManage: boolean
   onSelect: (id: number) => void
   onAdd: (p: DocSyncProvider) => void
 }) {
@@ -163,7 +165,7 @@ function Sidebar({
               <li key={link.id}>
                 <StoreButton
                   providerId={link.providerId}
-                  title={providers.find(p => p.id === link.providerId)?.name || link.providerId}
+                  title={storeName(link, providers)}
                   subtitle={link.remoteLabel || link.remoteRootPath || link.scopeKey}
                   state={link.lastSyncState}
                   active={link.id === activeId}
@@ -175,7 +177,7 @@ function Sidebar({
         </div>
       )}
 
-      {isOwner && available.length > 0 && (
+      {canManage && available.length > 0 && (
         <div>
           <h4 className="mb-2 px-1 text-caption font-medium text-content-muted">
             {links.length === 0 ? t('docsync.addProvider') : t('docsync.addAnother')}
@@ -340,7 +342,7 @@ function Attention({
 }
 
 /** The detail column before anything is bound: an invitation, not a blank. */
-function NothingBound({ isOwner }: { isOwner: boolean }) {
+function NothingBound({ canManage }: { canManage: boolean }) {
   const { t } = useTranslation()
   return (
     <div className="grid h-full min-h-[16rem] place-items-center rounded-xl border border-dashed border-edge px-6 py-12 text-center">
@@ -350,7 +352,7 @@ function NothingBound({ isOwner }: { isOwner: boolean }) {
         </span>
         <p className="mt-3 text-body text-content">{t('docsync.empty.title')}</p>
         <p className="mx-auto mt-1 max-w-xs text-caption text-content-muted">
-          {isOwner ? t('docsync.empty.hintOwner') : t('docsync.empty.hintMember')}
+          {canManage ? t('docsync.empty.hintOwner') : t('docsync.empty.hintMember')}
         </p>
       </div>
     </div>

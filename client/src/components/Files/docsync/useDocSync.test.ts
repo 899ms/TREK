@@ -1,4 +1,4 @@
-// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-022
+// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-024
 
 /**
  * The document-sync hook.
@@ -40,7 +40,7 @@ vi.mock('../../../api/client', async (importOriginal) => {
   }
 })
 
-import { useDocSync, canManageDocSync } from './useDocSync'
+import { useDocSync, canManageDocSync, storeName, type DocSyncLink, type DocSyncProvider } from './useDocSync'
 
 const TRIP = 3
 
@@ -177,6 +177,21 @@ describe('useDocSync initial load', () => {
     expect(result.current.links).toEqual([])
     expect(result.current.error).toBeNull()
     expect(result.current.loading).toBe(false)
+  })
+
+  it('FE-DOCSYNC-HOOK-023: a reload that finds the addon gone drops the bindings it had loaded', async () => {
+    statusApi.mockResolvedValue({ items: { conflict: 1 }, links: [] })
+    const { result } = await mountLoaded()
+    expect(result.current.links).toHaveLength(1)
+
+    providersApi.mockRejectedValue(Object.assign(new Error('not found'), { response: { status: 404 } }))
+    await act(async () => { await result.current.load() })
+
+    expect(result.current.providers).toEqual([])
+    expect(result.current.connections).toEqual([])
+    expect(result.current.links).toEqual([])
+    expect(result.current.itemCounts).toEqual({})
+    expect(result.current.error).toBeNull()
   })
 
   it('FE-DOCSYNC-HOOK-006: asks the server nothing while the panel is closed', async () => {
@@ -371,6 +386,18 @@ describe('useDocSync run and save feedback', () => {
     expect(result.current.busy).toBeNull()
     // nothing was refetched, because nothing changed server-side
     expect(listLinksApi).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('storeName', () => {
+  it('FE-DOCSYNC-HOOK-024: prefers the provider list, then the name on the link, then the raw id', () => {
+    const bound = link() as DocSyncLink
+    const listed = [provider({ name: 'Nextcloud Hub' }) as DocSyncProvider]
+
+    expect(storeName({ ...bound, providerName: 'Nextcloud' }, listed)).toBe('Nextcloud Hub')
+    // Switched off by an admin, so the providers route no longer lists it.
+    expect(storeName({ ...bound, providerName: 'Nextcloud' }, [])).toBe('Nextcloud')
+    expect(storeName(bound, [])).toBe('nextcloud')
   })
 })
 

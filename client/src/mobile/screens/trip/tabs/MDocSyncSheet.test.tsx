@@ -1,4 +1,4 @@
-// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-016
+// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-017
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '../../../../../tests/helpers/render'
@@ -18,7 +18,7 @@ const TRIP_ID = 3
  * Shaped like a row of document_provider_fields, which matters more than it looks.
  *
  * `field_key` is snake_case and `label` already carries the full key suffix
- * (`providerApiKey`, not `apiKey`) — see server/src/db/document-provider-seed.ts.
+ * (`providerApiKey`, not `apiKey`), see server/src/db/document-provider-seed.ts.
  * An earlier version of this fixture invented both, which made a sheet that
  * built label keys the wrong way look correct: the fixture's `apiKey` and the
  * sheet's `docsync.provider${cap(...)}` happened to meet in the middle, while
@@ -97,7 +97,7 @@ const onClose = vi.fn()
 
 function renderSheet(over: Partial<ComponentProps<typeof MDocSyncSheet>> = {}) {
   return render(
-    <MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" isOwner open onClose={onClose} {...over} />,
+    <MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" canManage open onClose={onClose} {...over} />,
   )
 }
 
@@ -141,7 +141,7 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('MDocSyncSheet — opening and the store list', () => {
+describe('MDocSyncSheet: opening and the store list', () => {
   it('FE-DOCSYNC-MOBILE-001: renders nothing and asks the server nothing while it is closed', () => {
     renderSheet({ open: false })
 
@@ -180,14 +180,34 @@ describe('MDocSyncSheet — opening and the store list', () => {
 
   it('FE-DOCSYNC-MOBILE-004: an instance with no providers says so instead of listing nothing', async () => {
     providers = []
+    links = []
     renderSheet()
 
     expect(await screen.findByText('No document providers are available')).toBeInTheDocument()
     expect(screen.queryByText('This trip')).not.toBeInTheDocument()
   })
+
+  it('FE-DOCSYNC-MOBILE-017: a bound trip keeps showing its store after every provider was switched off', async () => {
+    providers = []
+    links = [link({ providerName: 'Paperless-ngx' })]
+    renderSheet({ canManage: false })
+
+    const row = await screen.findByRole('button', { name: /TREK trip 3/ })
+    expect(screen.queryByText('No document providers are available')).not.toBeInTheDocument()
+    expect(screen.queryByText('Add another')).not.toBeInTheDocument()
+    // The providers route no longer names it, so the name comes off the link,
+    // in the list and again as the detail view's title and far end.
+    expect(row).toHaveAccessibleName(expect.stringContaining('Paperless-ngx'))
+
+    fireEvent.click(row)
+    await screen.findByRole('button', { name: 'Sync now' })
+    expect(screen.getAllByText('Paperless-ngx')).toHaveLength(2)
+    expect(screen.queryByText('Document sync')).not.toBeInTheDocument()
+    expect(screen.queryByText('paperless')).not.toBeInTheDocument()
+  })
 })
 
-describe('MDocSyncSheet — moving between the views', () => {
+describe('MDocSyncSheet: moving between the views', () => {
   it('FE-DOCSYNC-MOBILE-005: tapping a bound store opens its detail view', async () => {
     renderSheet()
 
@@ -219,8 +239,8 @@ describe('MDocSyncSheet — moving between the views', () => {
     const { rerender } = renderSheet()
     await openDetail()
 
-    rerender(<MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" isOwner open={false} onClose={onClose} />)
-    rerender(<MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" isOwner open onClose={onClose} />)
+    rerender(<MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" canManage open={false} onClose={onClose} />)
+    rerender(<MDocSyncSheet tripId={TRIP_ID} tripTitle="Rome" canManage open onClose={onClose} />)
 
     expect(await screen.findByText('Add another')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sync now' })).not.toBeInTheDocument()
@@ -255,7 +275,7 @@ describe('MDocSyncSheet — moving between the views', () => {
   })
 })
 
-describe('MDocSyncSheet — the two lanes', () => {
+describe('MDocSyncSheet: the two lanes', () => {
   it('FE-DOCSYNC-MOBILE-010: switching a lane off narrows the direction to the other one', async () => {
     renderSheet()
     await openDetail()
@@ -291,7 +311,7 @@ describe('MDocSyncSheet — the two lanes', () => {
   })
 })
 
-describe('MDocSyncSheet — what the owner may do', () => {
+describe('MDocSyncSheet: what the owner may do', () => {
   it('FE-DOCSYNC-MOBILE-012: the auto-sync switch patches the binding', async () => {
     renderSheet()
     await openDetail()
@@ -330,9 +350,9 @@ describe('MDocSyncSheet — what the owner may do', () => {
   })
 })
 
-describe('MDocSyncSheet — what a member may do', () => {
+describe('MDocSyncSheet: what a member may do', () => {
   it('FE-DOCSYNC-MOBILE-015: a member sees no settings and no disconnect, and the lanes are inert', async () => {
-    renderSheet({ isOwner: false })
+    renderSheet({ canManage: false })
     await openDetail()
 
     expect(screen.queryByRole('switch')).not.toBeInTheDocument()
@@ -350,7 +370,7 @@ describe('MDocSyncSheet — what a member may do', () => {
 
   it('FE-DOCSYNC-MOBILE-016: a member is not offered stores to add, and an unbound trip explains who sets it up', async () => {
     links = []
-    renderSheet({ isOwner: false })
+    renderSheet({ canManage: false })
 
     expect(await screen.findByText('Nothing connected yet')).toBeInTheDocument()
     expect(screen.getByText('The trip owner sets this up. Documents stay in TREK either way.')).toBeInTheDocument()

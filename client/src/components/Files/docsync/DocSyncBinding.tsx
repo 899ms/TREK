@@ -9,27 +9,27 @@ import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import DocSyncFlow, { type SyncDirection } from './DocSyncFlow'
 import { Badge, CONFLICT_POLICIES, conflictPolicyKey, LastRun, StateBadge } from './DocSyncBits'
-import type { DocSyncLink, DocSyncProvider, useDocSync } from './useDocSync'
+import type { DocSyncLink, useDocSync } from './useDocSync'
 
 /**
  * One binding: where this trip's documents live, which way they move, and what
  * happened last time.
  *
  * The flow bar carries the direction because that is the one thing this feature
- * is about. Everything a person sets once and forgets — the delete rule, the
- * webhook URL — is folded away behind "Settings" so the card stays a status
+ * is about. Everything a person sets once and forgets (the delete rule, the
+ * webhook URL) is folded away behind "Settings" so the card stays a status
  * card rather than a form.
  */
 export default function DocSyncBinding({
   link,
-  provider,
+  providerName,
   sync,
-  isOwner,
+  canManage,
 }: {
   link: DocSyncLink
-  provider?: DocSyncProvider
+  providerName: string
   sync: ReturnType<typeof useDocSync>
-  isOwner: boolean
+  canManage: boolean
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
@@ -59,15 +59,15 @@ export default function DocSyncBinding({
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className="truncate text-subtitle font-semibold text-content">
-              {provider?.name || link.providerId}
+              {providerName}
             </span>
-            {/* A healthy binding needs no word for it — the dot is the whole
+            {/* A healthy binding needs no word for it: the dot is the whole
                 message, and the states that do need words get them below. */}
             <StateBadge state={link.lastSyncState} compact={link.lastSyncState === 'ok'} />
             {!link.syncEnabled && <Badge tone="neutral">{t('docsync.binding.autoOff')}</Badge>}
           </span>
 
-          {/* Where and when, as two facts rather than a sentence — they are what
+          {/* Where and when, as two facts rather than a sentence. They are what
               a member checks before asking why a file has not turned up. */}
           <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <Badge tone="neutral" icon={<FolderOpen size={12} />} title={link.remoteRootPath || undefined}>
@@ -82,7 +82,7 @@ export default function DocSyncBinding({
         </span>
 
         {/* Both controls are h-9 so the square one cannot sit a pixel off the
-            other — the two together read as one segmented control. */}
+            other: the two together read as one segmented control. */}
         <span className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
@@ -97,7 +97,7 @@ export default function DocSyncBinding({
                 text still changes to "Syncing". */}
             <span className="sr-only sm:not-sr-only">{busy ? t('docsync.syncing') : t('docsync.syncNow')}</span>
           </button>
-          {isOwner && (
+          {canManage && (
             <Tooltip label={t('docsync.unlink')}>
               <button
                 type="button"
@@ -126,15 +126,15 @@ export default function DocSyncBinding({
         <DocSyncFlow
           direction={link.direction}
           providerId={link.providerId}
-          providerName={provider?.name || link.providerId}
+          providerName={providerName}
           running={busy}
           holdings={link.holdings ?? { inTrek: 0, atProvider: 0, paired: 0, missing: 0 }}
-          disabled={!isOwner}
+          disabled={!canManage}
           onChange={(next: SyncDirection) => void sync.updateLink(link.id, { direction: next })}
         />
       </div>
 
-      {isOwner && (
+      {canManage && (
         <>
           <button
             type="button"
@@ -183,7 +183,7 @@ export default function DocSyncBinding({
                   person pastes this in by hand; polling carries it either way. */}
               {link.webhookUrl && (
                 <div>
-                  {/* Same tier as the two rows above it — this is the third
+                  {/* Same tier as the two rows above it: this is the third
                       setting, not a footnote to the second. */}
                   <span className="block text-body text-content">{t('docsync.binding.webhookTitle')}</span>
                   <p className="mt-1 text-caption text-content-muted">{t('docsync.webhookHint')}</p>

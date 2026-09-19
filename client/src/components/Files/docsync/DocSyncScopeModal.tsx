@@ -12,7 +12,7 @@ import type { DocSyncConnection, DocSyncScope, useDocSync } from './useDocSync'
  * would be slower than the filter it replaces.
  *
  * "Create" is a first-class action rather than a fallback at the bottom,
- * because for a new trip it is the common case — there is no folder yet.
+ * because for a new trip it is the common case: there is no folder yet.
  */
 export default function DocSyncScopeModal({
   connection,
@@ -37,20 +37,22 @@ export default function DocSyncScopeModal({
   const [newName, setNewName] = useState(suggestedName)
   const [working, setWorking] = useState<string | null>(null)
 
+  // `loadScopes`, not `sync`: the hook hands back a fresh object on every
+  // render of the panel above, so depending on it re-listed the provider's
+  // folders each time anything up there changed. The callback itself is
+  // stable. Taken out of `sync` first, because calling it as `sync.loadScopes`
+  // inside the effect makes the whole object a dependency again.
+  const { loadScopes } = sync
   useEffect(() => {
-    // `sync.loadScopes`, not `sync`: the hook hands back a fresh object on
-    // every render of the panel above, so depending on it re-listed the
-    // provider's folders each time anything up there changed. The callback
-    // itself is stable.
     let cancelled = false
     void (async () => {
-      const res = await sync.loadScopes(connection.id)
+      const res = await loadScopes(connection.id)
       if (cancelled) return
       setScopes(res.scopes)
       setError(res.error ?? null)
     })()
     return () => { cancelled = true }
-  }, [connection.id, sync.loadScopes])
+  }, [connection.id, loadScopes])
 
   const shown = useMemo(() => {
     const needle = query.trim().toLowerCase()

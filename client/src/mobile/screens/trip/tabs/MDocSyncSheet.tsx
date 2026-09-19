@@ -12,7 +12,7 @@ import { useTranslation } from '../../../../i18n'
 import { DOCUMENT_PROVIDER_ICONS } from '../../../../components/shared/DocumentProviderIcons'
 import TrekIcon from '../../../../components/shared/TrekIcon'
 import {
-  useDocSync, type DocSyncLink, type DocSyncProvider,
+  storeName, useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
 import { useConnectForm } from '../../../../components/Files/docsync/useConnectForm'
 import { conflictPolicyKey, nextConflictPolicy } from '../../../../components/Files/docsync/DocSyncBits'
@@ -23,7 +23,7 @@ import { relativeTime } from '../../../../utils/relativeTime'
  * Document sync on the phone.
  *
  * Everything that decides anything lives in `useDocSync`, which the desktop
- * panel uses unchanged — this file is markup in the phone's design language and
+ * panel uses unchanged. This file is markup in the phone's design language and
  * nothing else. The two shells are a deliberate mirror, and duplicated logic
  * across them is what the 3% duplication budget is spent on.
  *
@@ -36,13 +36,13 @@ type View = 'list' | 'detail' | 'connect' | 'scope'
 export default function MDocSyncSheet({
   tripId,
   tripTitle,
-  isOwner,
+  canManage,
   open,
   onClose,
 }: {
   tripId: number | string
   tripTitle?: string
-  isOwner: boolean
+  canManage: boolean
   open: boolean
   onClose: () => void
 }) {
@@ -77,8 +77,8 @@ export default function MDocSyncSheet({
   const title =
     view === 'connect' || view === 'scope'
       ? pending?.name ?? t('docsync.title')
-      : view === 'detail'
-        ? sync.providers.find(p => p.id === link?.providerId)?.name ?? t('docsync.title')
+      : view === 'detail' && link
+        ? storeName(link, sync.providers)
         : t('docsync.title')
 
   return (
@@ -108,7 +108,8 @@ export default function MDocSyncSheet({
             <div className="flex justify-center py-12">
               <Loader2 size={20} className="animate-spin text-m-faint" />
             </div>
-          ) : sync.providers.length === 0 ? (
+          ) : sync.providers.length === 0 && sync.links.length === 0 ? (
+            // Only with nothing bound, as on the desktop panel.
             <Empty text={t('docsync.noProviders')} hint={t('docsync.noProvidersHint')} />
           ) : view === 'connect' && pending ? (
             <ConnectView
@@ -127,9 +128,9 @@ export default function MDocSyncSheet({
             <DetailView
               tripId={tripId}
               link={link}
-              providerName={sync.providers.find(p => p.id === link.providerId)?.name ?? link.providerId}
+              providerName={storeName(link, sync.providers)}
               sync={sync}
-              isOwner={isOwner}
+              canManage={canManage}
               onUnlink={() => setConfirmUnlink(true)}
             />
           ) : (
@@ -137,7 +138,7 @@ export default function MDocSyncSheet({
               links={sync.links}
               providers={sync.providers}
               available={available}
-              isOwner={isOwner}
+              canManage={canManage}
               onOpen={id => { setSelected(id); setView('detail') }}
               onAdd={openStore}
             />
@@ -167,14 +168,14 @@ function ListView({
   links,
   providers,
   available,
-  isOwner,
+  canManage,
   onOpen,
   onAdd,
 }: {
   links: DocSyncLink[]
   providers: DocSyncProvider[]
   available: DocSyncProvider[]
-  isOwner: boolean
+  canManage: boolean
   onOpen: (id: number) => void
   onAdd: (p: DocSyncProvider) => void
 }) {
@@ -189,7 +190,7 @@ function ListView({
               <StoreRow
                 key={l.id}
                 providerId={l.providerId}
-                title={providers.find(p => p.id === l.providerId)?.name || l.providerId}
+                title={storeName(l, providers)}
                 sub={l.remoteLabel || l.remoteRootPath || l.scopeKey}
                 state={l.lastSyncState}
                 onClick={() => onOpen(l.id)}
@@ -199,7 +200,7 @@ function ListView({
         </section>
       )}
 
-      {isOwner && available.length > 0 && (
+      {canManage && available.length > 0 && (
         <section>
           <SectionLabel>{links.length === 0 ? t('docsync.addProvider') : t('docsync.addAnother')}</SectionLabel>
           <div className="flex flex-col gap-2">
@@ -217,7 +218,7 @@ function ListView({
         </section>
       )}
 
-      {links.length === 0 && !isOwner && (
+      {links.length === 0 && !canManage && (
         <Empty text={t('docsync.empty.title')} hint={t('docsync.empty.hintMember')} />
       )}
     </div>
@@ -230,14 +231,14 @@ function DetailView({
   tripId,
   providerName,
   sync,
-  isOwner,
+  canManage,
   onUnlink,
 }: {
   link: DocSyncLink
   tripId: number | string
   providerName: string
   sync: ReturnType<typeof useDocSync>
-  isOwner: boolean
+  canManage: boolean
   onUnlink: () => void
 }) {
   const { t, language } = useTranslation()
@@ -249,7 +250,7 @@ function DetailView({
 
   /** The last remaining direction cannot be switched off. */
   const toggle = (lane: 'push' | 'pull') => {
-    if (!isOwner) return
+    if (!canManage) return
     const nextPush = lane === 'push' ? !pushOn : pushOn
     const nextPull = lane === 'pull' ? !pullOn : pullOn
     if (!nextPush && !nextPull) return
@@ -278,14 +279,14 @@ function DetailView({
             active={pushOn}
             label={t('docsync.flow.toProvider')}
             icon={<ArrowRight size={13} strokeWidth={2.6} />}
-            disabled={!isOwner}
+            disabled={!canManage}
             onClick={() => toggle('push')}
           />
           <LaneRow
             active={pullOn}
             label={t('docsync.flow.toTrek')}
             icon={<ArrowLeft size={13} strokeWidth={2.6} />}
-            disabled={!isOwner}
+            disabled={!canManage}
             onClick={() => toggle('pull')}
           />
         </div>
@@ -316,7 +317,7 @@ function DetailView({
         {busy ? t('docsync.syncing') : t('docsync.syncNow')}
       </button>
 
-      {isOwner && (
+      {canManage && (
         <>
           <SettingRow label={t('docsync.syncEnabled')} hint={t('docsync.binding.autoHint')}>
             <MToggle
@@ -367,8 +368,8 @@ function DetailView({
 /**
  * Credentials for a store this instance offers but the trip has not used yet.
  *
- * The rules — which field is the address, which one is a switch, how a label
- * becomes a key — live in `useConnectForm`, the same one the desktop dialog
+ * The rules (which field is the address, which one is a switch, how a label
+ * becomes a key) live in `useConnectForm`, the same one the desktop dialog
  * uses. Written out here a second time they came out wrong in four separate
  * ways, including an address this form never actually sent.
  */
@@ -485,20 +486,22 @@ function ScopeView({
   const [name, setName] = useState(suggestedName)
   const [working, setWorking] = useState<string | null>(null)
 
+  // `loadScopes`, not `sync`: the hook hands back a fresh object on every
+  // render of the panel above, so depending on it re-listed the provider's
+  // folders each time anything up there changed. The callback itself is
+  // stable. Taken out of `sync` first, because calling it as `sync.loadScopes`
+  // inside the effect makes the whole object a dependency again.
+  const { loadScopes } = sync
   useEffect(() => {
-    // `sync.loadScopes`, not `sync`: the hook hands back a fresh object on
-    // every render of the panel above, so depending on it re-listed the
-    // provider's folders each time anything up there changed. The callback
-    // itself is stable.
     let cancelled = false
     void (async () => {
-      const res = await sync.loadScopes(connectionId)
+      const res = await loadScopes(connectionId)
       if (cancelled) return
       setScopes(res.scopes)
       setError(res.error ?? null)
     })()
     return () => { cancelled = true }
-  }, [connectionId, sync.loadScopes])
+  }, [connectionId, loadScopes])
 
   const bind = async (scope: { scopeKey: string; label: string; remoteRootId: string | null; remoteRootPath: string | null }) => {
     setWorking(scope.scopeKey)
@@ -757,7 +760,7 @@ function slugFor(title: string | undefined, tripId: number | string): string {
 /**
  * The documents that changed in both places, with the way out.
  *
- * The same three answers the panel offers, through the same hook — only the
+ * The same three answers the panel offers, through the same hook. Only the
  * markup is a phone's.
  */
 function MConflicts({

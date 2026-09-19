@@ -19,7 +19,10 @@ import { stageOf } from '../../../components/Roadtrip/roadtripRowModel'
 import { badgeLabel, distanceBadge } from './roadtrip/stageBadges'
 import type { CorridorReach } from '../../../components/Roadtrip/corridorSearchModel'
 import { useSettingsStore } from '../../../store/settingsStore'
-import type { Day } from '../../../types'
+import { useAuthStore } from '../../../store/authStore'
+import { canManageDocSync } from '../../../components/Files/docsync/useDocSync'
+import { useDocSyncOffered } from '../../../components/Files/docsync/useDocSyncOffered'
+import type { Day, Trip } from '../../../types'
 
 /**
  * Mobile trip screen frame. Owns the chrome the design shares across every
@@ -675,9 +678,7 @@ export default function MTripShell({
         {trTab === 'dateien' && (
           <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-[7px]">
             <PrimaryPill icon={<Upload size={13} strokeWidth={2.2} />} label={t('common.upload')} onClick={() => setUploadFilesSignal(s => s + 1)} />
-            <MIconBtn ariaLabel={t('docsync.title')} onClick={() => setOpenDocSyncSignal(s => s + 1)} size={40} className="text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]">
-              <FolderSync size={15} strokeWidth={2} />
-            </MIconBtn>
+            <DocSyncButton tripId={tripId} trip={trip} label={t('docsync.title')} onOpen={() => setOpenDocSyncSignal(s => s + 1)} />
             <MIconBtn ariaLabel={t('files.trash')} onClick={() => setOpenFilesTrashSignal(s => s + 1)} size={40} className="text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]">
               <Trash2 size={15} strokeWidth={2} />
             </MIconBtn>
@@ -772,6 +773,23 @@ function PrimaryPill({ label, onClick, icon }: { label: string; onClick: () => v
       {icon ?? <Plus size={14} strokeWidth={2.2} />}
       {label}
     </button>
+  )
+}
+
+/**
+ * The Files header's sync button, only where there is something behind it.
+ *
+ * A component of its own so the question is asked while the Files header is
+ * up, not on every tab the shell renders.
+ */
+function DocSyncButton({ tripId, trip, label, onOpen }: { tripId: number; trip: Trip; label: string; onOpen: () => void }) {
+  const user = useAuthStore(s => s.user)
+  const offered = useDocSyncOffered(tripId, canManageDocSync(user, trip))
+  if (!offered) return null
+  return (
+    <MIconBtn ariaLabel={label} onClick={onOpen} size={40} className="text-m-muted backdrop-blur-[24px] backdrop-saturate-[1.7]">
+      <FolderSync size={15} strokeWidth={2} />
+    </MIconBtn>
   )
 }
 

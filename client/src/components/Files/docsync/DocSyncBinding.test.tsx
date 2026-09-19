@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '../../../../tests/helpers/render'
 import DocSyncBinding from './DocSyncBinding'
-import type { DocSyncLink, DocSyncProvider, useDocSync } from './useDocSync'
+import type { DocSyncLink, useDocSync } from './useDocSync'
 
 type Sync = ReturnType<typeof useDocSync>
 
@@ -11,15 +11,6 @@ const updateLink = vi.fn(async (_linkId: number, _patch: Record<string, unknown>
 const removeLink = vi.fn(async (_linkId: number) => {})
 
 const WEBHOOK = 'https://trek.example/api/trips/3/docsync/hooks/abc123'
-
-const provider: DocSyncProvider = {
-  id: 'paperless',
-  name: 'Paperless',
-  description: null,
-  icon: 'paperless',
-  available: true,
-  fields: [],
-}
 
 function makeLink(overrides: Partial<DocSyncLink> = {}): DocSyncLink {
   return {
@@ -71,17 +62,16 @@ function renderCard(
   opts: {
     link?: Partial<DocSyncLink>
     sync?: Partial<Sync>
-    isOwner?: boolean
-    /** null means "the provider list has not arrived yet". */
-    provider?: DocSyncProvider | null
+    canManage?: boolean
+    providerName?: string
   } = {},
 ) {
   const utils = render(
     <DocSyncBinding
       link={makeLink(opts.link)}
-      provider={opts.provider === null ? undefined : (opts.provider ?? provider)}
+      providerName={opts.providerName ?? 'Paperless'}
       sync={makeSync(opts.sync)}
-      isOwner={opts.isOwner ?? true}
+      canManage={opts.canManage ?? true}
     />,
   )
   const header = utils.container.querySelector('header') as HTMLElement
@@ -96,7 +86,7 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
-describe('DocSyncBinding — running a sync', () => {
+describe('DocSyncBinding: running a sync', () => {
   it('FE-DOCSYNC-BIND-001: "Sync now" asks the hook to run this binding', () => {
     renderCard()
 
@@ -131,7 +121,7 @@ describe('DocSyncBinding — running a sync', () => {
   })
 })
 
-describe('DocSyncBinding — what it says about itself', () => {
+describe('DocSyncBinding: what it says about itself', () => {
   it('FE-DOCSYNC-BIND-005: a healthy binding shows its state as a dot, not as a word', () => {
     renderCard()
 
@@ -193,11 +183,12 @@ describe('DocSyncBinding — what it says about itself', () => {
     expect(screen.getByText('trek-trip-3')).toBeInTheDocument()
   })
 
-  it('FE-DOCSYNC-BIND-013: without a provider record the card falls back to the provider id', () => {
-    const { header } = renderCard({ provider: null })
+  it('FE-DOCSYNC-BIND-013: names the store it is handed in the header and at the far end of the flow', () => {
+    const { header } = renderCard({ providerName: 'Paperless-ngx' })
 
-    expect(within(header).getByText('paperless')).toBeInTheDocument()
-    expect(within(header).queryByText('Paperless')).not.toBeInTheDocument()
+    expect(within(header).getByText('Paperless-ngx')).toBeInTheDocument()
+    expect(screen.getAllByText('Paperless-ngx')).toHaveLength(2)
+    expect(screen.queryByText('paperless')).not.toBeInTheDocument()
   })
 
   it('FE-DOCSYNC-BIND-014: the flow bar gets the holdings, and zeros when there are none', () => {
@@ -211,7 +202,7 @@ describe('DocSyncBinding — what it says about itself', () => {
   })
 })
 
-describe('DocSyncBinding — the settings section', () => {
+describe('DocSyncBinding: the settings section', () => {
   it('FE-DOCSYNC-BIND-015: the settings stay folded away until they are opened', () => {
     renderCard()
 
@@ -231,7 +222,7 @@ describe('DocSyncBinding — the settings section', () => {
   })
 
   it('FE-DOCSYNC-BIND-016: a member gets no settings section and no disconnect button', () => {
-    renderCard({ isOwner: false })
+    renderCard({ canManage: false })
 
     expect(screen.queryByRole('button', { name: 'Settings' })).not.toBeInTheDocument()
     expect(screen.queryByText('Sync automatically')).not.toBeInTheDocument()
@@ -275,7 +266,7 @@ describe('DocSyncBinding — the settings section', () => {
   })
 })
 
-describe('DocSyncBinding — the webhook URL', () => {
+describe('DocSyncBinding: the webhook URL', () => {
   const realClipboard = navigator.clipboard
 
   afterEach(() => {
@@ -328,7 +319,7 @@ describe('DocSyncBinding — the webhook URL', () => {
   })
 })
 
-describe('DocSyncBinding — the direction lanes', () => {
+describe('DocSyncBinding: the direction lanes', () => {
   it('FE-DOCSYNC-BIND-024: switching a lane off patches the direction', () => {
     renderCard()
 
@@ -338,7 +329,7 @@ describe('DocSyncBinding — the direction lanes', () => {
   })
 
   it('FE-DOCSYNC-BIND-025: a member cannot change the direction', () => {
-    renderCard({ isOwner: false })
+    renderCard({ canManage: false })
 
     const lane = screen.getByRole('button', { name: 'Out to the store' })
     expect(lane).toBeDisabled()

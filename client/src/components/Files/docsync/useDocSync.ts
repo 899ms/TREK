@@ -64,8 +64,26 @@ export interface DocSyncLink {
   lastSyncState: string
   lastSyncError: string | null
   webhookUrl: string | null
+  /**
+   * The store's display name as the server knows it. Carried on the link
+   * because the providers route only lists what an admin has switched on, and
+   * a binding outlives its provider being switched off.
+   */
+  providerName?: string
   /** Standing counts per side, from the status route. */
   holdings?: { inTrek: number; atProvider: number; paired: number; missing: number }
+}
+
+/**
+ * What to call the store a binding points at.
+ *
+ * One lookup for both shells, so the list row, the card header and the flow
+ * summary cannot name the same store three different ways. The providers list
+ * wins because the rest of the dialog uses its names; the link's own name
+ * covers a provider that has since been switched off.
+ */
+export function storeName(link: DocSyncLink, providers: readonly DocSyncProvider[]): string {
+  return providers.find(p => p.id === link.providerId)?.name || link.providerName || link.providerId
 }
 
 /**
@@ -76,7 +94,7 @@ export interface DocSyncLink {
  * share a folder the owner never chose to share. Instance admins are included
  * because they already override every other permission check in the client.
  *
- * Shared by both shells rather than written out twice — the desktop file
+ * Shared by both shells rather than written out twice: the desktop file
  * manager and the phone sheet must not be able to drift on who may do this.
  */
 export function canManageDocSync(
@@ -100,7 +118,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
    * Whether the first load is through.
    *
    * Every mutation refreshes, and a refresh that flips `loading` swaps the whole
-   * dialog for a spinner and back — a white flash on something as small as
+   * dialog for a spinner and back: a white flash on something as small as
    * toggling a direction. Only the first load has nothing to show yet.
    */
   const loadedOnce = useRef(false)
@@ -108,7 +126,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
   /**
    * Which load is the current one.
    *
-   * Four requests go out per load and several loads overlap — every mutation
+   * Four requests go out per load and several loads overlap: every mutation
    * starts one, and so does every ping. Without a generation stamp the slowest
    * response wins, which on a binding somebody just changed means the screen
    * settles on the state from before the change.
@@ -144,15 +162,20 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
       loadFailed.current = false
       loadedOnce.current = true
     } catch (e: unknown) {
-      // A 403 or 404 really does mean "nothing to configure here" — the addon is
-      // off or this person lost access — and blanking the panel is the honest
+      // A 403 or 404 really does mean "nothing to configure here" (the addon is
+      // off or this person lost access), and blanking the panel is the honest
       // answer. Anything else is a failure to say so: blanking on a dropped
       // connection told the user their provider list was empty.
       if (mine !== generation.current) return
       const status = (e as { response?: { status?: number } })?.response?.status
       loadFailed.current = true
       if (status === 403 || status === 404) {
+        // The bindings go too. Both shells keep a binding on screen with no
+        // provider left, so emptying the providers alone blanked nothing.
         setProviders([])
+        setConnections([])
+        setLinks([])
+        setItemCounts({})
         setError(null)
       } else {
         setError(readError(e))
@@ -191,7 +214,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
   }, [tripId, load])
 
   /**
-   * Probe without saving. Always resolves to a verdict object — the route
+   * Probe without saving. Always resolves to a verdict object: the route
    * answers 200 even for an unreachable instance, because a form showing a typo
    * needs a field to render, not an exception.
    */
@@ -216,7 +239,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
   /**
    * Make a container at the provider.
    *
-   * Reports failure the same way every other write here does — a rejected
+   * Reports failure the same way every other write here does. A rejected
    * create used to escape as an unhandled rejection, so the button blinked and
    * nothing happened and nothing was said. Null rather than a throw, because
    * the caller's next step is to bind what came back, and there is nothing to
@@ -254,7 +277,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
    * Change one binding, optimistically.
    *
    * The reload in `finally` puts the server's answer back either way, so a
-   * refused change corrects itself on screen — but it used to do that in
+   * refused change corrects itself on screen, but it used to do that in
    * silence, with the rejection escaping into a `void` call site. The switch
    * simply flipped back and nobody said why.
    */
@@ -266,8 +289,8 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
       await load()
       return true
     } catch (e: unknown) {
-      // Reload first, so the optimistic value is corrected, then say why —
-      // the other way round the reload cleared the message again.
+      // Reload first, so the optimistic value is corrected, then say why.
+      // The other way round the reload cleared the message again.
       await load()
       setError(readError(e))
       return false
@@ -299,8 +322,8 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
       await load()
       return res
     } catch (e: unknown) {
-      // A refused run is a thing the person asked for and did not get — an
-      // orphaned binding answers 409 here — so it has to be said out loud
+      // A refused run is a thing the person asked for and did not get (an
+      // orphaned binding answers 409 here), so it has to be said out loud
       // rather than escaping into the `void` at the call site. After the
       // reload, which would otherwise clear the message.
       await load()
@@ -334,7 +357,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
  * The error code a failed call carries, or `unknown`.
  *
  * Both shells render this as `docsync.error.<code>`, so anything that is not
- * one of the codes reaches the screen as a raw translation key — and the server
+ * one of the codes reaches the screen as a raw translation key, and the server
  * answers plenty of routes with a sentence ("Link not found") rather than a
  * code. A general message is worse than a specific one and far better than
  * `docsync.error.Link not found`.
@@ -342,7 +365,7 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
 function readError(e: unknown): string {
   const res = (e as { response?: { data?: { error?: string; message?: string } } })?.response
   const raw = res?.data?.error || res?.data?.message || ''
-  // A code passes through — the sync codes and the handful of keys the routes
+  // A code passes through: the sync codes and the handful of keys the routes
   // answer with are all of this shape. A sentence does not: several routes
   // answer with prose ("Link not found"), and both shells render this as
   // `docsync.error.<value>`, so that reached the screen as a raw translation
