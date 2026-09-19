@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
-import TrekMark from '../../shared/TrekMark'
+import TrekIcon from '../../shared/TrekIcon'
 import { Badge } from './DocSyncBits'
 
 export type SyncDirection = 'both' | 'pull' | 'push'
@@ -70,7 +70,7 @@ export default function DocSyncFlow({
         <End
           name={t('docsync.flow.trek')}
           count={holdings.inTrek}
-          glyph={<TrekMark className="h-6 w-6 text-content" />}
+          glyph={<TrekIcon className="h-6 w-6 text-content" />}
         />
 
         <div className="flex min-w-0 flex-1 flex-col gap-2.5">

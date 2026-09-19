@@ -7,14 +7,14 @@
  * person would notice if they slipped: a provider the server seeds but the
  * client has no glyph for (the row renders nothing at all), a mark that keeps a
  * brand colour and so stays black on a dark background, and the sizing contract
- * the callers rely on — `size` for the bare lucide-sized rows, a `className`
+ * the callers rely on: `size` for the bare lucide-sized rows, a `className`
  * everywhere the surrounding Tailwind box decides how big the glyph is.
  */
 import { describe, it, expect } from 'vitest'
 import { DOCUMENT_PROVIDER_IDS } from '@trek/shared'
 import { render } from '../../../tests/helpers/render'
 import { DOCUMENT_PROVIDER_ICONS } from './DocumentProviderIcons'
-import TrekMark from './TrekMark'
+import TrekIcon from './TrekIcon'
 
 const marks = Object.entries(DOCUMENT_PROVIDER_ICONS)
 
@@ -76,7 +76,7 @@ describe('DOCUMENT_PROVIDER_ICONS', () => {
     }
   })
 
-  it('FE-DOCSYNC-ICONS-006: stays out of the accessibility tree — the provider name is next to it', () => {
+  it('FE-DOCSYNC-ICONS-006: stays out of the accessibility tree, the provider name is next to it', () => {
     for (const [id, Icon] of marks) {
       expect(renderMark(Icon).getAttribute('aria-hidden'), id).toBe('true')
     }
@@ -117,9 +117,9 @@ describe('DOCUMENT_PROVIDER_ICONS', () => {
   })
 })
 
-describe('TrekMark', () => {
-  it('FE-DOCSYNC-ICONS-011: renders TREK\u2019s mark in currentColor', () => {
-    const { container } = render(<TrekMark />)
+describe('TrekIcon', () => {
+  it('FE-DOCSYNC-ICONS-011: renders TREK\u2019s app icon in currentColor', () => {
+    const { container } = render(<TrekIcon />)
     const svg = container.querySelector('svg')
 
     expect(svg).not.toBeNull()
@@ -128,7 +128,7 @@ describe('TrekMark', () => {
   })
 
   it('FE-DOCSYNC-ICONS-012: takes a className, which is the only thing that sizes it', () => {
-    const { container } = render(<TrekMark className="h-6 w-6 text-content" />)
+    const { container } = render(<TrekIcon className="h-6 w-6 text-content" />)
     const svg = container.querySelector('svg')!
 
     expect(svg.getAttribute('class')).toBe('h-6 w-6 text-content')
@@ -137,18 +137,18 @@ describe('TrekMark', () => {
   })
 
   it('FE-DOCSYNC-ICONS-013: forwards the rest of its svg props', () => {
-    const { container } = render(<TrekMark data-testid="trek-mark" role="img" />)
+    const { container } = render(<TrekIcon data-testid="trek-icon" role="img" />)
     const svg = container.querySelector('svg')!
 
-    expect(svg.getAttribute('data-testid')).toBe('trek-mark')
+    expect(svg.getAttribute('data-testid')).toBe('trek-icon')
     expect(svg.getAttribute('role')).toBe('img')
   })
 
   it('FE-DOCSYNC-ICONS-014: is decorative by default and can be unhidden by the caller', () => {
-    const { container } = render(<TrekMark />)
+    const { container } = render(<TrekIcon />)
     expect(container.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true')
 
-    const labelled = render(<TrekMark aria-hidden={false} aria-label="TREK" />)
+    const labelled = render(<TrekIcon aria-hidden={false} aria-label="TREK" />)
     const svg = labelled.container.querySelector('svg')!
     expect(svg.getAttribute('aria-hidden')).toBe('false')
     expect(svg.getAttribute('aria-label')).toBe('TREK')

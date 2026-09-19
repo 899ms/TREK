@@ -10,7 +10,7 @@ import MConfirmSheet from '../../settings/MConfirmSheet'
 import { TileHeader } from '../sheets/MTripSheetUi'
 import { useTranslation } from '../../../../i18n'
 import { DOCUMENT_PROVIDER_ICONS } from '../../../../components/shared/DocumentProviderIcons'
-import TrekMark from '../../../../components/shared/TrekMark'
+import TrekIcon from '../../../../components/shared/TrekIcon'
 import {
   useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
@@ -265,7 +265,7 @@ function DetailView({
           a phone does not have. */}
       <section className="rounded-2xl border border-[color:var(--m-rowbr)] bg-m-sheetop p-3">
         <div className="flex items-stretch gap-2">
-          <EndBox glyph={<TrekMark className="h-[18px] w-[18px]" />} count={holdings.inTrek} name={t('docsync.flow.trek')} />
+          <EndBox glyph={<TrekIcon className="h-[18px] w-[18px]" />} count={holdings.inTrek} name={t('docsync.flow.trek')} />
           <EndBox
             glyph={ProviderIcon ? <ProviderIcon className="h-[18px] w-[18px]" /> : null}
             count={holdings.atProvider}
