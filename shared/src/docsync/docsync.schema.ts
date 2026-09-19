@@ -3,7 +3,7 @@ import { idSchema } from '../common/primitives.schema';
 import { z } from 'zod';
 
 /**
- * Document provider contracts — two-way sync between a trip's documents and a
+ * Document provider contracts: two-way sync between a trip's documents and a
  * self-hosted document store (Paperless-ngx, Papra, Nextcloud, OpenCloud,
  * Synology Drive).
  *
@@ -16,7 +16,7 @@ import { z } from 'zod';
  * trip sees the same documents": it would make a document's visibility depend
  * on whose credentials fetched it. So a trip is bound to exactly one
  * connection, the server talks to the provider under that one identity, and
- * who may see what is decided by TREK's own trip membership — never by the
+ * who may see what is decided by TREK's own trip membership, never by the
  * provider. The provider never learns that TREK has members.
  *
  * **TREK keeps the bytes.** A synced document is an ordinary `trip_files` row,
@@ -63,9 +63,9 @@ export const docsyncConnectionInputSchema = z.object({
   baseUrl: z.string().trim().min(1).max(2048),
   /**
    * Secret and non-secret fields together, exactly as the generic form renders
-   * them. A secret that is omitted, blank or the mask keeps the stored value —
-   * the same rule the photo providers and Dawarich already use, so the client
-   * never has to hold a secret it was given back.
+   * them. A secret that is omitted, blank or the mask keeps the stored value.
+   * That is the same rule the photo providers and Dawarich already use, so the
+   * client never has to hold a secret it was given back.
    */
   credentials: docsyncCredentialsSchema.optional().default({}),
   /** LAN instances routinely run self-signed TLS. Default off, never on. */
@@ -157,7 +157,7 @@ export type DocsyncLinkInput = z.infer<typeof docsyncLinkInputSchema>;
  * Which folder or tag a binding points at is fixed once it exists: every
  * pairing in `document_sync_items` was made against that container, and moving
  * it would leave them all pointing somewhere else. The root fields are left out
- * rather than ignored — they were accepted and silently dropped, so a client
+ * rather than ignored: they were accepted and silently dropped, so a client
  * sending one was told the move had happened.
  *
  * Spelled out instead of derived from the input schema with `.partial()`. In
@@ -183,7 +183,7 @@ export const docsyncLinkUpdateSchema = z
  * `needs_reauth`, `scope_lost` and `orphaned` are separate from plain `failed`
  * because each needs a different human action, and a single "error" state would
  * hide which one. `scope_lost` means the folder or tag the trip is bound to no
- * longer exists — someone renamed or deleted it upstream. `orphaned` means the
+ * longer exists: someone renamed or deleted it upstream. `orphaned` means the
  * person whose credentials drive this binding left the trip.
  */
 export const docsyncLinkStateSchema = z.enum([

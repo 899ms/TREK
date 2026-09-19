@@ -20,12 +20,12 @@ import { Readable } from 'node:stream';
  *
  *  - **Auth** is `Authorization: Bearer ppapi_…`. A key carries per-verb scopes
  *    (`documents:read`, `tags:create`, …) and a missing scope answers **401
- *    `auth.unauthorized`**, exactly like a wrong key — there is no 403 to tell
+ *    `auth.unauthorized`**, exactly like a wrong key: there is no 403 to tell
  *    the two apart, so a failed call names the route it failed on instead.
  *  - **No timestamp is usable for change detection.** `updatedAt` did not move
  *    when a tag was added, when the document was renamed, or when it was
  *    trashed; only `createdAt` and `deletedAt` are ever written. Hence
- *    `snapshotVersion()` — a hash over a fixed field order — rather than an
+ *    `snapshotVersion()` (a hash over a fixed field order) rather than an
  *    ETag or a modified time.
  *  - **Uploads deduplicate on the sha256 of the bytes**, not on the name. An
  *    identical file answers 409 `document.already_exists`, and if the twin is
@@ -53,7 +53,7 @@ const TRANSFER_TIMEOUT_MS = 180000;
 const MAX_JSON_BYTES = 8 * 1024 * 1024;
 
 /**
- * A runaway guard on a download, not the sync core's file-size policy — that
+ * A runaway guard on a download, not the sync core's file-size policy. That
  * one lives in the core, which knows what it is willing to store. This only has
  * to stop an instance that answers a document request with an endless body.
  */
@@ -74,7 +74,7 @@ export const PAPRA_MAX_PAGES = 50;
 /** Papra requires a colour on every tag, so scope creation has to pick one. */
 export const PAPRA_DEFAULT_TAG_COLOR = '#4F46E5';
 
-/** `org_` + 24 lowercase alphanumerics — Papra 400s on anything else. */
+/** `org_` + 24 lowercase alphanumerics. Papra 400s on anything else. */
 const ORG_ID_PATTERN = /^org_[a-z0-9]{24}$/;
 
 export interface PapraCreds {
@@ -140,7 +140,7 @@ export interface PapraDownload {
  * The upstream message is English and occasionally an HTML error page from a
  * reverse proxy, so it travels in `detail` for the self-hoster's log while the
  * code is what the user sees through i18n. `papraCode` is kept separately
- * because several branches turn on it — `document.already_exists` is a dedup,
+ * because several branches turn on it: `document.already_exists` is a dedup,
  * not a failure, and `tags.not_found` is a lost scope rather than a bad id.
  */
 export class PapraError extends Error {
@@ -248,8 +248,8 @@ export function snapshotVersion(doc: PapraDocument): string {
  * A tag name as the search grammar wants it: quoted, because an unquoted name
  * with a space matches nothing at all.
  *
- * Returns null for a name the grammar cannot express — Papra accepts `"` in a
- * tag name and offers no escape for it — so the caller can fall back to
+ * Returns null for a name the grammar cannot express (Papra accepts `"` in a
+ * tag name and offers no escape for it), so the caller can fall back to
  * enumerating the organisation and filtering by tag id.
  */
 export function tagSearchQuery(tagName: string): string | null {
@@ -440,9 +440,9 @@ export class PapraClient {
    * missing it costs one sync cycle. Descending puts it at the front and pushes
    * every later page down by one, which silently skips an existing document.
    *
-   * The trash route takes `pageIndex` and `pageSize` and NOTHING else — it
+   * The trash route takes `pageIndex` and `pageSize` and NOTHING else (it
    * rejects a sort or a search with 400 `Invalid key: Expected never` rather
-   * than ignoring it — so the sort and the query are dropped there.
+   * than ignoring it), so the sort and the query are dropped there.
    */
   async listDocuments(
     creds: PapraCreds,
@@ -548,7 +548,7 @@ export class PapraClient {
    *
    * Two answers are not what they look like. A 200 carrying a `createdAt` from
    * before this request is a trashed twin Papra restored under its original id,
-   * and a 409 `document.already_exists` is a live twin — neither is a new
+   * and a 409 `document.already_exists` is a live twin. Neither is a new
    * document, and the caller resolves the second one through `findByHash`.
    */
   async uploadDocument(
@@ -669,7 +669,7 @@ export class PapraClient {
 }
 
 /**
- * Whether a 200 from the upload route describes a document Papra already held —
+ * Whether a 200 from the upload route describes a document Papra already held:
  * a trashed twin it silently restored under its original id.
  *
  * Papra says nothing about which of the two happened, so this has to be read
@@ -683,7 +683,7 @@ export class PapraClient {
  * the true start. That asymmetry is chosen rather than tolerated: a document
  * this request really did create can never be mistaken for a restore, and the
  * price is blindness to a twin trashed and re-pushed within roughly a second of
- * being created. Nothing else in the answer closes that second — the name is
+ * being created. Nothing else in the answer closes that second: the name is
  * not a tiebreaker, because a restore overwrites the stored name with the
  * filename of the upload that triggered it.
  *

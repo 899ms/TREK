@@ -54,7 +54,7 @@ export function useConflicts(tripId: number | string, sync: ReturnType<typeof us
       setWorking(itemId)
       try {
         await sync.resolveConflict(itemId, keep)
-        // The row is gone from this list either way — it was resolved, or the
+        // The row is gone from this list either way: it was resolved, or the
         // call failed and `sync.error` says so. Re-reading is what tells the
         // difference, rather than removing it here and hoping.
         await reload()

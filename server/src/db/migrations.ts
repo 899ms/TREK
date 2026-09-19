@@ -4957,7 +4957,7 @@ function runMigrations(db: Database.Database): void {
      * Deliberately its own pair of tables rather than a `kind` column on
      * `photo_providers`. The client filters on `type === 'photo_provider'`, the
      * Journey cascade runs `UPDATE photo_providers SET enabled = 0` with no
-     * WHERE clause, and migrations are append-only — reusing those tables would
+     * WHERE clause, and migrations are append-only. Reusing those tables would
      * change the behaviour of three existing paths, which is exactly what the
      * no-breaking-changes rule forbids. The field columns follow
      * `photo_provider_fields` except for `settings_key` and `payload_key`.
@@ -5002,7 +5002,7 @@ function runMigrations(db: Database.Database): void {
      * Photos, AirTrail and Dawarich all hang off a user, and even
      * `trip_album_links` carries a `user_id`; photos become visible to the rest
      * of a trip only through an opt-in `shared` flag. None of that can satisfy
-     * "everyone on the trip sees the same documents" — it would make a
+     * "everyone on the trip sees the same documents": it would make a
      * document's visibility depend on whose credentials fetched it. So the trip
      * admin binds the trip once, the server talks to the provider under that
      * single identity, and TREK's own membership decides who sees what.
@@ -5014,7 +5014,7 @@ function runMigrations(db: Database.Database): void {
      * Secrets live in one encrypted JSON blob instead of per-provider columns:
      * a sixth provider then needs no migration, and the key rotation in
      * scripts/migrate-encryption.ts stays one line instead of a field list that
-     * someone will forget — and a forgotten column does not survive a rotation.
+     * someone will forget, and a forgotten column does not survive a rotation.
      */
     () => {
       db.exec(`
@@ -5082,7 +5082,7 @@ function runMigrations(db: Database.Database): void {
      * cannot tell it from a stranger's edit, and the file bounces.
      *
      * `remote_missing_at` records that something vanished upstream instead of
-     * acting on it — the rule Dawarich already follows with `source_missing_at`.
+     * acting on it, the rule Dawarich already follows with `source_missing_at`.
      * An unmounted share answers with an empty listing, and reading that as
      * "everything was deleted" would empty a trip.
      *

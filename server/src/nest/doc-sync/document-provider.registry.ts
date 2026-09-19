@@ -8,7 +8,7 @@ import { DOCUMENT_PROVIDERS, type DocumentProvider } from './document-provider';
  * backend is registering an adapter in the module, not editing a switch that
  * exists in four places. Whether a registered provider is switched ON is a
  * different question, answered by the `document_providers` table plus the
- * `documents` addon — this only knows what the server can talk to at all.
+ * `documents` addon. This only knows what the server can talk to at all.
  */
 @Injectable()
 export class DocumentProviderRegistry {

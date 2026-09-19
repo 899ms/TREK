@@ -480,7 +480,7 @@ describe('DocSyncConnectModal with a connection already stored', () => {
     await screen.findByPlaceholderText('••••••••')
     // The address is a column of its own rather than a settings entry. Reading
     // it out of settings left the box empty over its placeholder while the form
-    // went on submitting the stored value — the field and the request quietly
+    // went on submitting the stored value, the field and the request quietly
     // disagreeing about what the connection is.
     await waitFor(() =>
       expect(screen.getByPlaceholderText('https://cloud.example.com')).toHaveValue('https://cloud.example.com'),

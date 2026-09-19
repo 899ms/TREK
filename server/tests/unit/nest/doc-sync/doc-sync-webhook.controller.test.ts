@@ -25,14 +25,14 @@ import type { DatabaseService } from '../../../../src/nest/database/database.ser
  * It is the only route in TREK a stranger on the internet can reach with a
  * guessed URL, so what matters is what it does NOT do: it never says whether a
  * token exists, never says whether a secret matched, and never acts on the
- * payload. Every case below therefore asserts two things — the answer, which is
+ * payload. Every case below therefore asserts two things: the answer, which is
  * always the same, and whether a run was scheduled, which is the only place the
  * decision is visible at all.
  *
  * The signature is computed here from a fixed id and timestamp, exactly as the
  * provider would. Timers are faked, because the endpoint now collects a burst
  * before it runs: providers fire once per document, and twenty files dropped
- * into a watched folder used to be twenty runs — nineteen of which the service
+ * into a watched folder used to be twenty runs, nineteen of which the service
  * answered `busy` and threw away.
  */
 
@@ -174,7 +174,7 @@ describe('a shared-secret header', () => {
     expect(sync.syncLink).not.toHaveBeenCalled();
   });
 
-  it('is not demanded from a binding that carries no secret — the token alone authenticates there', () => {
+  it('is not demanded from a binding that carries no secret: the token alone authenticates there', () => {
     config.webhookSecret.mockReturnValue('');
     controller.nudge('tok-live', makeReq());
     settle();
@@ -268,7 +268,7 @@ describe('a credential of the wrong length', () => {
  * A burst of calls is one run.
  *
  * Every provider here fires per document: a folder of twenty files is twenty
- * calls within a second or two. Each used to start its own run — the service's
+ * calls within a second or two. Each used to start its own run. The service's
  * in-flight guard then answered `busy` to nineteen of them, so nineteen
  * announcements were thrown away and the one run that did start had begun
  * before most of the changes landed.
@@ -375,7 +375,7 @@ describe('the admin switches', () => {
 /**
  * A nudge that lands on a run already in flight.
  *
- * `syncLink` answers `busy` and returns, so the nudge was thrown away — and the
+ * `syncLink` answers `busy` and returns, so the nudge was thrown away, and the
  * changes it was about may well have landed after the running pass read the
  * folder, which means waiting out a whole poll interval for them. Asked again
  * once, and only once, so two clients cannot keep each other going.

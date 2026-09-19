@@ -1,5 +1,5 @@
 /**
- * Document sync e2e — drives /api/trips/:tripId/docsync through the REAL
+ * Document sync e2e: drives /api/trips/:tripId/docsync through the REAL
  * AddonGuard, JwtAuthGuard and TripAccessGuard, over the real DI services
  * against a temp SQLite carrying the full schema.
  *
@@ -14,7 +14,7 @@
  * that would hurt most if it drifted: the addon gate answering 404 before 401,
  * a stranger being unable to see that a trip exists, and a plain member being
  * able to READ where their documents go while only the owner may change it.
- * That last split is unusual for TREK — most trip routes treat members alike —
+ * That last split is unusual for TREK (most trip routes treat members alike),
  * so it is worth a test that fails if someone "tidies" it away.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -51,7 +51,7 @@ const { isAddonEnabled } = vi.hoisted(() => ({ isAddonEnabled: vi.fn(() => true)
 vi.mock('../../src/websocket', () => ({ broadcastToUser: vi.fn(), broadcast: vi.fn() }));
 
 /**
- * The SSRF guard resolves DNS, and `paperless.example.com` does not exist — in
+ * The SSRF guard resolves DNS, and `paperless.example.com` does not exist. In
  * CI that is a lookup failure, which the guard correctly reports as "not
  * allowed". The guard is not what this file is testing, and a suite that needs
  * a working resolver is a suite that fails on someone's train.
@@ -381,7 +381,7 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
   });
 
   it('answers 200 with a verdict in the body when a probe fails, not an error status', async () => {
-    // The settings form needs a field to render, not an exception — the same
+    // The settings form needs a field to render, not an exception: the same
     // contract the photo providers pin as CRITICAL in their own e2e suite.
     const res = await request(server)
       .post(`/api/trips/${tripId}/docsync/connections/test`)

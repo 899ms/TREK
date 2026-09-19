@@ -105,7 +105,7 @@ describe('DocSyncJob bootstrap', () => {
   it('registers one cron under a name of its own, on the minute', () => {
     // Every minute, with the tick deciding whether it is due. Baking the
     // interval into the expression at bootstrap meant a changed setting did
-    // nothing until a restart — which is the opposite of what this job's own
+    // nothing until a restart, which is the opposite of what this job's own
     // comment promises, and nothing re-registers it (auto-backup has a start()
     // its settings save calls; this has no such path).
     const { job, registrar } = makeJob();
@@ -243,7 +243,7 @@ describe('DocSyncJob tick', () => {
   it('recovers on the next due tick after a failed one', async () => {
     // A failed pass still spends its interval, on purpose: a tick that throws
     // every time would otherwise run on every minute the cron fires. It does not
-    // block anything permanently — the next due tick works normally.
+    // block anything permanently: the next due tick works normally.
     vi.useFakeTimers();
     try {
       vi.setSystemTime(new Date(10_000_000));

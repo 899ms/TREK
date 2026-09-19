@@ -18,7 +18,7 @@ import { DOWNLOAD_MAX_BYTES, guardDownload, providerFetch, statusErrorCode } fro
  * against their prose documentation, which is silent or wrong on most of this:
  *
  *  - **`OC-Checksum` is a Nextcloud-only header here.** OpenCloud answers HTTP
- *    400 to `SHA256:<hex>` — it knows SHA1, MD5 and ADLER32, and treats an
+ *    400 to `SHA256:<hex>`: it knows SHA1, MD5 and ADLER32, and treats an
  *    unknown algorithm exactly like a mismatch, so sending the sha256 TREK
  *    already has would fail every upload into a space. Nextcloud accepts SHA256
  *    but does NOT verify it: `SHA256:0000` is stored verbatim and served back
@@ -152,7 +152,7 @@ const PROPFIND_BODY =
   '</d:prop></d:propfind>';
 
 /**
- * Namespace for the dead properties TREK writes. A URI, not an address — it is
+ * Namespace for the dead properties TREK writes. A URI, not an address: it is
  * never fetched, it only has to be unmistakably ours so a second tool writing
  * `doc-uid` on the same file cannot collide with it.
  */
@@ -279,7 +279,7 @@ function classifyStatus(status: number): DocsyncErrorCode {
  * A body cut off at the cap is still a run of complete `<d:response>` blocks
  * followed by a fragment. Dropping the fragment and closing the document keeps
  * the first few thousand files of a huge folder usable, which is what
- * `truncated` is for — the alternative is telling someone with one big folder
+ * `truncated` is for. The alternative is telling someone with one big folder
  * that nothing works at all.
  */
 function repairTruncatedMultistatus(xml: string): string | null {
@@ -401,7 +401,7 @@ function escapeXmlText(value: string): string {
 export class WebdavClient {
   /**
    * One authenticated request. Throws for anything that never reached the
-   * application, and hands the caller the response otherwise — a 404 on DELETE
+   * application, and hands the caller the response otherwise: a 404 on DELETE
    * and a 405 on MKCOL are answers, not failures.
    */
   private async send(
@@ -477,7 +477,7 @@ export class WebdavClient {
     }
 
     // RFC 4918 puts the requested resource first, but it is matched by path
-    // rather than trusted by position — the root must never end up in the
+    // rather than trusted by position: the root must never end up in the
     // document list, and one misordered server would put it there.
     const wanted = decodeHrefPath(path);
     const selfIndex = Math.max(
@@ -498,7 +498,7 @@ export class WebdavClient {
    * only thing that still identifies a document after a human has renamed it and
    * moved it somewhere else in the folder.
    *
-   * Answers whether the server accepted them. A 207 is not enough on its own —
+   * Answers whether the server accepted them. A 207 is not enough on its own:
    * a refusal arrives as a non-2xx status inside the multistatus.
    */
   async proppatch(creds: WebdavCreds, path: string, props: Record<string, string>): Promise<boolean> {
@@ -676,7 +676,7 @@ export class WebdavClient {
     return drives;
   }
 
-  /** One space, or null when it is gone — which is what makes `scope_missing` detectable. */
+  /** One space, or null when it is gone, which is what makes `scope_missing` detectable. */
   async getDrive(creds: WebdavCreds, driveId: string): Promise<WebdavDrive | null> {
     try {
       return toDrive(await this.graph(creds, 'GET', `/graph/v1.0/drives/${encodeURIComponent(driveId)}`));

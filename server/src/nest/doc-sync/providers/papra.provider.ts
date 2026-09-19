@@ -29,7 +29,7 @@ import crypto from 'node:crypto';
 /**
  * Papra as a document scope: one organisation, one tag per trip.
  *
- * Papra has no folders, so the container a trip binds to is a tag — which is
+ * Papra has no folders, so the container a trip binds to is a tag, which is
  * why the scope key carries both halves (`org:…/tag:…`). The organisation is in
  * there although it is also on the connection: an API key reaches every
  * organisation its owner belongs to, so a binding that only named the tag would
@@ -73,7 +73,7 @@ export class PapraDocumentProvider implements DocumentProvider {
   ): Promise<DocResult<{ account: string; capabilities: DocumentProviderCapabilities }>> {
     return this.withCreds(conn, async (creds) => {
       // Tags rather than `/organizations`: it is the narrowest call that proves
-      // all three things at once — the instance answers, the key is valid, and
+      // all three things at once: the instance answers, the key is valid, and
       // the key's owner is in this organisation.
       await this.client.listTags(creds);
       return { account: await this.accountLabel(creds), capabilities: this.capabilities(conn) };
@@ -164,7 +164,7 @@ export class PapraDocumentProvider implements DocumentProvider {
    * `trekDocUid`/`trekTripUid` are not written anywhere: Papra's custom
    * properties are session-only, so a key has nowhere to put an anchor. The tag
    * is the whole binding, and a human who removes it upstream detaches the
-   * document — which is `scope_drift` in the core, not a silent loss.
+   * document, which is `scope_drift` in the core, not a silent loss.
    *
    * The tag goes on in a second call because the upload route ignores every
    * multipart field except the file. That leaves a window in which the document
@@ -197,7 +197,7 @@ export class PapraDocumentProvider implements DocumentProvider {
 
         // Papra refused the bytes because it already holds them. The twin is
         // the document this push is about, so it has to be found before the tag
-        // can go on — and it is found by hash, because a twin stored under
+        // can go on, and it is found by hash, because a twin stored under
         // another name would otherwise pair the wrong document.
         const twin = await this.client.findByHash(creds, req.sha256, req.fileName);
         if (!twin) {
@@ -257,7 +257,7 @@ export class PapraDocumentProvider implements DocumentProvider {
       );
     }
 
-    // Papra has no single-tag route, so existence is answered by the list — the
+    // Papra has no single-tag route, so existence is answered by the list, the
     // same call that supplies the name the document search needs.
     const tags = await this.client.listTags(creds);
     const tag = tags.find((candidate) => candidate.id === parsed.tagId);
@@ -329,7 +329,7 @@ function toRemote(doc: PapraDocument): RemoteDocument {
 /**
  * Whether a listed document really carries the bound tag.
  *
- * The search already filters server-side, so this is belt and braces — except
+ * The search already filters server-side, so this is belt and braces, except
  * for the one case that matters: a tag name the grammar cannot express makes
  * the client enumerate the whole organisation, and then this is the only filter
  * there is. A document that states no tags at all is kept when the server did
@@ -345,7 +345,7 @@ function inScope(doc: PapraDocument, tagId: string, serverFiltered: boolean): bo
  * A fingerprint of the whole enumeration, used as the cursor.
  *
  * Papra offers nothing to short-circuit a walk with, so this cannot save the
- * enumeration — it only lets the core skip diffing when the tag is provably
+ * enumeration. It only lets the core skip diffing when the tag is provably
  * unchanged. It covers deletions as well as edits because it is built from the
  * complete set rather than from the newest entry.
  */

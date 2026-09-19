@@ -1361,7 +1361,7 @@ export const filesApi = {
 /**
  * Document sync: one provider connection per trip, shared by every member.
  *
- * Trip-scoped rather than user-scoped on purpose — a per-user connection would
+ * Trip-scoped rather than user-scoped on purpose: a per-user connection would
  * make a document's visibility depend on whose credentials fetched it, which is
  * the opposite of what a shared trip needs.
  */

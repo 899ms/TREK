@@ -10,7 +10,7 @@ import { DocSyncConfigService } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 
 /**
- * `/api/docsync/webhook/:token` — the one endpoint a provider calls.
+ * `/api/docsync/webhook/:token`: the one endpoint a provider calls.
  *
  * Deliberately the thinnest thing in the domain. It answers 200 and schedules a
  * run; it never reads the body as truth. Every provider here has a different
@@ -22,7 +22,7 @@ import { DocSyncService } from './doc-sync.service';
  *
  * `@Public` because a provider cannot hold a TREK session. The token in the URL
  * is the authentication, one per binding, so a leaked URL can only ever nudge
- * the one trip it belongs to — and nudging is all it can do. Where the provider
+ * the one trip it belongs to, and nudging is all it can do. Where the provider
  * supports it, a shared secret is checked as well.
  */
 @Controller('api/docsync/webhook')
@@ -32,7 +32,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
    *
    * Providers fire per document: dropping twenty files into a watched Nextcloud
    * folder is twenty calls within a second or two. Each one used to start its
-   * own run, which the service's in-flight guard then answered with `busy` —
+   * own run, which the service's in-flight guard then answered with `busy`,
    * so nineteen changes were announced and thrown away, and the one run that
    * did start had begun before most of them landed. Collecting them for a beat
    * and then running once is both less work and more correct.
@@ -50,7 +50,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
    * The same two switches the scheduler obeys.
    *
    * Without them "switch document sync off" meant "stop the poll", while every
-   * provider holding a webhook kept driving full runs — an admin turning the
+   * provider holding a webhook kept driving full runs: an admin turning the
    * addon off would have watched it carry on. Checked when the timer fires as
    * well as on arrival, so a switch thrown during the debounce window still
    * takes effect.
@@ -85,7 +85,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
 
     // Fire and forget. Paperless allows five seconds before it counts the call
     // as failed and retries, and a sync run takes longer than that whenever
-    // there is anything to do — so the answer goes out now and the run happens
+    // there is anything to do, so the answer goes out now and the run happens
     // after the debounce window, by which time the rest of the burst has
     // arrived and been folded into this same timer.
     this.schedule(link.id, () => this.config.getLink(link.id));
@@ -110,7 +110,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
       void this.sync.syncLink(fresh).then((res) => {
         // A run that was already in flight answers `busy`, and the changes this
         // nudge was about may have landed after that run read the folder. Ask
-        // again once rather than waiting out a whole poll interval — once, and
+        // again once rather than waiting out a whole poll interval: once, and
         // only for `busy`, so this cannot become a loop.
         if (res?.state === 'busy' && !isRetry) this.schedule(linkId, reload, true);
       });

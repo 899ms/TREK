@@ -144,7 +144,7 @@ function Verdict({
 }: {
   verdict: { connected: boolean; account?: string; error?: string } | null
   busy: boolean
-  /** A call that failed outside the connection test — saving, most of all. */
+  /** A call that failed outside the connection test (saving, most of all). */
   failure: string | null
 }) {
   const { t } = useTranslation()

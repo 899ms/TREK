@@ -7,7 +7,7 @@ import React from 'react'
  * they sit in a row of lucide icons and in a list of addon toggles, where a
  * full-colour badge among line icons reads as the one thing that is switched
  * on. Following the text colour also means they invert with the theme without a
- * second asset — black on light, white on dark.
+ * second asset: black on light, white on dark.
  *
  * Not in `public/brands/` beside AirTrail and Dawarich, because those are the
  * files each project ships, served unmodified. These are deliberately modified:

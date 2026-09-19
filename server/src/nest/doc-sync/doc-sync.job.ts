@@ -21,7 +21,7 @@ import {
  * changes on its own; Papra's webhook API is closed to API keys, Nextcloud's
  * needs admin rights, OpenCloud has no registrable hook, and Synology has
  * nothing at all. On top of that no provider here emits an event for every
- * change that matters — Paperless has no deletion trigger, and a tag change in
+ * change that matters: Paperless has no deletion trigger, and a tag change in
  * Papra moves no timestamp. So the run enumerates, and a webhook only ever
  * makes it happen sooner.
  *
@@ -32,8 +32,8 @@ import {
  * answer.
  *
  * Which is why the cron itself runs every minute and the tick decides whether it
- * is due: baking the interval into the cron expression at bootstrap — as this
- * did until the claim above was checked against the code — meant a changed
+ * is due: baking the interval into the cron expression at bootstrap (as this
+ * did until the claim above was checked against the code) meant a changed
  * interval did nothing until a restart, quietly, while the admin screen said
  * otherwise.
  */
@@ -67,7 +67,7 @@ export class DocSyncJob implements OnApplicationBootstrap {
   private isDue(now: number): boolean {
     // Null rather than 0: comparing against the epoch means "due" only once the
     // clock has passed the interval since 1970, which is true in production and
-    // false for any test that picks a small timestamp — a difference that would
+    // false for any test that picks a small timestamp, a difference that would
     // have hidden here rather than in the behaviour it is supposed to describe.
     if (this.lastRunAt === null) return true;
     return now - this.lastRunAt >= this.intervalSeconds() * 1000;
@@ -93,7 +93,7 @@ export class DocSyncJob implements OnApplicationBootstrap {
       this.lastRunAt = now;
 
       // Cheap, and it catches a binding whose owner left the trip through a
-      // path that has no hook to attach to — a transfer, a direct DB edit.
+      // path that has no hook to attach to: a transfer, a direct DB edit.
       const orphaned = this.config.markOrphanedLinks();
       if (orphaned > 0) logInfo(`Document sync: ${orphaned} link(s) orphaned, owner no longer on the trip`);
 

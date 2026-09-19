@@ -31,14 +31,14 @@ import { DOWNLOAD_MAX_BYTES, guardDownload } from './provider-http';
  * The scope is a TAG, because that is the only container Paperless has: there
  * are no folders, and a document belongs to as many tags as someone gives it.
  * A tag is also the one thing the instance's owner can see and reason about in
- * their own interface, which matters — this is their archive, and TREK is a
+ * their own interface, which matters: this is their archive, and TREK is a
  * guest in it.
  *
  * The tag is paired with a custom field (`trek_trip_id`) carrying the trip's
  * uid. A tag can be removed by a human in two clicks and the binding would be
  * silently empty; the custom field survives that and says which trip a document
  * came from even after someone re-tags it. Nothing here treats the field as
- * authority — it is a breadcrumb for the person cleaning up, and for a support
+ * authority: it is a breadcrumb for the person cleaning up, and for a support
  * question that starts with "where did this come from".
  *
  * Deletion propagates only as far as Paperless's own trash. `DELETE` on a
@@ -70,7 +70,7 @@ const PUSH_FALLBACK_MAX_BYTES = 64 * 1024 * 1024;
  * type is refused with `400 … not supported` before a task is created.
  *
  * Note that Paperless decides on the SNIFFED type of the bytes, not on the
- * Content-Type of the multipart part — a .csv arrives as `text/plain` and is
+ * Content-Type of the multipart part: a .csv arrives as `text/plain` and is
  * stored as such. The list is therefore a pre-filter that saves a round trip,
  * never the last word; the 400 is still mapped to the same code.
  */
@@ -356,7 +356,7 @@ export class PaperlessDocumentProvider implements DocumentProvider {
     try {
       return docOk(scopeOption(await this.client.getTag(creds, tagId)));
     } catch (err: unknown) {
-      // A tag that is gone is `scope_lost` for the link, not a generic 404 —
+      // A tag that is gone is `scope_lost` for the link, not a generic 404:
       // someone deleted or renamed it upstream and a human has to choose again.
       if (err instanceof PaperlessError && err.code === 'not_found') {
         return docFail('scope_missing', `tag ${tagId} no longer exists`, err.status);
@@ -526,7 +526,7 @@ export class PaperlessDocumentProvider implements DocumentProvider {
    *
    * The field id is resolved per upload rather than cached. It is one small GET
    * against a local instance, and a cached id goes stale exactly when it hurts
-   * most — after a human deleted the field, when every later upload would fail
+   * most: after a human deleted the field, when every later upload would fail
    * with a validation error nobody can read.
    */
   private async create(
@@ -546,15 +546,15 @@ export class PaperlessDocumentProvider implements DocumentProvider {
     try {
       return (await this.client.awaitConsume(creds, taskId)).documentId;
     } catch (err: unknown) {
-      // The consume outlived the poll budget. The document may well be there —
-      // OCR on a long scan takes minutes — and retrying blind would leave two,
+      // The consume outlived the poll budget. The document may well be there
+      // (OCR on a long scan takes minutes), and retrying blind would leave two,
       // because Paperless accepts duplicate bytes. So the checksum decides.
       if (err instanceof PaperlessError && err.code === 'timeout') {
         const existing = await this.client.findByChecksum(creds, req.sha256);
         // Only a document carrying this scope's tag can be the one this push
         // made: the tag goes on at upload. Anything else with the same bytes
         // belongs to someone else's filing, and adopting it would put a
-        // stranger's document in the trip — and delete it on the next
+        // stranger's document in the trip, and delete it on the next
         // delete-through.
         const mine = existing.find((doc) => doc.tagIds.includes(tagId));
         if (mine !== undefined) return mine.id;

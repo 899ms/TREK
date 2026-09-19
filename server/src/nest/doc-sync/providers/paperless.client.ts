@@ -19,7 +19,7 @@ import {
  * This is the ONLY place that talks to a trip's Paperless instance.
  *
  * Measured against Paperless-ngx 3.1.3 / API version 10, not against its
- * documentation — the two disagree in the places that matter here:
+ * documentation. The two disagree in the places that matter here:
  *
  *  - **A document carries no top-level `checksum` at 3.x.** The hash lives in
  *    `versions[]`, one entry per uploaded revision, and it is a **sha256** of
@@ -36,7 +36,7 @@ import {
  *    array. `status` is lower case (`success`, `failure`) where older builds
  *    shouted it, so both spellings are compared case-insensitively.
  *  - **`POST /api/documents/{id}/update_version/` keeps the document id**, and
- *    with it the tags and custom fields — but the task it returns reports a
+ *    with it the tags and custom fields, but the task it returns reports a
  *    DIFFERENT, internal document id (the version row), which answers 404 on
  *    `/api/documents/{id}/`. Callers must keep the id they updated.
  *  - **Duplicate bytes are not refused.** Uploading the same file twice yields
@@ -52,7 +52,7 @@ import {
  *
  * The API version is pinned in the Accept header. Paperless moves its default
  * with the server version, so an unpinned client changes shape under a routine
- * `docker pull` — that is exactly how the `checksum` field moved out of the
+ * `docker pull`. That is exactly how the `checksum` field moved out of the
  * document serializer.
  */
 
@@ -177,7 +177,7 @@ export const WEBHOOK_URL_MAX_LENGTH = 256;
 
 /**
  * Workflow trigger types, as `OPTIONS /api/workflows/` enumerates them. There
- * is deliberately no deletion trigger upstream — a document moved to the trash
+ * is deliberately no deletion trigger upstream: a document moved to the trash
  * fires nothing, which is why a webhook can only ever mean "look now".
  */
 export const TRIGGER_DOCUMENT_ADDED = 2;
@@ -185,7 +185,7 @@ export const TRIGGER_DOCUMENT_UPDATED = 3;
 /** Action type 4 is "Webhook". */
 export const ACTION_WEBHOOK = 4;
 /**
- * Consume folder, API upload, mail fetch, web UI — all four, or a document
+ * Consume folder, API upload, mail fetch, web UI: all four, or a document
  * dropped into Paperless's own interface would never reach TREK.
  */
 const TRIGGER_SOURCES = [1, 2, 3, 4];
@@ -343,8 +343,8 @@ function transportError(failure: TransportFailure): PaperlessError {
 
 /**
  * The code for an HTTP status, refined by the body where the status alone is
- * ambiguous. Paperless answers 400 both for "I do not take this file type" —
- * a per-document verdict the user can act on — and for a malformed request,
+ * ambiguous. Paperless answers 400 both for "I do not take this file type"
+ * (a per-document verdict the user can act on) and for a malformed request,
  * and the difference is only in the text.
  */
 function classify(status: number, body: string): DocsyncErrorCode {
@@ -394,7 +394,7 @@ function headerSafe(value: string): string {
  * length; a Buffer keeps Content-Length honest, which is what lets a reverse
  * proxy in front of Paperless enforce its own upload limit instead of buffering
  * an unbounded stream. Field and file names are stripped of quotes and line
- * breaks first — a document called `a".pdf` would otherwise end the
+ * breaks first: a document called `a".pdf` would otherwise end the
  * Content-Disposition header early and rewrite the rest of the request.
  */
 export function buildMultipart(
@@ -471,7 +471,7 @@ export class PaperlessClient {
 
     if (!response.ok) {
       // The body is what separates "wrong file type" from "wrong request", so it
-      // is read — through the cap, because a proxy's error page is HTML of
+      // is read, through the cap, because a proxy's error page is HTML of
       // unbounded length.
       const { text } = await readCappedText(response, MAX_JSON_BYTES);
       throw new PaperlessError(
@@ -571,7 +571,7 @@ export class PaperlessClient {
    *
    * `tags__id__all` rather than `tags__id__in`: with a single tag the two agree,
    * and `__all` keeps meaning "carries this tag" if a caller ever passes more.
-   * Ordering by id keeps the pages stable while documents are being added —
+   * Ordering by id keeps the pages stable while documents are being added:
    * ordering by `modified`, the field that changes under us, would let a
    * document move between pages and never be seen at all.
    *
@@ -622,7 +622,7 @@ export class PaperlessClient {
    *
    * The filter is server-side and exact. It exists here for one case: an upload
    * whose consume task was never observed, where the document may or may not
-   * have landed and a blind retry would leave two — Paperless does not refuse
+   * have landed and a blind retry would leave two: Paperless does not refuse
    * duplicate bytes.
    */
   async findByChecksum(creds: PaperlessCreds, sha256: string): Promise<PaperlessDocument[]> {
@@ -665,7 +665,7 @@ export class PaperlessClient {
    *
    * Without `original=true` Paperless serves the archived PDF it produced
    * itself, which is a different file with a different length and a different
-   * hash — TREK would store something the user never uploaded, and every
+   * hash. TREK would store something the user never uploaded, and every
    * comparison against the checksum would fail.
    */
   async downloadOriginal(creds: PaperlessCreds, documentId: number): Promise<Response> {
@@ -747,7 +747,7 @@ export class PaperlessClient {
    * Bounded twice: each poll carries its own request timeout, and the loop as a
    * whole gives up at `timeoutMs`. A large scan with OCR can outlast any budget
    * worth holding a worker for, and the caller has a cheaper way to find out
-   * whether the upload landed — the checksum filter — so this reports `timeout`
+   * whether the upload landed (the checksum filter), so this reports `timeout`
    * rather than waiting longer.
    */
   async awaitConsume(
@@ -833,7 +833,7 @@ export class PaperlessClient {
    * The payload is deliberately thin. Placeholders such as `{doc_id}` are NOT
    * substituted in a webhook body at 3.1.3 (measured: they arrive literally),
    * and `as_json` wraps a body STRING into a JSON string rather than sending an
-   * object — so the parameters, which do arrive as a real JSON object, carry the
+   * object, so the parameters, which do arrive as a real JSON object, carry the
    * link, and the callback means nothing more than "look now".
    */
   async createWorkflow(creds: PaperlessCreds, spec: PaperlessWorkflowSpec): Promise<number> {

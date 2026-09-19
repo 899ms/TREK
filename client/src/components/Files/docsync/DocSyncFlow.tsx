@@ -18,8 +18,8 @@ export interface FlowHoldings {
 /**
  * The direction control, drawn as what it actually is.
  *
- * A document sync has one characteristic picture — two places and things moving
- * between them — and a dropdown reading "Both ways" hides it behind a word.
+ * A document sync has one characteristic picture (two places and things moving
+ * between them), and a dropdown reading "Both ways" hides it behind a word.
  * Here the two ends carry what each side is holding, the lanes between them
  * carry the direction, and switching direction means switching a lane off. It
  * is the one loud element in the dialog; everything around it stays quiet.
@@ -113,7 +113,7 @@ export default function DocSyncFlow({
 /**
  * One end of the flow: the mark, the count, the name.
  *
- * The count is the largest thing in the box on purpose — "is my stuff over
+ * The count is the largest thing in the box on purpose: "is my stuff over
  * there" is the question that makes somebody open this dialog, and it should be
  * answered before they read a word.
  */
@@ -197,8 +197,8 @@ function Lane({
         {caption}
       </span>
 
-      {/* Only while a run is in flight. An idle lane needs no track — that it is
-          on or off is already in its fill — and a permanent line just asks the
+      {/* Only while a run is in flight. An idle lane needs no track (that it is
+          on or off is already in its fill), and a permanent line just asks the
           reader what it means. */}
       {moving && (
         <span

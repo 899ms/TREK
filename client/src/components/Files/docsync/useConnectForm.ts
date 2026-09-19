@@ -50,7 +50,7 @@ export function useConnectForm(
 ): ConnectForm {
   const [values, setValues] = useState<Record<string, string>>({})
   // Null until touched, so a connection that arrives after the form opened is
-  // still reflected — seeding from `existing` at mount showed a stored "allow
+  // still reflected. Seeding from `existing` at mount showed a stored "allow
   // self-signed" as off and wrote that back on the next save.
   const [insecure, setInsecure] = useState<boolean | null>(null)
 
@@ -75,7 +75,7 @@ export function useConnectForm(
   // The address stays in here as well as in its own argument: the server walks
   // the provider's fields over `credentials` and would otherwise store no
   // `base_url` setting. It special-cases the key when checking completeness, so
-  // dropping it changes nothing it needs — but it is an established request
+  // dropping it changes nothing it needs, but it is an established request
   // shape and this is not the change to alter it in.
   const credentials = Object.fromEntries(
     Object.entries(values).filter(([k]) => k !== INSECURE_TLS_FIELD),

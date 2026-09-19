@@ -4,7 +4,7 @@
  *
  * The tool bodies are three lines each, and what is worth pinning about them is
  * not the plumbing but the decisions around it. The access check is the whole
- * security story — there is no guard in front of an MCP tool, so a dropped
+ * security story: there is no guard in front of an MCP tool, so a dropped
  * `verifyTripAccess` is a stranger reading where somebody's documents live. The
  * absence of a connect tool is a decision too: setting a connection up means
  * handing over a credential that usually reaches a person's entire document

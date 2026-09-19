@@ -5,8 +5,8 @@ import { isEffectivelyOnline, onNetworkModeChange } from './networkMode'
 /**
  * How long pings are collected before one refetch goes out.
  *
- * Long enough to fold a burst into a single request — clearing twelve checked
- * items issues twelve deletes, and an import writes a whole list — short enough
+ * Long enough to fold a burst into a single request (clearing twelve checked
+ * items issues twelve deletes, and an import writes a whole list), short enough
  * that a single edit still reads as instant.
  */
 const COALESCE_MS = 250
@@ -19,7 +19,7 @@ const COALESCE_MS = 250
  * whose items this client may not see, and a document-sync run reports counts
  * that are only meaningful read back from the server. Every such ping is a
  * refetch, which is why this coalesces bursts and never lets two requests
- * overlap — the server pings the whole room including the originating socket, so
+ * overlap: the server pings the whole room including the originating socket, so
  * a busy trip would otherwise have every client refetching once per written row.
  *
  * A ping sent while this client is disconnected is gone for good, so the two

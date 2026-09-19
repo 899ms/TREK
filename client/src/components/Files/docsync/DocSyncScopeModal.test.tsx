@@ -9,7 +9,7 @@
  * pretending the archive is empty.
  *
  * The component takes the `useDocSync` hook as a prop, so the double here is the
- * real hook with `api/client` mocked underneath — the assertions are then about
+ * real hook with `api/client` mocked underneath, so the assertions are about
  * the requests that actually leave, not about a hand-written stand-in. The hook
  * is created with `enabled: false` because the panel-level lists it would fetch
  * belong to the dialog around this modal, not to the picker.
@@ -299,7 +299,7 @@ describe('DocSyncScopeModal creating a folder', () => {
 
   it('FE-DOCSYNC-SCOPE-021: a refused create says why instead of doing nothing', async () => {
     // The create had no failure path at all: the rejection escaped the click
-    // handler unhandled, nothing was bound, and the dialog said nothing — the
+    // handler unhandled, nothing was bound, and the dialog said nothing: the
     // button blinked and the person was left guessing. Every other write in the
     // hook reports, and so does this one now.
     createScope.mockRejectedValue({ response: { data: { error: 'quota_exceeded' } } })

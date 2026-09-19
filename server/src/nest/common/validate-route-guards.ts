@@ -110,7 +110,7 @@ export const PUBLIC_ROUTE_ALLOW_LIST: string[] = [
   // A document provider cannot hold a TREK session. The per-binding token in
   // the path is the credential, a shared secret is checked on top where the
   // provider can send one, and the handler's only effect is to schedule a sync
-  // run — it never reads the request body as data.
+  // run. It never reads the request body as data.
   'DocSyncWebhookController.nudge',
   'FeaturesController.features',
   // The container/uptime probe.

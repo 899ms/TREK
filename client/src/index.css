@@ -507,7 +507,7 @@ input[type="number"], input[type="time"], input[type="date"], input[type="dateti
 }
 
 /* Dokumentenabgleich: die aktive Bahn laeuft, WAEHREND ein Lauf laeuft.
-   Bewegung als Antwort auf eine Handlung, nicht als Dekoration — sie hoert auf,
+   Bewegung als Antwort auf eine Handlung, nicht als Dekoration: sie hoert auf,
    sobald der Lauf durch ist, und sagt in der Zwischenzeit, in welche Richtung
    gerade etwas unterwegs ist. */
 @keyframes trek-docsync-lane {
@@ -526,7 +526,7 @@ input[type="number"], input[type="time"], input[type="date"], input[type="dateti
   animation-direction: reverse;
 }
 
-/* Die abgeschaltete Richtung bekommt eine Schraffur — dasselbe Zeichen, das eine
+/* Die abgeschaltete Richtung bekommt eine Schraffur, dasselbe Zeichen, das eine
    gesperrte Flaeche ueberall traegt. Es liest sich als "hier geht nichts durch",
    ohne dass die Bahn verschwindet und die Zeile zusammenklappt. */
 .trek-docsync-lane-off {
@@ -636,7 +636,7 @@ input[type="number"], input[type="time"], input[type="date"], input[type="dateti
   .trek-lowfuel {
     animation: none;
   }
-  /* Die Bahn bleibt sichtbar, sie laeuft nur nicht mehr — die Aussage
+  /* Die Bahn bleibt sichtbar, sie laeuft nur nicht mehr. Die Aussage
      "hier ist gerade etwas unterwegs" traegt auch im Stillstand. */
   .trek-docsync-lane-run {
     animation: none;

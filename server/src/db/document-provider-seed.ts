@@ -8,7 +8,7 @@ import type Database from 'better-sqlite3';
  * use INSERT OR IGNORE, which is what lets an operator rename or re-sort a row
  * without a later boot undoing it.
  *
- * `label` and `hint` are i18n key suffixes, never display text — the client
+ * `label` and `hint` are i18n key suffixes, never display text: the client
  * resolves them as `docsync.<label>`, the same way the photo provider form
  * resolves `memories.<label>`.
  *
@@ -77,7 +77,7 @@ const PROVIDERS: ProviderRow[] = [
 ];
 
 /**
- * `allow_insecure_tls` defaults to 0 on every provider — unlike the Synology
+ * `allow_insecure_tls` defaults to 0 on every provider, unlike the Synology
  * photo provider, where skipping verification is the stored default. A LAN
  * instance with a self-signed certificate is common enough to need the switch
  * and not common enough to justify shipping it on.
@@ -94,7 +94,7 @@ const FIELDS: ProviderFieldRow[] = [
   { provider_id: 'papra', field_key: 'organization_id', label: 'providerOrganization', input_type: 'text', placeholder: 'org_…', hint: 'hintPapraOrg', required: 1, secret: 0, sort_order: 2 },
   { provider_id: 'papra', field_key: 'allow_insecure_tls', label: 'allowInsecureTls', input_type: 'checkbox', placeholder: null, hint: null, required: 0, secret: 0, sort_order: 3 },
 
-  // Nextcloud: an app password, never the account password — the latter breaks
+  // Nextcloud: an app password, never the account password. The latter breaks
   // the moment the account turns on 2FA or logs in through OIDC.
   { provider_id: 'nextcloud', field_key: 'base_url', label: 'providerUrl', input_type: 'url', placeholder: 'https://cloud.example.com', hint: null, required: 1, secret: 0, sort_order: 0 },
   { provider_id: 'nextcloud', field_key: 'login_name', label: 'providerUsername', input_type: 'text', placeholder: 'username', hint: 'hintNextcloudLogin', required: 1, secret: 0, sort_order: 1 },

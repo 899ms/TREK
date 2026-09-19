@@ -30,7 +30,7 @@ import {
  * The document adapter for Nextcloud and OpenCloud.
  *
  * One implementation serves both, and which one it is talking to is read off
- * the connection — Nextcloud brings a login name, an app password and a folder,
+ * the connection: Nextcloud brings a login name, an app password and a folder,
  * OpenCloud a username, an app token and a space. Nothing below branches on the
  * registered `id`; the two subclasses at the end of this file exist only because
  * the registry keys providers by `id` and Nest keys them by class, so two
@@ -42,8 +42,8 @@ import {
  * lets `stableId` be true and a trip binding survive someone tidying up.
  *
  * Deliberately NOT here: a change feed. `sync-collection` (RFC 6578) is not
- * implemented by either product — Nextcloud answers HTTP 415 with
- * `ReportNotSupported` — so the listing is a full enumeration, short-circuited
+ * implemented by either product (Nextcloud answers HTTP 415 with
+ * `ReportNotSupported`), so the listing is a full enumeration, short-circuited
  * by the root ETag, exactly as `DocumentProvider.list` describes.
  */
 
@@ -58,7 +58,7 @@ const WEBHOOK_EVENTS = [
 /**
  * Header the subscription carries the shared secret in.
  *
- * It has to be the one the endpoint reads — `doc-sync-webhook.controller.ts`
+ * It has to be the one the endpoint reads: `doc-sync-webhook.controller.ts`
  * looks for `x-trek-docsync-secret`. It used to say `X-TREK-Docsync-Signature`
  * here, so every webhook Nextcloud actually sent arrived without a secret the
  * controller could find and was silently dropped: the subscription existed, the
@@ -131,7 +131,7 @@ function credsOf(conn: DocumentConnectionRef): WebdavCreds | null {
   return { origin, username, password, allowInsecureTls: conn.allowInsecureTls, flavor };
 }
 
-/** `/remote.php/dav/files/<login>` — the per-account root of Nextcloud's file DAV. */
+/** `/remote.php/dav/files/<login>`: the per-account root of Nextcloud's file DAV. */
 function filesRoot(creds: WebdavCreds): string {
   return `/remote.php/dav/files/${encodeURIComponent(creds.username)}`;
 }
@@ -154,7 +154,7 @@ function scopeIdOf(scopeKey: string, flavor: WebdavFlavor): string | null {
  *
  * Nextcloud refuses `\ / < > : " | ? *` and a trailing dot or space outright, so
  * a trip called "Japan: 2026" would fail to get a folder at all. The replacement
- * is visible — the label in the returned option is the name that was really
+ * is visible: the label in the returned option is the name that was really
  * used, not the one that was asked for.
  */
 function sanitizeName(name: string): string {
@@ -204,7 +204,7 @@ function documentOf(entry: WebdavEntry, rootDecoded: string): RemoteDocument {
  *
  * `probe` and its siblings always resolve because the settings screen renders
  * the answer inline. An error that is not a WebdavError is a bug in this file
- * rather than a provider problem, and it still has to come back as data — one
+ * rather than a provider problem, and it still has to come back as data: one
  * broken adapter must not take down the run for every other link.
  */
 function failureOf<T>(err: unknown): DocResult<T> {
@@ -236,9 +236,9 @@ export class WebdavDocumentProvider implements DocumentProvider {
       // Conservative on purpose: most Nextcloud connections are an ordinary
       // account's app password, and `webhook_listeners` is admin-only. `probe`
       // upgrades this to `webhook-self-registered` once it has asked the
-      // instance. OpenCloud has no HTTP subscription API at all — its change
+      // instance. OpenCloud has no HTTP subscription API at all (its change
       // events live on an internal NATS bus that no trip admin can point at
-      // TREK — so it is `none` rather than a `webhook-manual` that would send
+      // TREK), so it is `none` rather than a `webhook-manual` that would send
       // someone looking for a settings page that does not exist.
       push: flavorOf(conn) === 'nextcloud' ? 'webhook-manual' : 'none',
       stableId: true,
@@ -811,7 +811,7 @@ export class WebdavDocumentProvider implements DocumentProvider {
       const relative = remoteId.slice(PATH_ID_PREFIX.length);
       // The path comes out of a listing, which is the provider's word and not
       // TREK's. A `..` in it would address a file outside the folder the trip is
-      // bound to — every other id here is opaque, this one is a path and has to
+      // bound to. Every other id here is opaque, this one is a path and has to
       // be treated like one.
       if (!relative || relative.split('/').some(seg => seg === '..' || seg === '.')) return null;
       return `${resolved.rootPath}/${encodePath(relative)}`;
@@ -836,7 +836,7 @@ export class WebdavDocumentProvider implements DocumentProvider {
  *
  * They carry an id and nothing else. The registry maps a connection's
  * `provider_id` onto a provider instance and Nest maps a class onto a token, so
- * two product ids need two classes — but both run the implementation above, and
+ * two product ids need two classes, but both run the implementation above, and
  * that implementation never asks which one it is.
  *
  * The constructors are spelled out rather than inherited: Nest reads

@@ -31,7 +31,7 @@ export const PROVIDER_MAX_PAGES = 40;
  * Paperless token all produce the same thing: a listing far shorter than the
  * last one. Without this guard the reconciler would read that as a mass
  * deletion. Below the threshold, vanished documents are recorded as
- * `remote_missing` and wait for a human either way — this only decides whether
+ * `remote_missing` and wait for a human either way. This only decides whether
  * the run trusts the listing enough to record anything at all.
  */
 export const MASS_DELETE_RATIO = 0.4;
@@ -66,7 +66,7 @@ export const MAX_POLL_INTERVAL_SECONDS = 3600;
 
 /**
  * How long a webhook may accelerate a link before the poll takes over again.
- * A webhook only ever means "look now" — this keeps a link whose subscription
+ * A webhook only ever means "look now". This keeps a link whose subscription
  * silently died from going stale forever.
  */
 export const WEBHOOK_NUDGE_DEBOUNCE_SECONDS = 5;
