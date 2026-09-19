@@ -350,7 +350,9 @@ function inScope(doc: PapraDocument, tagId: string, serverFiltered: boolean): bo
  * complete set rather than from the newest entry.
  */
 function enumerationDigest(documents: RemoteDocument[]): string {
-  const pairs = documents.map((doc) => `${doc.remoteId}:${doc.remoteVersion}`).sort();
+  const pairs = documents
+    .map((doc) => `${doc.remoteId}:${doc.remoteVersion}`)
+    .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
   return crypto.createHash('sha256').update(pairs.join('\n')).digest('hex');
 }
 
