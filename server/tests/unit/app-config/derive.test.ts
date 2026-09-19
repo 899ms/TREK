@@ -254,6 +254,11 @@ describe('deriveNet', () => {
     expect(deriveNet({ ALLOW_INTERNAL_NETWORK: '1' }).allowInternalNetwork).toBe(true);
     expect(deriveNet({}).allowInternalNetwork).toBe(false);
   });
+
+  it('ALLOW_LINK_LOCAL_IPS keeps only the addresses that may be used', () => {
+    expect(deriveNet({ ALLOW_LINK_LOCAL_IPS: '169.254.1.2,169.254.169.254,bogus' }).allowLinkLocalIps).toEqual(['169.254.1.2']);
+    expect(deriveNet({}).allowLinkLocalIps).toEqual([]);
+  });
 });
 
 describe('derivePaths', () => {

@@ -725,3 +725,77 @@ describe('safeFetchLlm', () => {
     expect(mockFetch).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('ALLOW_LINK_LOCAL_IPS (#2400)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  // The list is read when the module loads, like ALLOW_INTERNAL_NETWORK, so each
+  // case loads a fresh copy under its own environment.
+  async function guardWith(env: Record<string, string>) {
+    for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value);
+    vi.resetModules();
+    const guard = await import('../../../src/utils/ssrfGuard');
+    const lookup = vi.mocked((await import('dns/promises')).default.lookup);
+    const resolve = (ip: string) => lookup.mockResolvedValue({ address: ip, family: ip.includes(':') ? 6 : 4 });
+    return { guard, resolve };
+  }
+
+  it('reaches a rootless Podman host gateway from OIDC once the address is listed', async () => {
+    const { guard, resolve } = await guardWith({ ALLOW_LINK_LOCAL_IPS: '169.254.1.2' });
+    resolve('169.254.1.2');
+    const okFetch = vi.fn().mockResolvedValue({ status: 200, headers: new Headers() });
+    vi.stubGlobal('fetch', okFetch);
+
+    await guard.safeFetchAdminConfigured('https://keycloak.example.com/realms/trek/.well-known/openid-configuration');
+
+    expect(okFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses the gateway as before while nothing is listed, whatever ALLOW_INTERNAL_NETWORK says', async () => {
+    const { guard, resolve } = await guardWith({ ALLOW_INTERNAL_NETWORK: 'true' });
+    resolve('169.254.1.2');
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(guard.safeFetchAdminConfigured('https://keycloak.example.com/')).rejects.toThrow(
+      'Requests to link-local / cloud-metadata addresses are not allowed',
+    );
+    expect((await guard.checkSsrf('https://keycloak.example.com/')).allowed).toBe(false);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps every address that is not listed blocked, the metadata service included', async () => {
+    const { guard, resolve } = await guardWith({ ALLOW_LINK_LOCAL_IPS: '169.254.1.2', ALLOW_INTERNAL_NETWORK: 'true' });
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+
+    for (const ip of ['169.254.1.3', '169.254.169.254', '169.254.170.2', '::ffff:169.254.169.254']) {
+      resolve(ip);
+      await expect(guard.safeFetchAdminConfigured('https://idp.example/')).rejects.toThrow(guard.SsrfBlockedError);
+      expect((await guard.checkSsrf('https://idp.example/')).allowed).toBe(false);
+    }
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('counts as the internal network for a URL a user typed, so it also needs ALLOW_INTERNAL_NETWORK', async () => {
+    const closed = await guardWith({ ALLOW_LINK_LOCAL_IPS: '169.254.1.2', ALLOW_INTERNAL_NETWORK: 'false' });
+    closed.resolve('169.254.1.2');
+    expect(await closed.guard.checkSsrf('https://immich.example/')).toMatchObject({
+      allowed: false,
+      isPrivate: true,
+      error: expect.stringContaining('ALLOW_INTERNAL_NETWORK'),
+    });
+
+    const open = await guardWith({ ALLOW_LINK_LOCAL_IPS: '169.254.1.2', ALLOW_INTERNAL_NETWORK: 'true' });
+    open.resolve('169.254.1.2');
+    expect(await open.guard.checkSsrf('https://immich.example/')).toMatchObject({ allowed: true, isPrivate: true });
+    // A caller that refuses the internal network outright still refuses it.
+    expect((await open.guard.checkSsrf('https://immich.example/', true)).allowed).toBe(false);
+    // The IPv4-mapped spelling of the same address gets the same answer.
+    open.resolve('::ffff:169.254.1.2');
+    expect(await open.guard.checkSsrf('https://immich.example/')).toMatchObject({ allowed: true, isPrivate: true });
+  });
+});

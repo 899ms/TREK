@@ -8,13 +8,13 @@ TREK has two SSRF guards, both in `ssrfGuard.ts`. Which one applies depends on t
 
 **The strict guard** (`safeFetch` / `safeFetchFollow`, built on `checkSsrf`) covers most outbound traffic: Immich, Synology Photos, AirTrail, Dawarich, the document stores behind [Document-Sync](Document-Sync) (Paperless-ngx, Papra, Nextcloud, OpenCloud and Synology), notification webhooks, ntfy, Unsplash, and place lookups. It resolves the hostname to an IP address before allowing the connection and blocks loopback, link-local and private ranges. Only the private ranges open up, and only with `ALLOW_INTERNAL_NETWORK=true`. The two tables below describe this guard.
 
-**The relaxed guard** (`safeFetchAdminConfigured`, also exported as `safeFetchLlm`) covers endpoints that are expected to live on your own network: OIDC (discovery, token, userinfo, JWKS), the LLM providers behind the AI Parsing addon (a local Ollama or any OpenAI-compatible endpoint), and plugin OAuth token exchanges. The self-hosted routing engines an admin sets for the [Road-Trip](Road-Trip) addon (**Own routing engine**, **Own Valhalla instance**) go through it too when the server asks them itself, which it does for the MCP road trip tools. The planner asks them from the browser, so they must also be reachable from your users' devices. It deliberately permits loopback and LAN targets, so a model server on `localhost` or an identity provider on your LAN works **without** `ALLOW_INTERNAL_NETWORK`. It still resolves every hostname, re-checks every redirect hop, and always blocks link-local and cloud-metadata addresses (`169.254.0.0/16`, the full `fe80::/10`, and the AWS and Alibaba metadata addresses).
+**The relaxed guard** (`safeFetchAdminConfigured`, also exported as `safeFetchLlm`) covers endpoints that are expected to live on your own network: OIDC (discovery, token, userinfo, JWKS), the LLM providers behind the AI Parsing addon (a local Ollama or any OpenAI-compatible endpoint), and plugin OAuth token exchanges. The self-hosted routing engines an admin sets for the [Road-Trip](Road-Trip) addon (**Own routing engine**, **Own Valhalla instance**) go through it too when the server asks them itself, which it does for the MCP road trip tools. The planner asks them from the browser, so they must also be reachable from your users' devices. It deliberately permits loopback and LAN targets, so a model server on `localhost` or an identity provider on your LAN works **without** `ALLOW_INTERNAL_NETWORK`. It still resolves every hostname, re-checks every redirect hop, and always blocks link-local and cloud-metadata addresses (`169.254.0.0/16`, the full `fe80::/10`, and the AWS and Alibaba metadata addresses). The only way past is a single address listed in `ALLOW_LINK_LOCAL_IPS`, see [below](#a-link-local-address-you-need).
 
 **No guard** applies to the addresses an admin sets in the environment for place search: `TREK_PLACES_URL`, `NOMINATIM_URL` and `OVERPASS_URL`. They are configuration rather than user input, so a self-run copy of the [TREK Places API](TREK-Places-API), a Nominatim or an Overpass instance on your LAN or in the same Docker network is reached without `ALLOW_INTERNAL_NETWORK`.
 
-## Always blocked (no override possible)
+## Always blocked
 
-Under the strict guard, these ranges are blocked regardless of any setting:
+Under the strict guard, these ranges are blocked whatever `ALLOW_INTERNAL_NETWORK` says:
 
 | Range | Description |
 |---|---|
@@ -24,6 +24,8 @@ Under the strict guard, these ranges are blocked regardless of any setting:
 | `::ffff:127.x.x.x`, `::ffff:169.254.x.x` | IPv4-mapped loopback and link-local |
 
 The IPv6 link-local rule here matches the `fe80:` hextet only, which is narrower than the nominal `fe80::/10` prefix (`fe80:` to `febf:`). In practice that is the same set of addresses, since RFC 4291 link-local addresses are always `fe80::/64`. The relaxed guard covers the whole `/10`.
+
+The one way past this table is `ALLOW_LINK_LOCAL_IPS`, for a single IPv4 link-local address, see [below](#a-link-local-address-you-need).
 
 ## Blocked unless `ALLOW_INTERNAL_NETWORK=true`
 
@@ -50,6 +52,22 @@ A service in another container on the same Docker network counts as internal too
 See [Environment-Variables](Environment-Variables) for how to set environment variables.
 
 > **Admin:** Set `ALLOW_INTERNAL_NETWORK=true` in [Environment-Variables](Environment-Variables) before configuring Immich, Synology Photos, AirTrail, Dawarich or a document store on a LAN.
+
+## A link-local address you need
+
+A rootless Podman container reaches its host through `169.254.1.2`: `AddHost=keycloak.example.com:host-gateway` writes that address into the container's `/etc/hosts`. With the identity provider, or the reverse proxy in front of it, on the host, the OIDC login then fails with `[OIDC] Login error: Requests to link-local / cloud-metadata addresses are not allowed`, because both guards block `169.254.0.0/16`.
+
+Name that one address in `ALLOW_LINK_LOCAL_IPS`:
+
+```
+ALLOW_LINK_LOCAL_IPS=169.254.1.2
+```
+
+- The relaxed guard (OIDC, AI Parsing, plugin OAuth, your own routing engines) then reaches it with nothing else set.
+- The strict guard treats it as internal, like a `192.168.x` address, so Immich, a document store or any other integration behind it also needs `ALLOW_INTERNAL_NETWORK=true`.
+- Every other link-local address stays blocked. `169.254.169.x` and `169.254.170.x`, where AWS, GCP, Azure and the container services built on them hand out instance metadata and credentials, cannot be listed at all. TREK refuses to start with one of them in the list, and with any entry that is not a single IPv4 address such as `169.254.1.2`, so IPv6 link-local (`fe80::/10`) cannot be listed either.
+
+Several addresses are separated by commas. The list is read at startup, so restart TREK after changing it.
 
 ## DNS rebinding protection
 
