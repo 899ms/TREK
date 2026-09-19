@@ -183,20 +183,50 @@ Requires `journey:read` or `journey:write` scope.
 | `create_journey_share_link` | Create or update the public share link for a journey. Requires `journey:share`. |
 | `delete_journey_share_link` | Revoke the public share link for a journey. Requires `journey:share`. |
 
----
+### Dawarich _(Dawarich addon required)_
 
-### Roadtrip
-
-The Roadtrip addon must be enabled. These tools work without an open browser. The external assistant chooses places based on the traveller's interests, uses the existing trip, day, place and assignment tools to save them, and recalculates to check the result.
+Each tool asks for the scope of what it writes, so the scopes differ per tool. The connection itself (address, API key, test, disconnect) has no MCP tool. See [Dawarich](Dawarich).
 
 | Tool | Purpose | Scope |
 |---|---|---|
-| `get_roadtrip_context` | Saved days, visits, coordinates, stays, pinned times, vehicle preferences, route profiles, vias, tracks and manual boundaries | trips:read |
-| `calculate_roadtrip` | Calculated days, arrivals, departures, automatic pauses, driving warnings and range warnings; optional geometry | trips:read |
-| `get_roadtrip_settings` | Shared driving preferences for the specified trip | trips:read |
-| `update_roadtrip_settings` | Patch shared trip driving preferences, preserving other settings | trips:write |
-| `search_roadtrip_corridor` | Fuel, charging, rest areas, campsites, food, sights or hotels along a day | trips:read |
-| `update_route_via` | Move an existing routing handle and optionally change its outgoing leg | trips:write |
+| `list_dawarich_suggestions` | List the stays TREK pulled from the caller's Dawarich for review, optionally for one trip or one state (`new`, `accepted`, `dismissed`); 50 by default, up to 200 | `journey:read` |
+| `accept_dawarich_suggestion_as_place` | Turn a stay into a place on a trip, optionally on one of its days, with a corrected name, notes or coordinates | `places:write` |
+| `accept_dawarich_suggestion_as_journal_entry` | Turn a stay into a dated journal entry with a title, story, date and time | `journey:write` |
+| `mark_bucket_list_item_visited_from_dawarich` | Tick off the bucket list wish a stay was matched to, or another wish of the caller's | `atlas:write` |
+| `dismiss_dawarich_suggestion` | Dismiss a stay, or put a dismissed one back | `journey:write` |
+| `get_dawarich_trip_track` | Summary of a trip's recorded route per local day: segments, times, travel mode, distance and point counts, without the geometry. Read live from Dawarich, nothing stored | `journey:read` |
+
+### Document sync _(Documents addon required)_
+
+`get_trip_document_sync` and `list_trip_document_sync_issues` require `files:read`; `sync_trip_documents` requires `files:write`. Any member of the trip may call them. No tool connects a store or changes a binding: that hands TREK a credential to someone's document archive, and it stays with the trip owner in the file manager. See [Document-Sync](Document-Sync).
+
+| Tool | Description |
+|---|---|
+| `get_trip_document_sync` | Show whether the trip's documents are synced with a document store (Paperless-ngx, Papra, Nextcloud, OpenCloud or a Synology NAS), which tag, folder or space they are bound to, when the last run happened and how it went, and how many documents are synced, waiting, in conflict or missing in the store. |
+| `list_trip_document_sync_issues` | List the documents that need a person: conflicts, documents refused for their type or size, transfers that failed, and documents gone from the store. Returns `configured: false` for a trip that is not bound, and an empty list when everything is in step. |
+| `sync_trip_documents` | Run every binding of the trip now instead of waiting for the next scheduled check, and report how many documents came in, went out and are in conflict. Pass `full: true` to compare both sides in full. A binding whose owner left the trip, or whose store an admin switched off, is reported and not run. Safe to call repeatedly: a run already in progress is not started twice. |
+
+### Road trip _(Road trip addon required)_
+
+These tools work without an open browser. The external assistant chooses places based on the traveller's interests, uses the existing trip, day, place and assignment tools to save them, and recalculates to check the result. What each tool corresponds to in the planner is described on [Road-Trip](Road-Trip#mcp-tools).
+
+| Tool | Purpose | Scope |
+|---|---|---|
+| `get_roadtrip_context` | Saved days, visits, coordinates, stays, pinned times, vehicle preferences, route profiles, vias, tracks and manual boundaries | `trips:read` |
+| `calculate_roadtrip` | Calculated days, arrivals, departures, automatic pauses, driving warnings and range warnings; optional geometry | `trips:read` |
+| `get_roadtrip_settings` | Shared driving preferences for the specified trip | `trips:read` |
+| `update_roadtrip_settings` | Patch shared trip driving preferences, preserving other settings | `trips:write` |
+| `search_roadtrip_corridor` | Fuel, charging, rest areas, campsites, food, sights or hotels along a day | `trips:read` |
+| `update_route_via` | Move an existing routing handle and optionally change its outgoing leg | `trips:write` |
+| `list_route_vias` | A day's via points, or the whole trip's together with its followed tracks | `trips:read` |
+| `add_route_via`, `add_route_vias` | Add one via point, or a whole chain on one day | `trips:write` |
+| `reanchor_route_vias` | Re-pin a day's via points after its stops changed | `trips:write` |
+| `remove_route_via` | Remove a via point so the leg drives direct again | `trips:write` |
+| `list_day_boundaries`, `set_day_boundary` | Read or set dragged day endings; null restores the automatic ending | `trips:read` / `trips:write` |
+| `get_roadtrip_hazards` | Current DWD and GDACS notices with geometry, timestamps and source availability | `trips:read` |
+| `get_roadtrip_charging_info`, `lookup_roadtrip_charging_info` | Availability and published tariffs for a saved charging stop, or for a station by coordinate and name | `trips:read` |
+| `preview_google_maps_route` | Read the ordered stops of a Google Maps directions link; nothing is saved | `trips:read` |
+| `import_google_maps_route` | Append the reviewed stops to a day as places and visits | `places:write` |
 
 Driving preferences include daily times, day-ending mode, leg/day driving limits, fuel or electric vehicle specifications, fallback range, fill percentage, avoidance and route display. They belong to the specified trip and apply equally to all its travellers. Both settings tools require tripId. Changing driving preferences requires day-edit permission, as do changes to visits, vias and endings. Fixed visit times retain priority over automatic times. Turning daily travel times off preserves saved endings but stops applying them.
 
@@ -204,7 +234,19 @@ Calculation distances are metres, route durations seconds, and stays minutes. Se
 
 Corridor results include source attribution, distance along/from the route, failed areas and truncated areas. Follow `nextOffset` for remaining search rectangles. Filters include name or brand, socket type, minimum known charging power and `fromKm`/`toKm`. Unknown charging power remains unknown. Search never adds places automatically. Use the returned place information with `create_and_assign_place`, then move or reorder the assignment and re-anchor vias as needed. Recalculate after editing.
 
-Existing `list_route_vias`, `add_route_via`, `add_route_vias`, `reanchor_route_vias` and `remove_route_via` manage scenic detours and followed tracks. `list_day_boundaries`, `set_day_boundary` and `set_assignment_end_day` manage manual endings. The Places tool `import_trip_gpx` accepts GPX XML up to one million characters, uses the standard importer and requires places:write. It imports waypoints, routes and tracks without assigning them to days; `export_trip_gpx` exports the trip. Stay durations and place-level time defaults can be cleared with null through `update_place`.
+Corridor searches include installed search-provider plugins. Providers receive the category and search bounds, and the host filters hits to the route. The response lists successful and failed sources; a failed provider does not discard the remaining results.
+
+The via tools manage scenic detours and followed tracks. `list_day_boundaries`, `set_day_boundary` and `set_assignment_end_day` manage manual endings; `set_assignment_end_day` is a general assignment tool and is registered whether or not the addon is on. The Places tool `import_trip_gpx` accepts GPX XML up to one million characters, uses the standard importer and requires places:write. It imports waypoints, routes and tracks without assigning them to days; `export_trip_gpx` exports the trip. Stay durations and place-level time defaults can be cleared with null through `update_place`.
+
+`get_roadtrip_hazards` takes `tripId`. It does not reroute the trip. The shared `roadtrip_show_hazards` setting controls the online map overlay.
+
+Google Maps directions links can be reviewed with `preview_google_maps_route` and saved with `import_google_maps_route`. Import creates places and visits together in the supplied order, with trip access and place/day permission checks. Unresolved stops must be omitted from the confirmed input. The Google road geometry is not copied.
+
+`get_roadtrip_charging_info` accepts tripId and placeId. It requires trip access and the Road trip addon. It reports matching failures, unavailable feeds, freshness, known free capacity and unknown status counts separately. Published tariff components include currency, tax handling and conditions; they do not estimate a user's roaming price. Data source: [MobiData BW OCPDB](https://api.mobidata-bw.de/), with per-source attribution from its public source registry.
+
+`lookup_roadtrip_charging_info` answers the same question for a station that is not on the trip, by coordinate and name rather than by place id, which is what a hit found along the route has. It takes tripId, lat, lng and name, requires the same trip access and the same addon, and returns the same fields with the same caveats. The trip is there for the access check only and does not narrow the search. One station per call: it shares its cache with the saved-stop tool, and the registry behind it is public infrastructure. It carries no power rating and no socket count; those are OpenStreetMap tag data and travel with the corridor search result instead.
+
+---
 
 ## Addon-gated resources
 
@@ -235,19 +277,9 @@ Resources provide read-only access via `trek://` URIs. The following resources r
 
 ---
 
-Roadtrip also exposes `get_roadtrip_hazards` (`tripId`, trips read scope). It returns current DWD/GDACS notices with geometry, source timestamps and availability. This does not reroute the trip. The shared `roadtrip_show_hazards` setting controls the online map overlay.
-
 ## Related
 
 - [MCP-Tools-and-Resources](MCP-Tools-and-Resources)
 - [MCP-Scopes](MCP-Scopes)
 - [MCP-Prompts](MCP-Prompts)
 - [MCP-Setup](MCP-Setup)
-
-Roadtrip corridor searches include installed search-provider plugins. Providers receive the category and search bounds, and the host filters hits to the route. The response lists successful and failed sources; a failed provider does not discard the remaining results.
-
-Google Maps directions links can be reviewed with preview_google_maps_route and saved with import_google_maps_route. Import creates places and visits together in the supplied order, with trip access and place/day permission checks. Unresolved stops must be omitted from the confirmed input. The Google road geometry is not copied.
-
-get_roadtrip_charging_info accepts tripId and placeId. It requires trip access and the Roadtrip addon. It reports matching failures, unavailable feeds, freshness, known free capacity and unknown status counts separately. Published tariff components include currency, tax handling and conditions; they do not estimate a user's roaming price. Data source: [MobiData BW OCPDB](https://api.mobidata-bw.de/), with per-source attribution from its public source registry.
-
-lookup_roadtrip_charging_info answers the same question for a station that is not on the trip, by coordinate and name rather than by place id, which is what a hit found along the route has. It takes tripId, lat, lng and name, requires the same trip access and the same addon, and returns the same fields with the same caveats. The trip is there for the access check only and does not narrow the search. One station per call: it shares its cache with the saved-stop tool, and the registry behind it is public infrastructure. It carries no power rating and no socket count; those are OpenStreetMap tag data and travel with the corridor search result instead.

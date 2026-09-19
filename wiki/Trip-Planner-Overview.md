@@ -47,9 +47,11 @@ The active tab is saved in `sessionStorage` per trip, so switching between trips
 
 ## Roadtrip daily start and end times
 
+> The road trip addon has its own page: [Road-Trip](Road-Trip).
+
 Nearby station search results group into count badges when zoomed out. Click a badge to zoom into its stations. Stations that still overlap at close zoom appear in a selectable list. Planned stops, including photo markers, also group into count badges when zoomed out. Day endings remain separate. This works with all supported map providers in Roadtrip mode.
 
-In the Roadtrip view, open **Driving settings** and enter a **Day start** and **Day end** in HH:mm format. Both values enable automatic daily scheduling and connect the drives between days. Clear either field to return to the existing schedule. These preferences belong to the trip. All travellers see the same daily schedule, vehicle settings and driving limits. Members with permission to edit days can change them. Existing trips inherit their owner's previous values once; later changes affect only that trip.
+In the Roadtrip view, open **Driving settings** and enter a **Day start time** and **Day end time** in HH:mm format. Both values enable automatic daily scheduling and connect the drives between days. Clear either field to return to the existing schedule. These preferences belong to the trip. All travellers see the same daily schedule, vehicle settings and driving limits. Members with permission to edit days can change them. Existing trips inherit their owner's previous values once; later changes affect only that trip.
 
 Driving pauses at the end time and resumes from the same location at the next day's start time. Stops and visit durations determine where each pause falls. Editing, adding or removing stops recalculates the pauses and subsequent arrivals. If a visit crosses the end time, the remaining visit continues there the next morning before driving resumes.
 

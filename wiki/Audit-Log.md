@@ -135,6 +135,8 @@ A request for an account that can actually be reset writes **two** rows: one wit
 |---|---|
 | `immich.private_ip_configured` | Immich URL saved that resolves to a private IP |
 | `airtrail.private_ip_configured` | AirTrail URL saved that resolves to a private IP |
+| `dawarich.private_ip_configured` | Dawarich URL saved that resolves to a private IP |
+| `dawarich.disconnected` | A user disconnected their Dawarich instance |
 
 ## Log columns
 

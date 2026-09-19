@@ -46,6 +46,7 @@ On login, when the browser comes back online, and when you lift **Force offline 
 - Trips, days, places, packing items, to-dos, budget items, reservations, accommodations, trip members, tags, and categories.
 - File attachments that are neither photos nor videos (PDFs, documents, etc.) are downloaded and stored as blobs in IndexedDB. Videos are deliberately skipped — a single clip can be hundreds of megabytes and would evict the trip's real documents.
 - Map tiles are pre-fetched into the service-worker `map-tiles` cache for zoom levels 10–16 across each trip's bounding box, stopping at the zoom level that would push the total past 12 288 tiles (roughly 180 MB).
+- The places around each trip, up to 3000 from the [TREK Places API](TREK-Places-API) in one request (about a megabyte for a city), so place search and suggestions still answer offline. They are downloaded whether or not **Store map tiles offline** is on, refreshed only when the trip's area changes, and removed with the trip. See [Searching offline](Places-and-Search#searching-offline).
 
 > **Note:** A WebSocket reconnect does *not* run this sync. It replays your queued changes and then re-reads the trip you currently have open — days, places, packing items, to-dos, budget items, reservations and files — which refreshes that one trip's cached rows. It never re-downloads the bundles for your other trips, the file blobs or the map tiles; skipping the full sync there is deliberate, so a dropped socket on an otherwise online device doesn't run into the server's rate limiter.
 
