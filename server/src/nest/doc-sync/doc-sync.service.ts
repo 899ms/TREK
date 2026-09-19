@@ -237,6 +237,7 @@ export class DocSyncService {
     let conflicts = 0;
     let transfers = 0;
     let budgetExhausted = false;
+    let wroteUpstream = false;
     let softFailure: DocsyncErrorCode | undefined;
 
     for (const action of plan.actions) {
@@ -248,6 +249,7 @@ export class DocSyncService {
         budgetExhausted = true;
         break;
       }
+      if (changesProvider(action, link)) wroteUpstream = true;
       const outcome = await this.applyAction(action, { provider, ref, scope, link, conn });
       if (outcome === 'pulled') { pulled += 1; transfers += 1; }
       else if (outcome === 'pushed') { pushed += 1; transfers += 1; }
@@ -256,7 +258,23 @@ export class DocSyncService {
     }
 
     const state = softFailure || budgetExhausted ? 'partial' : 'ok';
-    this.recordLinkSuccess(link, listing.data.cursor, state, softFailure ?? null);
+    /**
+     * The cursor belongs to the listing this run started from, so it is only
+     * handed on while that listing still describes both sides.
+     *
+     * Paperless, Papra and Synology build theirs from what they list. A copy
+     * TREK uploaded and somebody deleted before the next run left the scope
+     * exactly as this listing had it, so the cursor came back unchanged and
+     * nothing flagged the copy or asked the mass-delete guard until something
+     * else moved in the scope. A copy TREK binned and somebody restored read
+     * the same way. A run that stopped short, at the transfer budget or on a
+     * failed download, left part of the listing undone, and under an unchanged
+     * cursor the planner never looks at the remote half again. Without one, the
+     * next run compares both sides in full and hands a cursor on if it ends
+     * clean.
+     */
+    const cursor = state === 'ok' && !wroteUpstream ? listing.data.cursor : null;
+    this.recordLinkSuccess(link, cursor, state, softFailure ?? null);
     if (pulled > 0 || pushed > 0) {
       this.realtime.broadcast(link.trip_id, 'docsync:changed', { linkId: link.id, pulled, pushed });
     }
@@ -766,24 +784,6 @@ export class DocSyncService {
     },
   ): void {
     const failed = patch.state === 'error';
-
-    if (patch.itemId !== null) {
-      /**
-       * The attempt counter, read before it is written.
-       *
-       * Two things needed it. The backoff was computed as
-       * `backoffSeconds(curve, 1)`, always the first step, so three of the
-       * four steps in the curve were unreachable and a provider that was down
-       * got asked again at the same short interval. And the counter only ever
-       * grew: a row that failed once a month reached the limit after six months
-       * of otherwise healthy syncing and was shelved for good. A successful
-       * pass now clears it, which is what makes the limit mean "six failures in
-       * a row" rather than "six failures ever".
-       */
-      const before = (this.db.connection
-        .prepare('SELECT attempts FROM document_sync_items WHERE id = ?')
-        .get(patch.itemId) as { attempts: number } | undefined)?.attempts ?? 0;
-      const attempts = failed ? before + 1 : 0;
     /**
      * A failed transfer leaves the pairing describing the copy TREK holds.
      *
@@ -804,6 +804,24 @@ export class DocSyncService {
     const remoteName = patch.remoteNameOverride ?? described?.name ?? null;
     const remoteSize = patch.remoteSize ?? described?.size ?? null;
     const remoteModifiedAt = patch.remoteModifiedAt ?? described?.remoteModifiedAt ?? null;
+
+    if (patch.itemId !== null) {
+      /**
+       * The attempt counter, read before it is written.
+       *
+       * Two things needed it. The backoff was computed as
+       * `backoffSeconds(curve, 1)`, always the first step, so three of the
+       * four steps in the curve were unreachable and a provider that was down
+       * got asked again at the same short interval. And the counter only ever
+       * grew: a row that failed once a month reached the limit after six months
+       * of otherwise healthy syncing and was shelved for good. A successful
+       * pass now clears it, which is what makes the limit mean "six failures in
+       * a row" rather than "six failures ever".
+       */
+      const before = (this.db.connection
+        .prepare('SELECT attempts FROM document_sync_items WHERE id = ?')
+        .get(patch.itemId) as { attempts: number } | undefined)?.attempts ?? 0;
+      const attempts = failed ? before + 1 : 0;
 
       this.db.connection
         .prepare(
@@ -1067,6 +1085,9 @@ export class DocSyncService {
         const row = byLink.get(l.id);
         return {
           ...this.config.publicLink(l, null),
+          // Paused rather than failed, so the card can say why nothing moves
+          // without the binding's own state being touched.
+          providerOff: this.isSwitchedOff(l),
           holdings: {
             inTrek: totalHere.n,
             atProvider: Number(row?.atProvider ?? 0),
@@ -1083,6 +1104,9 @@ export class DocSyncService {
 function isTransfer(action: PlanAction): boolean {
   return action.kind === 'pull' || action.kind === 'pull_update' || action.kind === 'push' || action.kind === 'push_update';
 }
-          // Paused rather than failed, so the card can say why nothing moves
-          // without the binding's own state being touched.
-          providerOff: this.isSwitchedOff(l),
+
+/** Whether carrying out the action asks the provider to change something. */
+function changesProvider(action: PlanAction, link: LinkRow): boolean {
+  if (action.kind === 'local_deleted') return link.delete_policy === 'trash';
+  return action.kind === 'push' || action.kind === 'push_update' || action.kind === 'rename_remote';
+}

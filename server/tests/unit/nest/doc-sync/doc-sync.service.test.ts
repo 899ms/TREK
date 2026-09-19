@@ -138,8 +138,14 @@ const provider = {
     _req: PushRequest,
   ): Promise<DocResult<PushResult>> =>
     ok({ remoteId: 'r-pushed', remoteVersion: 'v1', remoteModifiedAt: null, deduplicated: false })),
-  rename: vi.fn(async (): Promise<DocResult<{ remoteVersion: string }>> => ok({ remoteVersion: 'v2' })),
-  trash: vi.fn(async (): Promise<DocResult<void>> => ok(undefined)),
+  rename: vi.fn(async (
+    _conn: DocumentConnectionRef,
+    _scope: DocumentScopeRef,
+    _remoteId: string,
+    _name: string,
+  ): Promise<DocResult<{ remoteVersion: string }>> => ok({ remoteVersion: 'v2' })),
+  trash: vi.fn(async (_conn: DocumentConnectionRef, _scope: DocumentScopeRef, _remoteId: string): Promise<DocResult<void>> =>
+    ok(undefined)),
 };
 
 const storage = {
@@ -193,13 +199,13 @@ function makeLink(over: {
   failureCount?: number;
   nextAttemptAt?: string | null;
   lastSyncAt?: string | null;
+  providerId?: string;
 } = {}): LinkRow {
   scopeSeq += 1;
   const info = testDb
     .prepare(
       `INSERT INTO trip_document_links
          (trip_id, connection_id, provider_id, remote_scope_key, remote_root_id, remote_root_path, remote_label,
-  providerId?: string;
           direction, delete_policy, conflict_policy, sync_enabled, failure_count, next_attempt_at, created_by)
        VALUES (?, ?, ?, ?, '1', '/TREK/japan', 'Japan 2026', ?, ?, ?, ?, ?, ?, ?)`,
     )
@@ -286,16 +292,16 @@ const sqlTime = (modifier: string): string =>
  */
 const addons = { isAddonEnabled: vi.fn(() => true) };
 
+/** The admin's per-provider switch, which is a real row rather than a double. */
+const switchProvider = (id: string, on: boolean) =>
+  testDb.prepare('UPDATE document_providers SET enabled = ? WHERE id = ?').run(on ? 1 : 0, id);
+
 // ── Suite ────────────────────────────────────────────────────────────────────
 
 describe('DocSyncService', () => {
   beforeAll(() => {
     createTables(testDb);
     runMigrations(testDb);
-/** The admin's per-provider switch, which is a real row rather than a double. */
-const switchProvider = (id: string, on: boolean) =>
-  testDb.prepare('UPDATE document_providers SET enabled = ? WHERE id = ?').run(on ? 1 : 0, id);
-
     spoolDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trek-docsync-'));
 
     ownerId = createUser(testDb, { username: 'owner', email: 'owner@docsync.test' }).user.id;
@@ -336,15 +342,15 @@ const switchProvider = (id: string, on: boolean) =>
     testDb.prepare('DELETE FROM trip_files').run();
     testDb.prepare('DELETE FROM collab_messages').run();
     testDb.prepare('DELETE FROM collab_notes').run();
+    // Providers ship switched off; the fake one stands in for Paperless.
+    testDb.prepare('UPDATE document_providers SET enabled = 0').run();
+    switchProvider('paperless', true);
     for (const entry of fs.readdirSync(spoolDir)) fs.rmSync(path.join(spoolDir, entry), { force: true });
   });
 
   describe('dueLinks', () => {
     it('offers only bindings that are switched on, uncircuited and actually due', () => {
       const dueNow = makeLink();
-    // Providers ship switched off; the fake one stands in for Paperless.
-    testDb.prepare('UPDATE document_providers SET enabled = 0').run();
-    switchProvider('paperless', true);
       const overdue = makeLink({ nextAttemptAt: sqlTime('-1 hour') });
       makeLink({ nextAttemptAt: sqlTime('+1 hour') });
       makeLink({ syncEnabled: 0 });
@@ -944,22 +950,16 @@ const switchProvider = (id: string, on: boolean) =>
     it('fails a binding for a provider this build does not have', async () => {
       const link = makeLink();
       testDb.prepare("UPDATE trip_document_links SET provider_id = 'papra' WHERE id = ?").run(link.id);
+      switchProvider('papra', true);
 
       const res = await service.syncLink(config.getLink(link.id));
 
       expect(res.state).toBe('failed');
       expect(res.errorCode).toBe('provider_error');
       expect(provider.resolveScope).not.toHaveBeenCalled();
-      switchProvider('papra', true);
     });
   });
 
-  describe('status', () => {
-    it('reports the trip bindings together with a count per item state', () => {
-      const link = makeLink();
-      seedItem(link, { remoteId: 'r1', state: 'synced' });
-      seedItem(link, { remoteId: 'r2', state: 'synced' });
-      seedItem(link, { remoteId: 'r3', state: 'conflict' });
   /**
    * An administrator switching a provider off, or the Documents addon.
    *
@@ -1067,18 +1067,18 @@ const switchProvider = (id: string, on: boolean) =>
     });
   });
 
+  describe('status', () => {
+    it('reports the trip bindings together with a count per item state', () => {
+      const link = makeLink();
+      seedItem(link, { remoteId: 'r1', state: 'synced' });
+      seedItem(link, { remoteId: 'r2', state: 'synced' });
+      seedItem(link, { remoteId: 'r3', state: 'conflict' });
 
       const status = service.status(tripId);
 
       expect(status.links).toHaveLength(1);
       expect(status.items).toEqual({ synced: 2, conflict: 1 });
     });
-  });
-
-  describe('resolveConflict', () => {
-    /** A conflicted pairing: the provider moved on, and TREK holds its own copy. */
-    function seedConflict(link: LinkRow): { itemId: number; fileId: number } {
-      const fileId = makeFile({ name: 'boarding.pdf' });
 
     it('says which bindings are paused because their provider is switched off', () => {
       const off = makeLink();
@@ -1091,6 +1091,12 @@ const switchProvider = (id: string, on: boolean) =>
       expect(links.find((l) => l.id === off.id)?.providerOff).toBe(true);
       expect(links.find((l) => l.id === on.id)?.providerOff).toBe(false);
     });
+  });
+
+  describe('resolveConflict', () => {
+    /** A conflicted pairing: the provider moved on, and TREK holds its own copy. */
+    function seedConflict(link: LinkRow): { itemId: number; fileId: number } {
+      const fileId = makeFile({ name: 'boarding.pdf' });
       const itemId = seedItem(link, {
         remoteId: 'r1',
         remoteName: 'boarding.pdf',
@@ -1360,12 +1366,6 @@ const switchProvider = (id: string, on: boolean) =>
   });
 
   /**
-   * The attempt counter and the backoff curve, which were both stuck.
-   *
-   * The backoff was always computed at step 1, so three of the curve's four
-   * steps were unreachable and a provider that was down got asked again at the
-   * same short interval. And the counter only ever grew: a row that failed once
-  /**
    * A download that fails leaves the pairing where it was.
    *
    * The failed update used to write the provider's new version marker next to
@@ -1459,6 +1459,12 @@ const switchProvider = (id: string, on: boolean) =>
     });
   });
 
+  /**
+   * The attempt counter and the backoff curve, which were both stuck.
+   *
+   * The backoff was always computed at step 1, so three of the curve's four
+   * steps were unreachable and a provider that was down got asked again at the
+   * same short interval. And the counter only ever grew: a row that failed once
    * a month reached the limit after six months of otherwise healthy syncing and
    * was shelved permanently. Driven here through real runs, since the write is
    * private and a test hatch would only prove the hatch works.
@@ -2034,6 +2040,144 @@ const switchProvider = (id: string, on: boolean) =>
       expect(provider.push).not.toHaveBeenCalled();
       expect(fileRows()).toHaveLength(1);
       expect(itemRow(itemId)).toMatchObject({ remote_id: '/trek/b.pdf', remote_name: 'b.pdf', state: 'synced' });
+    });
+  });
+
+  /**
+   * The cursor a run hands the next one.
+   *
+   * Paperless, Papra and Synology build theirs from what they list, so a scope
+   * that ends up the way it was before a run answers "unchanged", and the run
+   * after it plans nothing upstream. A run used to store the cursor of the
+   * listing it started from whatever it then did, and an upload deleted at the
+   * provider before the next run left the scope exactly as that listing had it.
+   */
+  describe('the cursor a run leaves behind', () => {
+    /**
+     * A scope whose cursor is a digest of what it holds, the way those three
+     * build theirs, and which the run's own writes change.
+     */
+    function digestScope(documents: RemoteDocument[] = []): Map<string, RemoteDocument> {
+      const held = new Map(documents.map((d) => [d.remoteId, d]));
+      let seq = 0;
+      provider.list.mockImplementation(async (_conn, scope) => {
+        const cursor = `digest:${[...held.values()].map((d) => `${d.remoteId}@${d.remoteVersion}`).sort().join(',')}`;
+        return ok(listing([...held.values()], { cursor, cursorUnchanged: scope.cursor === cursor }));
+      });
+      provider.push.mockImplementation(async (_conn, _scope, req) => {
+        seq += 1;
+        const remoteId = `r-pushed-${seq}`;
+        held.set(remoteId, remoteDoc({ remoteId, name: req.fileName, contentHash: FILE_SHA }));
+        return ok({ remoteId, remoteVersion: 'v1', remoteModifiedAt: null, deduplicated: false });
+      });
+      provider.rename.mockImplementation(async (_conn, _scope, remoteId, name) => {
+        held.set(remoteId, { ...(held.get(remoteId) as RemoteDocument), name, remoteVersion: 'v2' });
+        return ok({ remoteVersion: 'v2' });
+      });
+      provider.trash.mockImplementation(async (_conn, _scope, remoteId) => {
+        held.delete(remoteId);
+        return ok(undefined);
+      });
+      return held;
+    }
+
+    it('flags a copy deleted at the provider right after TREK uploaded it', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'boarding.pdf' });
+      const held = digestScope();
+      expect(await service.syncLink(link)).toMatchObject({ state: 'ok', pushed: 1 });
+      const itemId = Number(itemRows()[0].id);
+
+      held.clear();
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run).toMatchObject({ state: 'ok', missing: 1 });
+      expect(itemRow(itemId)).toMatchObject({ state: 'remote_missing', file_id: fileId });
+      expect(itemRow(itemId).remote_missing_at).not.toBeNull();
+      expect(service.issues(tripId).map((r) => r.id)).toEqual([itemId]);
+    });
+
+    it('lets the mass-delete guard see a scope emptied right after an upload', async () => {
+      const link = makeLink();
+      for (let i = 0; i < 6; i += 1) makeFile({ name: `doc-${i}.pdf`, storageKey: `key-doc-${i}` });
+      const held = digestScope();
+      expect(await service.syncLink(link)).toMatchObject({ state: 'ok', pushed: 6 });
+
+      held.clear();
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run).toMatchObject({ state: 'partial', errorCode: 'mass_delete_guard', missing: 6 });
+      expect(itemRows().every((r) => r.state === 'synced')).toBe(true);
+    });
+
+    it('notices a copy TREK binned coming back, so a restore in TREK does not upload it twice', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'synced', contentSha256: FILE_SHA,
+      });
+      const copy = remoteDoc({ remoteId: 'r1' });
+      const held = digestScope([copy]);
+      await service.syncLink(link);
+      expect(held.size).toBe(0);
+      expect(itemRow(itemId).remote_trashed_at).not.toBeNull();
+
+      // Out of the provider's recycle bin as it went in, which is the scope the
+      // binning run listed.
+      held.set('r1', copy);
+      await service.syncLink(config.getLink(link.id));
+      expect(itemRow(itemId).remote_trashed_at).toBeNull();
+
+      testDb.prepare('UPDATE trip_files SET deleted_at = NULL WHERE id = ?').run(fileId);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(itemRow(itemId)).toMatchObject({ state: 'synced', remote_id: 'r1' });
+    });
+
+    it('lists in full after a rename it sent, then goes back to its cursor', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'new.pdf' });
+      seedItem(link, { remoteId: 'r1', remoteName: 'old.pdf', remoteVersion: 'v1', fileId, state: 'synced' });
+      digestScope([remoteDoc({ remoteId: 'r1', name: 'old.pdf' })]);
+
+      await service.syncLink(link);
+      expect(provider.rename).toHaveBeenCalledTimes(1);
+      expect(linkRow(link.id).remote_cursor).toBeNull();
+
+      await service.syncLink(config.getLink(link.id));
+      expect(linkRow(link.id).remote_cursor).toBe('digest:r1@v2');
+      const quiet = await service.syncLink(config.getLink(link.id));
+
+      expect(provider.list.mock.calls[2][1].cursor).toBe('digest:r1@v2');
+      expect(quiet).toMatchObject({ state: 'ok', pulled: 0, pushed: 0 });
+      expect(provider.rename).toHaveBeenCalledTimes(1);
+    });
+
+    it('pulls what the transfer budget left over on the next ordinary run', async () => {
+      const link = makeLink();
+      digestScope(Array.from({ length: MAX_TRANSFERS_PER_RUN + 5 }, (_, i) =>
+        remoteDoc({ remoteId: `r${i}`, name: `doc-${i}.pdf` })));
+
+      expect(await service.syncLink(link)).toMatchObject({ state: 'partial', pulled: MAX_TRANSFERS_PER_RUN });
+      const rest = await service.syncLink(config.getLink(link.id));
+
+      expect(rest).toMatchObject({ state: 'ok', pulled: 5 });
+      expect(fileRows()).toHaveLength(MAX_TRANSFERS_PER_RUN + 5);
+    });
+
+    it('fetches a failed download again while nothing moves upstream', async () => {
+      const link = makeLink();
+      digestScope([remoteDoc({ remoteId: 'r-new', name: 'fresh.pdf' })]);
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+      expect(await service.syncLink(link)).toMatchObject({ state: 'partial', errorCode: 'timeout' });
+
+      testDb.prepare('UPDATE document_sync_items SET next_attempt_at = NULL').run();
+      const retry = await service.syncLink(config.getLink(link.id));
+
+      expect(retry).toMatchObject({ state: 'ok', pulled: 1 });
+      expect(provider.fetch).toHaveBeenCalledTimes(2);
+      expect(itemRows()[0]).toMatchObject({ state: 'synced', remote_id: 'r-new' });
     });
   });
 
