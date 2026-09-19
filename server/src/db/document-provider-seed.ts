@@ -126,26 +126,11 @@ export function seedDocumentProviders(db: Database.Database): void {
 
   const insertField = db.prepare(
     `INSERT OR IGNORE INTO document_provider_fields
-       (provider_id, field_key, label, input_type, placeholder, hint, required, secret, settings_key, payload_key, sort_order)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (provider_id, field_key, label, input_type, placeholder, hint, required, secret, sort_order)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   for (const f of FIELDS) {
-    // settings_key and payload_key both carry the field key: every value lands
-    // in one JSON column here, but the generic client form reads those two and
-    // would need a branch if they were null.
-    insertField.run(
-      f.provider_id,
-      f.field_key,
-      f.label,
-      f.input_type,
-      f.placeholder,
-      f.hint,
-      f.required,
-      f.secret,
-      f.secret === 1 ? null : f.field_key,
-      f.field_key,
-      f.sort_order,
-    );
+    insertField.run(f.provider_id, f.field_key, f.label, f.input_type, f.placeholder, f.hint, f.required, f.secret, f.sort_order);
   }
 }
 

@@ -267,6 +267,55 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
     expect(row.secrets).toMatch(/^enc:v1:/);
   });
 
+  it('creates a folder or tag through the connection the path names', async () => {
+    const conns = await request(server)
+      .get(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId))
+      .expect(200);
+    const res = await request(server)
+      .post(`/api/trips/${tripId}/docsync/connections/${conns.body[0].id}/scopes`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ name: 'Norway' })
+      .expect(201);
+    expect(res.body).toMatchObject({ scopeKey: 'tag:2', label: 'Norway' });
+  });
+
+  it('still takes a scope request from a client that sends the connection in the body too', async () => {
+    // The body field was dropped in favour of the path. A client from before
+    // that change has it stripped by the contract instead of being refused.
+    const conns = await request(server)
+      .get(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId));
+    await request(server)
+      .post(`/api/trips/${tripId}/docsync/connections/${conns.body[0].id}/scopes`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ connectionId: conns.body[0].id, name: 'Norway' })
+      .expect(201);
+  });
+
+  it('creates no scope through a connection that belongs to another trip', async () => {
+    const otherTripId = createTrip(db as never, ownerId, { title: 'Elsewhere' }).id;
+    const conns = await request(server)
+      .get(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId));
+    await request(server)
+      .post(`/api/trips/${otherTripId}/docsync/connections/${conns.body[0].id}/scopes`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ name: 'Norway' })
+      .expect(404);
+  });
+
+  it('does not let a plain member create a folder or tag', async () => {
+    const conns = await request(server)
+      .get(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId));
+    await request(server)
+      .post(`/api/trips/${tripId}/docsync/connections/${conns.body[0].id}/scopes`)
+      .set('Cookie', sessionCookie(memberId))
+      .send({ name: 'Norway' })
+      .expect(403);
+  });
+
   it('binds the trip to a scope and reports it to every member', async () => {
     const conns = await request(server)
       .get(`/api/trips/${tripId}/docsync/connections`)
@@ -289,6 +338,34 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
     // The shared secret behind the webhook URL is never handed out, not even to
     // the owner: it exists so a provider can prove itself, not to be read.
     expect(asMember.body[0].webhookSecret).toBe('••••••••');
+  });
+
+  it('changes only the setting a patch names, through the real contract', async () => {
+    // The unit tests call the handler directly and never see the pipe. Through
+    // it, a schema that fills in defaults turns one switch into a full reset.
+    const links = await request(server)
+      .get(`/api/trips/${tripId}/docsync/links`)
+      .set('Cookie', sessionCookie(ownerId));
+    const linkId = links.body[0].id;
+    await request(server)
+      .patch(`/api/trips/${tripId}/docsync/links/${linkId}`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ direction: 'pull', deletePolicy: 'trash' })
+      .expect(200);
+
+    const paused = await request(server)
+      .patch(`/api/trips/${tripId}/docsync/links/${linkId}`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ syncEnabled: false })
+      .expect(200);
+
+    expect(paused.body).toMatchObject({
+      syncEnabled: false,
+      direction: 'pull',
+      deletePolicy: 'trash',
+      conflictPolicy: 'manual',
+      remoteLabel: 'Japan 2026',
+    });
   });
 
   it('refuses a binding whose connection belongs to another trip', async () => {

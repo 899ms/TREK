@@ -1,11 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import crypto from 'crypto';
-import {
-  DOCSYNC_SECRET_MASK,
-  type DocsyncConnectionInput,
-  type DocsyncLinkInput,
-  type DocsyncScopeOption,
-} from '@trek/shared';
+import { DOCSYNC_SECRET_MASK, type DocsyncConnectionInput, type DocsyncLinkInput } from '@trek/shared';
 import { DatabaseService } from '../database/database.service';
 import { checkSsrf } from '../../utils/ssrfGuard';
 import { DocumentProviderRegistry } from './document-provider.registry';
@@ -315,7 +310,15 @@ export class DocSyncConfigService {
     };
   }
 
-  createLink(tripId: number, userId: number, input: DocsyncLinkInput, scope: DocsyncScopeOption | null): DocResult<LinkRow> {
+  /**
+   * The anchor fields (`remoteRootId`, `remoteRootPath`, `remoteLabel`) are
+   * what the picker was handed by `listScopes` or `createScope` a moment
+   * earlier, sent back by the client. Taking them on trust is fine: only the
+   * trip owner or an instance admin gets here, and an anchor typed in by hand
+   * still goes through the connection's own credential, so it cannot open
+   * anything that credential could not open anyway.
+   */
+  createLink(tripId: number, userId: number, input: DocsyncLinkInput): DocResult<LinkRow> {
     const conn = this.getConnection(input.connectionId);
     if (!conn || conn.trip_id !== tripId) {
       return { success: false, error: { code: 'not_found', detail: 'connection not found for this trip' } };
@@ -343,9 +346,9 @@ export class DocSyncConfigService {
         input.connectionId,
         conn.provider_id,
         input.scopeKey,
-        scope?.remoteRootId ?? input.remoteRootId ?? null,
-        scope?.remoteRootPath ?? input.remoteRootPath ?? null,
-        scope?.label ?? input.remoteLabel ?? '',
+        input.remoteRootId ?? null,
+        input.remoteRootPath ?? null,
+        input.remoteLabel ?? '',
         input.direction,
         input.deletePolicy,
         input.conflictPolicy,

@@ -440,14 +440,24 @@ describe('the scope picker', () => {
       data: { scopeKey: 'tag:9', label: 'Norway', remoteRootId: '9', remoteRootPath: '/TREK/norway' },
     } as never);
 
-    await expect(controller.createScope(String(tripId), String(conn.id), owner, { connectionId: conn.id, name: 'Norway' }))
+    await expect(controller.createScope(String(tripId), String(conn.id), owner, { name: 'Norway' }))
       .resolves.toMatchObject({ scopeKey: 'tag:9', label: 'Norway' });
+    expect(paperless.createScope).toHaveBeenCalledWith(expect.objectContaining({ connectionId: conn.id }), 'Norway');
+  });
+
+  it('creates nothing through a connection that belongs to a different trip', async () => {
+    // The connection comes from the path and nowhere else, so the path is what
+    // has to match the trip the caller was admitted to.
+    const conn = await storedPaperless();
+    const err = await thrown(() => controller.createScope(String(otherTripId), String(conn.id), admin, { name: 'Norway' }));
+    expect(err.getStatus()).toBe(404);
+    expect(paperless.createScope).not.toHaveBeenCalled();
   });
 
   it('turns a refused creation into a 400 carrying the provider code', async () => {
     const conn = await storedPaperless();
     paperless.createScope.mockResolvedValueOnce({ success: false, error: { code: 'forbidden' } } as never);
-    const err = await thrown(() => controller.createScope(String(tripId), String(conn.id), owner, { connectionId: conn.id, name: 'Norway' }));
+    const err = await thrown(() => controller.createScope(String(tripId), String(conn.id), owner, { name: 'Norway' }));
     expect(err.getStatus()).toBe(400);
     expect(err.message).toBe('forbidden');
   });
@@ -695,9 +705,9 @@ describe('a manual run and the shelved rows', () => {
 /**
  * The trip the route was authorised against is now passed on to the service.
  *
- * `assertOwner` proves the caller owns the trip in the URL and says nothing
- * about whether the item id in the path belongs to that trip — the id is a
- * plain integer, and nothing tied the two together. The check itself lives in
+ * `assertCanManage` proves the caller may manage the trip in the URL and says
+ * nothing about whether the item id in the path belongs to that trip: the id is
+ * a plain integer, and nothing tied the two together. The check itself lives in
  * the service (where the row is), so what belongs here is that the trip reaches
  * it at all.
  */

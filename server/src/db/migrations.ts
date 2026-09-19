@@ -4959,10 +4959,12 @@ function runMigrations(db: Database.Database): void {
      * Journey cascade runs `UPDATE photo_providers SET enabled = 0` with no
      * WHERE clause, and migrations are append-only — reusing those tables would
      * change the behaviour of three existing paths, which is exactly what the
-     * no-breaking-changes rule forbids. The column set is copied verbatim so
-     * the same generic settings form renders both kinds without a special case,
-     * including `settings_key`/`payload_key`, which are redundant here (every
-     * value lands in one JSON column) but keep the client branch-free.
+     * no-breaking-changes rule forbids. The field columns follow
+     * `photo_provider_fields` except for `settings_key` and `payload_key`.
+     * Those map a photo field onto a settings key and a request key; a document
+     * field is stored under its own `field_key` in one JSON column, and the
+     * connect form takes its fields from /docsync/providers rather than from
+     * the generic settings form, so nothing would ever read them.
      */
     () => {
       db.exec(`
@@ -4985,8 +4987,6 @@ function runMigrations(db: Database.Database): void {
           hint TEXT,
           required INTEGER DEFAULT 0,
           secret INTEGER DEFAULT 0,
-          settings_key TEXT,
-          payload_key TEXT,
           sort_order INTEGER DEFAULT 0,
           UNIQUE(provider_id, field_key)
         );

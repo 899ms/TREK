@@ -49,8 +49,9 @@ import {
  * needs a field to render rather than an exception. Everything else answers the
  * status the failure deserves.
  *
- * Only the trip owner may change a binding. It hands TREK a credential that
- * usually reaches the owner's entire document archive, so widening this to
+ * Only the trip owner may change a binding (plus an instance admin, who
+ * overrides trip permissions everywhere else too). It hands TREK a credential
+ * that usually reaches the owner's entire document archive, so widening this to
  * every member would let any member point the trip at a folder the owner never
  * meant to share. Reading the status is open to all members — they need to know
  * where their documents are going.
@@ -67,12 +68,16 @@ export class DocSyncController {
   ) {}
 
   /**
-   * Trip ownership, checked here rather than through @RequirePermission: the
+   * The trip owner or an instance admin, the same rule as `canManageDocSync`
+   * on the client. Checked here rather than through @RequirePermission: the
    * permission table has no "manage integrations" action and inventing one
    * would grant it to every trip_member by default, which is the opposite of
    * what a credential this broad needs.
+   *
+   * The 403 still says "owner": an admin never sees it, and to everybody who
+   * does, the owner is the person to ask.
    */
-  private assertOwner(tripId: string, user: User): void {
+  private assertCanManage(tripId: string, user: User): void {
     if (user.role === 'admin') return;
     const trip = this.db.get<{ user_id: number }>('SELECT user_id FROM trips WHERE id = ?', tripId);
     if (!trip) throw new HttpException('Trip not found', 404);
@@ -117,7 +122,7 @@ export class DocSyncController {
     @CurrentUser() user: User,
     @Body() body: DocsyncConnectionDto,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     if (!this.config.enabledProviderIds().includes(body.providerId)) {
       throw new HttpException(`Provider: "${body.providerId}" is not enabled, contact server administrator`, 400);
     }
@@ -138,7 +143,7 @@ export class DocSyncController {
     @CurrentUser() user: User,
     @Body() body: DocsyncConnectionTestDto,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const provider = this.registry.get(body.providerId);
     if (!provider) return { connected: false, error: 'unknown_provider' };
 
@@ -187,7 +192,7 @@ export class DocSyncController {
     @Param('connectionId') connectionId: string,
     @CurrentUser() user: User,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const conn = this.config.getConnection(Number(connectionId));
     if (!conn || conn.trip_id !== Number(tripId)) throw new HttpException('Connection not found', 404);
     this.config.deleteConnection(conn.id);
@@ -204,7 +209,7 @@ export class DocSyncController {
     @CurrentUser() user: User,
     @Query('q') q?: string,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const conn = this.config.getConnection(Number(connectionId));
     if (!conn || conn.trip_id !== Number(tripId)) throw new HttpException('Connection not found', 404);
     const provider = this.registry.get(conn.provider_id);
@@ -221,7 +226,7 @@ export class DocSyncController {
     @CurrentUser() user: User,
     @Body() body: DocsyncScopeCreateDto,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const conn = this.config.getConnection(Number(connectionId));
     if (!conn || conn.trip_id !== Number(tripId)) throw new HttpException('Connection not found', 404);
     const provider = this.registry.get(conn.provider_id);
@@ -247,8 +252,8 @@ export class DocSyncController {
     @Body() body: DocsyncLinkDto,
     @Req() req: Request,
   ) {
-    this.assertOwner(tripId, user);
-    const res = this.config.createLink(Number(tripId), Number(user.id), body, null);
+    this.assertCanManage(tripId, user);
+    const res = this.config.createLink(Number(tripId), Number(user.id), body);
     if (docFailed(res)) throw new HttpException(res.error.detail || res.error.code, 400);
 
     // Subscribe where the provider lets TREK do it itself. A failure here is
@@ -288,7 +293,7 @@ export class DocSyncController {
     @Body() body: DocsyncLinkUpdateDto,
     @Req() req: Request,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const link = this.config.getLink(Number(linkId));
     if (!link || link.trip_id !== Number(tripId)) throw new HttpException('Link not found', 404);
     const updated = this.config.updateLink(link.id, body);
@@ -302,7 +307,7 @@ export class DocSyncController {
     @Param('linkId') linkId: string,
     @CurrentUser() user: User,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const link = this.config.getLink(Number(linkId));
     if (!link || link.trip_id !== Number(tripId)) throw new HttpException('Link not found', 404);
 
@@ -368,7 +373,7 @@ export class DocSyncController {
     @CurrentUser() user: User,
     @Body() body: DocsyncResolveConflictDto,
   ) {
-    this.assertOwner(tripId, user);
+    this.assertCanManage(tripId, user);
     const ok = await this.sync.resolveConflict(Number(itemId), body.keep, Number(tripId));
     if (!ok) throw new HttpException('Item is not in conflict', 400);
     return { success: true };

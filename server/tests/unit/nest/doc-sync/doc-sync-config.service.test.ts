@@ -106,7 +106,7 @@ function linkInput(connectionId: number, over: Partial<DocsyncLinkInput> = {}): 
 }
 
 function link(connectionId: number, over: Partial<DocsyncLinkInput> = {}): LinkRow {
-  const result = svc.createLink(TRIP, OWNER, linkInput(connectionId, over), null);
+  const result = svc.createLink(TRIP, OWNER, linkInput(connectionId, over));
   if (docFailed(result)) throw new Error(`fixture link refused: ${JSON.stringify(result.error)}`);
   return result.data;
 }
@@ -363,12 +363,11 @@ describe('toScopeRef', () => {
     // The adapters take a ref object rather than positional arguments because
     // an id and a path swapped compile cleanly and then read the wrong folder.
     const conn = await connect();
-    const created = svc.createLink(TRIP, OWNER, linkInput(conn.id, { scopeKey: 'fileid:437' }), {
-      scopeKey: 'fileid:437',
-      label: 'Japan 2026',
-      remoteRootId: '437',
-      remoteRootPath: '/TREK/japan',
-    });
+    const created = svc.createLink(
+      TRIP,
+      OWNER,
+      linkInput(conn.id, { scopeKey: 'fileid:437', remoteRootId: '437', remoteRootPath: '/TREK/japan' }),
+    );
     expect(created.success).toBe(true);
     const row = created.success ? created.data : ({} as LinkRow);
     testDb.prepare('UPDATE trip_document_links SET remote_cursor = ? WHERE id = ?').run('etag-9', row.id);
@@ -388,7 +387,7 @@ describe('createLink', () => {
   it('returns the binding that already exists rather than making a second one', async () => {
     const conn = await connect();
     const first = link(conn.id);
-    const again = svc.createLink(TRIP, MEMBER, linkInput(conn.id, { remoteLabel: 'renamed' }), null);
+    const again = svc.createLink(TRIP, MEMBER, linkInput(conn.id, { remoteLabel: 'renamed' }));
     expect(again.success && again.data.id).toBe(first.id);
     expect(svc.listLinks(TRIP)).toHaveLength(1);
   });
@@ -404,30 +403,37 @@ describe('createLink', () => {
   it('refuses a connection that belongs to somebody else\'s trip', async () => {
     const otherTrip = createTrip(testDb, MEMBER, { title: 'Not yours' }).id;
     const conn = await connect();
-    const result = svc.createLink(otherTrip, MEMBER, linkInput(conn.id), null);
+    const result = svc.createLink(otherTrip, MEMBER, linkInput(conn.id));
     expect(result.success).toBe(false);
     expect(result.success === false && result.error.code).toBe('not_found');
     expect(svc.listLinks(otherTrip)).toHaveLength(0);
   });
 
   it('refuses a connection id that does not exist at all', async () => {
-    const result = svc.createLink(TRIP, OWNER, linkInput(9999), null);
+    const result = svc.createLink(TRIP, OWNER, linkInput(9999));
     expect(result.success).toBe(false);
   });
 
-  it('takes the anchor from the scope the user picked, not from what the client sent', async () => {
+  it('stores the anchor the picker sent back with the scope key', async () => {
     const conn = await connect();
     const result = svc.createLink(
       TRIP,
       OWNER,
-      linkInput(conn.id, { remoteRootId: 'stale', remoteRootPath: '/stale', remoteLabel: 'stale' }),
-      { scopeKey: 'tag:1', label: 'Japan 2026', remoteRootId: '17', remoteRootPath: '/TREK/japan' },
+      linkInput(conn.id, { remoteRootId: '17', remoteRootPath: '/TREK/japan', remoteLabel: 'Japan 2026' }),
     );
     expect(result.success && result.data).toMatchObject({
+      remote_scope_key: 'tag:1',
       remote_root_id: '17',
       remote_root_path: '/TREK/japan',
       remote_label: 'Japan 2026',
     });
+  });
+
+  it('stores NULL for an anchor field the client left out', async () => {
+    // Synology binds by path alone, so its options carry no root id at all.
+    const conn = await connect();
+    const result = svc.createLink(TRIP, OWNER, linkInput(conn.id));
+    expect(result.success && result.data).toMatchObject({ remote_root_id: null, remote_root_path: null });
   });
 
   it('gives every binding its own webhook token and keeps the secret out of the public view', async () => {

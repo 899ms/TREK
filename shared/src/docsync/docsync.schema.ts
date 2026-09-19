@@ -105,9 +105,13 @@ export type DocsyncScopeOption = z.infer<typeof docsyncScopeOptionSchema>;
  * Creating a scope rather than picking one. Only providers with a container
  * concept accept this (a WebDAV folder, an OpenCloud space, a Paperless tag,
  * a Papra tag); the adapter reports whether it can.
+ *
+ * The connection comes from the path (`connections/:connectionId/scopes`) and
+ * is not repeated here. A copy in the body was never read and only let one
+ * request name two different connections; a client that still sends it has
+ * the key stripped rather than refused.
  */
 export const docsyncScopeCreateSchema = z.object({
-  connectionId: idSchema,
   /** Name for the new folder, tag or space. */
   name: z.string().trim().min(1).max(200),
 });
@@ -155,9 +159,22 @@ export type DocsyncLinkInput = z.infer<typeof docsyncLinkInputSchema>;
  * it would leave them all pointing somewhere else. The root fields are left out
  * rather than ignored — they were accepted and silently dropped, so a client
  * sending one was told the move had happened.
+ *
+ * Spelled out instead of derived from the input schema with `.partial()`. In
+ * Zod 4 a `.default()` still fires inside an optional field, so the derived
+ * version filled in every default the patch left out: `{ syncEnabled: false }`
+ * arrived as a full set of settings and reset direction, both policies and the
+ * label with it. A pull-only binding turned two-way the moment somebody paused
+ * it.
  */
-export const docsyncLinkUpdateSchema = docsyncLinkInputSchema
-  .omit({ connectionId: true, scopeKey: true, remoteRootId: true, remoteRootPath: true })
+export const docsyncLinkUpdateSchema = z
+  .object({
+    remoteLabel: z.string().max(512),
+    direction: docsyncDirectionSchema,
+    deletePolicy: docsyncDeletePolicySchema,
+    conflictPolicy: docsyncConflictPolicySchema,
+    syncEnabled: z.boolean(),
+  })
   .partial();
 
 // ── Sync state ───────────────────────────────────────────────────────────────

@@ -1375,7 +1375,7 @@ export const docsyncApi = {
   listScopes: (tripId: number | string, connectionId: number, q?: string) =>
     apiClient.get(`/trips/${tripId}/docsync/connections/${connectionId}/scopes`, { params: q ? { q } : {} }).then(r => r.data),
   createScope: (tripId: number | string, connectionId: number, name: string) =>
-    apiClient.post(`/trips/${tripId}/docsync/connections/${connectionId}/scopes`, { connectionId, name }).then(r => r.data),
+    apiClient.post(`/trips/${tripId}/docsync/connections/${connectionId}/scopes`, { name }).then(r => r.data),
   listLinks: (tripId: number | string) => apiClient.get(`/trips/${tripId}/docsync/links`).then(r => r.data),
   createLink: (tripId: number | string, data: unknown) => apiClient.post(`/trips/${tripId}/docsync/links`, data).then(r => r.data),
   updateLink: (tripId: number | string, linkId: number, data: unknown) => apiClient.patch(`/trips/${tripId}/docsync/links/${linkId}`, data).then(r => r.data),
