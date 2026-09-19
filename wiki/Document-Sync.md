@@ -309,7 +309,7 @@ See [MCP-Addon-Tools](MCP-Addon-Tools) and [MCP-Scopes](MCP-Scopes).
 | **Failed** | The store could not be used. The notice line names the reason; TREK retries with the backoff described above. |
 | **Sign in again** | The store refused the stored credential while TREK was listing documents. More often a refused credential shows as **Failed** with *The credentials were refused.* The usual causes: a revoked Paperless-ngx token or Papra key, a deleted app password or app token, a changed DSM password, or TREK removed from the account's trusted devices in DSM. If the credential still exists in the store, **Sync now** tries again. The connection form only opens for a store the trip has not been connected to yet, so a replaced credential cannot be entered from the trip at the moment. |
 | **Folder is gone** | The bound tag, folder or space no longer exists. TREK does not recreate it. **Disconnect**, then pick the store again under **Add another** and bind a new, empty one; TREK's documents go up into it. |
-| **Owner left the trip** | The person whose account the store was connected with is no longer on the trip. The binding stopped for good and **Sync now** is refused. Documents stay where they are on both sides. Once that person is back on the trip, switching **Sync automatically** on lets it run again. |
+| **Owner left the trip** | The person whose account the store was connected with is no longer on the trip. The binding stopped and **Sync now** is refused, also for a paused binding. Documents stay where they are on both sides. Once that person is back on the trip, switching **Sync automatically** on lets it run again; until then the switch stays off. |
 
 ### Messages
 

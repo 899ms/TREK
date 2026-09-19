@@ -101,7 +101,7 @@ export class DocSyncMcp {
       // An orphaned binding stays stopped, as it does on the REST route and for
       // the scheduler: its credential belongs to somebody who has left the trip,
       // and a run would use it anyway.
-      if (link.last_sync_state === 'orphaned') {
+      if (this.config.isOrphaned(link)) {
         results.push({ linkId: link.id, provider: link.provider_id, state: 'orphaned', errorCode: 'orphaned' });
         continue;
       }

@@ -411,6 +411,14 @@ export class DocSyncConfigService {
   updateLink(id: number, patch: Partial<DocsyncLinkInput>): LinkRow | undefined {
     const sets: string[] = [];
     const values: unknown[] = [];
+    // Sync automatically is the way back for an orphaned binding, but only once
+    // the person whose credential it runs under is on the trip again. Until
+    // then the switch stays off rather than handing that credential back.
+    const current = patch.syncEnabled === true ? this.getLink(id) : undefined;
+    if (current?.last_sync_state === 'orphaned') {
+      if (this.ownerLeft(current.connection_id)) patch = { ...patch, syncEnabled: undefined };
+      else sets.push("last_sync_state = 'never'");
+    }
     if (patch.direction !== undefined) { sets.push('direction = ?'); values.push(patch.direction); }
     if (patch.deletePolicy !== undefined) { sets.push('delete_policy = ?'); values.push(patch.deletePolicy); }
     if (patch.conflictPolicy !== undefined) { sets.push('conflict_policy = ?'); values.push(patch.conflictPolicy); }
@@ -465,6 +473,29 @@ export class DocSyncConfigService {
         : null,
       webhookSecret: link.webhook_secret ? DOCSYNC_SECRET_MASK : null,
     };
+  }
+
+  /**
+   * Whether a binding must not run. The sweep below marks it, but only while
+   * Sync automatically is on, so a paused binding whose owner left is not
+   * marked; every path that starts a run asks here rather than reading the
+   * mark alone.
+   */
+  isOrphaned(link: LinkRow): boolean {
+    return link.last_sync_state === 'orphaned' || this.ownerLeft(link.connection_id);
+  }
+
+  private ownerLeft(connectionId: number): boolean {
+    return !!this.db.connection
+      .prepare(
+        `SELECT 1 FROM document_connections c
+          WHERE c.id = ?
+            AND c.owner_user_id NOT IN (
+              SELECT tm.user_id FROM trip_members tm WHERE tm.trip_id = c.trip_id
+              UNION SELECT t.user_id FROM trips t WHERE t.id = c.trip_id
+            )`,
+      )
+      .get(connectionId);
   }
 
   /**

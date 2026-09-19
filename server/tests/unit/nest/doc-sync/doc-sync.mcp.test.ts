@@ -46,7 +46,12 @@ interface Setup {
 function makeMcp(over: Partial<Setup> = {}) {
   const setup: Setup = { access: true, links: [], status: {}, issues: [], addonOn: true, off: [], ...over };
   const files = { verifyTripAccess: vi.fn(() => (setup.access ? { id: 3, user_id: 7 } : undefined)) };
-  const config = { listLinks: vi.fn(() => setup.links) };
+  const config = {
+    listLinks: vi.fn(() => setup.links),
+    // The real helper also asks whether the owner is still on the trip; here
+    // the mark stands in for both.
+    isOrphaned: vi.fn((l: LinkRow) => l.last_sync_state === 'orphaned'),
+  };
   const sync = {
     status: vi.fn(() => setup.status),
     issues: vi.fn(() => setup.issues),

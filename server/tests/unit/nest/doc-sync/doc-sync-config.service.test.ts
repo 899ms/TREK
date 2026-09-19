@@ -645,3 +645,58 @@ describe('markOrphanedLinks', () => {
     expect(svc.getLink(paused.id)?.last_sync_state).toBe('never');
   });
 });
+
+describe('isOrphaned', () => {
+  async function bind(ownerUserId: number): Promise<LinkRow> {
+    return link((await connect({}, ownerUserId)).id);
+  }
+
+  it('answers yes for a paused binding whose owner left, which the sweep never marks', async () => {
+    const paused = await bind(MEMBER);
+    svc.updateLink(paused.id, { syncEnabled: false });
+    testDb.prepare('DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?').run(TRIP, MEMBER);
+
+    expect(svc.markOrphanedLinks()).toBe(0);
+    expect(svc.isOrphaned(svc.getLink(paused.id)!)).toBe(true);
+  });
+
+  it('answers yes for a marked binding, and no while the owner is on the trip', async () => {
+    const kept = await bind(OWNER);
+    expect(svc.isOrphaned(kept)).toBe(false);
+
+    testDb.prepare("UPDATE trip_document_links SET last_sync_state = 'orphaned' WHERE id = ?").run(kept.id);
+    expect(svc.isOrphaned(svc.getLink(kept.id)!)).toBe(true);
+  });
+
+  it('leaves a connection that is gone to the run, which reports it as not found', async () => {
+    const bound = await bind(OWNER);
+    expect(svc.isOrphaned({ ...bound, connection_id: 999999 })).toBe(false);
+  });
+});
+
+describe('switching an orphaned binding back on', () => {
+  async function orphan(): Promise<LinkRow> {
+    const bound = link((await connect({}, MEMBER)).id);
+    testDb.prepare('DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?').run(TRIP, MEMBER);
+    svc.markOrphanedLinks();
+    return bound;
+  }
+
+  it('keeps it off while its owner is still gone, and changes the rest of the patch', async () => {
+    const bound = await orphan();
+
+    const res = svc.updateLink(bound.id, { syncEnabled: true, direction: 'pull' });
+
+    expect(res).toMatchObject({ sync_enabled: 0, last_sync_state: 'orphaned', direction: 'pull' });
+  });
+
+  it('lets it run again once its owner is back on the trip', async () => {
+    const bound = await orphan();
+    testDb.prepare('INSERT INTO trip_members (trip_id, user_id) VALUES (?, ?)').run(TRIP, MEMBER);
+
+    const res = svc.updateLink(bound.id, { syncEnabled: true });
+
+    expect(res).toMatchObject({ sync_enabled: 1, last_sync_state: 'never' });
+    expect(svc.isOrphaned(res!)).toBe(false);
+  });
+});

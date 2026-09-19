@@ -112,6 +112,7 @@ export class DocSyncService {
       .prepare(
         `SELECT * FROM trip_document_links
           WHERE sync_enabled = 1
+            AND last_sync_state != 'orphaned'
             AND failure_count < ?
             AND (next_attempt_at IS NULL OR next_attempt_at <= CURRENT_TIMESTAMP)
             AND provider_id IN (SELECT id FROM document_providers WHERE enabled = 1)
@@ -175,6 +176,12 @@ export class DocSyncService {
     // run after binding reach this without asking beforehand.
     if (this.isSwitchedOff(link)) {
       return { state: 'disabled', pulled: 0, pushed: 0, conflicts: 0, missing: 0 };
+    }
+    // An orphaned binding runs for nobody. Its credential belongs to somebody
+    // who has left the trip, and a webhook or a resolved conflict reach this
+    // without asking beforehand.
+    if (this.config.isOrphaned(link)) {
+      return { state: 'orphaned', pulled: 0, pushed: 0, conflicts: 0, missing: 0 };
     }
     const conn = this.config.getConnection(link.connection_id);
     if (!conn) {
