@@ -1284,6 +1284,156 @@ describe('exportCollection / importCollection (#2198)', () => {
   });
 });
 
+// ── The same file into a list that is already there (#2301 follow-up) ────────
+
+describe('importIntoCollection', () => {
+  const file = (places: unknown[], labels?: { name: string; color?: string }[]) => ({
+    format: 'trek.collection' as const, version: 1, name: 'From a friend',
+    description: 'Their notes', color: '#ef4444', ...(labels ? { labels } : {}), places,
+  });
+
+  it('COLLECTIONS-SVC-120: adds the file to the list and leaves the list itself alone', () => {
+    const owner = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Lisbon', description: 'Mine', color: '#111827' });
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Time Out Market' });
+
+    const result = svc.importIntoCollection(owner.id, col.id, { file: file([{ name: 'Belém' }, { name: 'Alfama' }]) });
+
+    expect(result).toMatchObject({ imported: 2, skipped: 0, duplicates: 0 });
+    const after = svc.getCollection(owner.id, col.id);
+    expect(after.collection).toMatchObject({ name: 'Lisbon', description: 'Mine', color: '#111827' });
+    expect(after.places.map(p => p.name)).toEqual(['Time Out Market', 'Belém', 'Alfama']);
+    // Appended after what was there, so a manual order survives.
+    const orders = testDb.prepare('SELECT name, sort_order FROM collection_places WHERE collection_id = ? ORDER BY sort_order').all(col.id);
+    expect(orders).toEqual([
+      { name: 'Time Out Market', sort_order: 0 },
+      { name: 'Belém', sort_order: 1 },
+      { name: 'Alfama', sort_order: 2 },
+    ]);
+  });
+
+  it('COLLECTIONS-SVC-121: a place the list already has is counted and left exactly as it was', () => {
+    const owner = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Lisbon' });
+    const mine = svc.savePlace(owner.id, {
+      collection_id: col.id, name: 'Time Out Market', notes: 'Before noon', status: 'visited', osm_id: 'node/1',
+    }).place!;
+
+    const result = svc.importIntoCollection(owner.id, col.id, { file: file([
+      { name: 'Time Out Market', notes: 'Overrated', status: 'idea' },
+      { name: 'Renamed at the source', osm_id: 'node/1' },
+      { name: 'Belém' },
+    ]) });
+
+    expect(result).toMatchObject({ imported: 1, duplicates: 2, skipped: 0 });
+    const places = svc.getCollection(owner.id, col.id).places;
+    expect(places.map(p => p.name)).toEqual(['Time Out Market', 'Belém']);
+    expect(places[0]).toMatchObject({ id: mine.id, notes: 'Before noon', status: 'visited' });
+  });
+
+  it('COLLECTIONS-SVC-122: a file that lists the same place twice adds it once', () => {
+    const owner = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Lisbon' });
+
+    const result = svc.importIntoCollection(owner.id, col.id, { file: file([{ name: 'Belém' }, { name: 'belém' }]) });
+
+    expect(result).toMatchObject({ imported: 1, duplicates: 1 });
+  });
+
+  it('COLLECTIONS-SVC-123: labels are matched by name, and only the missing ones are created', () => {
+    const owner = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Lisbon' });
+    const must = svc.createLabel(owner.id, col.id, 'Must see', '#ff0000');
+
+    svc.importIntoCollection(owner.id, col.id, { file: file(
+      [{ name: 'Belém', labels: ['Must see', 'Rainy day'] }],
+      [{ name: 'must see', color: '#00ff00' }, { name: 'Rainy day', color: '#0000ff' }],
+    ) });
+
+    const labels = svc.getCollection(owner.id, col.id).collection.labels ?? [];
+    expect(labels.map(l => ({ name: l.name, color: l.color }))).toEqual([
+      // The list's own label keeps its name and its colour.
+      { name: 'Must see', color: '#ff0000' },
+      { name: 'Rainy day', color: '#0000ff' },
+    ]);
+    const added = svc.getCollection(owner.id, col.id).places.find(p => p.name === 'Belém')!;
+    expect([...(added.label_ids ?? [])].sort()).toEqual([must.id, labels[1].id].sort());
+  });
+
+  it('COLLECTIONS-SVC-124: an editor may add a file, a viewer may not, a stranger does not see the list', () => {
+    const owner = createUser(testDb).user;
+    const editor = createUser(testDb).user;
+    const viewer = createUser(testDb).user;
+    const stranger = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Shared' });
+    addMember(col.id, editor.id, 'editor');
+    addMember(col.id, viewer.id, 'viewer');
+
+    expect(svc.importIntoCollection(editor.id, col.id, { file: file([{ name: 'Belém' }]) })).toMatchObject({ imported: 1 });
+    expect(() => svc.importIntoCollection(viewer.id, col.id, { file: file([{ name: 'Alfama' }]) })).toThrow();
+    try {
+      svc.importIntoCollection(stranger.id, col.id, { file: file([{ name: 'Alfama' }]) });
+      throw new Error('should have thrown');
+    } catch (e) {
+      expect((e as { status: number }).status).toBe(404);
+    }
+    expect(svc.getCollection(owner.id, col.id).places.map(p => p.name)).toEqual(['Belém']);
+  });
+
+  it('COLLECTIONS-SVC-125: the places stay the list owner\'s, saved by whoever brought the file', () => {
+    const owner = createUser(testDb).user;
+    const editor = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Shared' });
+    addMember(col.id, editor.id, 'editor');
+
+    svc.importIntoCollection(editor.id, col.id, { file: file([{ name: 'Belém' }]) });
+
+    const row = testDb.prepare('SELECT owner_id, saved_by FROM collection_places WHERE collection_id = ?').get(col.id);
+    expect(row).toEqual({ owner_id: owner.id, saved_by: editor.id });
+  });
+
+  it('COLLECTIONS-SVC-126: everyone on the list is told once, and nothing is said when nothing changed', () => {
+    const owner = createUser(testDb).user;
+    const member = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Shared' });
+    addMember(col.id, member.id, 'editor');
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Belém' });
+    broadcastToUser.mockClear();
+
+    svc.importIntoCollection(owner.id, col.id, { file: file([{ name: 'Alfama' }]) });
+    // Once per person on the list, whole import, not once per place.
+    expect(broadcastToUser).toHaveBeenCalledTimes(2);
+    expect(broadcastToUser).toHaveBeenCalledWith(member.id, expect.objectContaining({ type: 'collections:updated' }), undefined);
+
+    broadcastToUser.mockClear();
+    const again = svc.importIntoCollection(owner.id, col.id, { file: file([{ name: 'Alfama' }]) });
+    expect(again).toMatchObject({ imported: 0, duplicates: 1 });
+    expect(broadcastToUser).not.toHaveBeenCalled();
+  });
+
+  it('COLLECTIONS-SVC-127: a file that fails halfway leaves the list as it was', () => {
+    const owner = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Lisbon' });
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Time Out Market' });
+    const real = testDb.prepare.bind(testDb);
+    const spy = vi.spyOn(testDb, 'prepare').mockImplementation((sql: string) => {
+      if (sql.includes('INSERT INTO collection_places')) throw new Error('disk is full');
+      return real(sql);
+    });
+
+    try {
+      expect(() => svc.importIntoCollection(owner.id, col.id, {
+        file: file([{ name: 'Belém' }], [{ name: 'Rainy day' }]),
+      })).toThrow('disk is full');
+    } finally {
+      spy.mockRestore();
+    }
+
+    expect(svc.getCollection(owner.id, col.id).places.map(p => p.name)).toEqual(['Time Out Market']);
+    expect(svc.getCollection(owner.id, col.id).collection.labels ?? []).toEqual([]);
+  });
+});
+
 // ── The same list as GPX (#2301) ─────────────────────────────────────────────
 
 describe('exportCollectionGpx / readCollectionGpx (#2301)', () => {

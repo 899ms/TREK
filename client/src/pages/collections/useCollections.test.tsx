@@ -1,4 +1,4 @@
-// FE-PAGE-COLL-001 to FE-PAGE-COLL-081
+// FE-PAGE-COLL-001 to FE-PAGE-COLL-085
 // The Collections page hook. The collection store is replaced by a fixture so
 // every handler/branch can be driven directly; the categories request goes
 // through MSW, and the websocket module is already mocked in tests/setup.ts.
@@ -1061,6 +1061,65 @@ describe('useCollections — export and import as a file', () => {
 
     expect(navigate).not.toHaveBeenCalledWith(expect.stringContaining('/collections/'))
     expect(result.current.showImportFile).toBe(true)
+  })
+
+  it('FE-PAGE-COLL-082: a file added to another list lands on it and says what it did', async () => {
+    const seen: unknown[] = []
+    server.use(http.post('/api/addons/collections/:id/import', async ({ request, params }) => {
+      seen.push({ id: params.id, body: await request.json() })
+      return HttpResponse.json({ collection: { id: 11, name: 'Lisbon 2027' }, imported: 2, skipped: 0, duplicates: 1 })
+    }))
+    const { result } = await setup()
+
+    await act(async () => { await result.current.handleImportFileInto(listFile as never, 11) })
+
+    expect(seen[0]).toEqual({ id: '11', body: { file: listFile } })
+    expect(store.loadAll).toHaveBeenCalled()
+    expect(navigate).toHaveBeenCalledWith('/collections/11')
+    expect(addToast).toHaveBeenCalledWith('2 added to Lisbon 2027, 1 were already there', 'success', undefined)
+    expect(result.current.showImportFile).toBe(false)
+  })
+
+  it('FE-PAGE-COLL-083: adding to the list that is open refreshes it instead of navigating', async () => {
+    server.use(http.post('/api/addons/collections/:id/import', () =>
+      HttpResponse.json({ collection: { id: 11, name: 'Lisbon 2027' }, imported: 2, skipped: 0, duplicates: 0 })))
+    store.activeId = 11
+    const { result } = await setup()
+    navigate.mockClear()
+
+    await act(async () => { await result.current.handleImportFileInto(listFile as never, 11) })
+
+    expect(store.refreshActive).toHaveBeenCalled()
+    expect(navigate).not.toHaveBeenCalledWith('/collections/11')
+    expect(addToast).toHaveBeenCalledWith('2 places added to Lisbon 2027', 'success', undefined)
+  })
+
+  it('FE-PAGE-COLL-084: a file whose places were all there already says so instead of claiming a success', async () => {
+    server.use(http.post('/api/addons/collections/:id/import', () =>
+      HttpResponse.json({ collection: { id: 11, name: 'Lisbon 2027' }, imported: 0, skipped: 0, duplicates: 2 })))
+    const { result } = await setup()
+
+    await act(async () => { await result.current.handleImportFileInto(listFile as never, 11) })
+
+    expect(addToast).toHaveBeenCalledWith('Every place in the file is already in Lisbon 2027', 'info', undefined)
+  })
+
+  it('FE-PAGE-COLL-085: only lists this person may write to are offered as a target', async () => {
+    const shared = (id: number, role: string | null) => ({
+      ...collection({ id, is_owner: false }),
+      members: role === null ? [] : [{ user_id: 7, username: 'me', status: 'accepted', role }],
+    }) as unknown as Collection
+    store.collections = [
+      collection({ id: 1 }),
+      shared(2, 'editor'),
+      shared(3, 'admin'),
+      shared(4, 'viewer'),
+      shared(5, null),
+      { ...shared(6, 'editor'), members: [{ user_id: 7, username: 'me', status: 'pending', role: 'editor' }] } as unknown as Collection,
+    ]
+    const { result } = await setup()
+
+    expect(result.current.writableLists.map(l => l.id)).toEqual([1, 2, 3])
   })
 
   it('FE-PAGE-COLL-076: a renamed import carries the new name to the server', async () => {

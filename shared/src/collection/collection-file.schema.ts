@@ -172,8 +172,8 @@ export type CollectionFile = z.infer<typeof collectionFileSchema>;
 
 /**
  * The import request: the file itself, plus the one thing the importer may
- * decide rather than the file. A list always arrives as a NEW list, so there
- * is no target id here and no way for a file to write into an existing one.
+ * decide rather than the file. This one always makes a NEW list, so it carries
+ * no target id; the list to add to is named in the URL of the route below.
  */
 export const collectionImportRequestSchema = z.object({
   file: collectionFileSchema,
@@ -182,12 +182,29 @@ export const collectionImportRequestSchema = z.object({
 });
 export type CollectionImportRequest = z.infer<typeof collectionImportRequestSchema>;
 
+/**
+ * The same file read into a list that already exists.
+ *
+ * Only the file: what the list is called, how it looks and what it says stay
+ * the list's own. Nothing in the request can overwrite a place either, so the
+ * worst a file can do to a list somebody else shares is add to it.
+ */
+export const collectionImportIntoRequestSchema = z.object({
+  file: collectionFileSchema,
+});
+export type CollectionImportIntoRequest = z.infer<typeof collectionImportIntoRequestSchema>;
+
 export interface CollectionImportResult {
-  /** The list as created, so the client can select it without a refetch. */
+  /** The list as created or added to, so the client can select it without a refetch. */
   collection: unknown;
   imported: number;
   /** Places the file carried that the contract refused. */
   skipped: number;
+  /**
+   * Places the list already had, left exactly as they were. Only an import
+   * into an existing list can report any: a new list starts empty.
+   */
+  duplicates?: number;
 }
 
 /*

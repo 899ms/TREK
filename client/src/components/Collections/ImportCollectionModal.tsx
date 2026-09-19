@@ -1,7 +1,7 @@
-import React, { useRef, useState } from 'react'
-import { Upload, FileJson, Loader2, MapPin, Tag, AlertCircle, Route, Info } from 'lucide-react'
+import React, { useMemo, useRef, useState } from 'react'
+import { Upload, FileJson, Loader2, MapPin, Tag, AlertCircle, Route, Info, Plus, FolderInput, Check, Search, Bookmark } from 'lucide-react'
 import Modal from '../shared/Modal'
-import { MAX_COLLECTION_FILE_PLACES, type CollectionFile } from '@trek/shared'
+import { MAX_COLLECTION_FILE_PLACES, type Collection, type CollectionFile } from '@trek/shared'
 import type { TranslationFn } from '../../types'
 import { getApiErrorMessage } from '../../types'
 import {
@@ -15,6 +15,12 @@ import {
 
 interface ImportCollectionModalProps {
   onImport: (file: CollectionFile, name?: string) => Promise<void>
+  /** Adds the file to a list that is already there. Without it the dialog only makes new ones. */
+  onImportInto?: (file: CollectionFile, collectionId: number) => Promise<void>
+  /** The lists this person may add to; the server applies the same rule again. */
+  lists?: Collection[]
+  /** The list that is open, so the obvious target is the one already selected. */
+  defaultListId?: number | null
   /** Reads a GPX into a list file (#2301); the server does the parsing. */
   onReadGpx: GpxReader
   onClose: () => void
@@ -50,6 +56,95 @@ function GpxNotes({ leftovers, placeCount, t }: { leftovers: GpxLeftovers; place
   )
 }
 
+/** One of the two answers to "where do these places go", as a card you can tap. */
+function TargetCard({ active, icon: Icon, title, hint, onClick }: {
+  active: boolean
+  icon: typeof Plus
+  title: string
+  hint: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`relative flex flex-col items-start gap-1.5 px-3 py-3 rounded-xl border text-left transition-colors ${
+        active ? 'border-accent bg-surface-hover' : 'border-edge hover:bg-surface-hover'
+      }`}
+    >
+      <span className={`w-8 h-8 rounded-lg flex items-center justify-center ${active ? 'bg-accent text-accent-text' : 'bg-surface-input text-content-muted'}`}>
+        <Icon size={15} />
+      </span>
+      <span className="text-[13px] font-semibold text-content">{title}</span>
+      <span className="text-[11.5px] text-content-faint leading-snug">{hint}</span>
+      {active && (
+        <span className="absolute top-2 right-2 w-4 h-4 rounded-full bg-accent text-accent-text flex items-center justify-center">
+          <Check size={11} strokeWidth={3} />
+        </span>
+      )}
+    </button>
+  )
+}
+
+/** The lists the file may be added to, the open one first. */
+function ListChoice({ lists, selectedId, onSelect, t }: {
+  lists: Collection[]
+  selectedId: number | null
+  onSelect: (id: number) => void
+  t: TranslationFn
+}) {
+  const [search, setSearch] = useState('')
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return q ? lists.filter(l => l.name.toLowerCase().includes(q)) : lists
+  }, [lists, search])
+
+  return (
+    <div className="flex flex-col gap-2">
+      {lists.length > 5 && (
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-faint" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder={t('collections.file.searchLists')}
+            className="w-full pl-8 pr-3 py-2 rounded-lg border border-edge bg-surface-input text-content text-[13px] outline-none focus:border-accent"
+          />
+        </div>
+      )}
+      <div className="flex flex-col gap-1 max-h-[34vh] overflow-y-auto -mx-1 px-1">
+        {shown.map(list => {
+          const active = list.id === selectedId
+          return (
+            <button
+              key={list.id}
+              type="button"
+              onClick={() => onSelect(list.id)}
+              aria-pressed={active}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-colors ${
+                active ? 'border-accent bg-surface-hover' : 'border-edge bg-surface-card hover:bg-surface-hover'
+              }`}
+            >
+              <span className="w-9 h-9 min-w-[36px] rounded-lg flex items-center justify-center shrink-0 text-white" style={{ background: list.color || '#6366f1' }}>
+                <Bookmark size={15} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-semibold text-content truncate">{list.name}</span>
+                <span className="block text-[11.5px] text-content-faint">{t('collections.placeCount', { count: list.place_count ?? 0 })}</span>
+              </span>
+              {active && <Check size={16} className="shrink-0 text-accent" />}
+            </button>
+          )
+        })}
+        {shown.length === 0 && (
+          <p className="text-center text-[13px] text-content-faint py-6">{t('collections.noOtherLists')}</p>
+        )}
+      </div>
+    </div>
+  )
+}
+
 /**
  * Read a list file or a GPX and make a list of it (#2198, #2301).
  *
@@ -64,8 +159,15 @@ function GpxNotes({ leftovers, placeCount, t }: { leftovers: GpxLeftovers; place
  * read by the server into the same kind of list file, and from then on the two
  * are one path: what goes to the import is a list file, through the same
  * contract the server validates against.
+ *
+ * The file can go into a list that is already there instead of a new one. That
+ * is a choice rather than the default, because the two do different things: a
+ * new list is the file as it stands, while adding to a list leaves everything
+ * in it alone and skips the places it already has.
  */
-export default function ImportCollectionModal({ onImport, onReadGpx, onClose, t }: ImportCollectionModalProps): React.ReactElement {
+export default function ImportCollectionModal({
+  onImport, onImportInto, lists, defaultListId, onReadGpx, onClose, t,
+}: ImportCollectionModalProps): React.ReactElement {
   const inputRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<CollectionFile | null>(null)
   const [leftovers, setLeftovers] = useState<GpxLeftovers | null>(null)
@@ -75,6 +177,16 @@ export default function ImportCollectionModal({ onImport, onReadGpx, onClose, t 
   const [reading, setReading] = useState(false)
   const [busy, setBusy] = useState(false)
   const [dragging, setDragging] = useState(false)
+  const [target, setTarget] = useState<'new' | 'existing'>('new')
+  // The open list first: it is the one somebody importing from inside a list means.
+  const targets = useMemo(() => {
+    const all = lists ?? []
+    const open = all.find(l => l.id === defaultListId)
+    return open ? [open, ...all.filter(l => l.id !== open.id)] : all
+  }, [lists, defaultListId])
+  const [listId, setListId] = useState<number | null>(() => targets[0]?.id ?? null)
+  const canChoose = !!onImportInto && targets.length > 0
+  const intoExisting = canChoose && target === 'existing'
 
   const take = async (chosen: File | undefined) => {
     if (!chosen || reading) return
@@ -109,8 +221,12 @@ export default function ImportCollectionModal({ onImport, onReadGpx, onClose, t 
     setError(null)
     setFailedMessage(null)
     try {
-      const trimmed = name.trim()
-      await onImport(file, trimmed && trimmed !== file.name ? trimmed : undefined)
+      if (intoExisting && listId != null) {
+        await onImportInto!(file, listId)
+      } else {
+        const trimmed = name.trim()
+        await onImport(file, trimmed && trimmed !== file.name ? trimmed : undefined)
+      }
     } catch (err) {
       setError('failed')
       setFailedMessage(getApiErrorMessage(err, t('common.error')))
@@ -140,11 +256,11 @@ export default function ImportCollectionModal({ onImport, onReadGpx, onClose, t 
           <button
             type="button"
             onClick={submit}
-            disabled={!file || busy || !name.trim() || nothingToImport}
+            disabled={!file || busy || nothingToImport || (intoExisting ? listId == null : !name.trim())}
             className="px-4 py-2 rounded-lg text-[13px] font-semibold bg-accent text-accent-text disabled:opacity-50 transition-opacity inline-flex items-center gap-2"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            {t('collections.file.confirm')}
+            {intoExisting ? t('collections.file.confirmInto') : t('collections.file.confirm')}
           </button>
         </div>
       }
@@ -203,17 +319,45 @@ export default function ImportCollectionModal({ onImport, onReadGpx, onClose, t 
 
             {leftovers && <GpxNotes leftovers={leftovers} placeCount={file.places.length} t={t} />}
 
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[12px] font-medium text-content-muted">{t('collections.listName')}</span>
-              <input
-                value={name}
-                onChange={e => setName(e.target.value)}
-                maxLength={120}
-                className="w-full px-3 py-2 rounded-lg border border-edge bg-surface-input text-content text-[13px] outline-none focus:border-accent"
-              />
-            </label>
+            {canChoose && (
+              <div className="grid grid-cols-2 gap-2">
+                <TargetCard
+                  active={target === 'new'}
+                  icon={Plus}
+                  title={t('collections.file.targetNew')}
+                  hint={t('collections.file.targetNewHint')}
+                  onClick={() => setTarget('new')}
+                />
+                <TargetCard
+                  active={intoExisting}
+                  icon={FolderInput}
+                  title={t('collections.file.targetExisting')}
+                  hint={t('collections.file.targetExistingHint')}
+                  onClick={() => setTarget('existing')}
+                />
+              </div>
+            )}
 
-            {!leftovers && <p className="text-[11.5px] text-content-faint">{t('collections.file.hint')}</p>}
+            {intoExisting ? (
+              <>
+                <ListChoice lists={targets} selectedId={listId} onSelect={setListId} t={t} />
+                <p className="text-[11.5px] text-content-faint">{t('collections.file.intoHint')}</p>
+              </>
+            ) : (
+              <>
+                <label className="flex flex-col gap-1.5">
+                  <span className="text-[12px] font-medium text-content-muted">{t('collections.listName')}</span>
+                  <input
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    maxLength={120}
+                    className="w-full px-3 py-2 rounded-lg border border-edge bg-surface-input text-content text-[13px] outline-none focus:border-accent"
+                  />
+                </label>
+
+                {!leftovers && <p className="text-[11.5px] text-content-faint">{t('collections.file.hint')}</p>}
+              </>
+            )}
           </>
         )}
 

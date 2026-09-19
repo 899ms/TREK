@@ -52,6 +52,7 @@ import {
   CollectionLabelUpdateDto,
   CollectionLabelAssignDto,
   CollectionImportDto,
+  CollectionImportIntoDto,
   CollectionGpxReadDto,
 } from './collections.dto';
 import { PlaceRatingDto } from '../places/places.dto';
@@ -421,6 +422,24 @@ export class CollectionsController {
   @Get(':id/export/gpx')
   exportCollectionGpx(@CurrentUser() user: User, @Param('id') id: string) {
     return this.collections.exportCollectionGpx(user.id, Number(id));
+  }
+
+  /**
+   * The same file read into a list that already exists (#2301 follow-up).
+   *
+   * 200, unlike POST /import above: this one adds to a list rather than making
+   * one. Anyone who may add a place to the list may do it, and the socket id
+   * rides along so the browser that asked does not echo its own change.
+   */
+  @Post(':id/import')
+  @HttpCode(200)
+  importIntoCollection(
+    @CurrentUser() user: User,
+    @Param('id') id: string,
+    @Body() body: CollectionImportIntoDto,
+    @Headers('x-socket-id') socketId?: string,
+  ) {
+    return this.collections.importIntoCollection(user.id, Number(id), body, socketId);
   }
 
   @Get(':id/importable/:tripId')

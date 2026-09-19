@@ -403,6 +403,35 @@ describe('Collections e2e (real auth guard + real service + temp SQLite)', () =>
     expect((await request(server).get(`/api/addons/collections/${col.id}/export/gpx`).set('Cookie', sessionCookie(otherId))).status).toBe(404);
   });
 
+  it('COLLECTIONS-E2E-083: a file goes into a list that already exists, without touching what is in it', async () => {
+    const as = (userId: number) => ({ Cookie: sessionCookie(userId) });
+    const col = (await request(server).post('/api/addons/collections').set(as(ownerId)).send({ name: 'Keep me' })).body;
+    await request(server).post('/api/addons/collections/places').set(as(ownerId))
+      .send({ collection_id: col.id, name: 'Pinned', lat: 41.9, lng: 12.48, status: 'want' });
+
+    const file = {
+      format: 'trek.collection', version: 1, name: 'From a friend', color: '#ef4444',
+      places: [{ name: 'Pinned', lat: 41.9, lng: 12.48 }, { name: 'New one' }],
+    };
+    const added = await request(server).post(`/api/addons/collections/${col.id}/import`).set(as(ownerId)).send({ file });
+
+    expect(added.status).toBe(200);
+    expect(added.body).toMatchObject({ imported: 1, skipped: 0, duplicates: 1 });
+    expect(added.body.collection).toMatchObject({ id: col.id, name: 'Keep me' });
+    const detail = await request(server).get(`/api/addons/collections/${col.id}`).set(as(ownerId));
+    expect(detail.body.places.map((p: { name: string }) => p.name)).toEqual(['Pinned', 'New one']);
+    expect(detail.body.places[0]).toMatchObject({ status: 'want' });
+  });
+
+  it('COLLECTIONS-E2E-084: a list the caller may only read, or cannot see at all, takes no file', async () => {
+    const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Mine' })).body;
+    const file = { format: 'trek.collection', version: 1, name: 'Theirs', places: [{ name: 'Belém' }] };
+
+    expect((await request(server).post(`/api/addons/collections/${col.id}/import`).set('Cookie', sessionCookie(otherId)).send({ file })).status).toBe(404);
+    expect((await request(server).post(`/api/addons/collections/${col.id}/import`).send({ file })).status).toBe(401);
+    expect((await request(server).post(`/api/addons/collections/${col.id}/import`).set('Cookie', sessionCookie(ownerId)).send({ file: { name: 'no format' } })).status).toBe(400);
+  });
+
   // ── delete ───────────────────────────────────────────────────────────────
   it('COLLECTIONS-E2E-050: owner deletes; non-owner member cannot (403)', async () => {
     const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Doomed' })).body;

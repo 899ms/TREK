@@ -11,6 +11,7 @@ import {
   collectionSetStatusRequestSchema,
   collectionSetStatusManyRequestSchema,
   collectionSetStatusFromTripRequestSchema,
+  collectionImportIntoRequestSchema,
   collectionCopyToTripRequestSchema,
   collectionInviteRequestSchema,
   collectionInviteActionRequestSchema,
@@ -42,6 +43,7 @@ export class CollectionPlaceUpdateDto extends createZodDto(collectionPlaceUpdate
 export class CollectionSetStatusDto extends createZodDto(collectionSetStatusRequestSchema) {}
 export class CollectionSetStatusManyDto extends createZodDto(collectionSetStatusManyRequestSchema) {}
 export class CollectionSetStatusFromTripDto extends createZodDto(collectionSetStatusFromTripRequestSchema) {}
+export class CollectionImportIntoDto extends createZodDto(collectionImportIntoRequestSchema) {}
 export class CollectionCopyToTripDto extends createZodDto(collectionCopyToTripRequestSchema) {}
 export class CollectionInviteDto extends createZodDto(collectionInviteRequestSchema) {}
 export class CollectionInviteActionDto extends createZodDto(collectionInviteActionRequestSchema) {}

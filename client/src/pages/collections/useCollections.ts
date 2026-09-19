@@ -170,6 +170,17 @@ export function useCollections() {
   useEffect(() => { setShowShare(false) }, [activeId])
 
   const ownedLists = useMemo(() => collections.filter(c => c.is_owner !== false), [collections])
+  /**
+   * Lists a file may be added to: the person's own, plus a shared one where
+   * they are an editor or an admin. Same rule the server applies on the way in,
+   * so the import dialog never offers a list the import would refuse.
+   */
+  const writableLists = useMemo(
+    () => collections.filter(c => c.is_owner !== false || (c.members ?? []).some(
+      m => m.user_id === currentUserId && m.status === 'accepted' && (m.role === 'editor' || m.role === 'admin'),
+    )),
+    [collections, currentUserId],
+  )
   const sharedLists = useMemo(() => collections.filter(c => c.is_owner === false), [collections])
 
   // Labels are per-collection, so never apply them on the "All saved" union.
@@ -259,6 +270,33 @@ export function useCollections() {
     }
     setShowImportFile(false)
   }, [loadAll, navigate, toast, t])
+
+  /**
+   * Read a chosen file into a list that is already there.
+   *
+   * Lands on that list, for the same reason a new one does. Nothing in it is
+   * overwritten: the server counts the places it already had and leaves them,
+   * and the toast says so rather than letting a file quietly do less than it
+   * looked like it would.
+   */
+  const handleImportFileInto = useCallback(async (file: CollectionFile, collectionId: number) => {
+    const result = await collectionsApi.importFileInto(collectionId, { file })
+    const name = (result.collection as Collection).name
+    const duplicates = result.duplicates ?? 0
+    await loadAll()
+    if (activeId === collectionId) refreshActive()
+    else navigate(`/collections/${collectionId}`)
+    if (result.imported === 0 && duplicates > 0) {
+      toast.info(t('collections.file.doneIntoNothing', { name }))
+    } else if (duplicates > 0) {
+      toast.success(t('collections.file.doneIntoDuplicates', { count: result.imported, duplicates, name }))
+    } else if (result.skipped > 0) {
+      toast.info(t('collections.file.doneSkipped', { count: result.imported, skipped: result.skipped }))
+    } else {
+      toast.success(t('collections.file.doneInto', { count: result.imported, name }))
+    }
+    setShowImportFile(false)
+  }, [activeId, loadAll, refreshActive, navigate, toast, t])
 
   const handleDeleteList = useCallback(async () => {
     if (confirmDeleteList == null) return
@@ -467,7 +505,8 @@ export function useCollections() {
     showAddPlace, setShowAddPlace, handlePlaceAdded,
     showImport, setShowImport,
     exporting, handleExportList,
-    showImportFile, setShowImportFile, handleImportFile, handleReadGpx,
+    showImportFile, setShowImportFile, handleImportFile, handleImportFileInto, handleReadGpx,
+    writableLists,
     confirmDeleteList, setConfirmDeleteList,
     mobileRailOpen, setMobileRailOpen,
     showShare, setShowShare, handleAfterLeave,

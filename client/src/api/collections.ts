@@ -12,6 +12,7 @@ import type {
   CollectionImportablesResponse,
   CollectionFile,
   CollectionImportRequest,
+  CollectionImportIntoRequest,
   CollectionImportResult,
   CollectionGpxExport,
   CollectionGpxReadRequest,
@@ -65,6 +66,9 @@ export const collectionsApi = {
     ax.get(`${base}/${id}/export`).then((r: AxiosResponse) => r.data),
   importFile: (body: CollectionImportRequest): Promise<CollectionImportResult> =>
     ax.post(`${base}/import`, body satisfies CollectionImportRequest).then((r: AxiosResponse) => r.data),
+  /** The same file into a list that already exists: it only ever adds to it. */
+  importFileInto: (id: number, body: CollectionImportIntoRequest): Promise<CollectionImportResult> =>
+    ax.post(`${base}/${id}/import`, body satisfies CollectionImportIntoRequest).then((r: AxiosResponse) => r.data),
   // The same list as GPX (#2301). A GPX is read by the server into a list file,
   // which then goes through importFile above like any other.
   exportGpx: (id: number): Promise<CollectionGpxExport> =>

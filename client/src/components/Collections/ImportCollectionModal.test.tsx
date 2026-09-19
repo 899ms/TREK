@@ -1,7 +1,7 @@
-// FE-COMP-COLLIMPORT-001 to FE-COMP-COLLIMPORT-016
+// FE-COMP-COLLIMPORT-001 to FE-COMP-COLLIMPORT-026
 import { render, screen, waitFor } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
-import type { CollectionFile } from '@trek/shared';
+import type { Collection, CollectionFile } from '@trek/shared';
 import { useTranslation } from '../../i18n/TranslationContext';
 import ImportCollectionModal from './ImportCollectionModal';
 import type { GpxReader } from './collectionFile';
@@ -231,5 +231,100 @@ describe('ImportCollectionModal with a GPX (#2301)', () => {
 
     await waitFor(() => expect(screen.getByText('The server is busy')).toBeInTheDocument());
     expect(screen.getByText('Choose a list file')).toBeInTheDocument();
+  });
+});
+
+// ── The same file into a list that is already there (#2301 follow-up) ────────
+
+describe('ImportCollectionModal into an existing list', () => {
+  const lists = [
+    { id: 7, owner_id: 1, name: 'Lisbon 2027', color: '#22c55e', place_count: 4 },
+    { id: 9, owner_id: 1, name: 'Porto', color: '#3b82f6', place_count: 2 },
+  ] as Collection[];
+
+  const intoProps = (over: Partial<React.ComponentProps<typeof ImportCollectionModal>> = {}) =>
+    renderModal({ onImportInto: vi.fn().mockResolvedValue(undefined), lists, ...over });
+
+  it('FE-COMP-COLLIMPORT-020: offers the choice only once a file has been read', async () => {
+    intoProps();
+    expect(screen.queryByText('Add to a list')).not.toBeInTheDocument();
+
+    await choose(JSON.stringify(listFile));
+
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+    expect(screen.getByText('New list')).toBeInTheDocument();
+    // A new list stays the default, so nothing changes for anyone who ignores it.
+    expect(screen.getByDisplayValue('Lisbon')).toBeInTheDocument();
+    expect(importButton()).toBeEnabled();
+  });
+
+  it('FE-COMP-COLLIMPORT-021: keeps to a new list when there is nothing to add to', async () => {
+    renderModal({ onImportInto: vi.fn(), lists: [] });
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByDisplayValue('Lisbon')).toBeInTheDocument());
+
+    expect(screen.queryByText('Add to a list')).not.toBeInTheDocument();
+  });
+
+  it('FE-COMP-COLLIMPORT-022: adds the file to the list that was picked, and asks for no name', async () => {
+    const props = intoProps();
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText('Add to a list'));
+    expect(screen.queryByDisplayValue('Lisbon')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText('Porto'));
+    await userEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+
+    await waitFor(() => expect(props.onImportInto).toHaveBeenCalledWith(expect.objectContaining({ name: 'Lisbon' }), 9));
+    expect(props.onImport).not.toHaveBeenCalled();
+  });
+
+  it('FE-COMP-COLLIMPORT-023: starts on the list that is open, whatever order they come in', async () => {
+    const props = intoProps({ defaultListId: 9 });
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText('Add to a list'));
+    await userEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+
+    await waitFor(() => expect(props.onImportInto).toHaveBeenCalledWith(expect.anything(), 9));
+  });
+
+  it('FE-COMP-COLLIMPORT-024: says what adding to a list does and does not do', async () => {
+    intoProps();
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText('Add to a list'));
+
+    expect(screen.getByText(/Places the list already has stay as they are/)).toBeInTheDocument();
+  });
+
+  it('FE-COMP-COLLIMPORT-025: keeps the dialog open and says why when adding fails', async () => {
+    const onImportInto = vi.fn().mockRejectedValue(
+      Object.assign(new Error('x'), { response: { status: 403, data: { error: 'You have read-only access to this list' } } }),
+    );
+    intoProps({ onImportInto });
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText('Add to a list'));
+    await userEvent.click(screen.getByRole('button', { name: 'Add to list' }));
+
+    await waitFor(() => expect(screen.getByText('You have read-only access to this list')).toBeInTheDocument());
+  });
+
+  it('FE-COMP-COLLIMPORT-026: goes back to a new list with the name it started with', async () => {
+    const props = intoProps();
+    await choose(JSON.stringify(listFile));
+    await waitFor(() => expect(screen.getByText('Add to a list')).toBeInTheDocument());
+
+    await userEvent.click(screen.getByText('Add to a list'));
+    await userEvent.click(screen.getByText('New list'));
+    await userEvent.click(importButton());
+
+    await waitFor(() => expect(props.onImport).toHaveBeenCalledWith(expect.objectContaining({ name: 'Lisbon' }), undefined));
+    expect(props.onImportInto).not.toHaveBeenCalled();
   });
 });
