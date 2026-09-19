@@ -21,7 +21,7 @@ import {
  * This is the ONLY place that talks to a user's NAS for document sync.
  *
  * Written against Synology's File Station Official API guide and verified
- * against the FileStation stub in `trek-docsync-testlab/syno-stub` — DSM itself
+ * against the FileStation stub in `trek-docsync-testlab/syno-stub`. DSM itself
  * cannot be containerised, so the parts marked below as unverified are the ones
  * no reachable instance could confirm.
  *
@@ -72,7 +72,7 @@ const SESSION_MAX_AGE_MS = 30 * 60 * 1000;
  * five failures in five minutes, and a link that polls every five minutes would
  * walk into it in under half an hour. A minute is long enough to keep any one
  * sync run from spending a second attempt, and short enough that an admin who
- * fixes the password does not wait — a corrected password changes the
+ * fixes the password does not wait: a corrected password changes the
  * fingerprint and clears the lockout immediately.
  */
 const CREDENTIAL_LOCKOUT_MS = 60 * 1000;
@@ -209,6 +209,8 @@ export interface SynologyDriveCreds {
    * not been saved yet. It keys the device token; see `deviceTokens`.
    */
   connectionId: number;
+  /** When that connection's row was created. With the id, it keys the device token. */
+  connectionCreatedAt: string;
   /** Instance origin including the DSM port, e.g. `https://nas.example.com:5001`. */
   baseUrl: string;
   username: string;
@@ -216,9 +218,17 @@ export interface SynologyDriveCreds {
   /**
    * A TOTP code from the connection form. Single-use by construction, so it can
    * only ever serve the first login; the device token that login returns is what
-   * keeps later logins working, and it lives in this process's memory only.
+   * keeps later logins working.
    */
   otpCode?: string;
+  /** The connection's device token as stored, in the form `storedDeviceToken` writes. */
+  storedDeviceToken?: string;
+  /**
+   * Store a new token in that form, or drop it with null. Only a saved
+   * connection passes one; a probe of form values uses the stored token without
+   * being able to change it.
+   */
+  saveDeviceToken?: (stored: string | null) => void;
   allowInsecureTls: boolean;
 }
 
@@ -294,6 +304,18 @@ interface CredentialLockout {
   until: number;
   code: DocsyncErrorCode;
   synoCode: number;
+}
+
+/** One connection's device token, and what its storage holds as far as this process knows. */
+interface DeviceTokenSlot {
+  /** Digest of the instance and account the token was issued for. */
+  account: string;
+  token: string | null;
+  /**
+   * The stored form this process last read or wrote, or undefined until a
+   * caller that can write has shown what storage holds.
+   */
+  stored?: string | null;
 }
 
 interface SynoEnvelope {
@@ -430,6 +452,22 @@ function appError(synoCode: number, isAuth: boolean): SynologyDriveError {
   });
 }
 
+/**
+ * A device token the way a connection stores it: `<account digest>:<token>`.
+ * The account travels with it, so a connection repointed at another NAS or
+ * another account reads its old token as foreign instead of offering it there.
+ */
+function storedDeviceToken(account: string, token: string): string {
+  return `${account}:${token}`;
+}
+
+/** The token out of its stored form, or null when none is stored for this account. */
+function deviceTokenFor(stored: string | undefined, account: string): string | null {
+  const prefix = `${account}:`;
+  if (!stored?.startsWith(prefix) || stored.length === prefix.length) return null;
+  return stored.slice(prefix.length);
+}
+
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 export class SynologyDriveClient {
@@ -441,7 +479,7 @@ export class SynologyDriveClient {
    * displaces the first, so two TREK connections pointing at the same NAS with
    * the same account share one session instead of evicting each other. The
    * password is part of the key because a connection test with a corrected
-   * password has to reach the NAS — riding the session the old password opened
+   * password has to reach the NAS: riding the session the old password opened
    * would report success for a credential that no longer works. It is also what
    * makes an explicit "forget this session" unnecessary: an edited credential
    * is a different key and cannot reach the old entry.
@@ -452,7 +490,7 @@ export class SynologyDriveClient {
   private readonly lockouts = new Map<string, CredentialLockout>();
 
   /**
-   * DSM's trusted-device tokens, one per TREK connection.
+   * DSM's trusted-device tokens, one slot per TREK connection.
    *
    * The token is DSM's record that somebody passed the second factor, and that
    * somebody is whoever typed the code into this connection's form. Keyed by
@@ -460,17 +498,27 @@ export class SynologyDriveClient {
    * never had the authenticator could point a connection at the same account
    * and log in on the first trip's token.
    *
+   * The connection is its id together with the time its row was created. The
+   * id alone comes round again: a backup restored in place, or the demo reset,
+   * rolls the id sequence back without restarting the process, and the next
+   * connection saved, on whatever trip, is handed an id this map may still hold
+   * a token under.
+   *
    * Not keyed by the password or the code: the token has to survive a password
    * edit and the single-use OTP going stale in the form, or the next session
-   * expiry needs a human with an authenticator app. An edit keeps the
-   * connection id, so it keeps the token. Instance and account stay in the key
-   * so a connection repointed at another NAS or account starts without one.
+   * expiry needs a human with an authenticator app. An edit updates the row in
+   * place, so it keeps the token. The slot remembers the instance and
+   * account the token was issued for, so a connection repointed at another NAS
+   * or account starts without one.
    *
    * A form that has not been saved has no id to file a token under (every
    * unsaved form is connection 0), so what its probe earns rides on the session
    * only, and the saved connection adopts it from there; see `session()`.
+   *
+   * This is the working copy. The one that survives a restart is in the
+   * connection's encrypted secrets; see `deviceSlot()`.
    */
-  private readonly deviceTokens = new Map<string, string>();
+  private readonly deviceTokens = new Map<string, DeviceTokenSlot>();
 
   /** The credential this session and lockout belong to, without storing it. */
   private sessionKey(creds: SynologyDriveCreds): string {
@@ -483,9 +531,56 @@ export class SynologyDriveClient {
     return `${normalizeBaseUrl(creds.baseUrl)}\u0000${creds.username}`;
   }
 
-  /** Where this connection's device token lives, or null for a form not saved yet. */
-  private deviceKey(creds: SynologyDriveCreds): string | null {
-    return creds.connectionId > 0 ? `${creds.connectionId}\u0000${this.accountKey(creds)}` : null;
+  /** What a device token is filed under: instance and account, never the password. */
+  private accountDigest(creds: SynologyDriveCreds): string {
+    return createHash('sha256').update(this.accountKey(creds)).digest('hex');
+  }
+
+  /**
+   * This connection's device token slot, with storage brought in line with it.
+   * Null for a form that has not been saved.
+   *
+   * Memory is what a login reads, because a sync run holds one snapshot of the
+   * stored secrets from its start, and a token earned or refused halfway
+   * through would otherwise be lost to the rest of the run. Storage is what
+   * survives a restart, and a process that has no slot for the connection yet
+   * starts from it.
+   *
+   * Whenever the two disagree and the caller can write, storage follows memory.
+   * That covers a token earned or refused here, one that a test of the saved
+   * form earned, and one left behind for an instance or account the connection
+   * no longer points at. The comparison is with what this process last read or
+   * wrote rather than with the caller's snapshot, which goes stale the moment
+   * anything is written, so a change is written once and not on every call of
+   * the run that made it.
+   */
+  private deviceSlot(creds: SynologyDriveCreds): DeviceTokenSlot | null {
+    if (creds.connectionId <= 0) return null;
+    const key = `${creds.connectionId}\u0000${creds.connectionCreatedAt}`;
+    const account = this.accountDigest(creds);
+    let slot = this.deviceTokens.get(key);
+    if (!slot || slot.account !== account) {
+      slot = { account, token: deviceTokenFor(creds.storedDeviceToken, account) };
+      this.deviceTokens.set(key, slot);
+    }
+    this.persist(creds, slot);
+    return slot;
+  }
+
+  private persist(creds: SynologyDriveCreds, slot: DeviceTokenSlot): void {
+    if (!creds.saveDeviceToken) return;
+    if (slot.stored === undefined) slot.stored = creds.storedDeviceToken ?? null;
+    const wanted = slot.token === null ? null : storedDeviceToken(slot.account, slot.token);
+    if (wanted === slot.stored) return;
+    creds.saveDeviceToken(wanted);
+    slot.stored = wanted;
+  }
+
+  private setDeviceToken(creds: SynologyDriveCreds, token: string | null): void {
+    const slot = this.deviceSlot(creds);
+    if (!slot || slot.token === token) return;
+    slot.token = token;
+    this.persist(creds, slot);
   }
 
   private async request(
@@ -596,10 +691,8 @@ export class SynologyDriveClient {
   private async session(creds: SynologyDriveCreds): Promise<SynoSession> {
     const cached = this.sessions.get(this.sessionKey(creds));
     if (cached && Date.now() - cached.createdAt < SESSION_MAX_AGE_MS) {
-      const deviceKey = this.deviceKey(creds);
-      if (deviceKey && cached.deviceId && !this.deviceTokens.has(deviceKey)) {
-        this.deviceTokens.set(deviceKey, cached.deviceId);
-      }
+      const slot = this.deviceSlot(creds);
+      if (slot && slot.token === null && cached.deviceId) this.setDeviceToken(creds, cached.deviceId);
       return cached;
     }
     return await this.login(creds);
@@ -610,13 +703,11 @@ export class SynologyDriveClient {
    *
    * The connection's device token is reused when there is one: the form's OTP
    * is a single TOTP code that expires in thirty seconds, so it can only ever
-   * serve the first login of a process. Without the device token, every session
-   * expiry would need a human to type a new code.
+   * serve the first login. Without the device token, every session expiry would
+   * need a human to type a new code.
    */
   private async login(creds: SynologyDriveCreds): Promise<SynoSession> {
     const key = this.sessionKey(creds);
-    const deviceKey = this.deviceKey(creds);
-    const deviceId = deviceKey ? this.deviceTokens.get(deviceKey) ?? null : null;
     const lockout = this.lockouts.get(key);
     if (lockout && lockout.until > Date.now()) {
       throw new SynologyDriveError(lockout.code, 'The NAS rejected these credentials; not retrying yet', {
@@ -625,6 +716,66 @@ export class SynologyDriveClient {
       });
     }
 
+    let answer: { data: unknown; deviceId: string | null };
+    try {
+      answer = await this.authenticate(creds);
+    } catch (error: unknown) {
+      if (error instanceof SynologyDriveError && error.synoCode && error.synoCode >= 400) {
+        this.lockouts.set(key, {
+          until: Date.now() + (error.synoCode === 407 ? AUTOBLOCK_LOCKOUT_MS : CREDENTIAL_LOCKOUT_MS),
+          code: error.code,
+          synoCode: error.synoCode,
+        });
+      }
+      throw error;
+    }
+
+    const { data, deviceId } = answer;
+    const sid = isRecord(data) && typeof data.sid === 'string' ? data.sid : null;
+    if (!sid) {
+      throw new SynologyDriveError('provider_error', 'The NAS accepted the login but returned no session id');
+    }
+    const issuedDeviceId = isRecord(data) && typeof data.did === 'string' ? data.did : deviceId;
+    if (issuedDeviceId) this.setDeviceToken(creds, issuedDeviceId);
+    const session: SynoSession = {
+      sid,
+      synoToken: isRecord(data) && typeof data.synotoken === 'string' ? data.synotoken : null,
+      deviceId: issuedDeviceId,
+      createdAt: Date.now(),
+    };
+    this.lockouts.delete(key);
+    this.sessions.set(key, session);
+    return session;
+  }
+
+  /**
+   * The login request, on the connection's device token when it has one and on
+   * the form's code otherwise.
+   *
+   * A token DSM refuses (someone removed TREK from the account's trusted
+   * devices, or it expired) is dropped on the spot, and the code in the form
+   * gets its turn in the same call. That code is usually what the owner just
+   * typed to repair exactly this, and a dead token sent ahead of it would fail
+   * every attempt, now that a stored token outlives the process. It is a second
+   * credential rather than a second try of the first, and whichever fails last
+   * is what the lockout records.
+   */
+  private async authenticate(creds: SynologyDriveCreds): Promise<{ data: unknown; deviceId: string | null }> {
+    const deviceId = this.deviceSlot(creds)?.token ?? null;
+    try {
+      return { data: await this.call(creds, this.loginParams(creds, deviceId), { cgi: AUTH_CGI }), deviceId };
+    } catch (error: unknown) {
+      if (!deviceId || !(error instanceof SynologyDriveError) || !DEVICE_TOKEN_REFUSED_CODES.has(error.synoCode ?? 0)) {
+        throw error;
+      }
+      // Unless another login replaced it while this one was out.
+      if (this.deviceSlot(creds)?.token === deviceId) this.setDeviceToken(creds, null);
+      if (!creds.otpCode) throw error;
+      return { data: await this.call(creds, this.loginParams(creds, null), { cgi: AUTH_CGI }), deviceId: null };
+    }
+  }
+
+  private loginParams(creds: SynologyDriveCreds, deviceId: string | null): Record<string, string> {
     const params: Record<string, string> = {
       api: 'SYNO.API.Auth',
       version: '6',
@@ -645,49 +796,14 @@ export class SynologyDriveClient {
       params.otp_code = creds.otpCode;
       params.enable_device_token = 'yes';
     }
-
-    let data: unknown;
-    try {
-      data = await this.call(creds, params, { cgi: AUTH_CGI });
-    } catch (error: unknown) {
-      if (error instanceof SynologyDriveError && error.synoCode && error.synoCode >= 400) {
-        // A token DSM no longer trusts would otherwise go out ahead of any fresh
-        // code typed into the form, on every attempt, until the process restarts.
-        if (deviceKey && deviceId && DEVICE_TOKEN_REFUSED_CODES.has(error.synoCode)
-          && this.deviceTokens.get(deviceKey) === deviceId) {
-          this.deviceTokens.delete(deviceKey);
-        }
-        this.lockouts.set(key, {
-          until: Date.now() + (error.synoCode === 407 ? AUTOBLOCK_LOCKOUT_MS : CREDENTIAL_LOCKOUT_MS),
-          code: error.code,
-          synoCode: error.synoCode,
-        });
-      }
-      throw error;
-    }
-
-    const sid = isRecord(data) && typeof data.sid === 'string' ? data.sid : null;
-    if (!sid) {
-      throw new SynologyDriveError('provider_error', 'The NAS accepted the login but returned no session id');
-    }
-    const issuedDeviceId = isRecord(data) && typeof data.did === 'string' ? data.did : deviceId;
-    if (deviceKey && issuedDeviceId) this.deviceTokens.set(deviceKey, issuedDeviceId);
-    const session: SynoSession = {
-      sid,
-      synoToken: isRecord(data) && typeof data.synotoken === 'string' ? data.synotoken : null,
-      deviceId: issuedDeviceId,
-      createdAt: Date.now(),
-    };
-    this.lockouts.delete(key);
-    this.sessions.set(key, session);
-    return session;
+    return params;
   }
 
   /**
    * Authenticate and report what this DSM offers.
    *
    * The API inventory is part of it because a DSM with File Station uninstalled
-   * logs in perfectly and then answers 102 to everything — a failure that looks
+   * logs in perfectly and then answers 102 to everything, a failure that looks
    * like a TREK bug unless the connection test says so.
    */
   async probe(creds: SynologyDriveCreds): Promise<SynoProbe> {
@@ -820,7 +936,7 @@ export class SynologyDriveClient {
 
     // The session is resolved before the body is touched. A stream can only be
     // read once, so the 106/119 re-login retry that every other call gets is not
-    // available here — better to spend the round trip up front than to fail an
+    // available here: better to spend the round trip up front than to fail an
     // upload that already read half the file.
     const session = await this.session(creds);
 
@@ -992,7 +1108,7 @@ export class SynologyDriveClient {
   /**
    * MD5 of a file already on the NAS.
    *
-   * MD5, not sha256, because MD5 is the only digest FileStation computes — and
+   * MD5, not sha256, because MD5 is the only digest FileStation computes, and
    * it is a task per file, so this is only ever a targeted question about one
    * file, never part of a listing.
    */

@@ -5,7 +5,7 @@
  * FileStation is the provider the sync core's weakest-common-denominator model
  * was shaped around: no change feed, no stable file id, app-level errors inside
  * HTTP 200, and one number meaning different things on two endpoints. So both
- * halves of that contract are pinned here — the exact parameters and their JSON
+ * halves of that contract are pinned here: the exact parameters and their JSON
  * encoding, and the docsync error code each way a NAS can disappoint maps to.
  *
  * Only `safeFetch` is mocked. `cappedFetch` runs for real against the fake
@@ -38,6 +38,7 @@ import {
   normalizeBaseUrl,
   normalizeSynoPath,
   snapshotVersion,
+  SynologyDriveClient,
 } from '../../../../src/nest/doc-sync/providers/synology-drive.client';
 import type {
   DocumentConnectionRef,
@@ -192,6 +193,7 @@ function callsTo(api: string, method?: string): Recorded[] {
 function connection(overrides: Partial<DocumentConnectionRef> = {}): DocumentConnectionRef {
   return {
     connectionId: 3,
+    createdAt: '2026-09-01 08:00:00',
     ownerId: 11,
     baseUrl: BASE_URL,
     secrets: { password: 'nas-secret' },
@@ -250,7 +252,7 @@ beforeEach(() => {
     throw new Error('unstubbed safeFetch');
   });
   install();
-  provider = new SynologyDriveDocumentProvider();
+  provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
 });
 
 // ── capabilities ─────────────────────────────────────────────────────────────
@@ -320,7 +322,7 @@ describe('SynologyDriveDocumentProvider: login', () => {
     expect(result).toMatchObject({ success: false, error: { code: 'unauthorized', detail: 'syno_code=400' } });
   });
 
-  it('SYNO-PROVIDER-014: a rejected credential is not retried — that is what earns an auto-block', async () => {
+  it('SYNO-PROVIDER-014: a rejected credential is not retried, since that is what earns an auto-block', async () => {
     route({ 'SYNO.API.Auth:login': fail(400) });
     await provider.probe(connection());
     const after = calls.length;
@@ -430,13 +432,20 @@ describe('SynologyDriveDocumentProvider: login', () => {
 // ── device tokens ────────────────────────────────────────────────────────────
 
 describe('SynologyDriveDocumentProvider: device tokens', () => {
-  /** DSM with two-factor on: a login needs a trusted device or a code, and a code earns a device. */
+  /** Codes the fake NAS has accepted. A TOTP code is good for one login, as on DSM. */
+  let spent = new Set<string>();
+
+  /** DSM with two-factor on: a login needs a trusted device or a fresh code, and a code earns a device. */
   function twoFactorNas(refused: string[] = []): Handler {
     return (call) => {
       const { device_id: deviceId, otp_code: otpCode } = call.params;
       if (deviceId && refused.includes(deviceId)) return fail(403);
       if (deviceId) return ok({ sid: `SID-${deviceId}` });
-      if (otpCode) return ok({ sid: `SID-${otpCode}`, did: `DEVICE-${otpCode}` });
+      if (otpCode && spent.has(otpCode)) return fail(404);
+      if (otpCode) {
+        spent.add(otpCode);
+        return ok({ sid: `SID-${otpCode}`, did: `DEVICE-${otpCode}` });
+      }
       return fail(403);
     };
   }
@@ -450,8 +459,42 @@ describe('SynologyDriveDocumentProvider: device tokens', () => {
     calls = [];
   }
 
+  /** Every write a saved connection made into its stored secrets. */
+  let writes: Array<[string, string | null]> = [];
+
+  /**
+   * A saved connection the way `DocSyncConfigService.toRef` hands one out: the
+   * secrets as they were stored when the ref was made, and a way to write back
+   * into `store`, which stands in for the connection's row.
+   */
+  function saved(store: Record<string, string>, overrides: Partial<DocumentConnectionRef> = {}): DocumentConnectionRef {
+    return connection({
+      secrets: { ...store },
+      saveSecret: (key, value) => {
+        writes.push([key, value]);
+        if (value === null) delete store[key];
+        else store[key] = value;
+      },
+      ...overrides,
+    });
+  }
+
+  /** A new process: nothing in memory, only what the connections stored. */
+  function restart(): void {
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
+    calls = [];
+    writes = [];
+  }
+
+  const picker = {
+    'SYNO.FileStation.List:list_share': ok({ shares: [] }),
+    'SYNO.FileStation.List:list': ok({ total: 0, files: [] }),
+  };
+
   beforeEach(() => {
     vi.useFakeTimers();
+    spent = new Set();
+    writes = [];
   });
 
   afterEach(() => {
@@ -499,13 +542,20 @@ describe('SynologyDriveDocumentProvider: device tokens', () => {
     });
     expireSessions();
     expect(await provider.probe(first)).toMatchObject({ success: false, error: { code: 'unauthorized' } });
+    // The code in the form gets its turn in the same call; this one was spent
+    // long ago, so DSM turns it down as well.
+    expect(logins().map((call) => [call.params.device_id, call.params.otp_code])).toEqual([
+      ['DEVICE-111111', undefined],
+      [undefined, '111111'],
+    ]);
     expect(await provider.probe(second)).toMatchObject({ success: true });
 
     // Once the lockout has passed, the first connection offers the code in its
-    // form again instead of the token DSM refused.
+    // form again and never the token DSM refused.
     vi.setSystemTime(Date.now() + 61 * 1000);
     calls = [];
     await provider.probe(first);
+    expect(logins()).toHaveLength(1);
     expect(logins()[0].params).toMatchObject({ otp_code: '111111', enable_device_token: 'yes' });
     expect(logins()[0].params.device_id).toBeUndefined();
   });
@@ -548,6 +598,154 @@ describe('SynologyDriveDocumentProvider: device tokens', () => {
     expect(logins()).toHaveLength(1);
     expect(logins()[0].params.device_id).toBe('DEVICE-111111');
     expect(logins()[0].params.otp_code).toBeUndefined();
+  });
+
+  it('SYNO-PROVIDER-100: the token a code earns is stored with the connection once, tied to its NAS and account', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+    await provider.listScopes(saved(store));
+
+    expect(store.device_token).toMatch(/^[0-9a-f]{64}:DEVICE-111111$/);
+    // Four FileStation calls, one change, one write.
+    expect(writes).toEqual([['device_token', store.device_token]]);
+  });
+
+  it('SYNO-PROVIDER-101: after a restart the stored token logs in, and nobody has to type a code', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    restart();
+    expect(await provider.listScopes(saved(store))).toMatchObject({ success: true });
+    expect(logins()).toHaveLength(1);
+    expect(logins()[0].params.device_id).toBe('DEVICE-111111');
+    expect(logins()[0].params.otp_code).toBeUndefined();
+    expect(writes).toEqual([]);
+  });
+
+  it('SYNO-PROVIDER-102: the stored token outlives a password edit and a spent or cleared code', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    store.password = 'rotated';
+    restart();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params).toMatchObject({ device_id: 'DEVICE-111111', passwd: '"rotated"' });
+    expect(logins()[0].params.otp_code).toBeUndefined();
+
+    delete store.otp_code;
+    restart();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params.device_id).toBe('DEVICE-111111');
+    expect(store.device_token).toMatch(/:DEVICE-111111$/);
+  });
+
+  it('SYNO-PROVIDER-103: an unsaved form writes nothing, even when handed a place to write', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), 'SYNO.FileStation.Info:get': ok({ hostname: 'nas' }) });
+    const saveSecret = vi.fn();
+    await provider.probe(connection({ connectionId: 0, ...withCode('111111'), saveSecret }));
+    expect(logins()[0].params.otp_code).toBe('111111');
+    expect(saveSecret).not.toHaveBeenCalled();
+  });
+
+  it('SYNO-PROVIDER-104: a token DSM refuses is dropped from storage too, and no error names it', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    route({ 'SYNO.API.Auth:login': twoFactorNas(['DEVICE-111111']), ...picker });
+    restart();
+    const result = await provider.listScopes(saved(store));
+    expect(result).toMatchObject({ success: false, error: { code: 'unauthorized' } });
+    expect(store.device_token).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('DEVICE-111111');
+
+    // The next process has nothing left to offer DSM but the code.
+    restart();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params.device_id).toBeUndefined();
+  });
+
+  it('SYNO-PROVIDER-105: a fresh code wins over a refused token in the same test, and the saved connection keeps it', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), 'SYNO.FileStation.Info:get': ok({ hostname: 'nas' }), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    // TREK was removed from the account's trusted devices. After a restart the
+    // owner types a new code and tests the form, which merges in what is stored
+    // but has no way to write.
+    route({
+      'SYNO.API.Auth:login': twoFactorNas(['DEVICE-111111']),
+      'SYNO.FileStation.Info:get': ok({ hostname: 'nas' }),
+      ...picker,
+    });
+    restart();
+    expect(await provider.probe(connection({ secrets: { ...store, otp_code: '222222' } }))).toMatchObject({ success: true });
+    expect(logins().map((call) => [call.params.device_id, call.params.otp_code])).toEqual([
+      ['DEVICE-111111', undefined],
+      [undefined, '222222'],
+    ]);
+    expect(store.device_token).toMatch(/:DEVICE-111111$/);
+
+    // Saved with that code: the connection's next call stores what the test earned.
+    store.otp_code = '222222';
+    await provider.listScopes(saved(store));
+    expect(store.device_token).toMatch(/:DEVICE-222222$/);
+
+    restart();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params.device_id).toBe('DEVICE-222222');
+  });
+
+  it('SYNO-PROVIDER-106: a connection repointed at another account forgets its token, in memory and in storage', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+    calls = [];
+
+    await provider.listScopes(saved(store, { settings: { username: 'someone-else', base_path: '/trek' } }));
+    expect(logins()[0].params.device_id).toBeUndefined();
+    expect(store.device_token).toBeUndefined();
+
+    // Pointed back, it has passed nobody's second factor there either.
+    expireSessions();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params.device_id).toBeUndefined();
+  });
+
+  it('SYNO-PROVIDER-107: after a restart, a token stored for another NAS is dropped rather than offered there', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    restart();
+    await provider.listScopes(saved(store, { baseUrl: 'https://other-nas.example.org:5001' }));
+    expect(logins()[0].params.device_id).toBeUndefined();
+    expect(store.device_token).toBeUndefined();
+  });
+
+  it('SYNO-PROVIDER-108: a connection that a restore hands the same id is a stranger to the token under it', async () => {
+    route({ 'SYNO.API.Auth:login': twoFactorNas(), ...picker });
+    const store: Record<string, string> = { password: 'nas-secret', otp_code: '111111' };
+    await provider.listScopes(saved(store));
+
+    // A backup from before that connection is restored without a restart, and
+    // another trip's owner, who knows the password but has no authenticator,
+    // saves a connection to the same account. The id sequence went back with
+    // the database, so the new row gets the same id.
+    const reissued: Record<string, string> = { password: 'nas-secret' };
+    const stranger = await provider.listScopes(saved(reissued, { ownerId: 12, createdAt: '2026-09-02 09:30:00' }));
+
+    expect(stranger).toMatchObject({ success: false, error: { code: 'unauthorized' } });
+    expect(logins()[1].params.device_id).toBeUndefined();
+    expect(reissued.device_token).toBeUndefined();
+
+    // A later backup brings the first row back, and it logs in on its token as before.
+    expireSessions();
+    await provider.listScopes(saved(store));
+    expect(logins()[0].params.device_id).toBe('DEVICE-111111');
   });
 });
 
@@ -672,7 +870,7 @@ describe('SynologyDriveDocumentProvider: list', () => {
       size: 12,
       mimeType: 'application/pdf',
       // MD5 is the only digest FileStation computes, and it is not the sha256
-      // the core compares against — so there is nothing honest to put here.
+      // the core compares against, so there is nothing honest to put here.
       contentHash: null,
       remoteModifiedAt: new Date(1_700_000_500 * 1000).toISOString(),
       isDeleted: false,
@@ -1031,7 +1229,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
       error: { code: 'unauthorized' },
     });
 
-    provider = new SynologyDriveDocumentProvider();
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     calls = [];
     route({ 'SYNO.FileStation.List:getinfo': fail(408) });
     expect(await provider.resolveScope(connection(), scope())).toMatchObject({
@@ -1052,7 +1250,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
       [117, 'forbidden'],
     ];
     for (const [synoCode, code] of expected) {
-      provider = new SynologyDriveDocumentProvider();
+      provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
       calls = [];
       route({ 'SYNO.FileStation.List:list': sequence(fail(synoCode), fail(synoCode)) });
       const result = await provider.list(connection(), scope());
@@ -1107,7 +1305,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
 
   it('SYNO-PROVIDER-088: the remaining HTTP statuses a NAS or its proxy answers', async () => {
     for (const [status, code] of [[403, 'forbidden'], [404, 'not_found'], [413, 'too_large'], [429, 'rate_limited']] as const) {
-      provider = new SynologyDriveDocumentProvider();
+      provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
       calls = [];
       route({ 'SYNO.API.Auth:login': reply({}, { status }) });
       expect(await provider.probe(connection()), `http ${status}`).toMatchObject({
@@ -1133,7 +1331,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
       error: { code: 'quota_exceeded', status: 507 },
     });
 
-    provider = new SynologyDriveDocumentProvider();
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     route({ 'SYNO.FileStation.Upload:upload': reply({}, { status: 500 }) });
     expect(await provider.push(connection(), scope(), push())).toMatchObject({
       success: false,
@@ -1154,21 +1352,21 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
       error: { code: 'scope_missing' },
     });
 
-    provider = new SynologyDriveDocumentProvider();
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     route({ 'SYNO.FileStation.CreateFolder:create': ok({ folders: [] }) });
     expect(await provider.createScope(connection(), 'kyoto')).toMatchObject({
       success: false,
       error: { code: 'provider_error' },
     });
 
-    provider = new SynologyDriveDocumentProvider();
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     route({ 'SYNO.FileStation.Rename:rename': ok({ files: [] }) });
     expect(await provider.rename(connection(), scope(), `${SCOPE}/a.pdf`, 'b.pdf')).toMatchObject({
       success: false,
       error: { code: 'provider_error' },
     });
 
-    provider = new SynologyDriveDocumentProvider();
+    provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     route({
       'SYNO.FileStation.Upload:upload': ok({}),
       'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/itinerary.pdf`)] }),
@@ -1238,7 +1436,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
 
 // ── path handling ────────────────────────────────────────────────────────────
 
-describe('synology-drive.client — paths and versions', () => {
+describe('synology-drive.client: paths and versions', () => {
   it('SYNO-CLIENT-090: normalises the spellings that mean the same folder', () => {
     expect(normalizeSynoPath('/trek//japan-2026/')).toBe('/trek/japan-2026');
     expect(normalizeSynoPath('  /trek/./japan-2026  ')).toBe('/trek/japan-2026');

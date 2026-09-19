@@ -4,8 +4,8 @@ import type { DocsyncErrorCode } from '@trek/shared';
 /**
  * The adapter seam for document providers.
  *
- * Shaped after `PhotoProvider` (memories/photo-provider.ts) — interface, symbol
- * token, registry — with one deliberate difference: that interface only covers
+ * Shaped after `PhotoProvider` (memories/photo-provider.ts): interface, symbol
+ * token, registry. One difference is deliberate: that interface only covers
  * handing out bytes, and everything else (settings, test, search, album list)
  * is dispatched through hand-written `if (provider === 'immich')` branches in
  * the service, the MCP tools and two separate controllers. With two providers
@@ -16,7 +16,7 @@ import type { DocsyncErrorCode } from '@trek/shared';
  * Capability differences are answered by data (`DocumentProviderCapabilities`),
  * never by type-switching: the core asks what a provider can do and plans
  * accordingly. Synology FileStation has no change feed and no stable file id,
- * so the core must be correct with nothing but a full enumeration — and because
+ * so the core must be correct with nothing but a full enumeration, and because
  * the weakest provider sets the model, every provider is driven the same way.
  * A webhook is only ever "look now", never a source of truth.
  */
@@ -58,17 +58,37 @@ export function docFailed<T>(result: DocResult<T>): result is DocFailure {
 export interface DocumentConnectionRef {
   connectionId: number;
   /**
-   * The user whose credentials these are — the trip admin who set the binding
+   * When the connection's row was created, or '' for form values that were
+   * never saved. The id alone does not name one row for good: a backup
+   * restored in place rolls the id sequence back, and the id comes round
+   * again on the next connection saved, on any trip. The two together do.
+   */
+  createdAt: string;
+  /**
+   * The user whose credentials these are: the trip admin who set the binding
    * up, not whoever is asking. The core passes both around separately and never
    * derives one from the other.
    */
   ownerId: number;
   baseUrl: string;
-  /** Decrypted `secret = 1` fields. Never logged, never returned to a client. */
+  /**
+   * Decrypted `secret = 1` fields, plus whatever the provider earned and kept
+   * through `saveSecret`. Never logged, never returned to a client.
+   */
   secrets: Readonly<Record<string, string>>;
   /** Non-secret fields: username, organization_id, base_path, root_tag, … */
   settings: Readonly<Record<string, string>>;
   allowInsecureTls: boolean;
+  /**
+   * Keep a secret the provider earned itself (DSM's device token) with this
+   * connection, or drop it with null. `secrets` is the snapshot this ref was
+   * made from and does not change when this writes.
+   *
+   * Only a saved connection has one. A probe of form values may use what is
+   * stored but never changes it: the values on screen may be for another
+   * account, or never be saved at all.
+   */
+  saveSecret?: (key: string, value: string | null) => void;
 }
 
 /** The container at the provider that one trip is bound to. */
@@ -96,7 +116,7 @@ export interface RemoteDocument {
   mimeType: string | null;
   /**
    * Opaque version marker. Different means changed. That is all the core may
-   * conclude from it — it is not a content hash, not comparable across
+   * conclude from it. It is not a content hash, not comparable across
    * instances, and not ordered.
    */
   remoteVersion: string;
@@ -190,7 +210,7 @@ export interface DocumentProvider {
 
   /**
    * Verify form values before anything is stored, and report what the account
-   * can actually do. Always resolves — a failed probe is data, not an
+   * can actually do. Always resolves: a failed probe is data, not an
    * exception, because the settings UI shows it inline (the photo providers
    * pin that with a test marked CRITICAL in their e2e suite).
    */

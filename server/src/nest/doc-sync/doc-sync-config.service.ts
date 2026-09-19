@@ -9,7 +9,7 @@ import { docFailed } from './document-provider';
 import { decryptSecrets, encryptSecrets, maskSecrets, mergeSecrets } from './doc-sync-secrets';
 
 /**
- * Connections and trip bindings — everything a human configures, as opposed to
+ * Connections and trip bindings: everything a human configures, as opposed to
  * what the reconciler does with it.
  *
  * The connection carries a `trip_id`, and that is the one place this design
@@ -41,6 +41,7 @@ export interface ConnectionRow {
   last_probe_at: string | null;
   last_probe_state: string;
   last_probe_error: string | null;
+  created_at: string;
 }
 
 export interface LinkRow {
@@ -69,7 +70,7 @@ export interface LinkRow {
 
 interface ProviderFieldRow {
   field_key: string;
-  /** i18n key suffix, never display text — the client resolves `docsync.<label>`. */
+  /** i18n key suffix, never display text: the client resolves `docsync.<label>`. */
   label: string;
   input_type: string;
   placeholder: string | null;
@@ -127,7 +128,8 @@ export class DocSyncConfigService {
   /**
    * Turn a stored row into what an adapter needs. Secrets are decrypted here
    * and nowhere else, so there is one place to audit and one place that could
-   * leak them into a log.
+   * leak them into a log. The ref can write back what the adapter earns, which
+   * is what makes it a saved connection's ref; see `saveEarnedSecret`.
    */
   toRef(row: ConnectionRow): DocumentConnectionRef {
     let settings: Record<string, string> = {};
@@ -143,12 +145,42 @@ export class DocSyncConfigService {
     }
     return {
       connectionId: row.id,
+      createdAt: row.created_at,
       ownerId: row.owner_user_id,
       baseUrl: row.base_url,
       secrets: decryptSecrets(row.secrets),
       settings,
       allowInsecureTls: row.allow_insecure_tls === 1,
+      saveSecret: (key, value) => this.saveEarnedSecret(row.id, key, value),
     };
+  }
+
+  /**
+   * Keep a secret the provider earned itself rather than one typed into the
+   * form, or drop it with null. DSM's device token is the one there is: without
+   * it, a restart would leave every two-factor NAS waiting for its owner to
+   * type a fresh code.
+   *
+   * It lives in the same encrypted blob as the form's secrets, under a key no
+   * form field has, and that is what keeps it out of every response
+   * (`maskSecrets` reports form fields only) and out of the form's reach
+   * (`mergeSecrets` writes form fields only).
+   *
+   * The blob is read back inside the transaction rather than taken from the
+   * caller's ref: a sync run holds its ref for minutes, and writing that
+   * snapshot back would undo a password the owner changed in the meantime.
+   */
+  saveEarnedSecret(connectionId: number, key: string, value: string | null): void {
+    this.db.transaction(() => {
+      const row = this.getConnection(connectionId);
+      if (!row) return;
+      const secrets = decryptSecrets(row.secrets);
+      if (value === null) delete secrets[key];
+      else secrets[key] = value;
+      this.db.connection
+        .prepare('UPDATE document_connections SET secrets = ? WHERE id = ?')
+        .run(encryptSecrets(secrets), connectionId);
+    });
   }
 
   /** What a client may see: no secret values, only whether each one is set. */
@@ -174,7 +206,7 @@ export class DocSyncConfigService {
    * Validate a base URL before it is stored.
    *
    * A private address is stored WITH a warning rather than refused, because
-   * self-hosting is the normal case here — a Paperless on 192.168.x is the
+   * self-hosting is the normal case here: a Paperless on 192.168.x is the
    * point of the feature, not an attack. That is the same call airtrail.service
    * and dawarich.service already made. What is refused is an address that the
    * SSRF guard rejects for a reason other than being private.
@@ -194,6 +226,10 @@ export class DocSyncConfigService {
    *
    * Secrets that arrive blank or masked keep their stored value, so a client
    * that renders the form from a GET never has to hold the real credential.
+   * A secret the provider earned itself is kept too, whatever the form sends.
+   * DSM's device token is stored with the address and account it was issued
+   * for, so an edit that points the connection somewhere else leaves it
+   * unusable, and the adapter drops it on its next call.
    */
   async upsertConnection(
     tripId: number,
@@ -274,7 +310,7 @@ export class DocSyncConfigService {
 
   /**
    * Deleting a connection leaves every document in place. It unbinds, nothing
-   * more — the same promise Dawarich's disconnect makes, and the only version
+   * more: the same promise Dawarich's disconnect makes, and the only version
    * of this action that is safe to offer without a confirmation dialog.
    */
   deleteConnection(id: number): void {
@@ -376,7 +412,7 @@ export class DocSyncConfigService {
 
   /**
    * Unbinding keeps both copies and drops the pairing rows. It never deletes a
-   * document on either side — a user who wants that does it deliberately, in
+   * document on either side. A user who wants that does it deliberately, in
    * the system that holds the file.
    */
   deleteLink(id: number): void {

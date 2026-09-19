@@ -190,6 +190,7 @@ export class DocSyncController {
   deleteConnection(
     @Param('tripId') tripId: string,
     @Param('connectionId') connectionId: string,
+      createdAt: existing?.created_at ?? '',
     @CurrentUser() user: User,
   ) {
     this.assertCanManage(tripId, user);

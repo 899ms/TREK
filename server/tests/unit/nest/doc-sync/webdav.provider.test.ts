@@ -69,6 +69,7 @@ const OC_ROOT = `/dav/spaces/${OC_DRIVE}`;
 
 const ncConn: DocumentConnectionRef = {
   connectionId: 7,
+  createdAt: '2026-09-01 08:00:00',
   ownerId: 3,
   baseUrl: NC_ORIGIN,
   secrets: { app_password: 'app-pw' },
@@ -78,6 +79,7 @@ const ncConn: DocumentConnectionRef = {
 
 const ocConn: DocumentConnectionRef = {
   connectionId: 8,
+  createdAt: '2026-09-01 08:00:00',
   ownerId: 3,
   baseUrl: OC_ORIGIN,
   secrets: { app_token: 'app-token' },

@@ -1,5 +1,5 @@
 /**
- * The Paperless-ngx adapter — PAPERLESS-001..095.
+ * The Paperless-ngx adapter: PAPERLESS-001..095.
  *
  * Two things are pinned here. What the client puts on the wire: the pinned API
  * version (an unpinned Accept header is how the `checksum` field silently moved
@@ -86,6 +86,7 @@ const BASE = 'https://papers.example.org';
 
 const CONN: DocumentConnectionRef = {
   connectionId: 4,
+  createdAt: '2026-09-01 08:00:00',
   ownerId: 9,
   baseUrl: BASE,
   secrets: { api_token: TOKEN },
@@ -285,7 +286,7 @@ beforeEach(() => {
   );
 });
 
-describe('PaperlessClient — the request it builds', () => {
+describe('PaperlessClient: the request it builds', () => {
   it('PAPERLESS-001: appends /api to whatever the operator pasted', () => {
     expect(apiBase(BASE)).toBe(`${BASE}/api`);
     expect(apiBase(`${BASE}/`)).toBe(`${BASE}/api`);
@@ -338,7 +339,7 @@ describe('PaperlessClient — the request it builds', () => {
   });
 });
 
-describe('PaperlessProvider — probing a connection', () => {
+describe('PaperlessProvider: probing a connection', () => {
   it('PAPERLESS-010: reports the self-registering webhook when the token may create workflows', async () => {
     on('GET /api/ui_settings/', reply({
       user: { username: 'admin' },
@@ -416,7 +417,7 @@ describe('PaperlessProvider — probing a connection', () => {
   });
 });
 
-describe('PaperlessProvider — scopes are tags', () => {
+describe('PaperlessProvider: scopes are tags', () => {
   it('PAPERLESS-020: a tag becomes a scope key, a label and the instance filter URL', async () => {
     on('GET /api/tags/', reply(page([tagRow(3, 'japan-2026', 4), tagRow(9, 'privat')])));
     const options = expectOk(await provider.listScopes(CONN));
@@ -468,7 +469,7 @@ describe('PaperlessProvider — scopes are tags', () => {
   });
 });
 
-describe('PaperlessProvider — listing a scope', () => {
+describe('PaperlessProvider: listing a scope', () => {
   it('PAPERLESS-030: maps a document onto the core’s shape', async () => {
     on('GET /api/documents/', reply(page([docRow()])));
     const listed = expectOk(await provider.list(CONN, SCOPE));
@@ -544,7 +545,7 @@ describe('PaperlessProvider — listing a scope', () => {
     const second = expectOk(await provider.list(CONN, { ...SCOPE, cursor: first.cursor }));
     expect(second.cursorUnchanged).toBe(true);
 
-    // A document leaving the tag moves no timestamp — only the count notices.
+    // A document leaving the tag moves no timestamp: only the count notices.
     on('GET /api/documents/', reply(page([], null, 0)));
     const third = expectOk(await provider.list(CONN, { ...SCOPE, cursor: first.cursor }));
     expect(third.cursorUnchanged).toBe(false);
@@ -583,7 +584,7 @@ describe('PaperlessProvider — listing a scope', () => {
   });
 });
 
-describe('PaperlessProvider — fetching bytes', () => {
+describe('PaperlessProvider: fetching bytes', () => {
   it('PAPERLESS-040: asks for the original file and hands back the stream with its version', async () => {
     on('GET /api/documents/11/', reply(docRow()));
     on('GET /api/documents/11/download/', streamReply('%PDF-1.4 hotel', {
@@ -635,7 +636,7 @@ describe('PaperlessProvider — fetching bytes', () => {
   });
 });
 
-describe('PaperlessProvider — pushing bytes', () => {
+describe('PaperlessProvider: pushing bytes', () => {
   function stubSuccessfulCreate(): void {
     on('GET /api/custom_fields/', reply(page([{ id: 1, name: TRIP_UID_FIELD_NAME, data_type: 'string' }])));
     on('POST /api/documents/post_document/', reply('"task-uuid-1"'));
@@ -731,7 +732,7 @@ describe('PaperlessProvider — pushing bytes', () => {
     expect(expectFail(await provider.push(CONN, SCOPE, pushRequest())).code).toBe('conflict');
   });
 
-  it('PAPERLESS-055: the task filter is not trusted either — a foreign task is ignored', async () => {
+  it('PAPERLESS-055: the task filter is not trusted either, so a foreign task is ignored', async () => {
     on('GET /api/custom_fields/', reply(page([{ id: 1, name: TRIP_UID_FIELD_NAME, data_type: 'string' }])));
     on('POST /api/documents/post_document/', reply('"task-uuid-1"'));
     on('GET /api/tasks/', reply(page([taskRow({ task_id: 'someone-elses-task', status: 'success' })])));
@@ -765,7 +766,7 @@ describe('PaperlessProvider — pushing bytes', () => {
   it('PAPERLESS-057a: a document with the same bytes but another tag is not adopted', async () => {
     // The tag goes on at upload, so only a tagged document can be the one this
     // push made. Taking the untagged twin instead put a stranger's document in
-    // the trip — and delete-through would have trashed it on a later run.
+    // the trip, and delete-through would have trashed it on a later run.
     vi.spyOn(client, 'awaitConsume').mockRejectedValue(
       new PaperlessError('timeout', 'Paperless is still processing the uploaded file'),
     );
@@ -842,7 +843,7 @@ describe('PaperlessProvider — pushing bytes', () => {
   });
 });
 
-describe('PaperlessProvider — renaming and trashing', () => {
+describe('PaperlessProvider: renaming and trashing', () => {
   it('PAPERLESS-070: renaming sets the title without the extension it would add back', async () => {
     on('PATCH /api/documents/11/', reply(docRow({ modified: '2026-09-18T19:00:00.000000+02:00' })));
     const renamed = expectOk(await provider.rename(CONN, SCOPE, '11', ' Hotelrechnung Kyoto.pdf '));
@@ -866,7 +867,7 @@ describe('PaperlessProvider — renaming and trashing', () => {
   });
 });
 
-describe('PaperlessProvider — the self-registered webhook', () => {
+describe('PaperlessProvider: the self-registered webhook', () => {
   it('PAPERLESS-090: subscribes both triggers, filtered on the tag, with the secret in a header', async () => {
     on('POST /api/workflows/', reply({ id: 6 }, 201));
     const registered = expectOk(

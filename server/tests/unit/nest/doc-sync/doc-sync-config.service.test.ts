@@ -5,7 +5,7 @@
  * The database here is real in-memory SQLite with the full schema, and the
  * at-rest crypto is real too. Both are deliberate. Almost everything this
  * service owns is either a credential or a decision about one, and a spy on
- * `db.run` would only prove that some strings were handed along — reading the
+ * `db.run` would only prove that some strings were handed along. Reading the
  * row back is the assertion. A stubbed `maybe_encrypt_api_key` would let a
  * regression that stores a Paperless token in plaintext pass every case below.
  *
@@ -63,7 +63,7 @@ import {
   type LinkRow,
 } from '../../../../src/nest/doc-sync/doc-sync-config.service';
 import type { DocumentProviderRegistry } from '../../../../src/nest/doc-sync/document-provider.registry';
-// `if (!result.success)` does not narrow in this workspace — strictNullChecks is
+// `if (!result.success)` does not narrow in this workspace: strictNullChecks is
 // off, so the boolean discriminant stops discriminating. The domain's own
 // predicate is what every call site uses instead.
 import { docFailed } from '../../../../src/nest/doc-sync/document-provider';
@@ -123,7 +123,7 @@ beforeAll(() => {
 
 beforeEach(() => {
   // The document_* tables are not in resetTestDb's list, and they reference
-  // trips and users — so they go first, before the rows they hang off vanish.
+  // trips and users, so they go first, before the rows they hang off vanish.
   testDb.exec('DELETE FROM document_sync_items; DELETE FROM trip_document_links; DELETE FROM document_connections;');
   resetTestDb(testDb);
   vi.clearAllMocks();
@@ -223,6 +223,83 @@ describe('publicConnection', () => {
     testDb.prepare('UPDATE document_connections SET capabilities = ? WHERE id = ?').run('{not json', created.id);
     const view = svc.publicConnection(svc.getConnection(created.id) as ConnectionRow);
     expect(view.capabilities).toBeNull();
+  });
+});
+
+describe('a secret the provider earned itself', () => {
+  // The shape the Synology adapter stores: account digest, colon, DSM's token.
+  const EARNED = 'a1b2c3:DEVICE-7';
+
+  function nas(credentials: Record<string, string> = { username: 'anna', password: 'nas-pw', otp_code: '123456' }) {
+    return connect({ providerId: 'synologydrive', baseUrl: 'https://nas.example.com:5001', credentials });
+  }
+
+  function secretsOf(connectionId: number): Readonly<Record<string, string>> {
+    return svc.toRef(svc.getConnection(connectionId) as ConnectionRow).secrets;
+  }
+
+  it('is stored through the ref the adapter was handed, encrypted with the form\'s secrets', async () => {
+    const conn = await nas();
+    svc.toRef(conn).saveSecret!('device_token', EARNED);
+
+    expect(secretsOf(conn.id)).toEqual({ password: 'nas-pw', otp_code: '123456', device_token: EARNED });
+    expect((svc.getConnection(conn.id) as ConnectionRow).secrets).not.toContain('DEVICE-7');
+  });
+
+  it('never reaches a client, not even as a mask', async () => {
+    const conn = await nas();
+    svc.saveEarnedSecret(conn.id, 'device_token', EARNED);
+    const view = svc.publicConnection(svc.getConnection(conn.id) as ConnectionRow);
+
+    expect(view.secrets).toEqual({ password: DOCSYNC_SECRET_MASK, otp_code: DOCSYNC_SECRET_MASK });
+    expect(JSON.stringify(view)).not.toContain('DEVICE-7');
+    expect(JSON.stringify(view)).not.toContain('device_token');
+  });
+
+  it('survives a form edit, whatever the form sends for the secrets it does show', async () => {
+    const conn = await nas();
+    svc.saveEarnedSecret(conn.id, 'device_token', EARNED);
+    await nas({ username: 'anna', password: 'rotated', otp_code: '' });
+    await nas({ username: 'anna', password: DOCSYNC_SECRET_MASK });
+
+    expect(secretsOf(conn.id)).toMatchObject({ password: 'rotated', device_token: EARNED });
+  });
+
+  it('cannot be planted or overwritten through the form', async () => {
+    const conn = await nas();
+    await nas({ username: 'anna', device_token: 'a1b2c3:PLANTED' });
+    expect(secretsOf(conn.id).device_token).toBeUndefined();
+
+    svc.saveEarnedSecret(conn.id, 'device_token', EARNED);
+    await nas({ username: 'anna', device_token: 'a1b2c3:PLANTED' });
+    expect(secretsOf(conn.id).device_token).toBe(EARNED);
+    expect(svc.toRef(svc.getConnection(conn.id) as ConnectionRow).settings).not.toHaveProperty('device_token');
+  });
+
+  it('is written against the row as it is now, so a run holding an old ref cannot undo a password edit', async () => {
+    const conn = await nas();
+    const ref = svc.toRef(conn);
+    await nas({ username: 'anna', password: 'rotated' });
+    ref.saveSecret!('device_token', EARNED);
+
+    expect(secretsOf(conn.id)).toMatchObject({ password: 'rotated', device_token: EARNED });
+  });
+
+  it('is dropped with null, and the form\'s secrets stay', async () => {
+    const conn = await nas();
+    svc.saveEarnedSecret(conn.id, 'device_token', EARNED);
+    svc.saveEarnedSecret(conn.id, 'device_token', null);
+
+    expect(secretsOf(conn.id)).toEqual({ password: 'nas-pw', otp_code: '123456' });
+  });
+
+  it('brings back no connection that was deleted while a run still held its ref', async () => {
+    const conn = await nas();
+    const ref = svc.toRef(conn);
+    svc.deleteConnection(conn.id);
+
+    ref.saveSecret!('device_token', EARNED);
+    expect(svc.getConnection(conn.id)).toBeUndefined();
   });
 });
 
@@ -335,6 +412,24 @@ describe('deleteConnection', () => {
     expect(svc.getConnection(doomed.id)).toBeUndefined();
     expect(svc.listLinks(TRIP).map((l) => l.id)).toEqual([keptLink.id]);
     expect(testDb.prepare('SELECT COUNT(*) AS n FROM document_sync_items').get()).toEqual({ n: 0 });
+  });
+});
+
+describe('toRef', () => {
+  it('names the row and not only its id, which a backup restored in place hands out again', async () => {
+    const first = await connect();
+    testDb.prepare("UPDATE document_connections SET created_at = '2026-09-01 08:00:00' WHERE id = ?").run(first.id);
+    const before = svc.toRef(svc.getConnection(first.id) as ConnectionRow);
+
+    // What the restore of an older backup does to this table: the row is gone
+    // and the id sequence is back where it stood before the row was made.
+    testDb.prepare('DELETE FROM document_connections WHERE id = ?').run(first.id);
+    testDb.prepare("UPDATE sqlite_sequence SET seq = ? WHERE name = 'document_connections'").run(first.id - 1);
+    const after = svc.toRef(await connect());
+
+    expect(after.connectionId).toBe(before.connectionId);
+    expect(before.createdAt).toBe('2026-09-01 08:00:00');
+    expect(after.createdAt).not.toBe(before.createdAt);
   });
 });
 

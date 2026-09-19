@@ -59,20 +59,33 @@ export interface GuardedDownload {
  */
 export const DOWNLOAD_MAX_BYTES = 2 * 1024 * 1024 * 1024;
 
-/** undici's own timers, plus the abort `AbortSignal.timeout` fires. */
+/**
+ * The abort `AbortSignal.timeout` fires, and undici's header and body timers:
+ * a host that took the request and then went quiet. undici's connect timer is
+ * left out on purpose. A host that never completed the handshake (switched
+ * off, or behind a firewall that drops the SYN) did not answer at all, so it
+ * reads as unreachable.
+ */
 const TIMEOUT_NAME = /^(TimeoutError|AbortError)$/;
 const TIMEOUT_CODE = /ABORT_ERR|HEADERS_TIMEOUT|BODY_TIMEOUT/i;
 
 /**
  * Codes that are a verdict on the certificate rather than on the connection,
  * which is what lets the settings screen offer the self-signed switch instead
- * of a dead end. Most carry CERT or TLS in the name; these two do not.
+ * of a dead end. Most carry CERT or TLS in the name; the verify codes listed
+ * here do not, and the switch gets past each of them all the same.
  *
  * ERR_SSL_* is deliberately not among them: a handshake that fails on the
  * protocol (https against a plain http port, say) is not something the switch
  * can fix, and `tls_untrusted` tells the user it is.
  */
-const CERTIFICATE_CODES = new Set(['UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'HOSTNAME_MISMATCH']);
+const CERTIFICATE_CODES = new Set([
+  'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+  'HOSTNAME_MISMATCH',
+  'INVALID_PURPOSE',
+  'INVALID_CA',
+  'PATH_LENGTH_EXCEEDED',
+]);
 const CERTIFICATE_CODE = /CERT|SELF_SIGNED|ERR_TLS/i;
 
 /**

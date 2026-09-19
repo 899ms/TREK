@@ -33,8 +33,8 @@ import {
 /**
  * Synology Drive over the FileStation Web API.
  *
- * The scope is a folder and identity is its path — FileStation has no file id,
- * no change feed and no webhook — so this adapter is the one the sync core's
+ * The scope is a folder and identity is its path (FileStation has no file id,
+ * no change feed and no webhook), so this adapter is the one the sync core's
  * "full enumeration, nothing assumed" model was shaped around. Everything it
  * cannot honestly promise it declares as absent in `capabilities()` rather than
  * faking: no push, no stable id, no hash in the listing.
@@ -62,10 +62,10 @@ const SCOPE_PREFIX = 'path:';
 const TRASH_FOLDER = '.trek-trash';
 
 /**
- * The adapter's own ceiling for one transfer. Not a policy — the install's limit
+ * The adapter's own ceiling for one transfer. Not a policy: the install's limit
  * is the upload limit (`MAX_FILE_SIZE`), enforced by the core before and during
- * every transfer — just a bound so a wrong path or a truncated header cannot
- * start an unbounded read.
+ * every transfer. This is just a bound so a wrong path or a truncated header
+ * cannot start an unbounded read.
  */
 const MAX_TRANSFER_BYTES = 2 * 1024 * 1024 * 1024;
 
@@ -82,14 +82,21 @@ const MD5_VERIFY_MAX_BYTES = 64 * 1024 * 1024;
 /** How many scope options one picker call may answer with. */
 const MAX_SCOPE_OPTIONS = 200;
 
+/**
+ * Where the connection keeps DSM's device token among its secrets. No form
+ * field has this key, which is what keeps it out of every response and out of
+ * the form's reach; see `saveEarnedSecret` in the config service.
+ */
+const DEVICE_TOKEN_SECRET = 'device_token';
+
 const CAPABILITIES: DocumentProviderCapabilities = {
   // FileStation has no subscription API at all. DSM's own notifications are
   // mail and mobile push, neither reachable from here.
   push: 'none',
   // The path IS the id: a rename upstream reads as delete + create.
   stableId: false,
-  // Through the move into TRASH_FOLDER below, not through DSM's own recycle bin
-  // — the API's delete is permanent and offers no flag to route it elsewhere.
+  // Through the move into TRASH_FOLDER below, not through DSM's own recycle bin:
+  // the API's delete is permanent and offers no flag to route it elsewhere.
   remoteTrash: true,
   // An upload with overwrite=true replaces the bytes under the same path.
   replaceInPlace: true,
@@ -145,7 +152,7 @@ function scopeOption(path: string, label?: string): DocumentScopeOption {
   return {
     scopeKey: `${SCOPE_PREFIX}${path}`,
     label: label ?? baseName(path),
-    // There is no stable folder id on a Synology share — the path is all there
+    // There is no stable folder id on a Synology share: the path is all there
     // is, and pretending otherwise would put a fiction in the binding.
     remoteRootId: null,
     remoteRootPath: path,
@@ -157,11 +164,11 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
   readonly id = PROVIDER_ID;
 
   /**
-   * Constructed here rather than injected: the client holds the SID cache, so
-   * there has to be exactly one of it per process, and it has no dependencies
-   * of its own to resolve.
+   * Injected, like the Paperless and WebDAV clients: it holds the SID cache,
+   * the lockouts and the device token slots, so there has to be exactly one of
+   * it per process, and the module's singleton is that one.
    */
-  private readonly client = new SynologyDriveClient();
+  constructor(private readonly client: SynologyDriveClient) {}
 
   capabilities(): DocumentProviderCapabilities {
     return CAPABILITIES;
@@ -188,7 +195,7 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
 
   /**
    * The shares this account can see, plus the folders under the configured base
-   * path — the two levels an operator actually picks from. Shares are offered
+   * path, the two levels an operator actually picks from. Shares are offered
    * too because a small NAS often has a share per purpose and no sub-folders.
    */
   async listScopes(conn: DocumentConnectionRef, query?: string): Promise<DocResult<DocumentScopeOption[]>> {
@@ -244,7 +251,7 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
       return docOk(scopeOption(created, folder.name));
     } catch (error: unknown) {
       // With force_parent DSM creates missing folders, but never a missing
-      // share — that is a storage operation, not a file one. Saying "the base
+      // share: that is a storage operation, not a file one. Saying "the base
       // path does not exist" is the actionable version of its 408.
       if (error instanceof SynologyDriveError && error.code === 'not_found') {
         return docFail('scope_missing', `The base path ${basePath} does not exist on the NAS`);
@@ -383,8 +390,8 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
    *
    * The confirmation is not ceremony: FileStation answers `success: true` as
    * soon as it has written the part, and the version the core stores has to
-   * describe the file as the NAS now sees it — including the mtime DSM rounded
-   * to whole seconds — or the next listing reads TREK's own upload as a change
+   * describe the file as the NAS now sees it (including the mtime DSM rounded
+   * to whole seconds), or the next listing reads TREK's own upload as a change
    * made upstream.
    */
   async push(
@@ -539,12 +546,16 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
     const password = conn.secrets.password ?? '';
     if (!username || !password || !conn.baseUrl.trim()) return null;
     const otpCode = (conn.secrets.otp_code ?? '').trim();
+    const save = conn.saveSecret;
     return {
       connectionId: conn.connectionId,
+      connectionCreatedAt: conn.createdAt,
       baseUrl: conn.baseUrl,
       username,
       password,
       otpCode: otpCode === '' ? undefined : otpCode,
+      storedDeviceToken: conn.secrets[DEVICE_TOKEN_SECRET],
+      saveDeviceToken: save ? (stored) => save(DEVICE_TOKEN_SECRET, stored) : undefined,
       allowInsecureTls: conn.allowInsecureTls,
     };
   }
@@ -582,7 +593,7 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
    * make. The trip boundary exists only here.
    *
    * Throws rather than returning a result, so a caller cannot forget to check
-   * it — every caller already runs inside the try that turns a
+   * it. Every caller already runs inside the try that turns a
    * `SynologyDriveError` into a `DocResult`.
    */
   private requireInScope(scope: DocumentScopeRef, remoteId: string): string {

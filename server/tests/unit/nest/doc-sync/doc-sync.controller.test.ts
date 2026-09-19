@@ -370,6 +370,52 @@ describe('probing form values', () => {
 
 describe('reading the trip state', () => {
   it('asks the reconciler with a number, because the path hands the handler a string', () => {
+describe('a secret the adapter earned itself', () => {
+  const EARNED = 'a1b2c3:DEVICE-SECRET';
+
+  it('is in neither connection payload the form is rendered from', async () => {
+    testDb.prepare("UPDATE document_providers SET enabled = 1 WHERE id = 'synologydrive'").run();
+    const nas = connBody({
+      providerId: 'synologydrive',
+      baseUrl: 'https://nas.example.com:5001',
+      credentials: { username: 'anna', password: 'nas-pw' },
+    });
+    const created = (await controller.upsertConnection(String(tripId), owner, nas)) as { id: number };
+    config.saveEarnedSecret(created.id, 'device_token', EARNED);
+
+    const listed = JSON.stringify(controller.listConnections(String(tripId)));
+    const edited = JSON.stringify(
+      await controller.upsertConnection(String(tripId), owner, { ...nas, credentials: { username: 'anna', password: 'rotated' } }),
+    );
+    for (const payload of [listed, edited]) {
+      expect(payload).not.toContain('DEVICE-SECRET');
+      expect(payload).not.toContain('device_token');
+    }
+    expect(config.toRef(config.getConnection(created.id)!).secrets.device_token).toBe(EARNED);
+  });
+
+  it('reaches a probe of the saved form, which gets no way to write', async () => {
+    const conn = await storedPaperless();
+    config.saveEarnedSecret(conn.id, 'device_token', EARNED);
+    const res = await controller.testConnection(String(tripId), owner, connBody({ credentials: { api_token: '' } }) as DocsyncConnectionTestDto);
+
+    const ref = paperless.probe.mock.calls[0][0];
+    // The row as well as its id: together they are where the saved connection keeps its device token.
+    expect(ref).toMatchObject({ connectionId: conn.id, createdAt: conn.created_at, secrets: { device_token: EARNED } });
+    expect(ref.createdAt).not.toBe('');
+    expect(ref.saveSecret).toBeUndefined();
+    expect(JSON.stringify(res)).not.toContain('DEVICE-SECRET');
+  });
+
+  it('gives a probe of an unsaved form no way to write either', async () => {
+    await controller.testConnection(String(tripId), owner, connBody({ credentials: { api_token: 'first-try' } }) as DocsyncConnectionTestDto);
+    const ref = paperless.probe.mock.calls[0][0];
+    expect(ref.connectionId).toBe(0);
+    expect(ref.createdAt).toBe('');
+    expect(ref.saveSecret).toBeUndefined();
+  });
+});
+
     controller.status(String(tripId));
     expect(sync.status).toHaveBeenCalledWith(tripId);
   });

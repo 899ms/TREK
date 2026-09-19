@@ -135,6 +135,10 @@ describe('classifyTransportFailure', () => {
     'CERT_SIGNATURE_FAILURE',
     'ERR_TLS_CERT_ALTNAME_INVALID',
     'HOSTNAME_MISMATCH',
+    // A leaf without serverAuth, signed by a CA this host does trust.
+    'INVALID_PURPOSE',
+    'INVALID_CA',
+    'PATH_LENGTH_EXCEEDED',
   ])('PROVIDER-HTTP-003: %s is an untrusted certificate', (code) => {
     expect(classifyTransportFailure(wrapped(coded('certificate verdict', code))).code).toBe('tls_untrusted');
   });
@@ -159,6 +163,15 @@ describe('classifyTransportFailure', () => {
     for (let level = 0; level < 4; level++) error = wrapped(error);
     expect(classifyTransportFailure(error).code).toBe('tls_untrusted');
     expect(classifyTransportFailure(wrapped(error)).code).toBe('unreachable');
+  });
+
+  it('PROVIDER-HTTP-007: a host that never takes the connection is unreachable, not slow', () => {
+    // undici gives up on the handshake after ten seconds, before the request's
+    // own timeout does: a NAS that is switched off, or a firewall that drops the SYN.
+    const error = wrapped(
+      Object.assign(new Error('Connect Timeout Error'), { name: 'ConnectTimeoutError', code: 'UND_ERR_CONNECT_TIMEOUT' }),
+    );
+    expect(classifyTransportFailure(error).code).toBe('unreachable');
   });
 });
 

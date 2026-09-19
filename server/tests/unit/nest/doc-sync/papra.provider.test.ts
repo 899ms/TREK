@@ -6,7 +6,7 @@
  * nothing and restores a trashed twin instead still answers 200, a missing key
  * scope is a 401 rather than a 403, and no timestamp moves when a document
  * changes. So the cases pinned here are mostly the ones where believing the
- * obvious reading would corrupt the sync — the dedup paths, the version
+ * obvious reading would corrupt the sync: the dedup paths, the version
  * marker, and the scope filter.
  *
  * `safeFetch` is mocked because the SSRF guard does a real DNS lookup and
@@ -51,6 +51,7 @@ const TAG = 'tag_egz8zvs4gcesi99d00mma0f3';
 
 const CONN: DocumentConnectionRef = {
   connectionId: 7,
+  createdAt: '2026-09-01 08:00:00',
   ownerId: 3,
   baseUrl: 'https://papra.example.org',
   secrets: { api_key: API_KEY },
@@ -1069,7 +1070,7 @@ describe('the version marker', () => {
 /**
  * The media type goes into a header, so it has to survive being one.
  *
- * It comes from `trip_files.mime_type` — influenced by an upload — and went in
+ * It comes from `trip_files.mime_type` (influenced by an upload) and went in
  * untouched while the filename beside it was escaped. A CR or LF ends the
  * header early and lets what follows be read as headers of its own.
  */
