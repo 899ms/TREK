@@ -1245,6 +1245,283 @@ describe('DocSyncService', () => {
     });
   });
 
+  /**
+   * A deletion in TREK is acted on once, under the policy of that moment.
+   *
+   * Both planner branches used to emit `local_deleted` for as long as the file
+   * sat in TREK's trash. Under `unlink` that was invisible, until somebody
+   * switched the binding to `trash`: the next run then binned every document
+   * ever deleted in TREK, months back included.
+   */
+  describe('a deletion in TREK', () => {
+    function deletedPairing(link: LinkRow): { itemId: number; fileId: number } {
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+        contentSha256: FILE_SHA, pushedSha256: FILE_SHA,
+      });
+      return { itemId, fileId };
+    }
+
+    it('does not reach back when the binding is switched from unlink to trash later', async () => {
+      const link = makeLink({ deletePolicy: 'unlink' });
+      const { itemId } = deletedPairing(link);
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+
+      await service.syncLink(link);
+      expect(itemRow(itemId).state).toBe('local_deleted');
+      expect(itemRow(itemId).remote_trashed_at).toBeNull();
+
+      testDb.prepare("UPDATE trip_document_links SET delete_policy = 'trash' WHERE id = ?").run(link.id);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.trash).not.toHaveBeenCalled();
+      expect(itemRow(itemId).state).toBe('local_deleted');
+    });
+
+    it('bins the provider copy exactly once, even while the provider keeps listing it', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const { itemId } = deletedPairing(link);
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+
+      await service.syncLink(link);
+      expect(itemRow(itemId).remote_trashed_at).not.toBeNull();
+      await service.syncLink(config.getLink(link.id));
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.trash).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again under an unchanged upstream either', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      deletedPairing(link);
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+      await service.syncLink(link);
+
+      provider.list.mockResolvedValue(ok(listing([], { cursorUnchanged: true })));
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.trash).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  /**
+   * Taking a file back out of TREK's trash.
+   *
+   * `FilesService.restoreFile` only clears `deleted_at`; nothing in the files
+   * domain knows about sync, so the next run is what finds out. Three cases,
+   * told apart by what happened to the provider copy while TREK's sat in the
+   * bin: still there, binned by TREK itself, or gone by somebody else's hand.
+   */
+  describe('a file taken back out of TREK trash', () => {
+    const restore = (fileId: number) =>
+      testDb.prepare('UPDATE trip_files SET deleted_at = NULL WHERE id = ?').run(fileId);
+
+    /** A synced pairing whose file was deleted in TREK and whose deletion one run has seen. */
+    async function deletedAndSeen(link: LinkRow): Promise<{ itemId: number; fileId: number }> {
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+        contentSha256: FILE_SHA, pushedSha256: FILE_SHA,
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+      await service.syncLink(link);
+      expect(itemRow(itemId).state).toBe('local_deleted');
+      return { itemId, fileId };
+    }
+
+    it('resumes the pairing without a transfer when the provider copy is still there', async () => {
+      const link = makeLink({ deletePolicy: 'unlink' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run.state).toBe('ok');
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(itemRow(itemId).state).toBe('synced');
+      expect(fileRows().map((f) => [f.id, f.deleted_at])).toEqual([[fileId, null]]);
+    });
+
+    it('lets the ordinary rules bring down an edit made upstream in the meantime', async () => {
+      const link = makeLink({ deletePolicy: 'unlink' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1', remoteVersion: 'v2' })])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run.pulled).toBe(1);
+      const row = itemRow(itemId);
+      expect(row.state).toBe('synced');
+      expect(row.file_id).not.toBe(fileId);
+      expect(fileRows().filter((f) => f.deleted_at === null)).toHaveLength(1);
+    });
+
+    it('puts the file back at the provider when TREK was the one that binned it', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+      expect(provider.trash).toHaveBeenCalledTimes(1);
+      const uid = itemRow(itemId).trek_doc_uid;
+
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run.pushed).toBe(1);
+      expect(provider.push.mock.calls[0][2]).toMatchObject({ fileName: 'boarding.pdf', remoteId: undefined, trekDocUid: uid });
+      const row = itemRow(itemId);
+      expect(row.state).toBe('synced');
+      expect(row.remote_id).toBe('r-pushed');
+      expect(row.file_id).toBe(fileId);
+      expect(row.remote_trashed_at).toBeNull();
+      expect(itemRows()).toHaveLength(1);
+    });
+
+    it('does not mistake the re-upload for a foreign change on the run after', async () => {
+      // The echo guard must still recognise TREK's own write once the provider
+      // reports it back under a new version marker.
+      const link = makeLink({ deletePolicy: 'trash' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([])));
+      await service.syncLink(config.getLink(link.id));
+
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r-pushed', name: 'boarding.pdf', remoteVersion: 'v2', contentHash: FILE_SHA }),
+      ])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run.pulled).toBe(0);
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(provider.push).toHaveBeenCalledTimes(1);
+      expect(itemRow(itemId).state).toBe('synced');
+    });
+
+    it('retries a re-upload that failed like any other unpaired file', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+      restore(fileId);
+      provider.list.mockResolvedValue(ok(listing([])));
+      provider.push.mockResolvedValueOnce(fail('unreachable'));
+
+      await service.syncLink(config.getLink(link.id));
+      const failed = itemRow(itemId);
+      expect(failed.state).toBe('error');
+      expect(failed.remote_id).toBeNull();
+
+      testDb.prepare('UPDATE document_sync_items SET next_attempt_at = NULL WHERE id = ?').run(itemId);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.push).toHaveBeenCalledTimes(2);
+      expect(itemRow(itemId).state).toBe('synced');
+      expect(itemRow(itemId).remote_id).toBe('r-pushed');
+    });
+
+    it('uploads many files TREK had binned instead of reading them as a mass deletion', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const fileIds = Array.from({ length: 10 }, (_, i) =>
+        makeFile({ name: `doc-${i}.pdf`, storageKey: `key-${i}`, deletedAt: '2026-09-18 08:00:00' }));
+      fileIds.forEach((fileId, i) =>
+        seedItem(link, { remoteId: `r${i}`, remoteName: `doc-${i}.pdf`, remoteVersion: 'v1', fileId, state: 'synced' }));
+      provider.list.mockResolvedValueOnce(ok(listing(fileIds.map((_, i) => remoteDoc({ remoteId: `r${i}`, name: `doc-${i}.pdf` })))));
+      await service.syncLink(link);
+      expect(provider.trash).toHaveBeenCalledTimes(10);
+
+      for (const fileId of fileIds) restore(fileId);
+      let seq = 0;
+      provider.push.mockImplementation(async () => {
+        seq += 1;
+        return ok({ remoteId: `r-new-${seq}`, remoteVersion: 'v1', remoteModifiedAt: null, deduplicated: false });
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(run.errorCode).toBeUndefined();
+      expect(run.state).toBe('ok');
+      expect(run.pushed).toBe(10);
+      expect(itemRows().every((r) => r.state === 'synced')).toBe(true);
+    });
+
+    it('does not upload a copy TREK binned that was restored at the provider meanwhile', async () => {
+      // Seen while TREK's file was still in the trash, so the note that TREK
+      // binned it is dropped. Without that, a later restore under an unchanged
+      // upstream (no listing to look at) would upload a second copy.
+      const link = makeLink({ deletePolicy: 'trash' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+      await service.syncLink(config.getLink(link.id));
+      expect(itemRow(itemId).remote_trashed_at).toBeNull();
+      expect(provider.fetch).not.toHaveBeenCalled();
+
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([], { cursorUnchanged: true })));
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(itemRow(itemId).state).toBe('synced');
+      expect(itemRow(itemId).remote_id).toBe('r1');
+    });
+
+    it('flags the copy as missing when it vanished upstream by somebody else', async () => {
+      const link = makeLink({ deletePolicy: 'unlink' });
+      const { itemId, fileId } = await deletedAndSeen(link);
+
+      restore(fileId);
+      provider.list.mockResolvedValueOnce(ok(listing([])));
+      const run = await service.syncLink(config.getLink(link.id));
+
+      expect(provider.push).not.toHaveBeenCalled();
+      expect(run.missing).toBe(1);
+      expect(itemRow(itemId).state).toBe('remote_missing');
+      expect(service.issues(tripId).map((r) => r.id)).toContain(itemId);
+    });
+  });
+
+  /**
+   * Purging leaves the row behind with `file_id` NULL (ON DELETE SET NULL), and
+   * that row read as a download that never landed: under `unlink` the document
+   * came back on the next run, and a purge no run had seen yet skipped the
+   * delete policy entirely.
+   */
+  describe('a file purged from TREK trash', () => {
+    const purge = (fileId: number) => testDb.prepare('DELETE FROM trip_files WHERE id = ?').run(fileId);
+
+    it('does not download a document again once its deletion was seen', async () => {
+      const link = makeLink({ deletePolicy: 'unlink' });
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, { remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'synced' });
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+      await service.syncLink(link);
+
+      purge(fileId);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(fileRows()).toHaveLength(0);
+      expect(itemRow(itemId).state).toBe('local_deleted');
+    });
+
+    it('applies the delete policy when the purge came before any run saw the deletion', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, { remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'synced' });
+      purge(fileId);
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r1' })])));
+
+      await service.syncLink(link);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.fetch).not.toHaveBeenCalled();
+      expect(provider.trash).toHaveBeenCalledTimes(1);
+      expect(fileRows()).toHaveLength(0);
+      expect(itemRow(itemId).state).toBe('local_deleted');
+    });
+  });
+
   describe('resolveConflict across trips', () => {
     function conflictedItem(linkId: number, tripOfItem: number): number {
       return Number(testDb.prepare(

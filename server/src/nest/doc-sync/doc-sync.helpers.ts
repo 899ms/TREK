@@ -14,20 +14,7 @@ import type { RemoteDocument } from './document-provider';
  * service does nothing but execute the plan.
  */
 
-// ── Identity and fingerprints ────────────────────────────────────────────────
-
-/**
- * A stable fingerprint over an explicit field order.
- *
- * The order is written out rather than derived from the object for the reason
- * dawarich.helpers.ts gives: a hash over `Object.keys` changes when someone
- * adds a field or a provider reorders its JSON, and a changed hash means
- * "changed upstream" to every later run. Explicit means a reviewer can see what
- * participates.
- */
-export function snapshotHash(parts: readonly (string | number | null | undefined)[]): string {
-  return crypto.createHash('sha256').update(parts.map((p) => String(p ?? '')).join('\u0000')).digest('hex');
-}
+// ── Identity and incoming names ──────────────────────────────────────────────
 
 /** Per-document anchor, written into provider metadata where there is room. */
 export function newTrekDocUid(): string {
@@ -108,6 +95,13 @@ export interface SyncItemState {
   /** When the backoff lets this row be tried again; null once it is shelved. */
   nextAttemptAt: string | null;
   remoteMissingAt: string | null;
+  /**
+   * When TREK itself put the provider copy in the recycle bin, under the
+   * `trash` policy. A copy binned by TREK and one deleted by somebody else
+   * leave the same gap in a listing; only this tells them apart once the file
+   * comes back out of TREK's trash.
+   */
+  remoteTrashedAt: string | null;
 }
 
 /** What TREK currently holds for this trip. */
@@ -138,6 +132,12 @@ export type PlanAction =
   | { kind: 'mark_remote_missing'; itemId: number }
   /** Deleted in TREK; what happens upstream is the link's delete policy. */
   | { kind: 'local_deleted'; itemId: number; remoteId: string }
+  /** Back out of TREK's trash while the provider copy stayed: the pairing counts again. */
+  | { kind: 'local_restored'; itemId: number }
+  /** Back out of TREK's trash after TREK binned the copy: unpaired, so it goes up as a new document. */
+  | { kind: 'detach'; itemId: number }
+  /** The copy TREK binned is listed again: somebody restored it at the provider. */
+  | { kind: 'remote_restored'; itemId: number }
   /** Nothing to do but the row should stop looking stale. */
   | { kind: 'touch'; itemId: number; remote: RemoteDocument | null };
 
@@ -195,7 +195,7 @@ export interface ReconcileInput {
  * or ping-pong forever.
  */
 export function planReconcile(input: ReconcileInput): ReconcilePlan {
-  const { items, remote, local, direction, remoteTruncated, stableRemoteIds, maxAttempts, conflictPolicy } = input;
+  const { remote, local, direction, remoteTruncated, stableRemoteIds, maxAttempts, conflictPolicy } = input;
   const now = input.now ?? new Date().toISOString().replace('T', ' ').slice(0, 19);
   const actions: PlanAction[] = [];
 
@@ -213,7 +213,7 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
    * which is what "waits for a person" means.
    */
   const blocked = new Set<number>();
-  for (const it of items) {
+  for (const it of input.items) {
     if (it.state !== 'error') continue;
     if (it.attempts >= maxAttempts) { blocked.add(it.id); continue; }
     if (it.nextAttemptAt !== null && it.nextAttemptAt > now) blocked.add(it.id);
@@ -260,6 +260,39 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
   const localById = new Map<number, LocalDocument>();
   for (const l of local) localById.set(l.fileId, l);
 
+  /**
+   * A file taken back out of TREK's trash.
+   *
+   * A deletion TREK has acted on is otherwise left alone for good (see the
+   * pair loop), so this is the one way out of `local_deleted`, and which way
+   * depends on the provider copy. If it stayed, the pairing counts again and
+   * the row is judged like any synced one from here on: an edit made upstream
+   * in the meantime comes down, and a copy somebody else deleted is flagged as
+   * missing instead of being uploaded over their deletion. If TREK binned it,
+   * TREK took it away and the person asked for it back, so the pairing is
+   * dropped and the file goes up as a new document through the ordinary push.
+   *
+   * The returned row is what the rest of the plan sees, so it has to match
+   * what the executor writes for the action added here.
+   */
+  const reopen = (it: SyncItemState): SyncItemState => {
+    if (it.state !== 'local_deleted' || !it.remoteId || it.fileId === null) return it;
+    const l = localById.get(it.fileId);
+    if (!l || l.deletedAt) return it;
+    const listed = !input.remoteUnchanged && remoteById.has(it.remoteId);
+    if (it.remoteTrashedAt === null || listed) {
+      add({ kind: 'local_restored', itemId: it.id });
+      return { ...it, state: 'synced', remoteMissingAt: null, remoteTrashedAt: null };
+    }
+    // A pull-only binding cannot upload, and a gap in a truncated listing says
+    // nothing about the copy. The row waits for a run that can decide.
+    if (direction === 'pull' || remoteTruncated) return it;
+    add({ kind: 'detach', itemId: it.id });
+    return { ...it, state: 'pending', remoteId: null, remoteVersion: null, remoteTrashedAt: null };
+  };
+  const items: SyncItemState[] = [];
+  for (const it of input.items) items.push(reopen(it));
+
   const itemsByRemote = new Map<string, SyncItemState>();
   const itemsByFile = new Map<number, SyncItemState>();
   for (const it of items) {
@@ -271,9 +304,14 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
   // remote half of the plan would be reading a list the adapter did not fetch.
   if (input.remoteUnchanged) {
     for (const it of items) {
-      if (it.fileId === null || !it.remoteId) continue;
-      const l = localById.get(it.fileId);
-      if (l?.deletedAt) add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
+      // A deletion already acted on stays acted on, as in the pair loop. A copy
+      // on record as gone is absent from a full listing too, so a full run
+      // plans nothing for it until it comes back; binning it here would also
+      // write the gap down as TREK's doing, and a restore would then upload
+      // what somebody else deleted.
+      if (!it.remoteId || it.state === 'local_deleted' || it.state === 'remote_missing') continue;
+      const l = it.fileId !== null ? localById.get(it.fileId) : undefined;
+      if (l?.deletedAt || lostItsFile(it)) add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
     }
     if (direction !== 'pull') {
       for (const l of local) {
@@ -315,7 +353,21 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
 
     const localChanged = !!l && l.sha256 !== null && it.contentSha256 !== null && l.sha256 !== it.contentSha256;
 
-    if (l?.deletedAt) {
+    /**
+     * A deletion is acted on once, under the policy in force at that moment.
+     *
+     * This used to be planned again on every run for as long as the file sat
+     * in TREK's trash. Under `unlink` nothing showed; switching the binding to
+     * `trash` later then binned every document ever deleted in TREK, months
+     * back included, and a binding on `trash` from the start asked the
+     * provider to bin the same copy on every run. A row still here is one
+     * `reopen` did not take back: its file is still in the trash or purged.
+     */
+    if (it.state === 'local_deleted') {
+      if (it.remoteTrashedAt !== null) add({ kind: 'remote_restored', itemId: it.id });
+      continue;
+    }
+    if (l?.deletedAt || lostItsFile(it)) {
       add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId });
       continue;
     }
@@ -442,6 +494,19 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
   }
 
   return { actions, massDeleteGuardTripped: guardTripped, missingCount: vanished.length };
+}
+
+/**
+ * A file purged from TREK's trash before any run saw it deleted.
+ *
+ * `file_id` is ON DELETE SET NULL, so the row outlives the file with nothing
+ * but a NULL to show for it. Read as a download that never landed, which is
+ * what happened until now, the document came straight back and the delete
+ * policy never ran. Only states a row holds together with a file count here: a
+ * first download that failed has no file either, and is retried.
+ */
+function lostItsFile(it: SyncItemState): boolean {
+  return it.fileId === null && (it.state === 'synced' || it.state === 'conflict' || it.state === 'remote_missing');
 }
 
 /** Backoff lookup that saturates instead of running off the end of the curve. */

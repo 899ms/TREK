@@ -5,7 +5,6 @@ import {
   isBlockedName,
   planReconcile,
   sanitizeIncomingName,
-  snapshotHash,
   type LocalDocument,
   type SyncItemState,
 } from '../../../../src/nest/doc-sync/doc-sync.helpers';
@@ -54,6 +53,7 @@ const item = (over: Partial<SyncItemState> = {}): SyncItemState => ({
   attempts: 0,
   nextAttemptAt: null,
   remoteMissingAt: null,
+  remoteTrashedAt: null,
   ...over,
 });
 
@@ -326,18 +326,6 @@ describe('isAllowedByOperator', () => {
 
   it('refuses a file with no extension even under the wildcard', () => {
     expect(isAllowedByOperator('README', '*')).toBe(false);
-  });
-});
-
-describe('snapshotHash', () => {
-  it('is stable for the same field order and differs when a field changes', () => {
-    expect(snapshotHash(['a', 1, null])).toBe(snapshotHash(['a', 1, null]));
-    expect(snapshotHash(['a', 1, null])).not.toBe(snapshotHash(['a', 2, null]));
-  });
-
-  it('does not collide when field boundaries shift', () => {
-    // Joining without a separator would make ['ab','c'] and ['a','bc'] equal.
-    expect(snapshotHash(['ab', 'c'])).not.toBe(snapshotHash(['a', 'bc']));
   });
 });
 
@@ -634,5 +622,154 @@ describe('planReconcile > a provider name TREK had to clean up', () => {
       local: [local({ fileId: 1, name: 'b.pdf' })],
     });
     expect(p.actions.map(a => a.kind)).toEqual(['rename_local']);
+  });
+});
+
+/**
+ * A deletion in TREK is acted on once.
+ *
+ * Both branches used to plan `local_deleted` for as long as the file sat in
+ * TREK's trash, so the policy was applied again on every run. Under `unlink`
+ * that was invisible until the binding was switched to `trash`: the next run
+ * then binned every document ever deleted in TREK.
+ */
+describe('planReconcile > a deletion TREK already acted on', () => {
+  const settled = (over: Partial<SyncItemState> = {}) =>
+    item({ id: 50, fileId: 5, remoteId: 'r5', state: 'local_deleted', ...over });
+  const inTrash = local({ fileId: 5, deletedAt: '2026-09-18 08:00:00' });
+
+  it('plans nothing more while the file sits in the trash', () => {
+    const p = plan({ items: [settled()], remote: [remote({ remoteId: 'r5' })], local: [inTrash] });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('plans nothing more under an unchanged upstream either', () => {
+    const p = plan({ items: [settled()], remote: [], local: [inTrash], remoteUnchanged: true });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('does not download the document again once the file is purged', () => {
+    // file_id is ON DELETE SET NULL, and a row without a file used to read as
+    // a download that never landed.
+    const p = plan({ items: [settled({ fileId: null })], remote: [remote({ remoteId: 'r5' })], local: [] });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('reads a file purged before any run saw it deleted as a deletion', () => {
+    const p = plan({ items: [item({ fileId: null, state: 'synced' })], remote: [remote()], local: [] });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 10, remoteId: 'r1' }]);
+  });
+
+  it('does the same under an unchanged upstream', () => {
+    const p = plan({ items: [item({ fileId: null, state: 'synced' })], remote: [], local: [], remoteUnchanged: true });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 10, remoteId: 'r1' }]);
+  });
+
+  it('leaves a copy already on record as gone alone under an unchanged upstream', () => {
+    // Binning it would record the gap as TREK's doing, and a restore would
+    // later upload a document somebody else deleted.
+    const p = plan({
+      items: [item({ state: 'remote_missing', remoteMissingAt: '2026-09-17 08:00:00' })],
+      remote: [],
+      local: [local({ deletedAt: '2026-09-18 08:00:00' })],
+      remoteUnchanged: true,
+    });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('notices when the copy TREK binned is listed again', () => {
+    const p = plan({
+      items: [settled({ remoteTrashedAt: '2026-09-18 08:05:00' })],
+      remote: [remote({ remoteId: 'r5' })],
+      local: [inTrash],
+    });
+    expect(p.actions).toEqual([{ kind: 'remote_restored', itemId: 50 }]);
+  });
+});
+
+/**
+ * A file taken back out of TREK's trash.
+ *
+ * Which way the row goes depends on what became of the provider copy while
+ * TREK's sat in the bin: still there, binned by TREK itself, or deleted by
+ * somebody else.
+ */
+describe('planReconcile > a file taken back out of TREK trash', () => {
+  const settled = (over: Partial<SyncItemState> = {}) =>
+    item({ id: 50, fileId: 5, remoteId: 'r5', state: 'local_deleted', ...over });
+  const binnedByTrek = (over: Partial<SyncItemState> = {}) =>
+    settled({ remoteTrashedAt: '2026-09-18 08:05:00', ...over });
+  const back = local({ fileId: 5 });
+
+  it('resumes the pairing when the provider copy stayed', () => {
+    const p = plan({ items: [settled()], remote: [remote({ remoteId: 'r5' })], local: [back] });
+    expect(p.actions.map(a => a.kind)).toEqual(['local_restored', 'touch']);
+  });
+
+  it('brings down an edit made upstream in the meantime, as for any synced row', () => {
+    const p = plan({ items: [settled()], remote: [remote({ remoteId: 'r5', remoteVersion: 'v2' })], local: [back] });
+    expect(p.actions.map(a => a.kind)).toEqual(['local_restored', 'pull_update']);
+  });
+
+  it('flags a copy somebody else deleted meanwhile instead of uploading it', () => {
+    const p = plan({ items: [settled()], remote: [], local: [back] });
+    expect(p.actions).toEqual([
+      { kind: 'local_restored', itemId: 50 },
+      { kind: 'mark_remote_missing', itemId: 50 },
+    ]);
+  });
+
+  it('resumes under an unchanged upstream and leaves the listing to a later run', () => {
+    const p = plan({ items: [settled()], remote: [], local: [back], remoteUnchanged: true });
+    expect(p.actions).toEqual([{ kind: 'local_restored', itemId: 50 }]);
+  });
+
+  it('uploads it again when TREK was the one that binned the copy', () => {
+    const p = plan({ items: [binnedByTrek()], remote: [], local: [back] });
+    expect(p.actions).toEqual([
+      { kind: 'detach', itemId: 50 },
+      { kind: 'push', local: back, itemId: 50, remoteId: null },
+    ]);
+  });
+
+  it('does so under an unchanged upstream too', () => {
+    const p = plan({ items: [binnedByTrek()], remote: [], local: [back], remoteUnchanged: true });
+    expect(p.actions.map(a => a.kind)).toEqual(['detach', 'push']);
+  });
+
+  it('is not held back by the echo guard: nothing about it is a remote change', () => {
+    const p = plan({ items: [binnedByTrek({ pushedSha256: 'aaa' })], remote: [], local: [local({ fileId: 5, sha256: 'aaa' })] });
+    expect(p.actions.map(a => a.kind)).toEqual(['detach', 'push']);
+  });
+
+  it('waits on a pull-only binding, which cannot upload', () => {
+    const p = plan({ items: [binnedByTrek()], remote: [], local: [back], direction: 'pull' });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('waits on a truncated listing, where a gap proves nothing', () => {
+    const p = plan({ items: [binnedByTrek()], remote: [], local: [back], remoteTruncated: true });
+    expect(p.actions).toEqual([]);
+  });
+
+  it('resumes instead when the binned copy was restored at the provider as well', () => {
+    const p = plan({ items: [binnedByTrek()], remote: [remote({ remoteId: 'r5' })], local: [back] });
+    expect(p.actions.map(a => a.kind)).toEqual(['local_restored', 'touch']);
+  });
+
+  it('reads many restores after TREK binned them as uploads, not as a mass deletion', () => {
+    const rows = Array.from({ length: 10 }, (_, i) =>
+      binnedByTrek({ id: 100 + i, fileId: 100 + i, remoteId: `r${100 + i}` }));
+    const p = plan({ items: rows, remote: [], local: rows.map((r) => local({ fileId: r.fileId as number })) });
+    expect(p.massDeleteGuardTripped).toBe(false);
+    expect(p.actions.filter(a => a.kind === 'detach')).toHaveLength(10);
+    expect(p.actions.filter(a => a.kind === 'push')).toHaveLength(10);
+  });
+
+  it('counts many restored rows whose copies vanished like any synced rows, guard included', () => {
+    const rows = Array.from({ length: 10 }, (_, i) =>
+      settled({ id: 100 + i, fileId: 100 + i, remoteId: `r${100 + i}` }));
+    const p = plan({ items: rows, remote: [], local: rows.map((r) => local({ fileId: r.fileId as number })) });
+    expect(p.massDeleteGuardTripped).toBe(true);
   });
 });

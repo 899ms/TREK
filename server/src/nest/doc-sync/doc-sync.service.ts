@@ -277,12 +277,54 @@ export class DocSyncService {
         return 'ok';
       }
       case 'local_deleted': {
-        if (ctx.link.delete_policy === 'trash') {
+        const binned = ctx.link.delete_policy === 'trash';
+        if (binned) {
           const res = await ctx.provider.trash(ctx.ref, ctx.scope, action.remoteId);
           if (docFailed(res)) return res.error.code;
         }
+        // The policy is applied here and never again: the planner leaves a
+        // `local_deleted` row alone, so a policy changed later cannot reach
+        // back. Whether TREK binned the copy is written down with it, because a
+        // restore in TREK later has to know whether the gap upstream is TREK's.
         this.db.connection
-          .prepare("UPDATE document_sync_items SET state = 'local_deleted', last_seen_at = CURRENT_TIMESTAMP WHERE id = ?")
+          .prepare(
+            `UPDATE document_sync_items
+                SET state = 'local_deleted', remote_missing_at = NULL,
+                    remote_trashed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
+                    last_seen_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+          )
+          .run(binned ? 1 : 0, action.itemId);
+        return 'ok';
+      }
+      case 'local_restored': {
+        this.db.connection
+          .prepare(
+            `UPDATE document_sync_items
+                SET state = 'synced', remote_missing_at = NULL, remote_trashed_at = NULL, last_seen_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+          )
+          .run(action.itemId);
+        return 'ok';
+      }
+      case 'detach': {
+        // The trek_doc_uid stays: it is the same document to TREK, only the
+        // provider copy is new. The push the planner queued after this fills
+        // the pairing in again, and if that push fails the row is an ordinary
+        // unpaired file that the next run retries.
+        this.db.connection
+          .prepare(
+            `UPDATE document_sync_items
+                SET state = 'pending', remote_id = NULL, remote_version = NULL, remote_trashed_at = NULL,
+                    error_code = NULL, last_seen_at = CURRENT_TIMESTAMP
+              WHERE id = ?`,
+          )
+          .run(action.itemId);
+        return 'ok';
+      }
+      case 'remote_restored': {
+        this.db.connection
+          .prepare('UPDATE document_sync_items SET remote_trashed_at = NULL, last_seen_at = CURRENT_TIMESTAMP WHERE id = ?')
           .run(action.itemId);
         return 'ok';
       }
@@ -546,7 +588,7 @@ export class DocSyncService {
     const rows = this.db.connection
       .prepare(
         `SELECT id, file_id, trek_doc_uid, remote_id, remote_version, remote_name, content_sha256,
-                pushed_sha256, state, attempts, next_attempt_at, remote_missing_at
+                pushed_sha256, state, attempts, next_attempt_at, remote_missing_at, remote_trashed_at
            FROM document_sync_items WHERE link_id = ?`,
       )
       .all(linkId) as Array<Record<string, unknown>>;
@@ -563,6 +605,7 @@ export class DocSyncService {
       attempts: Number(r.attempts ?? 0),
       nextAttemptAt: r.next_attempt_at === null || r.next_attempt_at === undefined ? null : String(r.next_attempt_at),
       remoteMissingAt: r.remote_missing_at === null ? null : String(r.remote_missing_at),
+      remoteTrashedAt: r.remote_trashed_at === null ? null : String(r.remote_trashed_at),
     }));
   }
 
@@ -913,7 +956,8 @@ export class DocSyncService {
       .prepare(
         `SELECT link_id,
                 SUM(CASE WHEN file_id IS NOT NULL AND remote_id IS NOT NULL AND state = 'synced' THEN 1 ELSE 0 END) AS paired,
-                SUM(CASE WHEN remote_id IS NOT NULL AND state != 'remote_missing' THEN 1 ELSE 0 END) AS atProvider,
+                SUM(CASE WHEN remote_id IS NOT NULL AND state != 'remote_missing' AND remote_trashed_at IS NULL
+                         THEN 1 ELSE 0 END) AS atProvider,
                 SUM(CASE WHEN state = 'remote_missing' THEN 1 ELSE 0 END) AS missing
            FROM document_sync_items
           WHERE trip_id = ?
