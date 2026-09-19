@@ -72,6 +72,8 @@ import { createTables } from '../../src/db/schema';
 import { runMigrations } from '../../src/db/migrations';
 import { createTrip, createUser } from '../helpers/factories';
 import { DocSyncModule } from '../../src/nest/doc-sync/doc-sync.module';
+import { DocSyncMcp } from '../../src/nest/doc-sync/doc-sync.mcp';
+import type { McpContext } from '../../src/nest-mcp';
 import { DatabaseModule } from '../../src/nest/database/database.module';
 import { AddonsService } from '../../src/nest/addons/addons.service';
 import { DOCUMENT_PROVIDERS } from '../../src/nest/doc-sync/document-provider';
@@ -366,6 +368,33 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
       conflictPolicy: 'manual',
       remoteLabel: 'Japan 2026',
     });
+  });
+
+  it('still names the store of a binding after the admin switches its provider off', async () => {
+    // The providers list drops a provider that is off, so the binding itself is
+    // the only thing left that can tell a member where the documents went.
+    db.prepare("UPDATE document_providers SET enabled = 0 WHERE id = 'paperless'").run();
+    try {
+      const providers = await request(server)
+        .get(`/api/trips/${tripId}/docsync/providers`)
+        .set('Cookie', sessionCookie(memberId))
+        .expect(200);
+      expect(providers.body.map((p: { id: string }) => p.id)).not.toContain('paperless');
+
+      const links = await request(server)
+        .get(`/api/trips/${tripId}/docsync/links`)
+        .set('Cookie', sessionCookie(memberId))
+        .expect(200);
+      expect(links.body[0]).toMatchObject({ providerId: 'paperless', providerName: 'Paperless-ngx' });
+
+      // The assistant reads the same bindings through its own tool.
+      const ctx = { userId: memberId, scopes: null, isStaticToken: false } as McpContext;
+      const result = app.get(DocSyncMcp).getTripDocumentSync({ tripId }, ctx);
+      const status = JSON.parse(result.content[0].text) as { links: Array<Record<string, unknown>> };
+      expect(status.links[0]).toMatchObject({ providerId: 'paperless', providerName: 'Paperless-ngx' });
+    } finally {
+      db.prepare("UPDATE document_providers SET enabled = 1 WHERE id = 'paperless'").run();
+    }
   });
 
   it('refuses a binding whose connection belongs to another trip', async () => {

@@ -82,8 +82,10 @@ export const HANDLED_OUTSIDE_TRIP_STORE = [
   'journey:book:peers',
   'journey:book:cursor',
   // Document sync: components/Files/docsync/useDocSync re-reads the bindings
-  // and their counts. Content-free like the bag ping: what a run changed is
-  // per-binding server state, and the files it moved arrive as file:* events.
+  // and their counts, and components/Files/docsync/useDocSyncOffered asks
+  // again whether the Files screen offers the sync button. Content-free like
+  // the bag ping: what a run changed is per-binding server state, and the
+  // files it moved arrive as file:* events.
   'docsync:changed',
   // Booking import — BackgroundTasks/BackgroundTasksWidget ('import:' prefix listener)
   'import:progress',

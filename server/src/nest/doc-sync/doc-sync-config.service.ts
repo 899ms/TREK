@@ -113,6 +113,18 @@ export class DocSyncConfigService {
     return this.providerFields(providerId).filter((f) => f.secret === 1).map((f) => f.field_key);
   }
 
+  /**
+   * The display name whatever the enabled flag says. A binding outlives the
+   * admin switching its provider off, and the client only gets names for the
+   * providers that are still on, so without this it would show the raw id.
+   */
+  private providerName(providerId: string): string {
+    const row = this.db.connection
+      .prepare('SELECT name FROM document_providers WHERE id = ?')
+      .get(providerId) as { name: string } | undefined;
+    return row?.name ?? providerId;
+  }
+
   // ── Connections ────────────────────────────────────────────────────────────
 
   getConnection(id: number): ConnectionRow | undefined {
@@ -433,6 +445,7 @@ export class DocSyncConfigService {
       tripId: link.trip_id,
       connectionId: link.connection_id,
       providerId: link.provider_id,
+      providerName: this.providerName(link.provider_id),
       scopeKey: link.remote_scope_key,
       remoteRootId: link.remote_root_id,
       remoteRootPath: link.remote_root_path,

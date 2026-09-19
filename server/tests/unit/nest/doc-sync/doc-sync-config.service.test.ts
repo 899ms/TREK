@@ -549,6 +549,24 @@ describe('createLink', () => {
   });
 });
 
+describe('publicLink', () => {
+  it('names the store of a binding whose provider the admin has since switched off', async () => {
+    // The client only learns names for the providers that are on, so this is
+    // the one place a binding left behind can still get its name from.
+    const conn = await connect();
+    const bound = link(conn.id);
+    testDb.prepare("UPDATE document_providers SET enabled = 0 WHERE id = 'paperless'").run();
+
+    expect(svc.publicLink(bound, null)).toMatchObject({ providerId: 'paperless', providerName: 'Paperless-ngx' });
+  });
+
+  it('falls back to the provider id for a provider this build does not know', async () => {
+    const conn = await connect();
+    const bound = link(conn.id);
+    expect(svc.publicLink({ ...bound, provider_id: 'dropbox' }, null).providerName).toBe('dropbox');
+  });
+});
+
 describe('deleteLink', () => {
   it('takes the pairing rows with it and leaves the other binding\'s alone', async () => {
     const conn = await connect();
