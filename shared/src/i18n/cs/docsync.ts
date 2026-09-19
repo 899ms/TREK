@@ -173,6 +173,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': 'Přenos neproběhl.',
 
   'docsync.error.unknown_provider': 'Tento poskytovatel není na této instanci dostupný.',
+  'docsync.error.provider_disabled': 'Pozastaveno: správce tohoto poskytovatele vypnul. Synchronizace bude pokračovat, jakmile ho znovu zapne.',
 };
 
 export default docsync;

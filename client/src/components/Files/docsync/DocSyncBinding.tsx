@@ -9,7 +9,7 @@ import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import DocSyncFlow, { type SyncDirection } from './DocSyncFlow'
 import { Badge, CONFLICT_POLICIES, conflictPolicyKey, LastRun, StateBadge } from './DocSyncBits'
-import type { DocSyncLink, useDocSync } from './useDocSync'
+import { bindingNotice, type DocSyncLink, type useDocSync } from './useDocSync'
 
 /**
  * One binding: where this trip's documents live, which way they move, and what
@@ -36,7 +36,7 @@ export default function DocSyncBinding({
   const [copied, setCopied] = useState(false)
   const Icon = DOCUMENT_PROVIDER_ICONS[link.providerId]
   const busy = sync.busy === `sync-${link.id}`
-  const needsAttention = link.lastSyncState !== 'ok' && link.lastSyncState !== 'never'
+  const notice = bindingNotice(link, t)
 
   const copyWebhook = async () => {
     if (!link.webhookUrl) return
@@ -112,13 +112,10 @@ export default function DocSyncBinding({
         </span>
       </header>
 
-      {needsAttention && (
+      {notice && (
         <p className="mx-4 mb-3 flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-caption text-warning">
           <AlertTriangle size={13} className="mt-px shrink-0" />
-          <span>
-            {t(`docsync.linkState.${link.lastSyncState}`)}
-            {link.lastSyncError ? ` · ${t(`docsync.error.${link.lastSyncError}`)}` : ''}
-          </span>
+          <span>{notice}</span>
         </p>
       )}
 

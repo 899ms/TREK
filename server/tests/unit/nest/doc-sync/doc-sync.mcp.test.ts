@@ -39,10 +39,12 @@ interface Setup {
   status: Record<string, unknown>;
   issues: Array<Record<string, unknown>>;
   addonOn: boolean;
+  /** Bindings whose provider an admin has switched off. */
+  off: number[];
 }
 
 function makeMcp(over: Partial<Setup> = {}) {
-  const setup: Setup = { access: true, links: [], status: {}, issues: [], addonOn: true, ...over };
+  const setup: Setup = { access: true, links: [], status: {}, issues: [], addonOn: true, off: [], ...over };
   const files = { verifyTripAccess: vi.fn(() => (setup.access ? { id: 3, user_id: 7 } : undefined)) };
   const config = { listLinks: vi.fn(() => setup.links) };
   const sync = {
@@ -50,6 +52,7 @@ function makeMcp(over: Partial<Setup> = {}) {
     issues: vi.fn(() => setup.issues),
     syncLink: vi.fn(async () => RUN),
     retryShelvedItems: vi.fn(),
+    isSwitchedOff: vi.fn((l: LinkRow) => setup.off.includes(l.id)),
   };
   const addons = { isAddonEnabled: vi.fn(() => setup.addonOn) };
   const mcp = new DocSyncMcp(
@@ -229,6 +232,28 @@ describe('sync_trip_documents', () => {
     const { mcp, sync } = makeMcp({ links });
     await mcp.syncNow({ tripId: 3 }, ctx);
     expect(sync.retryShelvedItems.mock.calls).toEqual([[1], [2]]);
+  });
+
+  it('refuses with the same code as the REST route when every binding is switched off', async () => {
+    const { mcp, sync } = makeMcp({ links: [link(1)], off: [1] });
+    const text = refusal(await mcp.syncNow({ tripId: 3 }, ctx));
+    expect(text.startsWith('provider_disabled:')).toBe(true);
+    expect(text).toContain('switched back on');
+    // Nothing un-shelved, nothing run: the binding resumes as it was left.
+    expect(sync.retryShelvedItems).not.toHaveBeenCalled();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('runs the bindings that are on and reports the switched-off one by its code', async () => {
+    const links = [link(1, 'paperless'), link(2, 'nextcloud')];
+    const { mcp, sync } = makeMcp({ links, off: [1] });
+    const body = payload(await mcp.syncNow({ tripId: 3 }, ctx));
+    expect(body.runs).toEqual([
+      { linkId: 1, provider: 'paperless', state: 'disabled', errorCode: 'provider_disabled' },
+      { linkId: 2, provider: 'nextcloud', ...RUN },
+    ]);
+    expect(sync.retryShelvedItems.mock.calls).toEqual([[2]]);
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
   });
 
   it('asks for the cheap incremental run unless the caller says otherwise', async () => {

@@ -175,6 +175,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': 'Việc truyền tệp không thành công.',
 
   'docsync.error.unknown_provider': 'Nhà cung cấp này không khả dụng trên máy chủ này.',
+  'docsync.error.provider_disabled': 'Đã tạm dừng: quản trị viên đã tắt nhà cung cấp này. Việc đồng bộ sẽ tiếp tục khi nó được bật lại.',
 };
 
 export default docsync;

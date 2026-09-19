@@ -74,6 +74,16 @@ export const WEBHOOK_NUDGE_DEBOUNCE_SECONDS = 5;
 /** Documents pulled or pushed per run, so one huge trip cannot starve others. */
 export const MAX_TRANSFERS_PER_RUN = 25;
 
+/**
+ * What a manual run answers for a binding an admin has switched off, through
+ * its provider or through the Documents addon.
+ *
+ * Not one of the shared DocsyncErrorCodes: those say what went wrong between
+ * TREK and a provider, and here nothing has. It is never written to the binding
+ * either, which is what lets the binding resume as it was left.
+ */
+export const PROVIDER_DISABLED = 'provider_disabled';
+
 /** app_settings keys, read per tick so an admin toggle needs no restart. */
 export const SETTING_POLL_INTERVAL = 'docsync_poll_interval_seconds';
 export const SETTING_SYNC_ENABLED = 'docsync_sync_enabled';

@@ -72,6 +72,12 @@ export interface DocSyncLink {
   providerName?: string
   /** Standing counts per side, from the status route. */
   holdings?: { inTrek: number; atProvider: number; paired: number; missing: number }
+  /**
+   * An admin has switched this binding's provider off. The server leaves the
+   * binding as it was, so `lastSyncState` still describes the last run and
+   * this is what says why nothing moves now. From the status route.
+   */
+  providerOff?: boolean
 }
 
 /**
@@ -84,6 +90,25 @@ export interface DocSyncLink {
  */
 export function storeName(link: DocSyncLink, providers: readonly DocSyncProvider[]): string {
   return providers.find(p => p.id === link.providerId)?.name || link.providerName || link.providerId
+}
+
+/**
+ * The line a binding card shows under its header, or null when there is
+ * nothing to say.
+ *
+ * Both shells render it, so a phone and a laptop cannot disagree about why a
+ * binding stands still. A provider an admin switched off comes first: the
+ * server leaves the binding's state as the last run wrote it, which would
+ * otherwise report an old failure, or nothing, for a binding that is paused.
+ */
+export function bindingNotice(
+  link: Pick<DocSyncLink, 'providerOff' | 'lastSyncState' | 'lastSyncError'>,
+  t: (key: string) => string,
+): string | null {
+  if (link.providerOff) return t('docsync.error.provider_disabled')
+  if (link.lastSyncState === 'ok' || link.lastSyncState === 'never') return null
+  const state = t(`docsync.linkState.${link.lastSyncState}`)
+  return link.lastSyncError ? `${state} · ${t(`docsync.error.${link.lastSyncError}`)}` : state
 }
 
 /**
@@ -149,11 +174,16 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
       if (mine !== generation.current) return
       setProviders(p as DocSyncProvider[])
       setConnections(c as DocSyncConnection[])
-      // The status route carries the holdings; the links route does not, so the
-      // two are merged here rather than asking every caller to join them.
+      // The status route carries the holdings and the provider switch; the
+      // links route does not, so the two are merged here rather than asking
+      // every caller to join them.
       const status = s as { items?: Record<string, number>; links?: DocSyncLink[] }
-      const holdingsById = new Map((status.links ?? []).map(x => [x.id, x.holdings]))
-      setLinks((l as DocSyncLink[]).map(x => ({ ...x, holdings: holdingsById.get(x.id) })))
+      const statusById = new Map((status.links ?? []).map(x => [x.id, x]))
+      setLinks((l as DocSyncLink[]).map(x => ({
+        ...x,
+        holdings: statusById.get(x.id)?.holdings,
+        providerOff: statusById.get(x.id)?.providerOff === true,
+      })))
       setItemCounts(status.items || {})
       // Only a load failure is cleared here. A write that just failed reloads to
       // put the server's answer back on screen, and clearing unconditionally

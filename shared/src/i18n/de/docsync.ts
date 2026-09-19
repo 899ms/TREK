@@ -178,6 +178,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': 'Die Übertragung ist nicht durchgegangen.',
 
   'docsync.error.unknown_provider': 'Dieser Anbieter steht auf dieser Instanz nicht zur Verfügung.',
+  'docsync.error.provider_disabled': 'Pausiert: Ein Administrator hat diesen Anbieter abgeschaltet. Der Abgleich läuft weiter, sobald er wieder eingeschaltet ist.',
 };
 
 export default docsync;

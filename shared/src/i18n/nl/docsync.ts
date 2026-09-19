@@ -175,6 +175,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': 'De overdracht is niet gelukt.',
 
   'docsync.error.unknown_provider': 'Deze aanbieder is niet beschikbaar op deze instantie.',
+  'docsync.error.provider_disabled': 'Gepauzeerd: een beheerder heeft deze aanbieder uitgeschakeld. De synchronisatie gaat verder zodra hij weer aanstaat.',
 };
 
 export default docsync;

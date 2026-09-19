@@ -1,4 +1,4 @@
-// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-024
+// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-026
 
 /**
  * The document-sync hook.
@@ -145,6 +145,16 @@ describe('useDocSync initial load', () => {
 
     expect(result.current.links[0].holdings).toEqual(holdings)
     expect(result.current.links[1].holdings).toBeUndefined()
+  })
+
+  it('FE-DOCSYNC-HOOK-025: carries the provider switch from the status route onto its binding', async () => {
+    listLinksApi.mockResolvedValue([link(), link({ id: 2 }), link({ id: 3 })])
+    statusApi.mockResolvedValue({ items: {}, links: [{ id: 1, providerOff: true }, { id: 2, providerOff: false }] })
+
+    const { result } = await mountLoaded()
+
+    // The third is one the status route never mentions: running, not paused.
+    expect(result.current.links.map(l => l.providerOff)).toEqual([true, false, false])
   })
 
   it('FE-DOCSYNC-HOOK-003: a status body without an items map leaves the counts empty', async () => {
@@ -370,6 +380,17 @@ describe('useDocSync run and save feedback', () => {
 
     expect(outcome).toBeNull()
     expect(result.current.error).toBe('link_orphaned')
+  })
+
+  it('FE-DOCSYNC-HOOK-026: a run refused because an admin switched the provider off keeps the code', async () => {
+    // Both shells render the error as docsync.error.<code>, so the code has to
+    // arrive untouched for the sentence to be the right one.
+    syncNowApi.mockRejectedValueOnce({ response: { status: 409, data: { error: 'provider_disabled' } } })
+    const { result } = await mountLoaded()
+
+    await act(async () => { await result.current.syncNow(1) })
+
+    expect(result.current.error).toBe('provider_disabled')
   })
 
   it('FE-DOCSYNC-HOOK-018: a refused save reports failure and surfaces the server reason', async () => {

@@ -178,6 +178,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': 'Transfer tidak berhasil.',
 
   'docsync.error.unknown_provider': 'Penyedia ini tidak tersedia di instans ini.',
+  'docsync.error.provider_disabled': 'Dijeda: administrator menonaktifkan penyedia ini. Sinkronisasi berlanjut setelah penyedia diaktifkan kembali.',
 };
 
 export default docsync;

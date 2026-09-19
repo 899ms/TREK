@@ -12,7 +12,7 @@ import { useTranslation } from '../../../../i18n'
 import { DOCUMENT_PROVIDER_ICONS } from '../../../../components/shared/DocumentProviderIcons'
 import TrekIcon from '../../../../components/shared/TrekIcon'
 import {
-  storeName, useDocSync, type DocSyncLink, type DocSyncProvider,
+  bindingNotice, storeName, useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
 import { useConnectForm } from '../../../../components/Files/docsync/useConnectForm'
 import { conflictPolicyKey, nextConflictPolicy } from '../../../../components/Files/docsync/DocSyncBits'
@@ -258,6 +258,7 @@ function DetailView({
   }
 
   const ranAt = link.lastSyncAt ? Date.parse(link.lastSyncAt) : NaN
+  const notice = bindingNotice(link, t)
 
   return (
     <div className="mt-3 flex flex-col gap-3">
@@ -298,10 +299,9 @@ function DetailView({
         value={Number.isNaN(ranAt) ? t('docsync.binding.neverRun') : relativeTime(ranAt, language)}
       />
 
-      {link.lastSyncState !== 'ok' && link.lastSyncState !== 'never' && (
+      {notice && (
         <p className="rounded-2xl bg-[color:var(--m-st-warn-bg,var(--m-ic))] px-3 py-2 font-geist text-[0.6875rem] text-[color:var(--m-st-warn,var(--m-muted))]">
-          {t(`docsync.linkState.${link.lastSyncState}`)}
-          {link.lastSyncError ? ` · ${t(`docsync.error.${link.lastSyncError}`)}` : ''}
+          {notice}
         </p>
       )}
 

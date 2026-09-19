@@ -199,11 +199,12 @@ function makeLink(over: {
     .prepare(
       `INSERT INTO trip_document_links
          (trip_id, connection_id, provider_id, remote_scope_key, remote_root_id, remote_root_path, remote_label,
+  providerId?: string;
           direction, delete_policy, conflict_policy, sync_enabled, failure_count, next_attempt_at, created_by)
-       VALUES (?, ?, 'paperless', ?, '1', '/TREK/japan', 'Japan 2026', ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, '1', '/TREK/japan', 'Japan 2026', ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
-      tripId, connectionId, `tag:${scopeSeq}`,
+      tripId, connectionId, over.providerId ?? 'paperless', `tag:${scopeSeq}`,
       over.direction ?? 'both', over.deletePolicy ?? 'unlink', over.conflictPolicy ?? 'manual',
       over.syncEnabled ?? 1, over.failureCount ?? 0, over.nextAttemptAt ?? null, ownerId,
     );
@@ -280,8 +281,8 @@ const sqlTime = (modifier: string): string =>
   (testDb.prepare("SELECT datetime('now', ?) AS t").get(modifier) as { t: string }).t;
 
 /**
- * The provider's own addon switch. Every binding asks it before it runs, so a
- * double that always says yes would hide the one case worth a test.
+ * The Documents addon. Every binding asks it before it runs, so a double that
+ * always says yes would hide the one case worth a test.
  */
 const addons = { isAddonEnabled: vi.fn(() => true) };
 
@@ -291,6 +292,10 @@ describe('DocSyncService', () => {
   beforeAll(() => {
     createTables(testDb);
     runMigrations(testDb);
+/** The admin's per-provider switch, which is a real row rather than a double. */
+const switchProvider = (id: string, on: boolean) =>
+  testDb.prepare('UPDATE document_providers SET enabled = ? WHERE id = ?').run(on ? 1 : 0, id);
+
     spoolDir = fs.mkdtempSync(path.join(os.tmpdir(), 'trek-docsync-'));
 
     ownerId = createUser(testDb, { username: 'owner', email: 'owner@docsync.test' }).user.id;
@@ -337,6 +342,9 @@ describe('DocSyncService', () => {
   describe('dueLinks', () => {
     it('offers only bindings that are switched on, uncircuited and actually due', () => {
       const dueNow = makeLink();
+    // Providers ship switched off; the fake one stands in for Paperless.
+    testDb.prepare('UPDATE document_providers SET enabled = 0').run();
+    switchProvider('paperless', true);
       const overdue = makeLink({ nextAttemptAt: sqlTime('-1 hour') });
       makeLink({ nextAttemptAt: sqlTime('+1 hour') });
       makeLink({ syncEnabled: 0 });
@@ -598,21 +606,6 @@ describe('DocSyncService', () => {
       expect(blocked?.remote_id).toBeNull();
     });
 
-    it('stands down while the provider is switched off in the admin panel', async () => {
-      // Switching a provider off stopped new connections and left every
-      // existing binding running, which is not what "off" means to the person
-      // who switched it. Not a failure either: nothing is wrong with the
-      // binding, an admin has closed the door.
-      const link = makeLink();
-      addons.isAddonEnabled.mockReturnValueOnce(false);
-
-      const res = await service.syncLink(link);
-
-      expect(res.state).toBe('disabled');
-      expect(provider.list).not.toHaveBeenCalled();
-      expect(linkRow(link.id).failure_count).toBe(0);
-    });
-
     it('counts a failure and puts the binding off until later', async () => {
       const link = makeLink();
       provider.list.mockResolvedValueOnce(fail('unreachable'));
@@ -853,14 +846,6 @@ describe('DocSyncService', () => {
       expect(service.issues(tripId)).toHaveLength(1);
     });
 
-    /**
-     * Pins what happens today, and it is wrong. The failed pull already wrote
-     * the provider's version marker into the pairing, so the next run sees no
-     * change and emits `touch`, and `touch` promotes `error` to `synced`. The
-     * document is then booked as synced with no `file_id`, out of the issues
-     * list and never retried. Reported rather than fixed here; this is the test
-     * that turns red once it is.
-     */
     it('keeps a failed download visible as an error instead of booking it as synced', async () => {
       // The failure path used to write the provider's version marker, so the
       // next run saw no change, produced a `touch`, and touch lifted `error` to
@@ -965,6 +950,7 @@ describe('DocSyncService', () => {
       expect(res.state).toBe('failed');
       expect(res.errorCode).toBe('provider_error');
       expect(provider.resolveScope).not.toHaveBeenCalled();
+      switchProvider('papra', true);
     });
   });
 
@@ -974,6 +960,113 @@ describe('DocSyncService', () => {
       seedItem(link, { remoteId: 'r1', state: 'synced' });
       seedItem(link, { remoteId: 'r2', state: 'synced' });
       seedItem(link, { remoteId: 'r3', state: 'conflict' });
+  /**
+   * An administrator switching a provider off, or the Documents addon.
+   *
+   * The check that was meant to do this asked the addon table about a provider
+   * id. Providers are not addons, so it answered "off" for every binding on
+   * every run, and the one test of it could not tell: it stubbed the answer.
+   * The switch is a kill switch, not a failure: nothing about the binding is
+   * written while it is off, so it resumes exactly where it stopped.
+   */
+  describe('an administrator switch', () => {
+    it('lets a binding run while its provider and the addon are on', async () => {
+      const link = makeLink();
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('ok');
+      expect(provider.list).toHaveBeenCalledTimes(1);
+      expect(addons.isAddonEnabled).toHaveBeenCalledWith('documents');
+    });
+
+    it('leaves a binding whose provider is off out of the due list', () => {
+      makeLink();
+      const on = makeLink({ providerId: 'nextcloud' });
+      switchProvider('paperless', false);
+      switchProvider('nextcloud', true);
+
+      expect(service.dueLinks().map((l) => l.id)).toEqual([on.id]);
+    });
+
+    it('does not let switched-off bindings take the slots of the ones that may run', () => {
+      // They never run, so they never get a last_sync_at and would sort first
+      // on every tick for good.
+      for (let i = 0; i < 25; i += 1) makeLink({ lastSyncAt: null });
+      const on = makeLink({ providerId: 'nextcloud', lastSyncAt: sqlTime('-1 minute') });
+      switchProvider('paperless', false);
+      switchProvider('nextcloud', true);
+
+      expect(service.dueLinks().map((l) => l.id)).toEqual([on.id]);
+    });
+
+    it('stands down without touching the binding or its documents while the provider is off', async () => {
+      const link = makeLink({ failureCount: 2 });
+      testDb.prepare("UPDATE trip_document_links SET last_sync_state = 'partial', last_sync_error = 'timeout' WHERE id = ?")
+        .run(link.id);
+      const itemId = seedItem(link, { remoteId: 'r1', remoteVersion: 'v1', state: 'error' });
+      testDb.prepare('UPDATE document_sync_items SET attempts = 6 WHERE id = ?').run(itemId);
+      const linkBefore = linkRow(link.id);
+      const itemBefore = itemRow(itemId);
+      switchProvider('paperless', false);
+
+      const res = await service.syncLink(config.getLink(link.id));
+
+      expect(res.state).toBe('disabled');
+      expect(provider.resolveScope).not.toHaveBeenCalled();
+      expect(provider.list).not.toHaveBeenCalled();
+      expect(linkRow(link.id)).toEqual(linkBefore);
+      expect(itemRow(itemId)).toEqual(itemBefore);
+    });
+
+    it('stands down the same way while the Documents addon is off', async () => {
+      const link = makeLink();
+      const before = linkRow(link.id);
+      addons.isAddonEnabled.mockReturnValue(false);
+
+      const res = await service.syncLink(link);
+
+      expect(res.state).toBe('disabled');
+      expect(provider.list).not.toHaveBeenCalled();
+      expect(linkRow(link.id)).toEqual(before);
+    });
+
+    it('stands down before it looks for the connection, so a gone one is not a failure either', async () => {
+      const link = { ...makeLink(), connection_id: 999999 };
+      switchProvider('paperless', false);
+
+      expect((await service.syncLink(link)).state).toBe('disabled');
+      expect(linkRow(link.id).failure_count).toBe(0);
+    });
+
+    it('picks up where it stopped once the provider is back on', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValue(ok(listing([remoteDoc()])));
+      switchProvider('paperless', false);
+      await service.syncLink(link);
+      expect(fileRows()).toHaveLength(0);
+
+      switchProvider('paperless', true);
+      expect(service.dueLinks().map((l) => l.id)).toEqual([link.id]);
+      const res = await service.syncLink(config.getLink(link.id));
+
+      expect(res).toMatchObject({ state: 'ok', pulled: 1 });
+      expect(fileRows()).toHaveLength(1);
+    });
+
+    it('answers the same question for any caller that has to refuse up front', () => {
+      const link = makeLink();
+      expect(service.isSwitchedOff(link)).toBe(false);
+
+      switchProvider('paperless', false);
+      expect(service.isSwitchedOff(link)).toBe(true);
+
+      switchProvider('paperless', true);
+      addons.isAddonEnabled.mockReturnValue(false);
+      expect(service.isSwitchedOff(link)).toBe(true);
+    });
+  });
+
 
       const status = service.status(tripId);
 
@@ -986,6 +1079,18 @@ describe('DocSyncService', () => {
     /** A conflicted pairing: the provider moved on, and TREK holds its own copy. */
     function seedConflict(link: LinkRow): { itemId: number; fileId: number } {
       const fileId = makeFile({ name: 'boarding.pdf' });
+
+    it('says which bindings are paused because their provider is switched off', () => {
+      const off = makeLink();
+      const on = makeLink({ providerId: 'nextcloud' });
+      switchProvider('paperless', false);
+      switchProvider('nextcloud', true);
+
+      const links = service.status(tripId).links as Array<{ id: number; providerOff: boolean }>;
+
+      expect(links.find((l) => l.id === off.id)?.providerOff).toBe(true);
+      expect(links.find((l) => l.id === on.id)?.providerOff).toBe(false);
+    });
       const itemId = seedItem(link, {
         remoteId: 'r1',
         remoteName: 'boarding.pdf',
@@ -1260,6 +1365,100 @@ describe('DocSyncService', () => {
    * The backoff was always computed at step 1, so three of the curve's four
    * steps were unreachable and a provider that was down got asked again at the
    * same short interval. And the counter only ever grew: a row that failed once
+  /**
+   * A download that fails leaves the pairing where it was.
+   *
+   * The failed update used to write the provider's new version marker next to
+   * the old bytes. The run after that saw no upstream change, planned `touch`,
+   * which leaves `error` alone, and the row sat in error on stale bytes for
+   * good. "Sync now" did not help: it only clears the backoff, and the plan was
+   * the same.
+   */
+  describe('a download that fails', () => {
+    const settleBackoff = () => testDb.prepare('UPDATE document_sync_items SET next_attempt_at = NULL').run();
+
+    function seedHeld(link: LinkRow): { itemId: number; fileId: number } {
+      const fileId = makeFile({ name: 'invoice.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'invoice.pdf', remoteVersion: 'v1', fileId, state: 'synced',
+        contentSha256: 'held-hash', remoteSize: 512, remoteModifiedAt: '2026-09-01T08:00:00Z',
+      });
+      return { itemId, fileId };
+    }
+
+    const edited = () => remoteDoc({
+      remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2', size: 2048, remoteModifiedAt: '2026-09-18T10:00:00Z',
+    });
+
+    it('keeps the version TREK holds on record, not the one it failed to get', async () => {
+      const link = makeLink();
+      const { itemId, fileId } = seedHeld(link);
+      provider.list.mockResolvedValue(ok(listing([edited()])));
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+
+      await service.syncLink(link);
+
+      expect(itemRow(itemId)).toMatchObject({
+        state: 'error', error_code: 'timeout', file_id: fileId, content_sha256: 'held-hash',
+        remote_version: 'v1', remote_size: 512, remote_modified_at: '2026-09-01T08:00:00Z',
+      });
+    });
+
+    it('fetches the update again once the backoff is over and ends synced with the new bytes', async () => {
+      const link = makeLink();
+      const { itemId, fileId } = seedHeld(link);
+      provider.list.mockResolvedValue(ok(listing([edited()])));
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+      await service.syncLink(link);
+
+      settleBackoff();
+      const res = await service.syncLink(config.getLink(link.id));
+
+      expect(res).toMatchObject({ state: 'ok', pulled: 1 });
+      expect(provider.fetch).toHaveBeenCalledTimes(2);
+      const row = itemRow(itemId);
+      expect(row).toMatchObject({
+        state: 'synced', error_code: null, attempts: 0, remote_version: 'v2', content_sha256: FILE_SHA,
+        remote_size: 2048, remote_modified_at: '2026-09-18T10:00:00Z',
+      });
+      const live = fileRows().filter(r => r.deleted_at === null);
+      expect(live).toHaveLength(1);
+      expect(Number(live[0].id)).toBe(Number(row.file_id));
+      expect(Number(row.file_id)).not.toBe(fileId);
+      expect(service.issues(tripId)).toHaveLength(0);
+    });
+
+    it('is fetched again by "Sync now" without waiting out the backoff', async () => {
+      const link = makeLink();
+      const { itemId } = seedHeld(link);
+      provider.list.mockResolvedValue(ok(listing([edited()])));
+      provider.fetch.mockResolvedValueOnce(fail('provider_error'));
+      await service.syncLink(link);
+
+      service.retryShelvedItems(link.id);
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.fetch).toHaveBeenCalledTimes(2);
+      expect(itemRow(itemId)).toMatchObject({ state: 'synced', remote_version: 'v2', content_sha256: FILE_SHA });
+    });
+
+    it('still retries a first download, which has no version to keep', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValue(ok(listing([remoteDoc({ remoteId: 'r-new', name: 'fresh.pdf', remoteVersion: 'v1' })])));
+      provider.fetch.mockResolvedValueOnce(fail('timeout'));
+      await service.syncLink(link);
+      expect(itemRows()[0]).toMatchObject({ state: 'error', file_id: null, remote_id: 'r-new', remote_version: null });
+
+      settleBackoff();
+      await service.syncLink(config.getLink(link.id));
+
+      expect(provider.fetch).toHaveBeenCalledTimes(2);
+      expect(itemRows()).toHaveLength(1);
+      expect(itemRows()[0]).toMatchObject({ state: 'synced', remote_version: 'v1', content_sha256: FILE_SHA });
+      expect(fileRows()).toHaveLength(1);
+    });
+  });
+
    * a month reached the limit after six months of otherwise healthy syncing and
    * was shelved permanently. Driven here through real runs, since the write is
    * private and a test hatch would only prove the hatch works.

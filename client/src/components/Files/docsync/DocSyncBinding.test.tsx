@@ -1,4 +1,4 @@
-// FE-DOCSYNC-BIND-001 to FE-DOCSYNC-BIND-025
+// FE-DOCSYNC-BIND-001 to FE-DOCSYNC-BIND-026
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '../../../../tests/helpers/render'
 import DocSyncBinding from './DocSyncBinding'
@@ -156,6 +156,15 @@ describe('DocSyncBinding: what it says about itself', () => {
 
     expect(screen.getAllByText('Not synced yet')).toHaveLength(1)
     expect(screen.getByText('not run yet')).toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-BIND-026: a binding whose provider an admin switched off says it is paused, not what the last run said', () => {
+    // The server leaves the binding's own state as the last run wrote it, so
+    // without this the card went on reporting an old failure, or nothing.
+    renderCard({ link: { providerOff: true, lastSyncState: 'failed', lastSyncError: 'unauthorized' } })
+
+    expect(screen.getByText('Paused: an administrator has switched this provider off. Syncing resumes once it is back on.')).toBeInTheDocument()
+    expect(screen.queryByText('Failed · The credentials were refused.')).not.toBeInTheDocument()
   })
 
   it('FE-DOCSYNC-BIND-010: a paused binding is badged, an active one is not', () => {

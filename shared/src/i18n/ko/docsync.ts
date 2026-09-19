@@ -171,6 +171,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': '전송이 완료되지 않았습니다.',
 
   'docsync.error.unknown_provider': '이 저장소는 이 인스턴스에서 사용할 수 없습니다.',
+  'docsync.error.provider_disabled': '일시 중지됨: 관리자가 이 저장소를 껐습니다. 다시 켜지면 동기화가 재개됩니다.',
 };
 
 export default docsync;

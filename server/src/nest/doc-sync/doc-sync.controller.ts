@@ -27,6 +27,7 @@ import { docFailed } from './document-provider';
 import { DocSyncConfigService, type LinkRow } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 import { DocumentProviderRegistry } from './document-provider.registry';
+import { PROVIDER_DISABLED } from './doc-sync.constants';
 import {
   DocsyncConnectionDto,
   DocsyncConnectionTestDto,
@@ -358,6 +359,12 @@ export class DocSyncController {
     // button was a way around that.
     if (link.last_sync_state === 'orphaned') {
       throw new HttpException({ error: 'This binding lost its owner and has to be reconnected' }, 409);
+    }
+    // Refused before the shelved rows are touched, so a binding an admin
+    // switched off stays exactly as it was and resumes where it stopped. A code
+    // rather than a sentence: the client says it in the reader's language.
+    if (this.sync.isSwitchedOff(link)) {
+      throw new HttpException({ error: PROVIDER_DISABLED }, 409);
     }
     // A person asking for a run is also asking for the rows that gave up to be
     // tried once more; the scheduler gets no such reprieve.

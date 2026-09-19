@@ -15,6 +15,7 @@ import { AddonsService } from '../addons/addons.service';
 import { FilesService } from '../files/files.service';
 import { DocSyncConfigService } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
+import { PROVIDER_DISABLED } from './doc-sync.constants';
 
 const documentsAddonOn = addonGate(ADDON_IDS.DOCUMENTS);
 
@@ -97,12 +98,24 @@ export class DocSyncMcp {
     }
     const results = [];
     for (const link of links) {
+      // Refused as the REST route refuses it, before the shelved rows below are
+      // touched: a binding an admin switched off stays exactly as it was, so it
+      // resumes where it stopped once the provider is back on.
+      if (this.sync.isSwitchedOff(link)) {
+        results.push({ linkId: link.id, provider: link.provider_id, state: 'disabled', errorCode: PROVIDER_DISABLED });
+        continue;
+      }
       // Asking for a run by hand means "try again", including the documents
       // that were shelved after too many failures. The REST route does the
       // same thing before its run; a tool that skipped it would answer "in
       // sync" while leaving them shelved.
       this.sync.retryShelvedItems(link.id);
       results.push({ linkId: link.id, provider: link.provider_id, ...(await this.sync.syncLink(link, { full: full === true })) });
+    }
+    if (results.every((r) => r.errorCode === PROVIDER_DISABLED)) {
+      return errorResult(
+        `${PROVIDER_DISABLED}: an administrator has switched off the document store this trip is bound to, so nothing was synced. The binding and its documents are kept, and syncing resumes once the store is switched back on.`,
+      );
     }
     return ok({ runs: results });
   }

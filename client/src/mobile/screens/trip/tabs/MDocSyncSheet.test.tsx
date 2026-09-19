@@ -1,4 +1,4 @@
-// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-017
+// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-018
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '../../../../../tests/helpers/render'
@@ -338,6 +338,25 @@ describe('MDocSyncSheet: what the owner may do', () => {
     await waitFor(() => expect(docsyncApi.deleteLink).toHaveBeenCalledWith(TRIP_ID, 11))
     expect(await screen.findByText('Connect a provider')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Sync now' })).not.toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-MOBILE-018: a binding whose provider an admin switched off says so, and a refused run leaves it at that', async () => {
+    let off = false
+    vi.spyOn(docsyncApi, 'status').mockImplementation(async () => ({
+      items: {},
+      links: links.map(l => ({ id: l.id, providerOff: off, holdings: { inTrek: 4, atProvider: 2, paired: 2, missing: 0 } })),
+    }))
+    vi.spyOn(docsyncApi, 'syncNow').mockImplementation(async () => {
+      off = true
+      throw { response: { status: 409, data: { error: 'provider_disabled' } } }
+    })
+    renderSheet()
+    await openDetail()
+    expect(screen.queryByText('Paused: an administrator has switched this provider off. Syncing resumes once it is back on.')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
+
+    expect(await screen.findByText('Paused: an administrator has switched this provider off. Syncing resumes once it is back on.')).toBeInTheDocument()
   })
 
   it('FE-DOCSYNC-MOBILE-014: Sync now runs that binding', async () => {

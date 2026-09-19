@@ -8,7 +8,7 @@ import { Readable } from 'node:stream';
 import type { DocsyncErrorCode } from '@trek/shared';
 import { DatabaseService } from '../database/database.service';
 import { AddonsService } from '../addons/addons.service';
-import type { AddonId } from '../../addons';
+import { ADDON_IDS } from '../../addons';
 import { StorageService } from '../storage/storage.service';
 import { FilesService } from '../files/files.service';
 import { AllowedFileTypesService } from '../files/allowed-file-types.service';
@@ -102,6 +102,10 @@ export class DocSyncService {
    * was never synced automatically at all. Found on a dev database with 170
    * bindings, where a freshly created one was still untouched minutes later
    * while the first twenty ran again and again.
+   *
+   * A binding whose provider an admin switched off is left out here rather
+   * than stood down per run. It never runs, so it never gets a `last_sync_at`,
+   * and twenty of them would sort first on every tick and take every slot.
    */
   dueLinks(limit = 20): LinkRow[] {
     return this.db.connection
@@ -110,12 +114,27 @@ export class DocSyncService {
           WHERE sync_enabled = 1
             AND failure_count < ?
             AND (next_attempt_at IS NULL OR next_attempt_at <= CURRENT_TIMESTAMP)
+            AND provider_id IN (SELECT id FROM document_providers WHERE enabled = 1)
           ORDER BY COALESCE(next_attempt_at, '1970-01-01') ASC,
                    COALESCE(last_sync_at, '1970-01-01') ASC,
                    id ASC
           LIMIT ?`,
       )
       .all(LINK_CIRCUIT_OPEN_AFTER, limit) as LinkRow[];
+  }
+
+  /**
+   * Whether an admin has closed the door on this binding: the Documents addon
+   * is off, or the provider it runs against is.
+   *
+   * A kill switch, not a failure. Nothing about the binding is written while it
+   * is off, not its state and not its documents' attempt counters, so it
+   * resumes exactly where it stopped once the switch is back on. Public because
+   * a manual run has to refuse before it un-shelves anything.
+   */
+  isSwitchedOff(link: Pick<LinkRow, 'provider_id'>): boolean {
+    if (!this.addons.isAddonEnabled(ADDON_IDS.DOCUMENTS)) return true;
+    return !this.config.enabledProviderIds().includes(link.provider_id);
   }
 
   /**
@@ -151,6 +170,12 @@ export class DocSyncService {
   private async runLink(link: LinkRow, opts: { full?: boolean }): Promise<{
     state: string; pulled: number; pushed: number; conflicts: number; missing: number; errorCode?: DocsyncErrorCode;
   }> {
+    // First, before anything that records a failure: a binding whose provider
+    // is switched off must come back as it was left. The webhook and a first
+    // run after binding reach this without asking beforehand.
+    if (this.isSwitchedOff(link)) {
+      return { state: 'disabled', pulled: 0, pushed: 0, conflicts: 0, missing: 0 };
+    }
     const conn = this.config.getConnection(link.connection_id);
     if (!conn) {
       this.recordLinkFailure(link, 'not_found');
@@ -160,13 +185,6 @@ export class DocSyncService {
     if (!provider) {
       this.recordLinkFailure(link, 'provider_error');
       return { state: 'failed', pulled: 0, pushed: 0, conflicts: 0, missing: 0, errorCode: 'provider_error' };
-    }
-    // Switching a provider off in the admin panel stopped new connections and
-    // left every existing binding running, which is not what "off" means to the
-    // person who switched it. Not recorded as a failure: nothing is wrong with
-    // the binding, an admin has closed the door.
-    if (!this.addons.isAddonEnabled(link.provider_id as AddonId)) {
-      return { state: 'disabled', pulled: 0, pushed: 0, conflicts: 0, missing: 0 };
     }
 
     const ref = this.config.toRef(conn);
@@ -747,11 +765,6 @@ export class DocSyncService {
       trekDocUid?: string;
     },
   ): void {
-    const remoteId = patch.remoteIdOverride ?? patch.remote?.remoteId ?? null;
-    const remoteVersion = patch.remoteVersion ?? patch.remote?.remoteVersion ?? null;
-    const remoteName = patch.remoteNameOverride ?? patch.remote?.name ?? null;
-    const remoteSize = patch.remoteSize ?? patch.remote?.size ?? null;
-    const remoteModifiedAt = patch.remoteModifiedAt ?? patch.remote?.remoteModifiedAt ?? null;
     const failed = patch.state === 'error';
 
     if (patch.itemId !== null) {
@@ -771,6 +784,26 @@ export class DocSyncService {
         .prepare('SELECT attempts FROM document_sync_items WHERE id = ?')
         .get(patch.itemId) as { attempts: number } | undefined)?.attempts ?? 0;
       const attempts = failed ? before + 1 : 0;
+    /**
+     * A failed transfer leaves the pairing describing the copy TREK holds.
+     *
+     * The listing entry is the copy that did not arrive. Its version marker
+     * written next to the old bytes meant the next run saw no upstream change,
+     * planned `touch`, which leaves `error` alone, and the row stayed in error
+     * on stale bytes for good, "Sync now" included. Size and time go with it:
+     * where the id is the path they are how a moved copy is recognised as the
+     * same bytes, and a match there adopts the listing's version as well.
+     *
+     * A new row keeps the listing's name, size and time, because they are what
+     * pairs it and follows it to be fetched again, but no version: TREK holds
+     * none yet, and the planner retries it for having no file.
+     */
+    const described = failed && patch.itemId !== null ? undefined : patch.remote;
+    const remoteId = patch.remoteIdOverride ?? patch.remote?.remoteId ?? null;
+    const remoteVersion = patch.remoteVersion ?? (failed ? null : patch.remote?.remoteVersion) ?? null;
+    const remoteName = patch.remoteNameOverride ?? described?.name ?? null;
+    const remoteSize = patch.remoteSize ?? described?.size ?? null;
+    const remoteModifiedAt = patch.remoteModifiedAt ?? described?.remoteModifiedAt ?? null;
 
       this.db.connection
         .prepare(
@@ -1050,3 +1083,6 @@ export class DocSyncService {
 function isTransfer(action: PlanAction): boolean {
   return action.kind === 'pull' || action.kind === 'pull_update' || action.kind === 'push' || action.kind === 'push_update';
 }
+          // Paused rather than failed, so the card can say why nothing moves
+          // without the binding's own state being touched.
+          providerOff: this.isSwitchedOff(l),

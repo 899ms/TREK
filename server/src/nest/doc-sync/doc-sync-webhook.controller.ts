@@ -2,11 +2,9 @@ import { Controller, HttpCode, OnModuleDestroy, Param, Post, Req } from '@nestjs
 import type { Request } from 'express';
 import crypto from 'crypto';
 import { Public } from '../auth/public.decorator';
-import { ADDON_IDS } from '../../addons';
-import { AddonsService } from '../addons/addons.service';
 import { DatabaseService } from '../database/database.service';
 import { SETTING_SYNC_ENABLED, WEBHOOK_NUDGE_DEBOUNCE_SECONDS } from './doc-sync.constants';
-import { DocSyncConfigService } from './doc-sync-config.service';
+import { DocSyncConfigService, type LinkRow } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 
 /**
@@ -42,12 +40,12 @@ export class DocSyncWebhookController implements OnModuleDestroy {
   constructor(
     private readonly config: DocSyncConfigService,
     private readonly sync: DocSyncService,
-    private readonly addons: AddonsService,
     private readonly db: DatabaseService,
   ) {}
 
   /**
-   * The same two switches the scheduler obeys.
+   * The same switches the scheduler obeys: the Documents addon, the binding's
+   * provider, and the instance-wide kill switch.
    *
    * Without them "switch document sync off" meant "stop the poll", while every
    * provider holding a webhook kept driving full runs: an admin turning the
@@ -55,8 +53,8 @@ export class DocSyncWebhookController implements OnModuleDestroy {
    * well as on arrival, so a switch thrown during the debounce window still
    * takes effect.
    */
-  private syncIsOn(): boolean {
-    if (!this.addons.isAddonEnabled(ADDON_IDS.DOCUMENTS)) return false;
+  private syncIsOn(link: LinkRow): boolean {
+    if (this.sync.isSwitchedOff(link)) return false;
     const killSwitch = this.db.get<{ value: string }>(
       'SELECT value FROM app_settings WHERE key = ?', SETTING_SYNC_ENABLED,
     )?.value;
@@ -78,7 +76,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
     // Always 200, even for an unknown token: a 404 here would let anyone probe
     // which tokens exist, and a provider that gets an error will retry anyway.
     if (!link || link.sync_enabled !== 1) return { received: true };
-    if (!this.syncIsOn()) return { received: true };
+    if (!this.syncIsOn(link)) return { received: true };
 
     const secret = this.config.webhookSecret(link);
     if (secret && !this.secretMatches(req, secret)) return { received: true };
@@ -106,7 +104,7 @@ export class DocSyncWebhookController implements OnModuleDestroy {
       this.pending.delete(linkId);
       const fresh = reload();
       if (!fresh || fresh.sync_enabled !== 1) return;
-      if (!this.syncIsOn()) return;
+      if (!this.syncIsOn(fresh)) return;
       void this.sync.syncLink(fresh).then((res) => {
         // A run that was already in flight answers `busy`, and the changes this
         // nudge was about may have landed after that run read the folder. Ask

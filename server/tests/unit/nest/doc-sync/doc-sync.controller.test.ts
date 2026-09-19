@@ -117,6 +117,7 @@ const nextcloud = fakeProvider('nextcloud');
 const sync = {
   syncLink: vi.fn(async (_link: LinkRow, _opts?: { full?: boolean }) => ({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 })),
   retryShelvedItems: vi.fn((_linkId: number) => {}),
+  isSwitchedOff: vi.fn((_link: LinkRow) => false),
   status: vi.fn(() => ({ links: [], items: {} })),
   resolveConflict: vi.fn(async () => true),
 };
@@ -647,6 +648,24 @@ describe('a manual run', () => {
 
     const err = await thrown(() => controller.syncNow(String(otherTripId), String(created.id), { full: false }));
     expect(err.getStatus()).toBe(404);
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('refuses a binding an admin switched off with a code, and touches nothing', async () => {
+    // A code rather than a sentence so the client can say it in the reader's
+    // language; the MCP tool answers with the same one. Refused before the
+    // shelved rows are cleared, so the binding resumes exactly as it was.
+    const conn = await storedPaperless();
+    const created = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq())) as { id: number };
+    sync.syncLink.mockClear();
+    sync.isSwitchedOff.mockReturnValueOnce(true);
+
+    const err = await thrown(() => controller.syncNow(String(tripId), String(created.id), { full: false }));
+
+    expect(err.getStatus()).toBe(409);
+    expect(err.getResponse()).toEqual({ error: 'provider_disabled' });
+    expect(sync.isSwitchedOff.mock.calls[0][0]).toMatchObject({ id: created.id });
+    expect(sync.retryShelvedItems).not.toHaveBeenCalled();
     expect(sync.syncLink).not.toHaveBeenCalled();
   });
 });

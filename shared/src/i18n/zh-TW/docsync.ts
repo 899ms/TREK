@@ -166,6 +166,7 @@ const docsync: TranslationStrings = {
   'docsync.issues.error': '傳輸沒有完成。',
 
   'docsync.error.unknown_provider': '這個提供者在此執行個體上無法使用。',
+  'docsync.error.provider_disabled': '已暫停：管理員已停用此提供者。重新啟用後會繼續同步。',
 };
 
 export default docsync;
