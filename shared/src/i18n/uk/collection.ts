@@ -159,6 +159,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Цей файл завеликий, щоб бути списком.',
   'collections.file.errorUnreadable': 'Не вдалося прочитати цей файл.',
   'collections.file.errorNotACollection': 'Це не файл списку TREK.',
+  'collections.file.formatTrek': 'Список TREK',
+  'collections.file.formatTrekHint': 'Для іншого TREK, з мітками й статусом',
+  'collections.file.formatGpxHint':
+    'Маршрутні точки для OsmAnd, Organic Maps, Garmin та інших картографічних застосунків',
+  'collections.file.gpxOmitted': 'Місць без координат, які не потрапили до файлу GPX: {count}',
+  'collections.file.gpxNothing': 'Жодне з цих місць не має координат, тож у файл GPX нічого записати.',
+  'collections.file.reading': 'Читання файлу…',
+  'collections.file.gpxSkipped': 'Маршрутні точки без придатних координат буде пропущено: {count}.',
+  'collections.file.gpxTrack': 'У файлі також є точки треку: {count}. Треки не імпортуються, лише маршрутні точки.',
+  'collections.file.gpxEmpty': 'У цьому файлі GPX немає маршрутних точок, тож імпортувати нічого.',
+  'collections.file.errorNotGpx': 'Це не файл GPX.',
+  'collections.file.errorTooManyPlaces':
+    'У цьому файлі понад {count} місць. Розділіть його та імпортуйте частини по черзі.',
 
   'collections.share.title': 'Поділитися списком',
   'collections.share.titleNamed': 'Поділитися «{name}»',

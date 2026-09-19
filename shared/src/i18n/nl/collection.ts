@@ -160,6 +160,20 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Dit bestand is te groot om een lijst te zijn.',
   'collections.file.errorUnreadable': 'Dit bestand kon niet worden gelezen.',
   'collections.file.errorNotACollection': 'Dit is geen TREK-lijstbestand.',
+  'collections.file.formatTrek': 'TREK-lijst',
+  'collections.file.formatTrekHint': 'Voor een andere TREK, met labels en status',
+  'collections.file.formatGpxHint': 'Waypoints voor OsmAnd, Organic Maps, Garmin en andere kaart-apps',
+  'collections.file.gpxOmitted': '{count} plekken zonder coördinaten zijn niet in het GPX-bestand opgenomen',
+  'collections.file.gpxNothing':
+    'Geen van deze plekken heeft coördinaten, dus er is niets om in een GPX-bestand te zetten.',
+  'collections.file.reading': 'Bestand wordt gelezen…',
+  'collections.file.gpxSkipped': '{count} waypoints zonder bruikbare coördinaten worden overgeslagen.',
+  'collections.file.gpxTrack':
+    'Dit bestand bevat ook {count} trackpunten. Tracks worden niet geïmporteerd, alleen waypoints.',
+  'collections.file.gpxEmpty': 'Dit GPX-bestand bevat geen waypoints, dus er valt niets te importeren.',
+  'collections.file.errorNotGpx': 'Dit is geen GPX-bestand.',
+  'collections.file.errorTooManyPlaces':
+    'Dit bestand bevat meer dan {count} plekken. Splits het op en importeer de delen een voor een.',
 
   'collections.share.title': 'Lijst delen',
   'collections.share.titleNamed': '“{name}” delen',

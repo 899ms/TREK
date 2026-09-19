@@ -13,6 +13,9 @@ import type {
   CollectionFile,
   CollectionImportRequest,
   CollectionImportResult,
+  CollectionGpxExport,
+  CollectionGpxReadRequest,
+  CollectionGpxReadResult,
   CollectionPlaceUpdateRequest,
   CollectionCopyToTripRequest,
   CollectionInviteRequest,
@@ -62,6 +65,12 @@ export const collectionsApi = {
     ax.get(`${base}/${id}/export`).then((r: AxiosResponse) => r.data),
   importFile: (body: CollectionImportRequest): Promise<CollectionImportResult> =>
     ax.post(`${base}/import`, body satisfies CollectionImportRequest).then((r: AxiosResponse) => r.data),
+  // The same list as GPX (#2301). A GPX is read by the server into a list file,
+  // which then goes through importFile above like any other.
+  exportGpx: (id: number): Promise<CollectionGpxExport> =>
+    ax.get(`${base}/${id}/export/gpx`).then((r: AxiosResponse) => r.data),
+  readGpx: (body: CollectionGpxReadRequest): Promise<CollectionGpxReadResult> =>
+    ax.post(`${base}/gpx/read`, body satisfies CollectionGpxReadRequest).then((r: AxiosResponse) => r.data),
   // Both answer with the bare collection, not a { collection } envelope — the
   // controller returns the service's `Collection` straight through, and the e2e
   // suite pins that shape. Declaring the envelope made createCollection() resolve

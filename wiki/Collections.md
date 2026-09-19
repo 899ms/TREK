@@ -100,9 +100,14 @@ The owner always has full control. The owner can also remove a member, and a mem
 
 Sharing works between people on the same TREK. To give a list to somebody who runs their own, or to keep a copy of your own, export it as a file.
 
-**Export** sits next to Edit and Share in the list header, on desktop. It downloads the open list as a `.trekcollection.json` file: the list's name, description and colour, its labels, and every place with its address, coordinates, notes, status, website, phone, category name and labels. Any member of a shared list may export it.
+**Export** sits next to Edit and Share in the list header, on desktop, and asks which format you want. Any member of a shared list may export it.
 
-**Import** sits next to **New list** in the lists rail, as the button with the upload arrow. Pick a file and TREK shows what is in it before anything happens: the name, how many places, how many labels. Rename it there if you like, then import. The file always becomes a **new list of your own**, so nothing you already have can be overwritten, and you land on the new list when it is done.
+- **TREK list** downloads the open list as a `.trekcollection.json` file: the list's name, description and colour, its labels, and every place with its address, coordinates, notes, status, website, phone, category name and labels. This is the one to give to another TREK.
+- **GPX** downloads the places as waypoints in a `.gpx` file, for OsmAnd, Organic Maps, a Garmin, gpx.studio or any other app that reads GPX. Each waypoint carries the place's name, description and address, notes, website and category, which every such app shows. Labels, status, phone and the rest travel alongside in a TREK extension that other apps ignore, so a GPX made by TREK comes back into TREK complete. A place without coordinates cannot be a waypoint: it is left out, and TREK tells you how many were.
+
+**Import** sits next to **New list** in the lists rail, as the button with the upload arrow. Pick a TREK list file or a GPX file and TREK shows what is in it before anything happens: the name, how many places, how many labels. Rename it there if you like, then import. The file always becomes a **new list of your own**, so nothing you already have can be overwritten, and you land on the new list when it is done.
+
+From a GPX, every waypoint becomes a place, and so does a route point somebody named. A track is a line rather than a place, so it is not imported, and the preview says how many track points were left behind. A waypoint's type (OsmAnd files its favourites into groups this way) becomes the place's category when your palette has one of that name. A waypoint without a name is called "Waypoint" and its number in the file; one without usable coordinates is skipped and counted.
 
 A few things deliberately stay behind, because they belong to the instance the file came from rather than to the list:
 
@@ -110,7 +115,7 @@ A few things deliberately stay behind, because they belong to the instance the f
 - **Uploaded photos and cover images.** They live on the sender's server; a place keeps an image only when it is an ordinary `https://` address.
 - **Ids of any kind**, including which trip a place was originally saved from. The receiving instance issues its own; a category comes across by name and is matched against the palette on the other side, or left empty when there is no match.
 
-A file that is not a TREK list is refused with a reason. A single place inside a file that cannot be read is skipped and reported, so one bad line does not cost you the rest of the list.
+A file that is neither a TREK list nor a GPX is refused with a reason. A single place inside a file that cannot be read is skipped and reported, so one bad line does not cost you the rest of the list.
 
 ## See also
 

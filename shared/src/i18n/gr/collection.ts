@@ -160,6 +160,20 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Αυτό το αρχείο είναι πολύ μεγάλο για λίστα.',
   'collections.file.errorUnreadable': 'Δεν ήταν δυνατή η ανάγνωση αυτού του αρχείου.',
   'collections.file.errorNotACollection': 'Αυτό δεν είναι αρχείο λίστας του TREK.',
+  'collections.file.formatTrek': 'Λίστα TREK',
+  'collections.file.formatTrekHint': 'Για άλλο TREK, με ετικέτες και κατάσταση',
+  'collections.file.formatGpxHint': 'Σημεία διαδρομής για OsmAnd, Organic Maps, Garmin και άλλες εφαρμογές χαρτών',
+  'collections.file.gpxOmitted': '{count} μέρη χωρίς συντεταγμένες έμειναν εκτός του αρχείου GPX',
+  'collections.file.gpxNothing':
+    'Κανένα από αυτά τα μέρη δεν έχει συντεταγμένες, οπότε δεν υπάρχει τίποτα για αρχείο GPX.',
+  'collections.file.reading': 'Ανάγνωση αρχείου…',
+  'collections.file.gpxSkipped': '{count} σημεία διαδρομής χωρίς χρήσιμες συντεταγμένες μένουν εκτός.',
+  'collections.file.gpxTrack':
+    'Το αρχείο έχει επίσης {count} σημεία ίχνους. Τα ίχνη δεν εισάγονται, μόνο τα σημεία διαδρομής.',
+  'collections.file.gpxEmpty': 'Αυτό το αρχείο GPX δεν έχει σημεία διαδρομής, οπότε δεν υπάρχει τίποτα για εισαγωγή.',
+  'collections.file.errorNotGpx': 'Αυτό δεν είναι αρχείο GPX.',
+  'collections.file.errorTooManyPlaces':
+    'Αυτό το αρχείο έχει περισσότερα από {count} μέρη. Χωρίστε το και εισαγάγετε τα κομμάτια ένα ένα.',
 
   'collections.share.title': 'Κοινή χρήση λίστας',
   'collections.share.titleNamed': 'Κοινή χρήση «{name}»',

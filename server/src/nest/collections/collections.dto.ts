@@ -21,6 +21,7 @@ import {
   collectionLabelUpdateRequestSchema,
   collectionLabelAssignRequestSchema,
   collectionImportRequestSchema,
+  collectionGpxReadRequestSchema,
 } from '@trek/shared';
 
 /**
@@ -51,3 +52,4 @@ export class CollectionLabelCreateDto extends createZodDto(collectionLabelCreate
 export class CollectionLabelUpdateDto extends createZodDto(collectionLabelUpdateRequestSchema) {}
 export class CollectionLabelAssignDto extends createZodDto(collectionLabelAssignRequestSchema) {}
 export class CollectionImportDto extends createZodDto(collectionImportRequestSchema) {}
+export class CollectionGpxReadDto extends createZodDto(collectionGpxReadRequestSchema) {}

@@ -159,6 +159,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Filen är för stor för att vara en lista.',
   'collections.file.errorUnreadable': 'Filen gick inte att läsa.',
   'collections.file.errorNotACollection': 'Det här är ingen TREK-listfil.',
+  'collections.file.formatTrek': 'TREK-lista',
+  'collections.file.formatTrekHint': 'För en annan TREK, med etiketter och status',
+  'collections.file.formatGpxHint': 'Vägpunkter för OsmAnd, Organic Maps, Garmin och andra kartappar',
+  'collections.file.gpxOmitted': '{count} platser utan koordinater kom inte med i GPX-filen',
+  'collections.file.gpxNothing':
+    'Ingen av de här platserna har koordinater, så det finns inget att lägga i en GPX-fil.',
+  'collections.file.reading': 'Läser filen…',
+  'collections.file.gpxSkipped': '{count} vägpunkter utan användbara koordinater lämnas utanför.',
+  'collections.file.gpxTrack': 'Filen innehåller också {count} spårpunkter. Spår importeras inte, bara vägpunkter.',
+  'collections.file.gpxEmpty': 'Den här GPX-filen har inga vägpunkter, så det finns inget att importera.',
+  'collections.file.errorNotGpx': 'Det här är ingen GPX-fil.',
+  'collections.file.errorTooManyPlaces':
+    'Filen har fler än {count} platser. Dela upp den och importera delarna en i taget.',
 
   'collections.share.title': 'Dela lista',
   'collections.share.titleNamed': 'Dela ”{name}”',

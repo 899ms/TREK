@@ -1283,3 +1283,82 @@ describe('exportCollection / importCollection (#2198)', () => {
     expect(svc.listCollections(owner.id).collections).toHaveLength(before);
   });
 });
+
+// ── The same list as GPX (#2301) ─────────────────────────────────────────────
+
+describe('exportCollectionGpx / readCollectionGpx (#2301)', () => {
+  const fixture = (name: string) => fs.readFileSync(path.join(__dirname, '../../fixtures/gpx', name), 'utf8');
+
+  it('COLLECTIONS-SVC-120: a list that goes out as GPX comes back as the same list', () => {
+    const owner = createUser(testDb).user;
+    const other = createUser(testDb).user;
+    const cat = createCategory(testDb, { name: 'Restaurant' });
+    const col = svc.createCollection(owner.id, { name: 'Lisbon', description: 'Three days', color: '#ef4444' });
+    const must = svc.createLabel(owner.id, col.id, 'Must see', '#ff0000');
+    svc.createLabel(owner.id, col.id, 'Rainy day', '#00ff00');
+    const market = svc.savePlace(owner.id, {
+      collection_id: col.id, name: 'Time Out Market', description: 'Market hall', lat: 38.7071, lng: -9.1459,
+      address: 'Av. 24 de Julho 49', notes: 'Before noon', website: 'https://timeoutmarket.com/',
+      phone: '+351 210 606 040', osm_id: 'node/1', status: 'want', category_id: cat.id, price: 12.5, currency: 'EUR',
+      links: [{ url: 'https://menu.example/', label: 'Menu' }],
+    }).place!;
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Miradouro', lat: 38.7195, lng: -9.1327, status: 'visited' });
+    svc.assignLabels(owner.id, [must.id], [market.id], false);
+    const original = svc.exportCollection(owner.id, col.id);
+
+    const exported = svc.exportCollectionGpx(owner.id, col.id);
+    const read = svc.readCollectionGpx({ gpx: exported.gpx, file_name: 'lisbon.gpx' });
+    const result = svc.importCollection(other.id, { file: read.file });
+
+    expect(exported).toMatchObject({ name: 'Lisbon', waypoints: 2, omitted: 0 });
+    expect(read).toMatchObject({ skipped: 0, track_points: 0 });
+    expect(result).toMatchObject({ imported: 2, skipped: 0 });
+    // Names, coordinates, notes, website, category, labels, status and the rest:
+    // exported again from the copy, the file is the one the original gave.
+    const again = svc.exportCollection(other.id, (result.collection as { id: number }).id);
+    expect({ ...again, exported_at: undefined }).toEqual({ ...original, exported_at: undefined });
+  });
+
+  it('COLLECTIONS-SVC-121: a place without coordinates is left out and counted, and a stranger gets nothing', () => {
+    const owner = createUser(testDb).user;
+    const stranger = createUser(testDb).user;
+    const col = svc.createCollection(owner.id, { name: 'Mixed' });
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Pinned', lat: 1, lng: 2 });
+    svc.savePlace(owner.id, { collection_id: col.id, name: 'Somewhere vague' });
+
+    const result = svc.exportCollectionGpx(owner.id, col.id);
+
+    expect(result).toMatchObject({ name: 'Mixed', waypoints: 1, omitted: 1 });
+    expect(result.gpx).toContain('<name>Pinned</name>');
+    expect(result.gpx).not.toContain('Somewhere vague');
+    expect(() => svc.exportCollectionGpx(stranger.id, col.id)).toThrow(expect.objectContaining({ status: 404 }));
+  });
+
+  it('COLLECTIONS-SVC-122: OsmAnd favourites become a list, their groups matched against the palette', () => {
+    const owner = createUser(testDb).user;
+    createCategory(testDb, { name: 'Restaurant' });
+
+    const read = svc.readCollectionGpx({ gpx: fixture('osmand-favourites.gpx'), file_name: 'favourites.gpx' });
+    const created = svc.importCollection(owner.id, { file: read.file, name: 'Lisbon favourites' }).collection as { id: number };
+
+    const detail = svc.getCollection(owner.id, created.id);
+    expect(detail.collection.name).toBe('Lisbon favourites');
+    expect(detail.places.map(p => [p.name, p.category?.name ?? null, p.address ?? null])).toEqual([
+      ['Time Out Market', 'Restaurant', 'Av. 24 de Julho 49, 1200-479 Lisboa'],
+      // No "Viewpoints" in this palette, and a file does not get to add one.
+      ['Miradouro de Santa Luzia', null, null],
+      ['Pastéis de Belém', null, 'R. de Belém 84 92, 1300-085 Lisboa'],
+    ]);
+  });
+
+  it('COLLECTIONS-SVC-123: reading a GPX writes nothing, whatever is in it', () => {
+    const owner = createUser(testDb).user;
+    const before = testDb.prepare('SELECT COUNT(*) AS n FROM collections').get() as { n: number };
+
+    svc.readCollectionGpx({ gpx: fixture('garmin-sym.gpx') });
+    expect(() => svc.readCollectionGpx({ gpx: fixture('hostile-doctype.gpx') })).toThrow(expect.objectContaining({ code: 'unreadable' }));
+
+    expect(testDb.prepare('SELECT COUNT(*) AS n FROM collections').get()).toEqual(before);
+    expect(svc.listCollections(owner.id).collections).toHaveLength(0);
+  });
+});

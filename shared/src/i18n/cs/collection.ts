@@ -159,6 +159,18 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Tento soubor je na seznam příliš velký.',
   'collections.file.errorUnreadable': 'Tento soubor se nepodařilo přečíst.',
   'collections.file.errorNotACollection': 'Toto není soubor se seznamem TREK.',
+  'collections.file.formatTrek': 'Seznam TREK',
+  'collections.file.formatTrekHint': 'Pro jiný TREK, se štítky a stavem',
+  'collections.file.formatGpxHint': 'Trasové body pro OsmAnd, Organic Maps, Garmin a další mapové aplikace',
+  'collections.file.gpxOmitted': 'Místa bez souřadnic vynechaná ze souboru GPX: {count}',
+  'collections.file.gpxNothing': 'Žádné z těchto míst nemá souřadnice, takže do souboru GPX není co uložit.',
+  'collections.file.reading': 'Načítání souboru…',
+  'collections.file.gpxSkipped': 'Trasové body bez použitelných souřadnic budou vynechány: {count}.',
+  'collections.file.gpxTrack': 'Soubor obsahuje také body stopy: {count}. Stopy se neimportují, jen trasové body.',
+  'collections.file.gpxEmpty': 'Tento soubor GPX neobsahuje žádné trasové body, takže není co importovat.',
+  'collections.file.errorNotGpx': 'Toto není soubor GPX.',
+  'collections.file.errorTooManyPlaces':
+    'Tento soubor obsahuje více než {count} míst. Rozdělte ho a importujte části postupně.',
 
   'collections.share.title': 'Sdílet seznam',
   'collections.share.titleNamed': 'Sdílet „{name}“',

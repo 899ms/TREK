@@ -158,6 +158,18 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': '이 파일은 목록이라고 하기에 너무 큽니다.',
   'collections.file.errorUnreadable': '이 파일을 읽을 수 없습니다.',
   'collections.file.errorNotACollection': 'TREK 목록 파일이 아닙니다.',
+  'collections.file.formatTrek': 'TREK 목록',
+  'collections.file.formatTrekHint': '다른 TREK용, 라벨과 상태 포함',
+  'collections.file.formatGpxHint': 'OsmAnd, Organic Maps, Garmin 등 지도 앱용 웨이포인트',
+  'collections.file.gpxOmitted': '좌표가 없는 장소 {count}개는 GPX 파일에서 빠졌습니다',
+  'collections.file.gpxNothing': '좌표가 있는 장소가 없어 GPX 파일에 넣을 것이 없습니다.',
+  'collections.file.reading': '파일을 읽는 중…',
+  'collections.file.gpxSkipped': '쓸 수 있는 좌표가 없는 웨이포인트 {count}개는 제외됩니다.',
+  'collections.file.gpxTrack':
+    '이 파일에는 트랙 포인트 {count}개도 있습니다. 트랙은 가져오지 않고 웨이포인트만 가져옵니다.',
+  'collections.file.gpxEmpty': '이 GPX 파일에는 웨이포인트가 없어 가져올 것이 없습니다.',
+  'collections.file.errorNotGpx': 'GPX 파일이 아닙니다.',
+  'collections.file.errorTooManyPlaces': '이 파일에는 장소가 {count}개보다 많습니다. 나눠서 하나씩 가져오세요.',
 
   'collections.share.title': '목록 공유',
   'collections.share.titleNamed': '“{name}” 공유',

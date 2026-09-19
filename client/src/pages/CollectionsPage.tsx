@@ -349,6 +349,7 @@ function CollectionsPageDesktop(): React.ReactElement {
       {c.showImportFile && (
         <ImportCollectionModal
           onImport={c.handleImportFile}
+          onReadGpx={c.handleReadGpx}
           onClose={() => c.setShowImportFile(false)}
           t={t}
         />

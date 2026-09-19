@@ -160,6 +160,18 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Tệp này quá lớn để là một danh sách.',
   'collections.file.errorUnreadable': 'Không đọc được tệp này.',
   'collections.file.errorNotACollection': 'Đây không phải tệp danh sách của TREK.',
+  'collections.file.formatTrek': 'Danh sách TREK',
+  'collections.file.formatTrekHint': 'Cho một TREK khác, kèm nhãn và trạng thái',
+  'collections.file.formatGpxHint': 'Điểm tham chiếu cho OsmAnd, Organic Maps, Garmin và các ứng dụng bản đồ khác',
+  'collections.file.gpxOmitted': '{count} địa điểm không có tọa độ nên không có trong tệp GPX',
+  'collections.file.gpxNothing': 'Không địa điểm nào có tọa độ, nên không có gì để đưa vào tệp GPX.',
+  'collections.file.reading': 'Đang đọc tệp…',
+  'collections.file.gpxSkipped': '{count} điểm tham chiếu không có tọa độ dùng được sẽ bị bỏ qua.',
+  'collections.file.gpxTrack':
+    'Tệp này còn có {count} điểm của vết đường đi. Vết đường đi không được nhập, chỉ các điểm tham chiếu.',
+  'collections.file.gpxEmpty': 'Tệp GPX này không có điểm tham chiếu nào, nên không có gì để nhập.',
+  'collections.file.errorNotGpx': 'Đây không phải tệp GPX.',
+  'collections.file.errorTooManyPlaces': 'Tệp này có hơn {count} địa điểm. Hãy chia nhỏ và nhập từng phần một.',
 
   'collections.share.title': 'Chia sẻ danh sách',
   'collections.share.titleNamed': 'Chia sẻ “{name}”',

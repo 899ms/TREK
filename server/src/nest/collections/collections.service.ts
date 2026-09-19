@@ -19,11 +19,13 @@ import {
   COLLECTION_FILE_VERSION,
   MAX_COLLECTION_FILE_LABELS,
   type PlaceMatchCandidate,
-  type CollectionFile,
   type CollectionFileLabel,
   type CollectionFilePlace,
   type CollectionImportRequest,
   type CollectionImportResult,
+  type CollectionGpxExport,
+  type CollectionGpxReadRequest,
+  type CollectionGpxReadResult,
 } from '@trek/shared';
 import type {
   Collection,
@@ -44,6 +46,7 @@ import type {
   CollectionImportablesResponse,
 } from '@trek/shared';
 import { NotificationsService } from '../notifications/notifications.service';
+import { collectionFileToGpx, gpxToCollectionFile, type ExportedCollectionFile } from './collection-gpx.helpers';
 
 /** Links are stored as a JSON TEXT column; parse on read, stringify on write. */
 function parseLinks(raw: unknown): CollectionLink[] | undefined {
@@ -368,7 +371,7 @@ export class CollectionsService {
    * and a viewer who can read all of this on screen loses nothing by having it
    * as a file; what a viewer must not do is write, which no export does.
    */
-  exportCollection(userId: number, id: number): CollectionFile {
+  exportCollection(userId: number, id: number): ExportedCollectionFile {
     this.assertAccess(userId, id);
     const collection = this.getCollectionRow(id);
     const labels = this.loadLabelsByCollection(id);
@@ -417,6 +420,25 @@ export class CollectionsService {
       labels: labels.map(l => ({ name: l.name, color: l.color ?? null })),
       places,
     };
+  }
+
+  /**
+   * The list as GPX (#2301), written from the very file the export above
+   * returns. What may leave the instance is decided once, there, and a GPX can
+   * only ever carry less of it. Same access rule too, since it is the same read.
+   */
+  exportCollectionGpx(userId: number, id: number): CollectionGpxExport {
+    return collectionFileToGpx(this.exportCollection(userId, id));
+  }
+
+  /**
+   * A GPX document read into the list file it amounts to. Touches no table:
+   * the file goes back to the browser to be shown, and comes back through
+   * importCollection like any other, so there is one import and one
+   * transaction whatever the format was.
+   */
+  readCollectionGpx(body: CollectionGpxReadRequest): CollectionGpxReadResult {
+    return gpxToCollectionFile(body.gpx, body.file_name);
   }
 
   /**

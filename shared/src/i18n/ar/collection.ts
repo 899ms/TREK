@@ -159,6 +159,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'هذا الملف أكبر من أن يكون قائمة.',
   'collections.file.errorUnreadable': 'تعذّرت قراءة هذا الملف.',
   'collections.file.errorNotACollection': 'هذا ليس ملف قائمة من TREK.',
+  'collections.file.formatTrek': 'قائمة TREK',
+  'collections.file.formatTrekHint': 'لنسخة TREK أخرى، مع التسميات والحالة',
+  'collections.file.formatGpxHint': 'نقاط طريق لتطبيقات OsmAnd وOrganic Maps وGarmin وغيرها من تطبيقات الخرائط',
+  'collections.file.gpxOmitted': 'لم يُضمَّن {count} من الأماكن في ملف GPX لأنها بلا إحداثيات',
+  'collections.file.gpxNothing': 'لا يملك أي من هذه الأماكن إحداثيات، فلا يوجد ما يُوضع في ملف GPX.',
+  'collections.file.reading': 'جارٍ قراءة الملف…',
+  'collections.file.gpxSkipped': 'سيُستبعد {count} من نقاط الطريق لعدم وجود إحداثيات صالحة لها.',
+  'collections.file.gpxTrack':
+    'يحتوي هذا الملف أيضًا على {count} من نقاط المسار. لا تُستورد المسارات، بل نقاط الطريق فقط.',
+  'collections.file.gpxEmpty': 'لا يحتوي ملف GPX هذا على نقاط طريق، فلا يوجد ما يُستورد.',
+  'collections.file.errorNotGpx': 'هذا ليس ملف GPX.',
+  'collections.file.errorTooManyPlaces':
+    'يحتوي هذا الملف على أكثر من {count} مكان. قسّمه واستورد الأجزاء واحدًا تلو الآخر.',
 
   'collections.share.title': 'مشاركة القائمة',
   'collections.share.titleNamed': 'مشاركة «{name}»',

@@ -161,6 +161,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Ez a fájl túl nagy ahhoz, hogy lista legyen.',
   'collections.file.errorUnreadable': 'Ezt a fájlt nem sikerült beolvasni.',
   'collections.file.errorNotACollection': 'Ez nem TREK-listafájl.',
+  'collections.file.formatTrek': 'TREK-lista',
+  'collections.file.formatTrekHint': 'Másik TREK-hez, címkékkel és állapottal',
+  'collections.file.formatGpxHint': 'Útpontok OsmAndhez, Organic Mapshez, Garminhoz és más térképes alkalmazásokhoz',
+  'collections.file.gpxOmitted': '{count} hely koordináták nélkül kimaradt a GPX-fájlból',
+  'collections.file.gpxNothing': 'Egyik helynek sincs koordinátája, így nincs mit GPX-fájlba tenni.',
+  'collections.file.reading': 'Fájl beolvasása…',
+  'collections.file.gpxSkipped': '{count} használható koordináták nélküli útpont kimarad.',
+  'collections.file.gpxTrack':
+    'A fájlban {count} nyomvonalpont is van. A nyomvonalakat nem importáljuk, csak az útpontokat.',
+  'collections.file.gpxEmpty': 'Ebben a GPX-fájlban nincsenek útpontok, így nincs mit importálni.',
+  'collections.file.errorNotGpx': 'Ez nem GPX-fájl.',
+  'collections.file.errorTooManyPlaces':
+    'Ebben a fájlban több mint {count} hely van. Oszd fel, és importáld a részeket egyenként.',
 
   'collections.share.title': 'Lista megosztása',
   'collections.share.titleNamed': '„{name}” megosztása',

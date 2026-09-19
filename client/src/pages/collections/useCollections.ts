@@ -7,7 +7,7 @@ import { useSettingsStore } from '../../store/settingsStore'
 import { useAuthStore } from '../../store/authStore'
 import { useToast } from '../../components/shared/Toast'
 import { collectionsApi } from '../../api/collections'
-import { downloadCollectionFile } from '../../components/Collections/collectionFile'
+import { downloadCollectionFile, downloadCollectionGpx, type CollectionExportFormat } from '../../components/Collections/collectionFile'
 import { getApiErrorMessage } from '../../types'
 import { addListener, removeListener } from '../../api/websocket'
 import { useCollectionStore, ALL_SAVED } from '../../store/collectionStore'
@@ -206,22 +206,40 @@ export function useCollections() {
   const handlePlaceAdded = useCallback(() => { refreshActive() }, [refreshActive])
 
   /**
-   * Download the active list as a file.
+   * Download the active list as a file, in the format picked from the menu.
    *
    * The file is fetched rather than built from what this page holds: the page
    * has the places for display, the server decides what may leave the instance.
+   * A GPX holds only places with coordinates, so the rest are counted and the
+   * count is said; a list with none at all gets no empty file (#2301).
    */
-  const handleExportList = useCallback(async () => {
+  const handleExportList = useCallback(async (format: CollectionExportFormat = 'trek') => {
     if (typeof activeId !== 'number') return
     setExporting(true)
     try {
-      downloadCollectionFile(await collectionsApi.exportFile(activeId))
+      if (format === 'trek') {
+        downloadCollectionFile(await collectionsApi.exportFile(activeId))
+        return
+      }
+      const result = await collectionsApi.exportGpx(activeId)
+      if (result.waypoints === 0) {
+        toast.warning(t('collections.file.gpxNothing'))
+        return
+      }
+      downloadCollectionGpx(result.name, result.gpx)
+      if (result.omitted > 0) toast.info(t('collections.file.gpxOmitted', { count: result.omitted }))
     } catch (err) {
       toast.error(getApiErrorMessage(err, t('common.error')))
     } finally {
       setExporting(false)
     }
   }, [activeId, toast, t])
+
+  /** A GPX read into a list file for the import dialog to show. The server does the parsing. */
+  const handleReadGpx = useCallback(
+    (gpx: string, fileName: string) => collectionsApi.readGpx({ gpx, file_name: fileName }),
+    [],
+  )
 
   /**
    * Read a chosen file and create the list it describes.
@@ -449,7 +467,7 @@ export function useCollections() {
     showAddPlace, setShowAddPlace, handlePlaceAdded,
     showImport, setShowImport,
     exporting, handleExportList,
-    showImportFile, setShowImportFile, handleImportFile,
+    showImportFile, setShowImportFile, handleImportFile, handleReadGpx,
     confirmDeleteList, setConfirmDeleteList,
     mobileRailOpen, setMobileRailOpen,
     showShare, setShowShare, handleAfterLeave,

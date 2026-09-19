@@ -160,6 +160,20 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Questo file è troppo grande per essere un elenco.',
   'collections.file.errorUnreadable': 'Non è stato possibile leggere questo file.',
   'collections.file.errorNotACollection': 'Questo non è un file di elenco TREK.',
+  'collections.file.formatTrek': 'Elenco TREK',
+  'collections.file.formatTrekHint': 'Per un altro TREK, con etichette e stato',
+  'collections.file.formatGpxHint': 'Punti di passaggio per OsmAnd, Organic Maps, Garmin e altre app di mappe',
+  'collections.file.gpxOmitted': '{count} luoghi senza coordinate sono rimasti fuori dal file GPX',
+  'collections.file.gpxNothing':
+    'Nessuno di questi luoghi ha coordinate, quindi non c’è niente da mettere in un file GPX.',
+  'collections.file.reading': 'Lettura del file…',
+  'collections.file.gpxSkipped': '{count} punti di passaggio senza coordinate utilizzabili restano fuori.',
+  'collections.file.gpxTrack':
+    'Questo file contiene anche {count} punti di traccia. Le tracce non vengono importate, solo i punti di passaggio.',
+  'collections.file.gpxEmpty': 'Questo file GPX non contiene punti di passaggio, quindi non c’è niente da importare.',
+  'collections.file.errorNotGpx': 'Questo non è un file GPX.',
+  'collections.file.errorTooManyPlaces':
+    'Questo file contiene più di {count} luoghi. Dividilo e importa le parti una alla volta.',
 
   'collections.share.title': 'Condividi lista',
   'collections.share.titleNamed': 'Condividi «{name}»',

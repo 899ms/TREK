@@ -151,6 +151,20 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Aquest fitxer és massa gran per ser una llista.',
   'collections.file.errorUnreadable': 'No s’ha pogut llegir aquest fitxer.',
   'collections.file.errorNotACollection': 'Això no és un fitxer de llista del TREK.',
+  'collections.file.formatTrek': 'Llista del TREK',
+  'collections.file.formatTrekHint': 'Per a un altre TREK, amb etiquetes i estat',
+  'collections.file.formatGpxHint': 'Punts de pas per a OsmAnd, Organic Maps, Garmin i altres aplicacions de mapes',
+  'collections.file.gpxOmitted': '{count} llocs no tenen coordenades i han quedat fora del fitxer GPX',
+  'collections.file.gpxNothing':
+    'Cap d’aquests llocs té coordenades, així que no hi ha res per posar en un fitxer GPX.',
+  'collections.file.reading': 'S’està llegint el fitxer…',
+  'collections.file.gpxSkipped': 'Es deixen fora {count} punts de pas sense coordenades vàlides.',
+  'collections.file.gpxTrack':
+    'Aquest fitxer també té {count} punts de traça. Les traces no s’importen, només els punts de pas.',
+  'collections.file.gpxEmpty': 'Aquest fitxer GPX no té punts de pas, així que no hi ha res per importar.',
+  'collections.file.errorNotGpx': 'Això no és un fitxer GPX.',
+  'collections.file.errorTooManyPlaces':
+    'Aquest fitxer té més de {count} llocs. Divideix-lo i importa’n les parts d’una en una.',
 
   'collections.share.title': 'Compartir llista',
   'collections.share.titleNamed': 'Compartir «{name}»',

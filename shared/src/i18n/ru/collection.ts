@@ -159,6 +159,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Этот файл слишком велик для списка.',
   'collections.file.errorUnreadable': 'Не удалось прочитать этот файл.',
   'collections.file.errorNotACollection': 'Это не файл списка TREK.',
+  'collections.file.formatTrek': 'Список TREK',
+  'collections.file.formatTrekHint': 'Для другого TREK, с метками и статусом',
+  'collections.file.formatGpxHint':
+    'Путевые точки для OsmAnd, Organic Maps, Garmin и других картографических приложений',
+  'collections.file.gpxOmitted': 'Мест без координат, не попавших в файл GPX: {count}',
+  'collections.file.gpxNothing': 'Ни у одного из этих мест нет координат, поэтому в файл GPX нечего записать.',
+  'collections.file.reading': 'Чтение файла…',
+  'collections.file.gpxSkipped': 'Путевые точки без пригодных координат будут пропущены: {count}.',
+  'collections.file.gpxTrack': 'В файле также есть точки трека: {count}. Треки не импортируются, только путевые точки.',
+  'collections.file.gpxEmpty': 'В этом файле GPX нет путевых точек, поэтому импортировать нечего.',
+  'collections.file.errorNotGpx': 'Это не файл GPX.',
+  'collections.file.errorTooManyPlaces':
+    'В этом файле больше {count} мест. Разделите его и импортируйте части по очереди.',
 
   'collections.share.title': 'Поделиться списком',
   'collections.share.titleNamed': 'Поделиться «{name}»',

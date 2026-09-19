@@ -160,6 +160,19 @@ const collection: TranslationStrings = {
   'collections.file.errorTooLarge': 'Berkas ini terlalu besar untuk sebuah daftar.',
   'collections.file.errorUnreadable': 'Berkas ini tidak bisa dibaca.',
   'collections.file.errorNotACollection': 'Ini bukan berkas daftar TREK.',
+  'collections.file.formatTrek': 'Daftar TREK',
+  'collections.file.formatTrekHint': 'Untuk TREK lain, lengkap dengan label dan status',
+  'collections.file.formatGpxHint': 'Titik lokasi untuk OsmAnd, Organic Maps, Garmin, dan aplikasi peta lain',
+  'collections.file.gpxOmitted': '{count} tempat tanpa koordinat tidak dimasukkan ke berkas GPX',
+  'collections.file.gpxNothing':
+    'Tidak ada tempat yang punya koordinat, jadi tidak ada yang bisa dimasukkan ke berkas GPX.',
+  'collections.file.reading': 'Membaca berkas…',
+  'collections.file.gpxSkipped': '{count} titik lokasi tanpa koordinat yang bisa dipakai tidak disertakan.',
+  'collections.file.gpxTrack': 'Berkas ini juga berisi {count} titik jejak. Jejak tidak diimpor, hanya titik lokasi.',
+  'collections.file.gpxEmpty': 'Berkas GPX ini tidak berisi titik lokasi, jadi tidak ada yang diimpor.',
+  'collections.file.errorNotGpx': 'Ini bukan berkas GPX.',
+  'collections.file.errorTooManyPlaces':
+    'Berkas ini berisi lebih dari {count} tempat. Pecah menjadi beberapa bagian dan impor satu per satu.',
 
   'collections.share.title': 'Bagikan daftar',
   'collections.share.titleNamed': 'Bagikan “{name}”',
