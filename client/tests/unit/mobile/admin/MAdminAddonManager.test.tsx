@@ -1,4 +1,4 @@
-// FE-MOB-AADD-001 to FE-MOB-AADD-031
+// FE-MOB-AADD-001 to FE-MOB-AADD-032
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
@@ -240,6 +240,23 @@ describe('MAdminAddonManager', () => {
 
     await user.click(screen.getByRole('switch', { name: 'Polls' }));
     expect(onToggleCollabFeature).toHaveBeenCalledWith('polls');
+  });
+
+  it('FE-MOB-AADD-032: the links row describes the feature, not an empty list', async () => {
+    // The line under the row is its description. The links tab's empty state
+    // read as a status here, and a status that never changes reads as a
+    // broken feature.
+    server.use(addonsRoute([buildAddon({ id: 'collab', name: 'Collab', enabled: true })]));
+    render(
+      <MAdminAddonManager
+        collabFeatures={{ chat: true, notes: true, links: true, polls: true, whatsnext: true }}
+        onToggleCollabFeature={vi.fn()}
+      />,
+    );
+
+    await screen.findByText('Links');
+    expect(screen.getByText('Shared links and bookmarks')).toBeInTheDocument();
+    expect(screen.queryByText('No shared links yet')).not.toBeInTheDocument();
   });
 
   it('FE-MOB-AADD-013: collab sub-features stay hidden without the handler props', async () => {

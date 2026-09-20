@@ -13,7 +13,7 @@ import { StorageService } from '../storage/storage.service';
 import { FilesService } from '../files/files.service';
 import { AllowedFileTypesService } from '../files/allowed-file-types.service';
 import { RealtimeService } from '../realtime/realtime.service';
-import { MAX_FILE_SIZE } from '../files/files.constants';
+import { MAX_FILE_SIZE, isVideoExtension } from '../files/files.constants';
 import { DocumentProviderRegistry } from './document-provider.registry';
 import { DocSyncConfigService, type ConnectionRow, type LinkRow } from './doc-sync-config.service';
 import type { DocumentProvider, RemoteDocument } from './document-provider';
@@ -357,7 +357,10 @@ export class DocSyncService {
         return 'ok';
       }
       case 'local_deleted': {
-        const binned = ctx.link.delete_policy === 'trash';
+        // A copy already gone upstream cannot be binned, and asking would only
+        // fail the run for a document that no longer exists anywhere.
+        const remoteGone = action.remoteGone === true;
+        const binned = ctx.link.delete_policy === 'trash' && !remoteGone;
         if (binned) {
           const res = await ctx.provider.trash(ctx.ref, ctx.scope, action.remoteId);
           if (docFailed(res)) return res.error.code;
@@ -366,15 +369,18 @@ export class DocSyncService {
         // `local_deleted` row alone, so a policy changed later cannot reach
         // back. Whether TREK binned the copy is written down with it, because a
         // restore in TREK later has to know whether the gap upstream is TREK's.
+        // A copy on record as gone stays on record: the holdings count reads
+        // the mark, and the copy is no more at the store than it was before.
         this.db.connection
           .prepare(
             `UPDATE document_sync_items
-                SET state = 'local_deleted', remote_missing_at = NULL,
+                SET state = 'local_deleted',
+                    remote_missing_at = CASE WHEN ? = 1 THEN remote_missing_at ELSE NULL END,
                     remote_trashed_at = CASE WHEN ? = 1 THEN CURRENT_TIMESTAMP ELSE NULL END,
                     last_seen_at = CURRENT_TIMESTAMP
               WHERE id = ?`,
           )
-          .run(binned ? 1 : 0, action.itemId);
+          .run(remoteGone ? 1 : 0, binned ? 1 : 0, action.itemId);
         return 'ok';
       }
       case 'local_restored': {
@@ -448,14 +454,18 @@ export class DocSyncService {
     remote: RemoteDocument,
     itemId: number | null,
     ctx: { provider: DocumentProvider; ref: ReturnType<DocSyncConfigService['toRef']>; scope: ReturnType<DocSyncConfigService['toScopeRef']>; link: LinkRow },
-  ): Promise<'pulled' | DocsyncErrorCode> {
+  ): Promise<'pulled' | 'ok' | DocsyncErrorCode> {
     const name = sanitizeIncomingName(remote.name);
 
     // The same defences an upload goes through. A provider folder routinely
     // holds .svg and .html, and TREK serves downloads inline with a
     // Content-Type derived from the extension: letting those through would be
     // stored XSS. Rejected documents become a visible row, never a silent skip.
-    if (isBlockedName(name) || !isAllowedByOperator(name, this.allowedTypes.get())) {
+    // Video is admitted the way the upload admits it, whatever the operator's
+    // list says: a clip the file manager takes must not come back as refused
+    // when it arrives through the store instead.
+    const allowed = isVideoExtension(path.extname(name)) || isAllowedByOperator(name, this.allowedTypes.get());
+    if (isBlockedName(name) || !allowed) {
       this.upsertItem(ctx.link, { itemId, remote, state: 'rejected_type', errorCode: 'unsupported_type' });
       return 'unsupported_type';
     }
@@ -499,6 +509,36 @@ export class DocSyncService {
     }
 
     const sha256 = hash.digest('hex');
+
+    // What this row pointed at before, if anything: a pull_update replaces a
+    // document TREK already holds, and `createFile` only ever inserts.
+    const pairing = itemId === null
+      ? undefined
+      : (this.db.connection
+          .prepare('SELECT file_id, remote_name, content_sha256 FROM document_sync_items WHERE id = ?')
+          .get(itemId) as { file_id: number | null; remote_name: string | null; content_sha256: string | null } | undefined);
+    const supersededId = pairing?.file_id ?? null;
+    const superseded = supersededId === null ? undefined : this.files.getFileById(supersededId, ctx.link.trip_id);
+
+    // The bytes TREK already holds, under a version marker that moved on
+    // metadata: Paperless bumps it for a tag or a correspondent as much as for
+    // a new revision, and not every listing carries a hash the planner could
+    // have read this off. Nothing to replace, so the file stays, and with it
+    // the booking it hangs on. The agreed name stays too: a rename that came
+    // with the edit is the planner's business next run, and moving the arbiter
+    // here would read it as TREK's own and send the old name back up.
+    if (superseded && !superseded.deleted_at && pairing?.content_sha256 === sha256) {
+      await fs.promises.rm(tmpPath, { force: true });
+      this.upsertItem(ctx.link, {
+        itemId,
+        remote,
+        state: 'synced',
+        remoteNameOverride: pairing.remote_name ?? undefined,
+        errorCode: null,
+      });
+      return 'ok';
+    }
+
     try {
       await this.storage.put('files', storageKey, { tmpPath });
     } catch {
@@ -506,14 +546,6 @@ export class DocSyncService {
       this.upsertItem(ctx.link, { itemId, remote, state: 'error', errorCode: 'provider_error' });
       return 'provider_error';
     }
-
-    // What this row pointed at before, if anything: a pull_update replaces a
-    // document TREK already holds, and `createFile` only ever inserts.
-    const supersededId = itemId === null
-      ? null
-      : (this.db.connection
-          .prepare('SELECT file_id FROM document_sync_items WHERE id = ?')
-          .get(itemId) as { file_id: number | null } | undefined)?.file_id ?? null;
 
     /**
      * The file row, the retirement of the copy it replaces and the pairing are
@@ -524,7 +556,9 @@ export class DocSyncService {
      *
      * The superseded copy goes to the trash rather than out of existence: the
      * bytes it holds are a version somebody may still want, and TREK's own
-     * delete works the same way.
+     * delete works the same way. What it was attached to goes to the new row:
+     * a new revision is the same document to the trip, and without this every
+     * edit in the store quietly took the attachment off its booking.
      */
     const { created, retired } = this.db.transaction(() => {
       const file = this.files.createFile(
@@ -533,10 +567,24 @@ export class DocSyncService {
         // Attributed to the person whose connection brought it in, which is the
         // only honest answer: nobody in TREK uploaded it.
         this.config.getConnection(ctx.link.connection_id)?.owner_user_id ?? 0,
-        {},
+        {
+          place_id: superseded?.place_id ?? null,
+          reservation_id: superseded?.reservation_id ?? null,
+          description: superseded?.description ?? null,
+        },
       );
       const gone = supersededId !== null && Number(supersededId) !== Number(file.id);
-      if (gone) this.files.softDeleteFile(supersededId as number);
+      const starred = gone && !!superseded?.starred;
+      if (gone) {
+        if (starred) this.db.connection.prepare('UPDATE trip_files SET starred = 1 WHERE id = ?').run(file.id);
+        this.db.connection
+          .prepare(
+            `INSERT OR IGNORE INTO file_links (file_id, reservation_id, assignment_id, place_id, budget_item_id)
+             SELECT ?, reservation_id, assignment_id, place_id, budget_item_id FROM file_links WHERE file_id = ?`,
+          )
+          .run(file.id, supersededId);
+        this.files.softDeleteFile(supersededId as number);
+      }
       this.upsertItem(ctx.link, {
         itemId,
         remote,
@@ -545,7 +593,7 @@ export class DocSyncService {
         contentSha256: sha256,
         errorCode: null,
       });
-      return { created: file, retired: gone ? (supersededId as number) : null };
+      return { created: starred ? { ...file, starred: 1 } : file, retired: gone ? (supersededId as number) : null };
     });
 
     // Announced only once it is committed: a rolled-back transaction that had
@@ -1077,7 +1125,10 @@ export class DocSyncService {
       .prepare(
         `SELECT link_id,
                 SUM(CASE WHEN file_id IS NOT NULL AND remote_id IS NOT NULL AND state = 'synced' THEN 1 ELSE 0 END) AS paired,
+                -- A deletion closed over a copy already gone keeps its missing mark,
+                -- and that copy is at the store no more than a binned one is.
                 SUM(CASE WHEN remote_id IS NOT NULL AND state != 'remote_missing' AND remote_trashed_at IS NULL
+                          AND (state != 'local_deleted' OR remote_missing_at IS NULL)
                          THEN 1 ELSE 0 END) AS atProvider,
                 SUM(CASE WHEN state = 'remote_missing' THEN 1 ELSE 0 END) AS missing
            FROM document_sync_items

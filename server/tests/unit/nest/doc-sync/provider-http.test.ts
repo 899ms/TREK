@@ -30,6 +30,7 @@ import {
   classifyTransportFailure,
   declaredLength,
   guardDownload,
+  isUnresolvedHost,
   providerFetch,
   statusErrorCode,
   type TransportFailure,
@@ -172,6 +173,18 @@ describe('classifyTransportFailure', () => {
       Object.assign(new Error('Connect Timeout Error'), { name: 'ConnectTimeoutError', code: 'UND_ERR_CONNECT_TIMEOUT' }),
     );
     expect(classifyTransportFailure(error).code).toBe('unreachable');
+  });
+
+  it('PROVIDER-HTTP-008: a name DNS cannot resolve is unreachable, not a policy verdict', () => {
+    // The guard refuses it the same way it refuses loopback, but a typo in the
+    // host name is not something the SSRF settings can fix.
+    const error = new SsrfBlockedErrorMock('Could not resolve hostname (ENOTFOUND)');
+    expect(classifyTransportFailure(error)).toEqual({
+      code: 'unreachable',
+      detail: 'Could not resolve hostname (ENOTFOUND)',
+    });
+    expect(isUnresolvedHost('Could not resolve hostname (EAI_AGAIN)')).toBe(true);
+    expect(isUnresolvedHost('Requests to loopback are not allowed')).toBe(false);
   });
 });
 

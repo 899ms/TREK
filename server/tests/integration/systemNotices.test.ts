@@ -235,9 +235,12 @@ describe('GET /api/system-notices/active', () => {
     const { user } = createUser(testDb);
     testDb.prepare('UPDATE users SET login_count = 5, first_seen_version = ? WHERE id = ?').run('3.0.0', user.id);
 
+    // The client announces the release layout with `?supports=release`; a bundle that
+    // predates it never gets the notice (pinned separately below).
     const shows = async () => {
       const res = await request(app)
         .get('/api/system-notices/active')
+        .query({ supports: 'release' })
         .set('Cookie', authCookie(user.id));
       expect(res.status).toBe(200);
       return res.body.some((n: { id: string }) => n.id === 'release-notes');
@@ -266,6 +269,29 @@ describe('GET /api/system-notices/active', () => {
     // ...and closing it again holds until the one after that.
     await dismiss();
     expect(await shows()).toBe(false);
+  });
+
+  // Right after an update the browser still runs the bundle the service worker cached,
+  // which has neither the copy for the new release notice nor a way to tell. It would
+  // draw the keys and, on close, spend the notice for this whole version. So the notice
+  // waits for a client that announces the release layout; the reload brings one.
+  it('keeps the release notes from a client that does not announce the release layout', async () => {
+    const { user } = createUser(testDb);
+    testDb.prepare('UPDATE users SET login_count = 5, first_seen_version = ? WHERE id = ?').run('3.0.0', user.id);
+
+    const fetchActive = (query: Record<string, string>) => request(app)
+      .get('/api/system-notices/active')
+      .query(query)
+      .set('Cookie', authCookie(user.id));
+
+    const without = await fetchActive({});
+    expect(without.status).toBe(200);
+    expect(without.body.some((n: { id: string }) => n.id === 'release-notes')).toBe(false);
+    expect(without.body.some((n: { release?: unknown }) => n.release !== undefined)).toBe(false);
+
+    const withLayout = await fetchActive({ supports: 'release' });
+    expect(withLayout.status).toBe(200);
+    expect(withLayout.body.some((n: { id: string }) => n.id === 'release-notes')).toBe(true);
   });
 });
 

@@ -269,6 +269,18 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
     expect(row.secrets).toMatch(/^enc:v1:/);
   });
 
+  it('does not let a blank form carry the stored secret to another address', async () => {
+    // The stored token only ever goes to the server it was stored against;
+    // anywhere else, the credential has to be typed in for that address.
+    await request(server)
+      .put(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ providerId: 'paperless', baseUrl: 'https://paperless.example.net', credentials: { api_token: '' } })
+      .expect(400);
+    const row = db.prepare('SELECT base_url FROM document_connections WHERE trip_id = ?').get(tripId) as { base_url: string };
+    expect(row.base_url).toBe('https://paperless.example.com');
+  });
+
   it('creates a folder or tag through the connection the path names', async () => {
     const conns = await request(server)
       .get(`/api/trips/${tripId}/docsync/connections`)
@@ -432,6 +444,31 @@ describe('Document sync e2e (real guards + real services + temp SQLite)', () => 
       .expect(200);
     expect(res.body.documentsKept).toBe(true);
     expect(db.prepare('SELECT COUNT(*) AS n FROM trip_document_links WHERE id = ?').get(linkId)).toEqual({ n: 0 });
+  });
+
+  it('disconnects the store through the real contract, bindings included', async () => {
+    const conns = await request(server)
+      .get(`/api/trips/${tripId}/docsync/connections`)
+      .set('Cookie', sessionCookie(ownerId));
+    const connectionId = conns.body[0].id;
+    await request(server)
+      .post(`/api/trips/${tripId}/docsync/links`)
+      .set('Cookie', sessionCookie(ownerId))
+      .send({ connectionId, scopeKey: 'tag:2', remoteLabel: 'Norway', direction: 'both', deletePolicy: 'unlink', conflictPolicy: 'manual', syncEnabled: true })
+      .expect(200);
+
+    await request(server)
+      .delete(`/api/trips/${tripId}/docsync/connections/${connectionId}`)
+      .set('Cookie', sessionCookie(memberId))
+      .expect(403);
+    const res = await request(server)
+      .delete(`/api/trips/${tripId}/docsync/connections/${connectionId}`)
+      .set('Cookie', sessionCookie(ownerId))
+      .expect(200);
+
+    expect(res.body).toEqual({ success: true });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM document_connections WHERE trip_id = ?').get(tripId)).toEqual({ n: 0 });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM trip_document_links WHERE trip_id = ?').get(tripId)).toEqual({ n: 0 });
   });
 
   it('accepts an unknown webhook token without revealing that it is unknown', async () => {

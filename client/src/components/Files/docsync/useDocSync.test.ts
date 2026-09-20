@@ -1,4 +1,4 @@
-// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-026
+// FE-DOCSYNC-HOOK-001 to FE-DOCSYNC-HOOK-030
 
 /**
  * The document-sync hook.
@@ -21,6 +21,8 @@ const saveConnectionApi = vi.fn(async (_tripId: number | string, _data: unknown)
 const testConnectionApi = vi.fn(async (_tripId: number | string, _data: unknown): Promise<unknown> => ({ connected: true }))
 const updateLinkApi = vi.fn(async (_tripId: number | string, _linkId: number, _patch: unknown): Promise<unknown> => ({}))
 const syncNowApi = vi.fn(async (_tripId: number | string, _linkId: number, _full: boolean): Promise<unknown> => ({}))
+const listScopesApi = vi.fn(async (_tripId: number | string, _connectionId: number, _q?: string): Promise<unknown> => ({ scopes: [] }))
+const resolveApi = vi.fn(async (_tripId: number | string, _itemId: number, _keep: string): Promise<unknown> => ({ success: true }))
 
 vi.mock('../../../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/client')>()
@@ -36,11 +38,13 @@ vi.mock('../../../api/client', async (importOriginal) => {
       testConnection: (tripId: number | string, data: unknown) => testConnectionApi(tripId, data),
       updateLink: (tripId: number | string, linkId: number, patch: unknown) => updateLinkApi(tripId, linkId, patch),
       syncNow: (tripId: number | string, linkId: number, full: boolean) => syncNowApi(tripId, linkId, full),
+      listScopes: (tripId: number | string, connectionId: number, q?: string) => listScopesApi(tripId, connectionId, q),
+      resolve: (tripId: number | string, itemId: number, keep: string) => resolveApi(tripId, itemId, keep),
     },
   }
 })
 
-import { useDocSync, canManageDocSync, storeName, type DocSyncLink, type DocSyncProvider } from './useDocSync'
+import { useDocSync, canManageDocSync, needsReauth, storeName, type DocSyncLink, type DocSyncProvider } from './useDocSync'
 
 const TRIP = 3
 
@@ -120,6 +124,8 @@ beforeEach(() => {
   testConnectionApi.mockResolvedValue({ connected: true })
   updateLinkApi.mockResolvedValue({})
   syncNowApi.mockResolvedValue({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 })
+  listScopesApi.mockResolvedValue({ scopes: [] })
+  resolveApi.mockResolvedValue({ success: true })
 })
 
 describe('useDocSync initial load', () => {
@@ -407,6 +413,71 @@ describe('useDocSync run and save feedback', () => {
     expect(result.current.busy).toBeNull()
     // nothing was refetched, because nothing changed server-side
     expect(listLinksApi).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useDocSync loadScopes', () => {
+  it('FE-DOCSYNC-HOOK-027: a request that fell over still produces a listing the picker can render', async () => {
+    // The picker awaits this inside an effect with nothing to catch, so a
+    // rejection never reached `setScopes` and the spinner ran forever. A store
+    // behind a VPN that is down answers this way every time.
+    listScopesApi.mockRejectedValueOnce({ code: 'ECONNABORTED', message: 'timeout of 60000ms exceeded' })
+    const { result } = await mountLoaded()
+
+    let listing: unknown
+    await act(async () => { listing = await result.current.loadScopes(9) })
+
+    expect(listing).toEqual({ scopes: [], error: 'unknown' })
+  })
+
+  it('FE-DOCSYNC-HOOK-028: a refusal with a code keeps the code, a sentence does not become a key', async () => {
+    const { result } = await mountLoaded()
+    let listing: { scopes: unknown[]; error?: string } | undefined
+
+    listScopesApi.mockRejectedValueOnce({ response: { status: 400, data: { error: 'unknown_provider' } } })
+    await act(async () => { listing = await result.current.loadScopes(9, 'tri') })
+    expect(listing?.error).toBe('unknown_provider')
+    expect(listScopesApi).toHaveBeenCalledWith(TRIP, 9, 'tri')
+
+    // The picker renders this as docsync.error.<value>, so prose must not
+    // arrive there as a translation key.
+    listScopesApi.mockRejectedValueOnce({ response: { status: 404, data: { message: 'Connection not found' } } })
+    await act(async () => { listing = await result.current.loadScopes(9) })
+    expect(listing?.error).toBe('unknown')
+  })
+})
+
+describe('useDocSync resolveConflict', () => {
+  it('FE-DOCSYNC-HOOK-029: a refused choice says why instead of vanishing into a void call', async () => {
+    // Both shells call this as `void conflicts.resolve(...)`. A member's choice
+    // answers 403 and a row settled elsewhere answers 400; either way the
+    // button came back and nothing said what happened.
+    resolveApi.mockRejectedValueOnce({ response: { status: 403, data: { error: 'forbidden' } } })
+    const { result } = await mountLoaded()
+
+    let outcome: boolean | undefined
+    await act(async () => { outcome = await result.current.resolveConflict(4, 'trek') })
+
+    expect(outcome).toBe(false)
+    expect(result.current.error).toBe('forbidden')
+    // reloaded, so the counts are the server's, and the message survived it
+    expect(listLinksApi).toHaveBeenCalledTimes(2)
+
+    await act(async () => { outcome = await result.current.resolveConflict(4, 'provider') })
+
+    expect(outcome).toBe(true)
+    expect(result.current.error).toBeNull()
+    expect(resolveApi).toHaveBeenLastCalledWith(TRIP, 4, 'provider')
+  })
+})
+
+describe('needsReauth', () => {
+  it('FE-DOCSYNC-HOOK-030: reads a refused credential off either the state or the error code', () => {
+    expect(needsReauth({ lastSyncState: 'needs_reauth', lastSyncError: null })).toBe(true)
+    expect(needsReauth({ lastSyncState: 'failed', lastSyncError: 'unauthorized' })).toBe(true)
+    expect(needsReauth({ lastSyncState: 'partial', lastSyncError: 'unauthorized' })).toBe(true)
+    expect(needsReauth({ lastSyncState: 'failed', lastSyncError: 'unreachable' })).toBe(false)
+    expect(needsReauth({ lastSyncState: 'ok', lastSyncError: null })).toBe(false)
   })
 })
 

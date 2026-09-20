@@ -163,13 +163,17 @@ const files = {
     tripId: string | number,
     file: { filename: string; originalname: string; size: number; mimetype: string },
     uploadedBy: number,
+    opts: { place_id?: string | number | null; reservation_id?: string | number | null; description?: string | null } = {},
   ) => {
     const info = testDb
       .prepare(
-        `INSERT INTO trip_files (trip_id, filename, original_name, file_size, mime_type, uploaded_by)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO trip_files (trip_id, place_id, reservation_id, filename, original_name, file_size, mime_type, description, uploaded_by)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
-      .run(tripId, file.filename, file.originalname, file.size, file.mimetype, uploadedBy || null);
+      .run(
+        tripId, opts.place_id || null, opts.reservation_id || null,
+        file.filename, file.originalname, file.size, file.mimetype, opts.description || null, uploadedBy || null,
+      );
     return testDb.prepare('SELECT * FROM trip_files WHERE id = ?').get(info.lastInsertRowid);
   }),
   // Writes for real, like the two above: a double that answers but changes
@@ -1388,6 +1392,120 @@ describe('DocSyncService', () => {
 
       expect(fileRows().filter(r => r.deleted_at === null)).toHaveLength(1);
     });
+
+    /**
+     * The booking a document hangs on has to survive a new revision.
+     *
+     * The fresh row was created bare, and the old one went to the trash with
+     * the reservation, the description, the star and the extra links still on
+     * it: an edit in the store took the attachment off its booking, and the
+     * reservation showed no document until somebody dug the old copy out.
+     */
+    it('carries the attachments of the superseded copy over to the new revision', async () => {
+      const link = makeLink();
+      const { itemId, fileId } = seedSynced(link);
+      const reservationId = Number(
+        testDb.prepare("INSERT INTO reservations (trip_id, title) VALUES (?, 'Hotel Kyoto')").run(tripId).lastInsertRowid,
+      );
+      const otherReservationId = Number(
+        testDb.prepare("INSERT INTO reservations (trip_id, title) VALUES (?, 'Ryokan Hakone')").run(tripId).lastInsertRowid,
+      );
+      testDb.prepare('UPDATE trip_files SET reservation_id = ?, description = ?, starred = 1 WHERE id = ?')
+        .run(reservationId, 'Booking confirmation', fileId);
+      testDb.prepare('INSERT INTO file_links (file_id, reservation_id) VALUES (?, ?)').run(fileId, otherReservationId);
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2' }),
+      ])));
+
+      await service.syncLink(link);
+
+      const fresh = fileRows().find(r => Number(r.id) !== fileId) as Record<string, unknown>;
+      expect(fresh).toMatchObject({ reservation_id: reservationId, description: 'Booking confirmation', starred: 1, deleted_at: null });
+      expect(itemRow(itemId).file_id).toBe(Number(fresh.id));
+      const links = testDb.prepare('SELECT reservation_id FROM file_links WHERE file_id = ? ORDER BY id').all(fresh.id) as Array<{ reservation_id: number }>;
+      expect(links.map(l => l.reservation_id)).toEqual([otherReservationId]);
+      // The old copy keeps what it had: the trash shows it as it was.
+      expect(fileRows().find(r => Number(r.id) === fileId)).toMatchObject({ reservation_id: reservationId, starred: 1 });
+      expect(realtime.broadcast).toHaveBeenCalledWith(tripId, 'file:created', { file: expect.objectContaining({ id: fresh.id, starred: 1 }) });
+    });
+
+    /**
+     * A version marker that moved over the same bytes.
+     *
+     * Paperless bumps `modified` for a tag or a correspondent, and its listing
+     * only carries a hash the planner can read where the checksum is sha256.
+     * Without one the bytes were fetched again and a fresh row replaced the
+     * file, booking link and all, on every edit of metadata. The download
+     * cannot be avoided without a hash, but what it brings back can be
+     * compared before anything is written.
+     */
+    it('keeps the file when the download turns out to be the bytes TREK already holds', async () => {
+      const link = makeLink();
+      const fileId = makeFile({ name: 'invoice.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'invoice.pdf', remoteVersion: 'v1', fileId, state: 'synced', contentSha256: FILE_SHA,
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'invoice.pdf', remoteVersion: 'v2', contentHash: null }),
+      ])));
+
+      const res = await service.syncLink(link);
+
+      expect(fileRows()).toHaveLength(1);
+      expect(fileRows()[0]).toMatchObject({ id: fileId, deleted_at: null });
+      expect(itemRow(itemId)).toMatchObject({ file_id: fileId, remote_version: 'v2', state: 'synced', content_sha256: FILE_SHA });
+      expect(storage.put).not.toHaveBeenCalled();
+      expect(fs.readdirSync(spoolDir)).toHaveLength(0);
+      expect(res.pulled).toBe(0);
+      expect(realtime.broadcast).not.toHaveBeenCalledWith(tripId, 'file:created', expect.anything());
+    });
+
+    it('leaves a rename that came with such an edit for the planner to follow', async () => {
+      // Moving the agreed name here would read the store's rename as TREK's
+      // own on the next run and send the old name back up.
+      const link = makeLink();
+      const fileId = makeFile({ name: 'invoice.pdf' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'invoice.pdf', remoteVersion: 'v1', fileId, state: 'synced', contentSha256: FILE_SHA,
+      });
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'hotel-invoice.pdf', remoteVersion: 'v2', contentHash: null }),
+      ])));
+
+      await service.syncLink(link);
+
+      expect(itemRow(itemId)).toMatchObject({ remote_name: 'invoice.pdf', remote_version: 'v2' });
+      expect(fileRows()[0].original_name).toBe('invoice.pdf');
+
+      provider.list.mockResolvedValueOnce(ok(listing([
+        remoteDoc({ remoteId: 'r1', name: 'hotel-invoice.pdf', remoteVersion: 'v2', contentHash: null }),
+      ])));
+      await service.syncLink(link);
+
+      expect(provider.rename).not.toHaveBeenCalled();
+      expect(fileRows()[0].original_name).toBe('hotel-invoice.pdf');
+      expect(itemRow(itemId).remote_name).toBe('hotel-invoice.pdf');
+    });
+  });
+
+  /**
+   * Video comes in the way the file manager takes it: regardless of the
+   * operator's allowed types, which do not list a video extension by default.
+   * A clip in a bound Nextcloud folder was refused as *Type not allowed* while
+   * the same clip uploaded by hand went through.
+   */
+  describe('video from the store', () => {
+    it('is pulled, not refused for its type', async () => {
+      const link = makeLink();
+      provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r-clip', name: 'flug.mp4', mimeType: 'video/mp4' })])));
+
+      const res = await service.syncLink(link);
+
+      expect(provider.fetch).toHaveBeenCalledTimes(1);
+      expect(fileRows().map(r => r.original_name)).toEqual(['flug.mp4']);
+      expect(itemRows()[0].state).toBe('synced');
+      expect(res.state).toBe('ok');
+    });
   });
 
   /**
@@ -1674,6 +1792,10 @@ describe('DocSyncService', () => {
       const { itemId, fileId } = await deletedAndSeen(link);
 
       restore(fileId);
+      // An edit is new bytes, not only a new version marker: the same bytes under
+      // a moved marker are kept as they are.
+      const edited = Buffer.from('trek-document-bytes, revised upstream');
+      provider.fetch.mockResolvedValueOnce(ok({ body: Readable.from([edited]), size: edited.length, mimeType: 'application/pdf', remoteVersion: 'v2' }));
       provider.list.mockResolvedValueOnce(ok(listing([remoteDoc({ remoteId: 'r1', remoteVersion: 'v2' })])));
       const run = await service.syncLink(config.getLink(link.id));
 
@@ -1921,6 +2043,37 @@ describe('DocSyncService', () => {
       expect(fileRows()).toHaveLength(0);
       expect(provider.trash).toHaveBeenCalledTimes(1);
       expect(itemRow(itemId).state).toBe('local_deleted');
+    });
+
+    /**
+     * A copy on record as gone from the store, whose TREK copy is then purged.
+     *
+     * The row had no way out: nothing planned anything for a `remote_missing`
+     * row without a listing entry, so it kept counting under "Needs a look"
+     * with a sentence about a TREK copy that no longer existed. With both
+     * copies gone the row closes, and the store is not asked to bin a copy
+     * that is not there, whatever the delete policy says.
+     */
+    it('closes a row on record as gone from the store once the TREK copy is purged too', async () => {
+      const link = makeLink({ deletePolicy: 'trash' });
+      const fileId = makeFile({ name: 'boarding.pdf', deletedAt: '2026-09-18 08:00:00' });
+      const itemId = seedItem(link, {
+        remoteId: 'r1', remoteName: 'boarding.pdf', remoteVersion: 'v1', fileId, state: 'remote_missing',
+        remoteMissingAt: '2026-09-17 08:00:00',
+      });
+      purge(fileId);
+      provider.list.mockResolvedValue(ok(listing([])));
+
+      const res = await service.syncLink(link);
+
+      expect(provider.trash).not.toHaveBeenCalled();
+      expect(itemRow(itemId)).toMatchObject({ state: 'local_deleted', remote_trashed_at: null, file_id: null });
+      expect(itemRow(itemId).remote_missing_at).not.toBeNull();
+      expect(service.issues(tripId).map((r) => r.id)).not.toContain(itemId);
+      // Closed is not "back at the store": the holdings must not count it there.
+      const [status] = (service.status(tripId) as { links: Array<{ holdings: { atProvider: number; missing: number } }> }).links;
+      expect(status.holdings).toMatchObject({ atProvider: 0, missing: 0 });
+      expect(res.state).toBe('ok');
     });
   });
 

@@ -71,7 +71,7 @@ Every connection form ends with **Accept a self-signed certificate**, off by def
 - **Custom field:** a document TREK uploads carries the trip's tag and a custom field named `trek_trip_id`, holding `trek-trip-` plus the trip's id. TREK creates the field on the first upload. It is a breadcrumb for whoever tidies the archive later; TREK does not filter on it. Removing the tag from a document takes it out of the trip, whatever the field says.
 - **Names:** Paperless-ngx keeps a title rather than a file name, so a document arrives in TREK as its title plus the extension of the original file. TREK downloads the original file, not the archived PDF Paperless-ngx makes from it.
 - **File types:** Paperless-ngx takes PDF, JPEG, PNG, TIFF, GIF, BMP, WebP, HEIC and HEIF images, plain text, CSV and email (`.eml`) files. Word, Excel, PowerPoint, OpenDocument and RTF files only go through on an instance that runs Tika and Gotenberg; without them Paperless-ngx refuses them and TREK lists them as *Type not allowed*.
-- **Instant updates:** when the token's user may add workflows, TREK creates a workflow named `TREK document sync (link n)` that calls TREK whenever a document with the trip's tag is added or updated. **Disconnect** deletes it again. See [When TREK checks](#when-trek-checks).
+- **Instant updates:** when the token's user may add workflows, TREK creates a workflow named `TREK document sync (link n)` that calls TREK whenever a document with the trip's tag is added or updated. **Disconnect** deletes it again. Without that permission the binding runs on the timer, unless a user who may add workflows pastes the binding's **Instant updates** address into a workflow by hand. See [When TREK checks](#when-trek-checks).
 - **Recycle bin:** a document TREK removes goes to the Paperless-ngx trash.
 - **Version:** Paperless-ngx 3 or newer.
 
@@ -89,7 +89,7 @@ Every connection form ends with **Accept a self-signed certificate**, off by def
 - **Key permissions:** a key limited in Papra must still be allowed to work with the organisation's documents and tags. Papra answers a missing permission exactly like a wrong key, so TREK can only report *The credentials were refused.*
 - **Duplicates:** Papra keeps one document for identical bytes, so of two identical files in TREK only the first reaches Papra; the second is listed under **Needs a look**.
 - **Upload limit:** Papra's own upload limit is an instance setting TREK cannot read. A file over it is listed as *Too large*.
-- **Instant updates:** none. Papra does not let an API key manage webhooks, so the binding runs on the timer.
+- **Instant updates:** by hand. Papra does not let an API key manage webhooks, so TREK cannot subscribe itself; paste the binding's **Instant updates** address into a webhook in Papra, and the binding runs on the timer until then. See [When TREK checks](#when-trek-checks).
 - **Recycle bin:** a document TREK removes goes to Papra's trash.
 
 ### Nextcloud
@@ -105,7 +105,7 @@ Every connection form ends with **Accept a self-signed certificate**, off by def
 
 - **Scope:** a folder directly under the base folder. **Make a new one** creates it there, and creates the base folder too if it does not exist yet. A folder of that name that already exists is refused; pick it from the list instead.
 - **Only the top level** of the folder is synced. Sub-folders inside it are left alone, so moving a file into one takes it out of the trip.
-- **Instant updates:** when the account may manage webhooks (an administrator account on an instance with the `webhook_listeners` app), TREK subscribes itself to files being created, written, deleted and renamed. Otherwise the binding runs on the timer.
+- **Instant updates:** when the account may manage webhooks (an administrator account on an instance with the `webhook_listeners` app), TREK subscribes itself to files being created, written, deleted and renamed. Otherwise the binding runs on the timer, unless a Nextcloud administrator registers the binding's **Instant updates** address as a listener by hand.
 - **Recycle bin:** a document TREK removes goes to Nextcloud's *Deleted files*. **On an instance without the Deleted files app, it is deleted for good.**
 
 ### OpenCloud
@@ -165,7 +165,7 @@ Once bound, the dialog lists the trip's stores under **This trip** and shows the
 
 On the phone the card opens as a sheet. The first three settings are buttons there that step through their options with each tap; the **Instant updates** address is only shown on the desktop.
 
-**Disconnect** ends the binding and keeps every document where it is, on both sides: *Documents stay in TREK and at the store. Only the pairing between them goes.* The phone asks before it disconnects; the desktop does not. A workflow or webhook subscription TREK created for the binding is removed with it.
+**Disconnect** ends the binding and keeps every document where it is, on both sides: *Documents stay in TREK and at the store. Only the pairing between them goes.* Both the desktop and the phone ask before they disconnect. A workflow or webhook subscription TREK created for the binding is removed with it.
 
 ## How changes travel
 
@@ -180,7 +180,7 @@ TREK itself has no way to rename a document or replace its content, so what trav
 
 A document whose content changed in the store is downloaded again as a new document, and the copy it replaces goes to TREK's trash. Links the old copy had to bookings, places or expenses stay with the old copy.
 
-**Renames in the store come through.** On Nextcloud, OpenCloud and Synology the TREK copy takes the new name. On Paperless-ngx and Papra a document that came from the store arrives again as a fresh copy after a rename, and on Paperless-ngx after any edit of the document, and the old copy goes to TREK's trash without its links. A document TREK itself uploaded to Paperless-ngx or Papra is renamed in place.
+**Renames in the store come through.** The TREK copy takes the new name, on every store. On Paperless-ngx and Papra the listing carries a checksum of the file, so an edit that leaves the file alone, such as a rename, a new tag or a new correspondent, is not a new document either: the copy is downloaded again only when its content changed.
 
 ### Deletions
 
@@ -253,13 +253,14 @@ Where a store can tell TREK that something changed, it calls the binding's own a
 
 | Store | Instant updates |
 |---|---|
-| Paperless-ngx | TREK creates the workflow itself when the token's user may add workflows. |
-| Nextcloud | TREK subscribes itself when the account may manage webhooks (an administrator account with the `webhook_listeners` app). Nextcloud sends these from its background jobs, so they arrive as promptly as its cron runs, and a TREK on a private address is only called when Nextcloud's `allow_local_remote_servers` is on. |
-| Papra, OpenCloud, Synology | Timer only. |
+| Paperless-ngx | TREK creates the workflow itself when the token's user may add workflows. Otherwise a Paperless-ngx user who may add workflows can paste the **Instant updates** address into a workflow's webhook action by hand. |
+| Nextcloud | TREK subscribes itself when the account may manage webhooks (an administrator account with the `webhook_listeners` app). Where it may not, a Nextcloud administrator can register the **Instant updates** address as a listener by hand. Nextcloud sends these from its background jobs, so they arrive as promptly as its cron runs, and a TREK on a private address is only called when Nextcloud's `allow_local_remote_servers` is on. |
+| Papra | Paste the **Instant updates** address into a webhook in Papra by hand. Papra's webhook API is closed to API keys, so TREK cannot subscribe itself. |
+| OpenCloud, Synology | Timer only. Neither can call TREK. |
 
 - **The address TREK registers** is built from the address the person binding the trip used to open TREK at that moment, including what the reverse proxy passes in `X-Forwarded-Host` and `X-Forwarded-Proto`. Bind the trip through the address the store can reach TREK under. Behind a proxy that passes no host, no address is registered and the timer carries the binding.
 - **Paperless-ngx refuses a callback address longer than 256 characters.** The binding then runs on the timer.
-- **TREK only acts on a call that carries the binding's secret**, which TREK hands over itself when it subscribes. The **Instant updates** address under **Settings** is shown for every binding, but the secret is not shown anywhere, so pasting that address into a store by hand does not speed anything up. Those bindings run on the timer.
+- **The address is the key.** A call to the **Instant updates** address under **Settings** starts a run on its own, so an address pasted into a store by hand works for Papra, for a Nextcloud where TREK could not subscribe itself and for a Paperless-ngx whose token may not add workflows. Where TREK registered the subscription itself, it also hands over a secret and only acts on a call that carries it; the secret is not shown anywhere, so pasting that binding's address somewhere else by hand adds nothing. For OpenCloud and Synology there is nowhere to paste it, and once **Test connection** on the saved connection has reported that, their bindings show no address at all.
 
 ### Tuning
 
@@ -307,7 +308,7 @@ See [MCP-Addon-Tools](MCP-Addon-Tools) and [MCP-Scopes](MCP-Scopes).
 | **In sync** | The last run finished with nothing left over. |
 | **Partly synced** | The last run left something undone: more than 25 documents to move, documents listed under **Needs a look**, or the mass-delete guard. The notice line names which. |
 | **Failed** | The store could not be used. The notice line names the reason; TREK retries with the backoff described above. |
-| **Sign in again** | The store refused the stored credential while TREK was listing documents. More often a refused credential shows as **Failed** with *The credentials were refused.* The usual causes: a revoked Paperless-ngx token or Papra key, a deleted app password or app token, a changed DSM password, or TREK removed from the account's trusted devices in DSM. If the credential still exists in the store, **Sync now** tries again. The connection form only opens for a store the trip has not been connected to yet, so a replaced credential cannot be entered from the trip at the moment. |
+| **Sign in again** | The store refused the stored credential while TREK was listing documents. More often a refused credential shows as **Failed** with *The credentials were refused.* The usual causes: a revoked Paperless-ngx token or Papra key, a deleted app password or app token, a changed DSM password, or TREK removed from the account's trusted devices in DSM. If the credential still exists in the store, **Sync now** tries again. A replaced credential goes in through **Reconnect**, which the trip owner finds next to the notice on the binding in both states: it opens the store's connection form again, and the binding runs as soon as the new credential is saved. **Add another** in the sidebar still lists only the stores the trip is not connected to. |
 | **Folder is gone** | The bound tag, folder or space no longer exists. TREK does not recreate it. **Disconnect**, then pick the store again under **Add another** and bind a new, empty one; TREK's documents go up into it. |
 | **Owner left the trip** | The person whose account the store was connected with is no longer on the trip. The binding stopped and **Sync now** is refused, also for a paused binding. Documents stay where they are on both sides. Once that person is back on the trip, switching **Sync automatically** on lets it run again; until then the switch stays off. |
 

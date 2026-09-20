@@ -264,5 +264,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Bez oplat',
   'roadtrip.alt.noFerry': 'Bez promu',
   'roadtrip.summary.partial': 'Reszta trasy jest jeszcze obliczana',
+  'roadtrip.stay.releaseTitle': 'Usunąć nocleg?',
+  'roadtrip.stay.releaseBody': 'Nocleg w „{name}” zostanie usunięty. Przystanek pozostaje na trasie jako postój.',
+  'roadtrip.stay.releaseBookedBody': 'Nocleg w „{name}” zostanie usunięty razem z rezerwacją „{booking}” i powiązanymi wydatkami. Przystanek pozostaje na trasie jako postój.',
+  'roadtrip.stay.releaseAction': 'Zamień na postój',
 };
 export default roadtrip;

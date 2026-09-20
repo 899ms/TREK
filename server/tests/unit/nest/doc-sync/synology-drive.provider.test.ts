@@ -232,11 +232,11 @@ function push(overrides: Partial<PushRequest> = {}): PushRequest {
   };
 }
 
-/** The four answers a successful push needs after the upload itself. */
+/** The answers a successful push needs: nothing at the path before the upload, the stored file after it. */
 function pushRoutes(path: string, size = BYTES.length, md5 = BYTES_MD5): Record<string, Handler | Reply> {
   return {
     'SYNO.FileStation.Upload:upload': ok({ file: path.slice(path.lastIndexOf('/') + 1) }),
-    'SYNO.FileStation.List:getinfo': ok({ files: [entry(path, { size })] }),
+    'SYNO.FileStation.List:getinfo': sequence(fail(408), ok({ files: [entry(path, { size })] })),
     'SYNO.FileStation.MD5:start': ok({ taskid: 'T-md5' }),
     'SYNO.FileStation.MD5:status': ok({ finished: true, md5 }),
   };
@@ -1063,13 +1063,37 @@ describe('SynologyDriveDocumentProvider: push', () => {
   });
 
   it('SYNO-PROVIDER-061: a name collision without a remoteId is a conflict, never an overwrite', async () => {
-    route({ 'SYNO.FileStation.Upload:upload': fail(1805) });
+    // A namesake that appears between the check and the upload is not
+    // overwritten: the upload never goes out with overwrite on for a new file,
+    // and a refusal from the NAS at that point is a conflict.
+    route({
+      'SYNO.FileStation.List:getinfo': fail(408),
+      'SYNO.FileStation.Upload:upload': fail(1805),
+    });
     const result = await provider.push(connection(), scope(), push());
     expect(result).toMatchObject({ success: false, error: { code: 'conflict', detail: 'syno_code=1805' } });
+    expect(callsTo('SYNO.FileStation.Upload')[0].params.overwrite).toBe('false');
+  });
+
+  it('SYNO-PROVIDER-061a: a name already taken is a conflict before a single byte is uploaded', async () => {
+    // A success from the upload says nothing about a file that was already
+    // there, and the size and digest checks would read it as a broken transfer
+    // and upload the whole file again on every retry. So the path is asked first.
+    route({ 'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/itinerary.pdf`, { size: 200 })] }) });
+    const result = await provider.push(connection(), scope(), push());
+
+    expect(result).toMatchObject({ success: false, error: { code: 'conflict' } });
+    expect(result.success === false && result.error.detail).toContain(`${SCOPE}/itinerary.pdf`);
+    expect(callsTo('SYNO.FileStation.Upload')).toHaveLength(0);
+    expect(callsTo('SYNO.FileStation.MD5')).toHaveLength(0);
   });
 
   it('SYNO-PROVIDER-062: a remoteId means replace in place, and the request name is ignored', async () => {
-    route(pushRoutes(`${SCOPE}/leg-2/hotel.pdf`));
+    // The path is expected to be taken: it is the file being replaced.
+    route({
+      ...pushRoutes(`${SCOPE}/leg-2/hotel.pdf`),
+      'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/leg-2/hotel.pdf`, { size: BYTES.length })] }),
+    });
     const result = await provider.push(
       connection(),
       scope(),
@@ -1131,7 +1155,10 @@ describe('SynologyDriveDocumentProvider: push', () => {
     // version has to come from that, or the next listing looks like a change.
     route({
       'SYNO.FileStation.Upload:upload': ok({}),
-      'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/itinerary.pdf`, { size: BYTES.length, mtime: 1_700_000_042 })] }),
+      'SYNO.FileStation.List:getinfo': sequence(
+        fail(408),
+        ok({ files: [entry(`${SCOPE}/itinerary.pdf`, { size: BYTES.length, mtime: 1_700_000_042 })] }),
+      ),
       'SYNO.FileStation.MD5:start': ok({ taskid: 'T' }),
       'SYNO.FileStation.MD5:status': ok({ finished: true, md5: BYTES_MD5 }),
     });
@@ -1179,6 +1206,7 @@ describe('SynologyDriveDocumentProvider: rename and trash', () => {
       'SYNO.FileStation.CreateFolder:create': ok({ folders: [entry(`${SCOPE}/.trek-trash`, { dir: true })] }),
       'SYNO.FileStation.CopyMove:start': ok({ taskid: 'T-move' }),
       'SYNO.FileStation.CopyMove:status': sequence(ok({ finished: false }), ok({ finished: true })),
+      'SYNO.FileStation.List:getinfo': fail(408),
     });
     const result = await provider.trash(connection(), scope(), `${SCOPE}/a.pdf`);
 
@@ -1193,6 +1221,11 @@ describe('SynologyDriveDocumentProvider: rename and trash', () => {
     // A CopyMove is asynchronous: returning on the start call would let the
     // caller list the folder and find the file in both places, or in neither.
     expect(callsTo('SYNO.FileStation.CopyMove', 'status')).toHaveLength(2);
+    // And a finished task is not the same as a moved file: the source is asked.
+    const asked = callsTo('SYNO.FileStation.List', 'getinfo');
+    expect(asked).toHaveLength(1);
+    expect(JSON.parse(asked[0].params.path)).toEqual([`${SCOPE}/a.pdf`]);
+    expect(calls.indexOf(asked[0])).toBeGreaterThan(calls.indexOf(callsTo('SYNO.FileStation.CopyMove', 'status')[1]));
   });
 
   it('SYNO-PROVIDER-073: a twin already in the bin steps aside instead of being overwritten', async () => {
@@ -1201,6 +1234,7 @@ describe('SynologyDriveDocumentProvider: rename and trash', () => {
       'SYNO.FileStation.CopyMove:start': sequence(fail(1805), ok({ taskid: 'T-move' })),
       'SYNO.FileStation.CopyMove:status': ok({ finished: true }),
       'SYNO.FileStation.Rename:rename': ok({ files: [entry(`${SCOPE}/.trek-trash/a.123.pdf`)] }),
+      'SYNO.FileStation.List:getinfo': fail(408),
     });
     const result = await provider.trash(connection(), scope(), `${SCOPE}/a.pdf`);
 
@@ -1216,6 +1250,42 @@ describe('SynologyDriveDocumentProvider: rename and trash', () => {
     const result = await provider.trash(connection(), scope(), `${SCOPE}/.trek-trash/a.pdf`);
     expect(result).toMatchObject({ success: false, error: { code: 'not_found' } });
     expect(calls).toHaveLength(0);
+  });
+
+  it('SYNO-PROVIDER-075: a task that finished while the file stayed put is a twin in the bin, not a done deal', async () => {
+    // Nothing in a finished task says whether the file moved. The source path
+    // does: still there means not moved, so the twin steps aside and the move
+    // runs again, and only a source that is gone counts as binned.
+    route({
+      'SYNO.FileStation.CreateFolder:create': ok({ folders: [entry(`${SCOPE}/.trek-trash`, { dir: true })] }),
+      'SYNO.FileStation.CopyMove:start': ok({ taskid: 'T-move' }),
+      'SYNO.FileStation.CopyMove:status': ok({ finished: true }),
+      'SYNO.FileStation.List:getinfo': sequence(ok({ files: [entry(`${SCOPE}/a.pdf`)] }), fail(408)),
+      'SYNO.FileStation.Rename:rename': ok({ files: [entry(`${SCOPE}/.trek-trash/a.123.pdf`)] }),
+    });
+    const result = await provider.trash(connection(), scope(), `${SCOPE}/a.pdf`);
+
+    expect(result).toMatchObject({ success: true });
+    const renamed = callsTo('SYNO.FileStation.Rename', 'rename');
+    expect(renamed).toHaveLength(1);
+    expect(JSON.parse(renamed[0].params.path)).toEqual([`${SCOPE}/.trek-trash/a.pdf`]);
+    expect(callsTo('SYNO.FileStation.CopyMove', 'start')).toHaveLength(2);
+    expect(callsTo('SYNO.FileStation.List', 'getinfo')).toHaveLength(2);
+  });
+
+  it('SYNO-PROVIDER-076: a file that will not leave even after the bin made room is a conflict, not a success', async () => {
+    route({
+      'SYNO.FileStation.CreateFolder:create': ok({ folders: [entry(`${SCOPE}/.trek-trash`, { dir: true })] }),
+      'SYNO.FileStation.CopyMove:start': ok({ taskid: 'T-move' }),
+      'SYNO.FileStation.CopyMove:status': ok({ finished: true }),
+      'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/a.pdf`)] }),
+      'SYNO.FileStation.Rename:rename': ok({ files: [entry(`${SCOPE}/.trek-trash/a.123.pdf`)] }),
+    });
+    const result = await provider.trash(connection(), scope(), `${SCOPE}/a.pdf`);
+
+    expect(result).toMatchObject({ success: false, error: { code: 'conflict' } });
+    expect(callsTo('SYNO.FileStation.CopyMove', 'start')).toHaveLength(2);
+    expect(callsTo('SYNO.FileStation.Rename', 'rename')).toHaveLength(1);
   });
 });
 
@@ -1325,14 +1395,20 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
 
   it('SYNO-PROVIDER-090: an upload the NAS answers with a bare HTTP error keeps the status', async () => {
     // 507 reads as a full volume, the same verdict DSM's own 415/416/1101 give.
-    route({ 'SYNO.FileStation.Upload:upload': reply({}, { status: 507 }) });
+    route({
+      'SYNO.FileStation.List:getinfo': fail(408),
+      'SYNO.FileStation.Upload:upload': reply({}, { status: 507 }),
+    });
     expect(await provider.push(connection(), scope(), push())).toMatchObject({
       success: false,
       error: { code: 'quota_exceeded', status: 507 },
     });
 
     provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
-    route({ 'SYNO.FileStation.Upload:upload': reply({}, { status: 500 }) });
+    route({
+      'SYNO.FileStation.List:getinfo': fail(408),
+      'SYNO.FileStation.Upload:upload': reply({}, { status: 500 }),
+    });
     expect(await provider.push(connection(), scope(), push())).toMatchObject({
       success: false,
       error: { code: 'provider_error', status: 500 },
@@ -1340,7 +1416,10 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
   });
 
   it('SYNO-PROVIDER-091: an upload answered with HTML is a provider_error, not a parse crash', async () => {
-    route({ 'SYNO.FileStation.Upload:upload': reply(null, { raw: '<html>413</html>', contentType: 'text/html' }) });
+    route({
+      'SYNO.FileStation.List:getinfo': fail(408),
+      'SYNO.FileStation.Upload:upload': reply(null, { raw: '<html>413</html>', contentType: 'text/html' }),
+    });
     const result = await provider.push(connection(), scope(), push());
     expect(result).toMatchObject({ success: false, error: { code: 'provider_error' } });
   });
@@ -1369,7 +1448,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
     provider = new SynologyDriveDocumentProvider(new SynologyDriveClient());
     route({
       'SYNO.FileStation.Upload:upload': ok({}),
-      'SYNO.FileStation.List:getinfo': ok({ files: [entry(`${SCOPE}/itinerary.pdf`)] }),
+      'SYNO.FileStation.List:getinfo': sequence(fail(408), ok({ files: [entry(`${SCOPE}/itinerary.pdf`)] })),
       'SYNO.FileStation.MD5:start': ok({}),
     });
     expect(await provider.push(connection(), scope(), push({ size: 100 }))).toMatchObject({
@@ -1382,6 +1461,7 @@ describe('SynologyDriveDocumentProvider: how a NAS disappoints', () => {
     route({
       'SYNO.FileStation.CreateFolder:create': ok({ folders: [entry(`${SCOPE}/.trek-trash`, { dir: true })] }),
       'SYNO.FileStation.CopyMove:start': ok({}),
+      'SYNO.FileStation.List:getinfo': fail(408),
     });
     const result = await provider.trash(connection(), scope(), `${SCOPE}/a.pdf`);
     expect(result).toMatchObject({ success: true });

@@ -260,5 +260,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': '통행료 없음',
   'roadtrip.alt.noFerry': '페리 없음',
   'roadtrip.summary.partial': '남은 구간을 계산하고 있습니다',
+  'roadtrip.stay.releaseTitle': '숙박을 취소할까요?',
+  'roadtrip.stay.releaseBody': '“{name}”에서의 숙박이 삭제됩니다. 이 정차지는 휴식으로 경로에 남습니다.',
+  'roadtrip.stay.releaseBookedBody': '“{name}”에서의 숙박이 예약 “{booking}” 및 연결된 지출과 함께 삭제됩니다. 이 정차지는 휴식으로 경로에 남습니다.',
+  'roadtrip.stay.releaseAction': '휴식으로 바꾸기',
 };
 export default roadtrip;

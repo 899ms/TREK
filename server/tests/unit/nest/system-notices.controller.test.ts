@@ -33,7 +33,33 @@ describe('SystemNoticesController (parity with the legacy /api/system-notices ro
     it('returns the evaluated notices for the current user', () => {
       const getActiveFor = vi.fn().mockReturnValue([notice]);
       expect(makeController({ getActiveFor }).active(user)).toEqual([notice]);
-      expect(getActiveFor).toHaveBeenCalledWith(7);
+      expect(getActiveFor).toHaveBeenCalledWith(7, new Set());
+    });
+
+    // The layouts a bundle announces with `?supports=` reach the service as a set, so
+    // a bundle that predates the parameter announces nothing.
+    it('passes the announced layouts through as a set', () => {
+      const getActiveFor = vi.fn().mockReturnValue([]);
+      makeController({ getActiveFor }).active(user, 'release');
+      expect(getActiveFor).toHaveBeenCalledWith(7, new Set(['release']));
+    });
+
+    it('splits a comma separated list and a repeated parameter alike', () => {
+      const getActiveFor = vi.fn().mockReturnValue([]);
+      const ctrl = makeController({ getActiveFor });
+      ctrl.active(user, ' release, banner ,,');
+      expect(getActiveFor).toHaveBeenLastCalledWith(7, new Set(['release', 'banner']));
+      ctrl.active(user, ['release', 'banner']);
+      expect(getActiveFor).toHaveBeenLastCalledWith(7, new Set(['release', 'banner']));
+    });
+
+    it('announces nothing for an empty or missing parameter', () => {
+      const getActiveFor = vi.fn().mockReturnValue([]);
+      const ctrl = makeController({ getActiveFor });
+      ctrl.active(user, '');
+      expect(getActiveFor).toHaveBeenLastCalledWith(7, new Set());
+      ctrl.active(user, undefined);
+      expect(getActiveFor).toHaveBeenLastCalledWith(7, new Set());
     });
   });
 

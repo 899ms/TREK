@@ -263,5 +263,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Utan vagavgifter',
   'roadtrip.alt.noFerry': 'Utan färja',
   'roadtrip.summary.partial': 'Resten av resan beräknas fortfarande',
+  'roadtrip.stay.releaseTitle': 'Ta bort övernattningen?',
+  'roadtrip.stay.releaseBody': 'Natten på ”{name}” tas bort. Stoppet ligger kvar på resan som en paus.',
+  'roadtrip.stay.releaseBookedBody': 'Natten på ”{name}” tas bort tillsammans med bokningen ”{booking}” och alla utgifter som hör till den. Stoppet ligger kvar på resan som en paus.',
+  'roadtrip.stay.releaseAction': 'Gör till en paus',
 };
 export default roadtrip;

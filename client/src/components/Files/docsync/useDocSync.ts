@@ -112,6 +112,19 @@ export function bindingNotice(
 }
 
 /**
+ * Whether the store has refused the stored credential.
+ *
+ * Two shapes say so. A refusal while listing is recorded as its own state; a
+ * refusal anywhere else (resolving the folder, one transfer) leaves the state
+ * at failed or partial and puts the reason in the error code. Either way the
+ * cure is the same, a new credential, and both shells decide from here
+ * whether to offer the form for it.
+ */
+export function needsReauth(link: Pick<DocSyncLink, 'lastSyncState' | 'lastSyncError'>): boolean {
+  return link.lastSyncState === 'needs_reauth' || link.lastSyncError === 'unauthorized'
+}
+
+/**
  * Whether this person may change a sync binding.
  *
  * Only the trip owner: the credential a binding stores usually reaches that
@@ -261,9 +274,22 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
     }
   }, [tripId])
 
+  /**
+   * The containers a connection can be bound to.
+   *
+   * Always resolves to a listing, the way `testConnection` always resolves to
+   * a verdict: the route answers 200 with an error code when the store refuses,
+   * and a request that fell over on the way (a store behind a VPN that is not
+   * up, a connection an admin deleted meanwhile) has to reach the picker the
+   * same way. Left to reject, it never reached `setScopes`, and the picker
+   * spun forever with nothing said.
+   */
   const loadScopes = useCallback(async (connectionId: number, q?: string) => {
-    const res = await docsyncApi.listScopes(tripId, connectionId, q) as { scopes: DocSyncScope[]; error?: string }
-    return res
+    try {
+      return await docsyncApi.listScopes(tripId, connectionId, q) as { scopes: DocSyncScope[]; error?: string }
+    } catch (e: unknown) {
+      return { scopes: [] as DocSyncScope[], error: readError(e) }
+    }
   }, [tripId])
 
   /**
@@ -364,9 +390,27 @@ export function useDocSync(tripId: number | string, enabled: boolean) {
     }
   }, [tripId, load])
 
+  /**
+   * Settle one conflict.
+   *
+   * Reports failure the way the other writes do. The rejection used to escape
+   * into the `void` at the call site, so a refused choice (the row was settled
+   * elsewhere a moment ago, or the server answered 403) put the button back
+   * and left the row standing with nothing said.
+   */
   const resolveConflict = useCallback(async (itemId: number, keep: 'trek' | 'provider' | 'both') => {
-    await docsyncApi.resolve(tripId, itemId, keep)
-    await load()
+    setError(null)
+    try {
+      await docsyncApi.resolve(tripId, itemId, keep)
+      await load()
+      return true
+    } catch (e: unknown) {
+      // Reload first, so the counts match what the server has, then say why.
+      // The other way round the reload cleared the message again.
+      await load()
+      setError(readError(e))
+      return false
+    }
   }, [tripId, load])
 
   /** Providers the admin switched on that also have a working adapter. */

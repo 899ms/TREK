@@ -865,6 +865,119 @@ describe('webhooks', () => {
   });
 });
 
+describe('an install below a path', () => {
+  const NC_PREFIXED = 'https://home.example.org/nextcloud';
+  const OC_PREFIXED = 'https://opencloud.example.org/oc';
+  const prefixedNc: DocumentConnectionRef = { ...ncConn, baseUrl: NC_PREFIXED };
+  const prefixedOc: DocumentConnectionRef = { ...ocConn, baseUrl: OC_PREFIXED };
+
+  it('reaches a Nextcloud under a sub-path instead of calling its address a wrong password', async () => {
+    route(
+      `PROPFIND /nextcloud${NC_ROOT}`,
+      multistatus([{ href: `/nextcloud${NC_ROOT}/`, collection: true, fileid: '1' }]),
+    );
+    route('GET /nextcloud/ocs/v2.php/apps/webhook_listeners/api/v1/webhooks', reply('{"ocs":{"data":[]}}'));
+
+    const result = await nextcloud.probe(prefixedNc);
+
+    expect(result).toMatchObject({ success: true, data: { account: 'admin' } });
+    expect(calls[0].url).toBe(`${NC_PREFIXED}${NC_ROOT}`);
+  });
+
+  it('strips the file-app address people paste and keeps the install path underneath it', async () => {
+    route(
+      `PROPFIND /nextcloud${NC_ROOT}`,
+      multistatus([{ href: `/nextcloud${NC_ROOT}/`, collection: true, fileid: '1' }]),
+    );
+    route('GET /nextcloud/ocs/v2.php/apps/webhook_listeners/api/v1/webhooks', reply('{}', { status: 403 }));
+
+    const result = await nextcloud.probe({ ...ncConn, baseUrl: `${NC_PREFIXED}/apps/files/files/123?dir=/TREK` });
+
+    expect(result).toMatchObject({ success: true });
+    expect(calls[0].url).toBe(`${NC_PREFIXED}${NC_ROOT}`);
+  });
+
+  it('keeps an install path that happens to contain apps, cutting only the pasted page behind it', async () => {
+    const APPS_ROOT = 'https://home.example.org/apps/nextcloud';
+    route(
+      `PROPFIND /apps/nextcloud${NC_ROOT}`,
+      multistatus([{ href: `/apps/nextcloud${NC_ROOT}/`, collection: true, fileid: '1' }]),
+    );
+    route('GET /apps/nextcloud/ocs/v2.php/apps/webhook_listeners/api/v1/webhooks', reply('{}', { status: 403 }));
+
+    expect(await nextcloud.probe({ ...ncConn, baseUrl: `${APPS_ROOT}/apps/dashboard/` })).toMatchObject({ success: true });
+    expect(calls[0].url).toBe(`${APPS_ROOT}${NC_ROOT}`);
+
+    calls = [];
+    expect(await nextcloud.probe({ ...ncConn, baseUrl: APPS_ROOT })).toMatchObject({ success: true });
+    expect(calls[0].url).toBe(`${APPS_ROOT}${NC_ROOT}`);
+  });
+
+  it('takes the prefix off the hrefs it is answered, so a download is not addressed twice over', async () => {
+    route(
+      `PROPFIND /nextcloud${NC_ROOT}/TREK/trip%2042`,
+      multistatus([
+        { href: `/nextcloud${NC_ROOT}/TREK/trip%2042/`, collection: true, fileid: '60', etag: '"root-1"' },
+        { href: `/nextcloud${NC_ROOT}/TREK/trip%2042/pass.pdf`, fileid: '61', etag: '"doc-1"', size: 4, type: 'application/pdf' },
+      ]),
+    );
+    route(`GET /nextcloud${NC_ROOT}/TREK/trip%2042/pass.pdf`, reply('pdf!', { headers: { etag: '"doc-1"' } }));
+
+    const listed = await nextcloud.list(prefixedNc, ncScope);
+    expect(listed.success && listed.data.documents.map((doc) => doc.name)).toEqual(['pass.pdf']);
+    expect(listed.success && listed.data.cursor).toBe('"root-1"');
+
+    const fetched = await nextcloud.fetch(prefixedNc, ncScope, '61');
+    expect(fetched).toMatchObject({ success: true, data: { remoteVersion: '"doc-1"' } });
+    expect(requests('GET').map((call) => call.url)).toEqual([`${NC_PREFIXED}${NC_ROOT}/TREK/trip%2042/pass.pdf`]);
+  });
+
+  it('renames within the prefixed folder and points the Destination at the full base', async () => {
+    route(
+      `PROPFIND /nextcloud${NC_ROOT}/TREK/trip%2042`,
+      multistatus([
+        { href: `/nextcloud${NC_ROOT}/TREK/trip%2042/`, collection: true, fileid: '60' },
+        { href: `/nextcloud${NC_ROOT}/TREK/trip%2042/pass.pdf`, fileid: '61', size: 4, type: 'application/pdf' },
+      ]),
+    );
+    route(`MOVE /nextcloud${NC_ROOT}/TREK/trip%2042/pass.pdf`, reply(null, { status: 201, headers: { 'oc-etag': '"moved"' } }));
+
+    const result = await nextcloud.rename(prefixedNc, ncScope, '61', 'passport.pdf');
+
+    expect(result).toEqual({ success: true, data: { remoteVersion: '"moved"' } });
+    expect(requests('MOVE')[0].headers.destination).toBe(`${NC_PREFIXED}${NC_ROOT}/TREK/trip%2042/passport.pdf`);
+  });
+
+  it('re-bases an OpenCloud space below a path without spelling the path twice', async () => {
+    route(
+      'GET /oc/graph/v1.0/me/drives',
+      reply(JSON.stringify({ value: [drive(OC_DRIVE, 'TREK Trip 42', 'project', `https://internal.lan:9200/oc${OC_ROOT}`)] })),
+    );
+    route(
+      `PROPFIND /oc${OC_ROOT}`,
+      multistatus([
+        { href: `/oc${OC_ROOT}/`, collection: true, fileid: `${OC_DRIVE}!root`, etag: '"root"' },
+        { href: `/oc${OC_ROOT}/pass.pdf`, fileid: `${OC_DRIVE}!doc`, etag: '"doc"', size: 10, type: 'application/pdf' },
+      ]),
+    );
+
+    const scopes = await opencloud.listScopes(prefixedOc);
+    expect(scopes.success && scopes.data[0].remoteRootPath).toBe(`${OC_PREFIXED}${OC_ROOT}`);
+
+    const listed = await opencloud.list(prefixedOc, { ...ocScope, remoteRootPath: `${OC_PREFIXED}${OC_ROOT}` });
+    expect(listed.success && listed.data.documents[0]).toMatchObject({ remoteId: `${OC_DRIVE}!doc`, name: 'pass.pdf' });
+    expect(requests('PROPFIND').map((call) => call.url)).toEqual([`${OC_PREFIXED}${OC_ROOT}`]);
+  });
+
+  it('leaves a root install exactly as it was', async () => {
+    route(`PROPFIND ${NC_ROOT}`, multistatus([{ href: `${NC_ROOT}/`, collection: true, fileid: '1' }]));
+    route('GET /ocs/v2.php/apps/webhook_listeners/api/v1/webhooks', reply('{}', { status: 403 }));
+
+    expect(await nextcloud.probe({ ...ncConn, baseUrl: `${NC_ORIGIN}/index.php/apps/files/` })).toMatchObject({ success: true });
+    expect(calls[0].url).toBe(`${NC_ORIGIN}${NC_ROOT}`);
+  });
+});
+
 describe('failure classification', () => {
   it('separates a timeout, an untrusted certificate and a blocked host', async () => {
     const timeout = Object.assign(new TypeError('fetch failed'), {

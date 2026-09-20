@@ -85,3 +85,15 @@ data:
   {{- if .Values.env.OVERPASS_TIMEOUT_MS }}
   OVERPASS_TIMEOUT_MS: {{ .Values.env.OVERPASS_TIMEOUT_MS | quote }}
   {{- end }}
+  {{- /* Tested for presence rather than truth: the one value this switch gets set to is
+         false, and an unquoted false (or --set env.TREK_PLACES_ENABLED=false) would
+         otherwise drop the key and leave the index on. */}}
+  {{- if not (kindIs "invalid" .Values.env.TREK_PLACES_ENABLED) }}
+  TREK_PLACES_ENABLED: {{ .Values.env.TREK_PLACES_ENABLED | quote }}
+  {{- end }}
+  {{- if .Values.env.TREK_PLACES_URL }}
+  TREK_PLACES_URL: {{ .Values.env.TREK_PLACES_URL | quote }}
+  {{- end }}
+  {{- if .Values.env.AMAP_API_BASE }}
+  AMAP_API_BASE: {{ .Values.env.AMAP_API_BASE | quote }}
+  {{- end }}

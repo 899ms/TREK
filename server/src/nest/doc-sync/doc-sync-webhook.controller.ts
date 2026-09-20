@@ -20,8 +20,9 @@ import { DocSyncService } from './doc-sync.service';
  *
  * `@Public` because a provider cannot hold a TREK session. The token in the URL
  * is the authentication, one per binding, so a leaked URL can only ever nudge
- * the one trip it belongs to, and nudging is all it can do. Where the provider
- * supports it, a shared secret is checked as well.
+ * the one trip it belongs to, and nudging is all it can do. Where TREK
+ * registered the subscription itself, the shared secret it handed over is
+ * checked as well.
  */
 @Controller('api/docsync/webhook')
 export class DocSyncWebhookController implements OnModuleDestroy {
@@ -78,7 +79,14 @@ export class DocSyncWebhookController implements OnModuleDestroy {
     if (!link || link.sync_enabled !== 1) return { received: true };
     if (!this.syncIsOn(link)) return { received: true };
 
-    const secret = this.config.webhookSecret(link);
+    // The secret is only known to a provider TREK subscribed at itself, so it
+    // is only demanded there. A URL pasted into a store by hand (Papra, or a
+    // Nextcloud without admin rights) carries the token and nothing else: the
+    // secret is never shown to anybody, and Papra signs with a secret of its
+    // own that TREK cannot know. Demanding it there meant every such call was
+    // dropped and the binding ran on the timer while the screen promised
+    // instant updates.
+    const secret = link.webhook_subscription_id ? this.config.webhookSecret(link) : '';
     if (secret && !this.secretMatches(req, secret)) return { received: true };
 
     // Fire and forget. Paperless allows five seconds before it counts the call

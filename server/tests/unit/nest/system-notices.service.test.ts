@@ -44,6 +44,44 @@ describe('SystemNoticesService', () => {
     expect(mockDismiss).toHaveBeenCalledWith(7, 'welcome');
   });
 
+  // After an update the service worker keeps serving the previous bundle for a while.
+  // That bundle would draw a release notice as bare keys and let the reader dismiss it
+  // for good, so the release layout is only delivered to a client that says it can
+  // draw it. Everything without a release block goes out as before.
+  describe('getActiveFor holds the release layout back from a client that does not announce it', () => {
+    const generic = {
+      id: 'outage', display: 'banner', severity: 'warn',
+      titleKey: 'system_notice.outage.title', bodyKey: 'system_notice.outage.body', dismissible: true,
+    };
+    const release = {
+      id: 'release-notes', display: 'modal', severity: 'info',
+      titleKey: 'system_notice.release_notes.headline', bodyKey: 'system_notice.release_notes.intro',
+      dismissible: true,
+      release: { version: '4.3.0', headlineKey: 'system_notice.release_notes.headline' },
+    };
+
+    it('drops a notice with a release block when nothing is announced', () => {
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7).map(n => n.id)).toEqual(['outage']);
+    });
+
+    it('drops it when other layouts are announced but not release', () => {
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7, new Set(['banner'])).map(n => n.id)).toEqual(['outage']);
+    });
+
+    it('delivers it, in place, once the client announces the release layout', () => {
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7, new Set(['release'])).map(n => n.id)).toEqual(['release-notes', 'outage']);
+    });
+
+    it('always delivers a notice without a release block', () => {
+      mockGetActive.mockReturnValue([generic]);
+      expect(svc.getActiveFor(7).map(n => n.id)).toEqual(['outage']);
+      expect(svc.getActiveFor(7, new Set(['release'])).map(n => n.id)).toEqual(['outage']);
+    });
+  });
+
   it('still loads and works when the AddonsService binding is unresolved (import-cycle fallback)', async () => {
     // The emitted design:paramtypes metadata guards an unresolved class binding
     // with `typeof AddonsService === 'undefined' ? Object : AddonsService`.

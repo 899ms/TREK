@@ -37,6 +37,11 @@ import type { DatabaseService } from '../../../../src/nest/database/database.ser
 
 const SECRET = 'M7dQ2vLp5rTn8kYw1xZc4bJh';
 
+/**
+ * A binding whose subscription TREK registered itself, so the provider was
+ * handed the secret and is expected to present it. A binding pasted in by
+ * hand has no subscription id; see the cases on that below.
+ */
 const link = (over: Partial<LinkRow> = {}): LinkRow => ({
   id: 4,
   trip_id: 1,
@@ -52,7 +57,7 @@ const link = (over: Partial<LinkRow> = {}): LinkRow => ({
   sync_enabled: 1,
   webhook_token: 'tok-live',
   webhook_secret: 'enc:v1:whatever',
-  webhook_subscription_id: null,
+  webhook_subscription_id: 'sub-7',
   remote_cursor: null,
   last_sync_at: null,
   last_sync_state: 'never',
@@ -179,6 +184,45 @@ describe('a shared-secret header', () => {
     controller.nudge('tok-live', makeReq());
     settle();
     expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * A URL somebody pasted into the store by hand.
+ *
+ * Papra's webhook settings are closed to API keys and Nextcloud's need admin
+ * rights, so the person copies the address off the binding card. The secret
+ * behind it is never shown to anybody, and Papra signs with a secret of its
+ * own, so no such call could ever carry the one TREK holds. Every one of them
+ * was dropped, and the binding ran on the timer while the card promised
+ * instant updates. The token in the URL is the whole credential there.
+ */
+describe('a binding pasted into the store by hand', () => {
+  const pasted = () => link({ webhook_subscription_id: null });
+
+  beforeEach(() => {
+    config.getLinkByToken.mockImplementation((token: string) => (token === 'tok-live' ? pasted() : undefined));
+    config.getLink.mockImplementation((id: number) => (id === 4 ? pasted() : undefined));
+  });
+
+  it('runs on the token alone, with no secret in the call', () => {
+    controller.nudge('tok-live', makeReq());
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+    expect(config.webhookSecret).not.toHaveBeenCalled();
+  });
+
+  it('runs on a Papra call signed with a secret TREK has never seen', () => {
+    const payload = JSON.stringify({ event: 'document.created', documentId: 'doc_1' });
+    controller.nudge('tok-live', papraReq(payload, sign(payload, 'papras-own-signing-secret')));
+    settle();
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('still needs the right token', () => {
+    controller.nudge('tok-guessed', makeReq());
+    settle();
+    expect(sync.syncLink).not.toHaveBeenCalled();
   });
 });
 

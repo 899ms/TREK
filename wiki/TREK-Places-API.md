@@ -88,7 +88,7 @@ services:
       - TREK_PLACES_ENABLED=false
 ```
 
-Only the value `false` switches the index off. `0`, `no`, `off` and `FALSE` pass the startup check and leave it on; a value that is not boolean-like at all aborts startup.
+`false`, `0`, `off` and `no` in any casing switch the index off, as on every other boolean switch. A value that is not boolean-like at all aborts startup, and unset or blank leaves the index on.
 
 With the index off, TREK stops asking it for suggestions, searches, category buttons, the Road trip search, import geocoding and offline downloads, and place search works the way it did before 4.3.0:
 
@@ -106,7 +106,7 @@ The card in **Admin → Settings → API Keys** stays either way: it describes t
 
 The address is read from your own configuration and is not a URL a user can type, so it does not go through the SSRF guard: a copy on your LAN or in the same Docker network works without `ALLOW_INTERNAL_NETWORK`.
 
-> **Helm:** the chart passes only the variables its ConfigMap declares, and `TREK_PLACES_ENABLED` and `TREK_PLACES_URL` are not among them yet. Patch them onto the Deployment; see [How to Set Variables](Environment-Variables#how-to-set-variables).
+> **Helm:** both variables go under `env:` in `values.yaml`, and the chart's ConfigMap passes them through. `TREK_PLACES_ENABLED` is passed whenever it is set at all, so an unquoted `false` or `--set env.TREK_PLACES_ENABLED=false` reaches the container too; see [How to Set Variables](Environment-Variables#how-to-set-variables).
 
 ### Related variables
 

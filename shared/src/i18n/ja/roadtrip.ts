@@ -262,5 +262,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': '有料道路なし',
   'roadtrip.alt.noFerry': 'フェリーなし',
   'roadtrip.summary.partial': '残りの行程を計算しています',
+  'roadtrip.stay.releaseTitle': '宿泊を取り消しますか？',
+  'roadtrip.stay.releaseBody': '「{name}」での宿泊を取り消します。停車地は休憩として行程に残ります。',
+  'roadtrip.stay.releaseBookedBody': '「{name}」での宿泊を、予約「{booking}」と関連する支出とともに取り消します。停車地は休憩として行程に残ります。',
+  'roadtrip.stay.releaseAction': '休憩にする',
 };
 export default roadtrip;

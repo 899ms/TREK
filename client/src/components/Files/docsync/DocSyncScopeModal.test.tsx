@@ -1,4 +1,4 @@
-// FE-DOCSYNC-SCOPE-001 to FE-DOCSYNC-SCOPE-022
+// FE-DOCSYNC-SCOPE-001 to FE-DOCSYNC-SCOPE-023
 
 /**
  * The folder picker of the document-sync dialog.
@@ -363,5 +363,21 @@ describe('DocSyncScopeModal errors', () => {
 
     expect(await screen.findByText(S['docsync.error.scope_missing'])).toBeInTheDocument()
     expect(screen.queryByText('Trips')).not.toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-SCOPE-023: a listing request that fell over says so instead of spinning forever', async () => {
+    // The store answers 200 with a code when it refuses, but a request that
+    // never got an answer (a store behind a VPN that is down, a connection an
+    // admin deleted meanwhile) rejected instead, nothing caught it, and the
+    // spinner was all the picker ever showed.
+    listScopes.mockRejectedValue({ code: 'ECONNABORTED', message: 'timeout of 60000ms exceeded' })
+    render(<Harness />)
+
+    expect(await screen.findByText(S['docsync.error.unknown'])).toBeInTheDocument()
+    expect(document.querySelector('.animate-spin')).toBeNull()
+    expect(screen.queryByText(S['docsync.noFolders'])).not.toBeInTheDocument()
+    // Making a new folder is still on offer: the store may well be reachable
+    // for that, and it is the way out when the listing is what failed.
+    expect(createButton()).toBeEnabled()
   })
 })

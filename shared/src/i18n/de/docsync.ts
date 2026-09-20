@@ -179,6 +179,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Dieser Anbieter steht auf dieser Instanz nicht zur Verfügung.',
   'docsync.error.provider_disabled': 'Pausiert: Ein Administrator hat diesen Anbieter abgeschaltet. Der Abgleich läuft weiter, sobald er wieder eingeschaltet ist.',
+  'docsync.binding.reconnect': 'Neu verbinden',
 };
 
 export default docsync;

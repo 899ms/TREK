@@ -177,6 +177,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Цей постачальник недоступний на цьому сервері.',
   'docsync.error.provider_disabled': 'Призупинено: адміністратор вимкнув цього постачальника. Синхронізація відновиться, щойно його знову ввімкнуть.',
+  'docsync.binding.reconnect': 'Підключити знову',
 };
 
 export default docsync;

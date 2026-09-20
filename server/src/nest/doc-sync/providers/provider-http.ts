@@ -89,6 +89,19 @@ const CERTIFICATE_CODES = new Set([
 const CERTIFICATE_CODE = /CERT|SELF_SIGNED|ERR_TLS/i;
 
 /**
+ * The guard's own wording for a name DNS could not resolve. It arrives as an
+ * SsrfBlockedError like every other refusal, but nothing was blocked: there is
+ * no address to block. Reporting it as a policy verdict sends the self-hoster
+ * to the SSRF settings when the fault is a typo in the host name.
+ */
+const UNRESOLVED_HOST = /could not resolve hostname/i;
+
+/** Whether a guard refusal is really a host that does not exist. */
+export function isUnresolvedHost(message: string): boolean {
+  return UNRESOLVED_HOST.test(message);
+}
+
+/**
  * The codes every product answers alike. A client layers its own meaning on
  * top through `overrides`, and `fallback` answers whatever neither table knows.
  */
@@ -128,7 +141,9 @@ export function classifyTransportFailure(err: unknown): TransportFailure {
     .filter((message) => message.length > 0)
     .join(': ');
 
-  if (err instanceof SsrfBlockedError) return { code: 'ssrf_blocked', detail };
+  if (err instanceof SsrfBlockedError) {
+    return { code: isUnresolvedHost(err.message) ? 'unreachable' : 'ssrf_blocked', detail };
+  }
 
   const codes = chain.map(codeOf);
   const names = chain.map((entry) => (entry instanceof Error ? entry.name : ''));

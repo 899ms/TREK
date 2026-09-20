@@ -1,4 +1,4 @@
-// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-018
+// FE-DOCSYNC-MOBILE-001 to FE-DOCSYNC-MOBILE-024
 import type { ComponentProps } from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '../../../../../tests/helpers/render'
@@ -135,7 +135,17 @@ beforeEach(() => {
   vi.spyOn(docsyncApi, 'saveConnection').mockResolvedValue({})
   vi.spyOn(docsyncApi, 'createScope').mockResolvedValue(scope({}))
   vi.spyOn(docsyncApi, 'createLink').mockResolvedValue({})
+  vi.spyOn(docsyncApi, 'items').mockResolvedValue([])
+  vi.spyOn(docsyncApi, 'resolve').mockResolvedValue({ success: true })
 })
+
+/** The status route with a number of conflicts on it, holdings as usual. */
+function withConflicts(count: number) {
+  vi.spyOn(docsyncApi, 'status').mockImplementation(async () => ({
+    items: { conflict: count },
+    links: links.map(l => ({ id: l.id, holdings: { inTrek: 4, atProvider: 2, paired: 2, missing: 0 } })),
+  }))
+}
 
 afterEach(() => {
   vi.restoreAllMocks()
@@ -273,6 +283,21 @@ describe('MDocSyncSheet: moving between the views', () => {
     // A folder name is suggested from the trip so nobody has to invent one.
     expect(screen.getByDisplayValue('rome-3')).toBeInTheDocument()
   })
+
+  it('FE-DOCSYNC-MOBILE-019: a folder listing that fails outright says so instead of spinning', async () => {
+    // Not a provider failure, which the route folds into a 200: the request itself
+    // dies, as it does when the phone loses its signal or a proxy answers 502.
+    vi.spyOn(docsyncApi, 'listScopes').mockRejectedValue({ response: { status: 502, data: '<html>Bad Gateway</html>' } })
+    renderSheet()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Nextcloud/ }))
+
+    expect(await screen.findByText('Something went wrong.')).toBeInTheDocument()
+    expect(document.querySelector('.animate-spin')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Photos/ })).not.toBeInTheDocument()
+    // The new-folder lane stays usable: a listing that failed is not a store that is gone.
+    expect(screen.getByRole('button', { name: /Create/ })).toBeEnabled()
+  })
 })
 
 describe('MDocSyncSheet: the two lanes', () => {
@@ -352,11 +377,92 @@ describe('MDocSyncSheet: what the owner may do', () => {
     })
     renderSheet()
     await openDetail()
-    expect(screen.queryByText('Paused: an administrator has switched this provider off. Syncing resumes once it is back on.')).not.toBeInTheDocument()
+    const paused = 'Paused: an administrator has switched this provider off. Syncing resumes once it is back on.'
+    expect(screen.queryByText(paused)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
 
-    expect(await screen.findByText('Paused: an administrator has switched this provider off. Syncing resumes once it is back on.')).toBeInTheDocument()
+    // The standing notice on the binding, and the refused run's own report
+    // under it, which says the same reason for this one.
+    expect(await screen.findAllByText(paused)).toHaveLength(2)
+    expect(screen.getByRole('alert')).toHaveTextContent(paused)
+  })
+
+  it('FE-DOCSYNC-MOBILE-021: a choice the server refuses is said in the sheet, and the row stays', async () => {
+    withConflicts(1)
+    vi.spyOn(docsyncApi, 'items').mockResolvedValue([{ id: 40, file_name: 'boarding-pass.pdf', remote_name: 'boarding-pass.pdf' }])
+    // Settled by the owner on another device a moment ago.
+    vi.spyOn(docsyncApi, 'resolve').mockRejectedValue({ response: { status: 400, data: { error: 'conflict' } } })
+    renderSheet()
+    await openDetail()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /Resolve/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep the TREK version' }))
+
+    await waitFor(() => expect(docsyncApi.resolve).toHaveBeenCalledWith(TRIP_ID, 40, 'trek'))
+    expect(await screen.findByRole('alert')).toHaveTextContent('The document changed on both sides.')
+    // The list is read back rather than trimmed by hand, so the row is still
+    // there, ready for another try.
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Keep the TREK version' })).toBeEnabled())
+    expect(screen.getByText('boarding-pass.pdf')).toBeInTheDocument()
+    expect(docsyncApi.items).toHaveBeenCalledTimes(2)
+  })
+
+  it('FE-DOCSYNC-MOBILE-022: a refused credential offers Reconnect, and saving runs the binding and comes back to it', async () => {
+    // The list only ever opens the form for a store with no connection yet,
+    // and a bound store is not listed there, so a rotated token could only
+    // be entered through the API.
+    links = [link({ lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' })]
+    renderSheet()
+    await openDetail()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+
+    // The credential form for this store, not the folder picker.
+    expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('https://paperless.example')).toBeInTheDocument()
+    expect(screen.queryByText('Or use one you already have')).not.toBeInTheDocument()
+    expect(docsyncApi.listScopes).not.toHaveBeenCalled()
+
+    fireEvent.change(screen.getByLabelText(/API token/), { target: { value: 'fresh-token' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(docsyncApi.saveConnection).toHaveBeenCalledWith(TRIP_ID, expect.objectContaining({
+      providerId: 'paperless',
+      credentials: expect.objectContaining({ api_token: 'fresh-token' }),
+    })))
+    await waitFor(() => expect(docsyncApi.syncNow).toHaveBeenCalledWith(TRIP_ID, 11, false))
+    // Back on the binding, not at the list and not in the folder picker.
+    expect(await screen.findByRole('button', { name: 'Sync now' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Or use one you already have')).not.toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-MOBILE-023: the back arrow from the reconnect form returns to the binding, and a paused provider offers no Reconnect', async () => {
+    links = [link({ lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' })]
+    renderSheet()
+    await openDetail()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Reconnect' }))
+    await screen.findByRole('button', { name: 'Save' })
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+
+    expect(await screen.findByRole('button', { name: 'Sync now' })).toBeInTheDocument()
+    expect(screen.queryByText('Add another')).not.toBeInTheDocument()
+    expect(docsyncApi.saveConnection).not.toHaveBeenCalled()
+    expect(docsyncApi.syncNow).not.toHaveBeenCalled()
+
+    // Switched off by an admin meanwhile: a new credential would change
+    // nothing until it is back on, so the paused notice stands alone.
+    vi.spyOn(docsyncApi, 'status').mockImplementation(async () => ({
+      items: {},
+      links: links.map(l => ({ id: l.id, providerOff: true, holdings: { inTrek: 4, atProvider: 2, paired: 2, missing: 0 } })),
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'Sync now' }))
+
+    expect(await screen.findByText(/Paused: an administrator/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument()
   })
 
   it('FE-DOCSYNC-MOBILE-014: Sync now runs that binding', async () => {
@@ -385,6 +491,30 @@ describe('MDocSyncSheet: what a member may do', () => {
 
     // Reading and running it is still theirs.
     expect(screen.getByRole('button', { name: 'Sync now' })).toBeEnabled()
+  })
+
+  it('FE-DOCSYNC-MOBILE-020: a member is shown the conflict count but offered no choice', async () => {
+    // The server refuses a member's choice with 403, so the three buttons
+    // would only ever fail for them. The count is what they are owed.
+    withConflicts(3)
+    renderSheet({ canManage: false })
+    await openDetail()
+
+    expect(screen.getByText('Both copies changed')).toBeInTheDocument()
+    expect(screen.getByText('Changed in both places. Pick which one to keep.')).toBeInTheDocument()
+    expect(screen.getByText('3')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Resolve/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Keep the TREK version' })).not.toBeInTheDocument()
+    expect(docsyncApi.items).not.toHaveBeenCalled()
+  })
+
+  it('FE-DOCSYNC-MOBILE-024: a member whose store refused its credential is told, but not offered Reconnect', async () => {
+    links = [link({ lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' })]
+    renderSheet({ canManage: false })
+    await openDetail()
+
+    expect(screen.getByText(/The credentials were refused/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reconnect' })).not.toBeInTheDocument()
   })
 
   it('FE-DOCSYNC-MOBILE-016: a member is not offered stores to add, and an unbound trip explains who sets it up', async () => {

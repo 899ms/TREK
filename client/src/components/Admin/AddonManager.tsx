@@ -99,7 +99,7 @@ interface CollabFeatures { chat: boolean; notes: boolean; links?: boolean; polls
 const COLLAB_SUB_FEATURES = [
   { key: 'chat', icon: MessageCircle, titleKey: 'admin.collab.chat.title', subtitleKey: 'admin.collab.chat.subtitle' },
   { key: 'notes', icon: StickyNote, titleKey: 'admin.collab.notes.title', subtitleKey: 'admin.collab.notes.subtitle' },
-  { key: 'links', icon: Link2, titleKey: 'collab.tabs.links', subtitleKey: 'collab.links.empty' },
+  { key: 'links', icon: Link2, titleKey: 'collab.tabs.links', subtitleKey: 'admin.collab.links.subtitle' },
   { key: 'polls', icon: BarChart3, titleKey: 'admin.collab.polls.title', subtitleKey: 'admin.collab.polls.subtitle' },
   { key: 'whatsnext', icon: Sparkles, titleKey: 'admin.collab.whatsnext.title', subtitleKey: 'admin.collab.whatsnext.subtitle' },
 ] as const

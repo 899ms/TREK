@@ -267,5 +267,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Tanpa tol',
   'roadtrip.alt.noFerry': 'Tanpa feri',
   'roadtrip.summary.partial': 'Sisa perjalanan masih dihitung',
+  'roadtrip.stay.releaseTitle': 'Hapus menginap semalam?',
+  'roadtrip.stay.releaseBody': 'Malam di “{name}” akan dihapus. Perhentian tetap ada di perjalanan sebagai jeda.',
+  'roadtrip.stay.releaseBookedBody': 'Malam di “{name}” akan dihapus bersama pemesanan “{booking}” dan pengeluaran yang terkait. Perhentian tetap ada di perjalanan sebagai jeda.',
+  'roadtrip.stay.releaseAction': 'Jadikan jeda',
 };
 export default roadtrip;

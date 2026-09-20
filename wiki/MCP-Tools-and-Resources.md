@@ -59,8 +59,8 @@ Requires `places:read` or `places:write` scope.
 | `update_place` | Update any field of an existing place including transport mode, timing, price and `stop_type`. Pass `stop_type: null` to turn a service stop back into an ordinary place. |
 | `rate_place` | Set or clear your own 1–5 star rating on a place. Every trip member rates independently and the place shows the average. Pass `null` to clear the vote. |
 | `bulk_update_places` | Update many places at once, applying the same field values (e.g. category, price, transport mode, `stop_type`) to every listed place in a single call. `stop_type: null` turns the listed service stops back into ordinary places. |
-| `delete_place` | Remove a place from a trip. Also removes all day assignments. |
-| `bulk_delete_places` | Delete multiple places by ID. Removes all day assignments. Cannot be undone. |
+| `delete_place` | Remove a place from a trip. Also removes all day assignments, the expenses linked to the place and any night booked at it, together with that night's reservation and the reservation's expense. Cannot be undone, so an assistant should warn before deleting a hotel that holds a booking. |
+| `bulk_delete_places` | Delete multiple places by ID. Removes all day assignments, linked expenses and any nights booked at each place, with their reservations and expenses. Cannot be undone. |
 | `import_places_from_url` | Import all places from a publicly shared Google Maps or Naver Maps list URL. |
 | `list_categories` | List all available place categories with id, name, icon, and color. |
 | `create_category` | Add a category to the instance-wide palette, with name, hex colour and emoji icon. Every trip on the instance sees it, so prefer an existing one from `list_categories`. Admin only; a non-admin gets `Admin access required`. Requires `places:write`. |

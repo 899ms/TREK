@@ -66,7 +66,12 @@ export const createAssignmentsSlice = (set: SetState, get: GetState): Assignment
     if (!place) return
 
     const tempId = Date.now() * -1
-    const current = [...(state.assignments[String(dayId)] || [])]
+    // Sorted first, as moveAssignment does: the position is an index in the day as
+    // it is shown, and that day is sorted by order_index. The stored list is not
+    // always, a stop that arrived over the socket is appended wherever its
+    // order_index says it belongs, so a splice into the raw list landed the new
+    // row behind the wrong neighbour and the reorder that follows wrote that order.
+    const current = (state.assignments[String(dayId)] || []).slice().sort((a, b) => a.order_index - b.order_index)
     const insertIdx = position != null ? position : current.length
     const tempAssignment: Assignment = {
       id: tempId,

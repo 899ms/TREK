@@ -619,7 +619,8 @@ describe('collection labels', () => {
     const viewer = createUser(testDb).user;
     const col = svc.createCollection(owner.id, { name: 'Trip' });
     addMember(col.id, viewer.id, 'viewer');
-    try { svc.createLabel(viewer.id, col.id, 'X'); } catch (e) { expect((e as { status: number }).status).toBe(403); }
+    expect(() => svc.createLabel(viewer.id, col.id, 'X')).toThrow(expect.objectContaining({ status: 403, message: 'You have read-only access to this list' }));
+    expect(svc.getCollection(owner.id, col.id).collection.labels).toHaveLength(0);
 
     const editor = createUser(testDb).user;
     addMember(col.id, editor.id, 'editor');

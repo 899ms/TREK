@@ -41,10 +41,17 @@ export default function DocSyncPanel({
   const [selected, setSelected] = useState<number | null>(null)
   const [connecting, setConnecting] = useState<DocSyncProvider | null>(null)
   const [scopeFor, setScopeFor] = useState<string | null>(null)
+  // The credential form again, for a store this trip is already bound to. Kept
+  // apart from `connecting`, whose next step is the folder picker: here the
+  // folder is known and the next step is the run that the refusal stopped.
+  const [reconnecting, setReconnecting] = useState<DocSyncProvider | null>(null)
 
   const bound = useMemo(() => new Set(sync.links.map(l => l.providerId)), [sync.links])
   const available = sync.providers.filter(p => !bound.has(p.id))
   const active = sync.links.find(l => l.id === selected) ?? sync.links[0] ?? null
+  // Undefined once an admin has switched the store off: the form needs the
+  // provider's field list, and the providers route no longer carries it.
+  const activeProvider = active ? sync.providers.find(p => p.id === active.providerId) : undefined
 
   // Follow the list: a freshly bound store should be the one on screen, and a
   // removed one must not leave the detail column pointing at nothing.
@@ -98,8 +105,20 @@ export default function DocSyncPanel({
                     providerName={storeName(active, sync.providers)}
                     sync={sync}
                     canManage={canManage}
+                    onReconnect={activeProvider ? () => setReconnecting(activeProvider) : undefined}
                   />
-                  {attention > 0 && <Attention counts={sync.itemCounts} tripId={tripId} sync={sync} />}
+                  {/* Every action in this column reports here: a refused run, a
+                      switch that flipped back, a conflict the server would not
+                      settle. The two dialogs say their own, but nothing said
+                      what happened to a click on the card itself. */}
+                  {sync.error && (
+                    <p role="alert" className="rounded-xl border border-edge bg-danger-soft px-3 py-2.5 text-caption text-danger">
+                      {t(`docsync.error.${sync.error}`)}
+                    </p>
+                  )}
+                  {attention > 0 && (
+                    <Attention counts={sync.itemCounts} tripId={tripId} sync={sync} canManage={canManage} />
+                  )}
                 </div>
               ) : (
                 <NothingBound canManage={canManage} />
@@ -115,6 +134,22 @@ export default function DocSyncPanel({
           sync={sync}
           onClose={() => setConnecting(null)}
           onConnected={id => { setConnecting(null); setScopeFor(id) }}
+        />
+      )}
+
+      {reconnecting && (
+        <DocSyncConnectModal
+          provider={reconnecting}
+          sync={sync}
+          onClose={() => setReconnecting(null)}
+          onConnected={id => {
+            setReconnecting(null)
+            // Run straight away, as binding does: the card still reports the
+            // refusal until a run says otherwise, and the person has just
+            // done the one thing that could change the answer.
+            const rebound = sync.links.find(l => l.providerId === id)
+            if (rebound) void sync.syncNow(rebound.id)
+          }}
         />
       )}
 
@@ -267,10 +302,12 @@ function Attention({
   counts,
   tripId,
   sync,
+  canManage,
 }: {
   counts: Record<string, number>
   tripId: number | string
   sync: ReturnType<typeof useDocSync>
+  canManage: boolean
 }) {
   const { t } = useTranslation()
   const rows = ATTENTION_STATES.filter(k => (counts[k] ?? 0) > 0)
@@ -292,8 +329,10 @@ function Attention({
                 <span className="mt-0.5 block text-caption text-content-muted">{t(`docsync.issues.${k}`)}</span>
               </span>
               {/* A conflict is the one of these a person can act on, so it is
-                  the one that opens. The rest are a state to read. */}
-              {k === 'conflict' ? (
+                  the one that opens. The rest are a state to read. Only for
+                  the owner: the server refuses a member's choice, so a member
+                  gets the count, like every other row. */}
+              {k === 'conflict' && canManage ? (
                 <button
                   type="button"
                   onClick={() => setShowConflicts(v => !v)}
@@ -306,7 +345,7 @@ function Attention({
               )}
             </div>
 
-            {k === 'conflict' && showConflicts && (
+            {k === 'conflict' && canManage && showConflicts && (
               <ul className="mt-3 space-y-2">
                 {conflicts.items === null && (
                   <li className="flex justify-center py-2">

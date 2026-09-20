@@ -18,12 +18,23 @@ export class SystemNoticesService {
     private readonly env: RuntimeEnvService,
   ) {}
 
-  getActiveFor(userId: number): SystemNoticeDto[] {
-    return getActiveNoticesFor(
+  /**
+   * `supports` names the layouts the calling bundle can draw. A notice with a release
+   * block is held back from a bundle that does not name `release`: after an update the
+   * service worker keeps serving the previous bundle until the new one is installed,
+   * and that bundle would draw the release notice as bare keys and let the reader
+   * dismiss it for good, because the dismissal is recorded against the server's
+   * version. A bundle that never sends the parameter loses only the notice it could
+   * not read anyway and gets it after the reload. Nothing is spent by holding it back:
+   * a notice is used up by a dismissal and by nothing else.
+   */
+  getActiveFor(userId: number, supports: ReadonlySet<string> = new Set()): SystemNoticeDto[] {
+    const notices = getActiveNoticesFor(
       userId,
       (addonId) => this.addons.isAddonEnabled(addonId),
       this.env.isManaged(),
     ) as SystemNoticeDto[];
+    return supports.has('release') ? notices : notices.filter(n => !n.release);
   }
 
   dismiss(userId: number, noticeId: string): boolean {

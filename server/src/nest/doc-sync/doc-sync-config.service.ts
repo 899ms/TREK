@@ -6,6 +6,7 @@ import { checkSsrf } from '../../utils/ssrfGuard';
 import { DocumentProviderRegistry } from './document-provider.registry';
 import type { DocumentConnectionRef, DocumentScopeRef, DocResult } from './document-provider';
 import { docFailed } from './document-provider';
+import { sameOrigin } from './doc-sync.helpers';
 import { decryptSecrets, encryptSecrets, maskSecrets, mergeSecrets } from './doc-sync-secrets';
 
 /**
@@ -239,9 +240,23 @@ export class DocSyncConfigService {
    * Secrets that arrive blank or masked keep their stored value, so a client
    * that renders the form from a GET never has to hold the real credential.
    * A secret the provider earned itself is kept too, whatever the form sends.
-   * DSM's device token is stored with the address and account it was issued
-   * for, so an edit that points the connection somewhere else leaves it
-   * unusable, and the adapter drops it on its next call.
+   *
+   * Only for the address the credential was stored against, the same rule the
+   * probe route applies. Written under a new host, a blank form would carry
+   * the stored token to a server of the caller's choosing: a trip changes
+   * hands with its connection, and the new owner, or an instance admin, could
+   * point the previous owner's Paperless token at a machine of their own and
+   * read it off the first request. A new address takes the credentials typed
+   * for it and nothing stored, DSM's device token included: it was issued for
+   * the old address and account and would only be sent somewhere it does not
+   * belong.
+   *
+   * `owner_user_id` names whose credential the connection runs under. It moves
+   * to the caller only when the caller typed every required secret in, so the
+   * connection now runs on a credential of their own; an edit that keeps the
+   * stored one keeps its owner, or the orphan check would read the previous
+   * owner's token as the caller's own. An optional secret alone (DSM's
+   * one-time code) does not count: it is used against the stored password.
    */
   async upsertConnection(
     tripId: number,
@@ -260,7 +275,23 @@ export class DocSyncConfigService {
       .get(tripId, input.providerId) as ConnectionRow | undefined;
 
     const storedSecrets = existing ? decryptSecrets(existing.secrets) : {};
-    const nextSecrets = mergeSecrets(storedSecrets, input.credentials, secretKeys);
+    // What the form actually filled in, by the same rule the merge below uses.
+    const typedSecrets = mergeSecrets({}, input.credentials, secretKeys);
+    const sameTarget = !existing || sameOrigin(existing.base_url, urlCheck.data.url);
+    if (!sameTarget) {
+      const kept = fields.find(
+        (f) => f.secret === 1 && f.required === 1 && !!storedSecrets[f.field_key] && !typedSecrets[f.field_key],
+      );
+      if (kept) {
+        return {
+          success: false,
+          error: { code: 'unauthorized', detail: `${kept.field_key} has to be entered again for a new address` },
+        };
+      }
+    }
+    const nextSecrets = sameTarget ? mergeSecrets(storedSecrets, input.credentials, secretKeys) : typedSecrets;
+    const ownCredential = fields.every((f) => f.secret !== 1 || f.required !== 1 || !!typedSecrets[f.field_key]);
+    const ownerId = existing && !ownCredential ? existing.owner_user_id : userId;
 
     const settings: Record<string, string> = {};
     for (const key of plainKeys) {
@@ -294,7 +325,7 @@ export class DocSyncConfigService {
                     owner_user_id = ?, updated_at = CURRENT_TIMESTAMP
               WHERE id = ?`,
           )
-          .run(urlCheck.data.url, encrypted, settingsJson, insecure, userId, existing.id);
+          .run(urlCheck.data.url, encrypted, settingsJson, insecure, ownerId, existing.id);
         return this.getConnection(existing.id) as ConnectionRow;
       }
       const info = this.db.connection
@@ -467,12 +498,25 @@ export class DocSyncConfigService {
       lastSyncError: link.last_sync_error,
       failureCount: link.failure_count,
       // Shown so a user can paste it into a provider that will not let TREK
-      // subscribe on its own (Papra, and Nextcloud without admin rights).
-      webhookUrl: webhookBaseUrl && link.webhook_token
+      // subscribe on its own (Papra, and Nextcloud without admin rights). Not
+      // for a provider that takes no webhook at all: an address with nowhere
+      // to paste it only promises what the timer delivers anyway.
+      webhookUrl: webhookBaseUrl && link.webhook_token && this.takesWebhook(link)
         ? `${webhookBaseUrl}/api/docsync/webhook/${link.webhook_token}`
         : null,
       webhookSecret: link.webhook_secret ? DOCSYNC_SECRET_MASK : null,
     };
+  }
+
+  /**
+   * Whether the store behind a binding can call TREK at all, as the last probe
+   * recorded it. Unknown counts as yes: a connection that was never probed
+   * still gets the address, and a stale answer costs nothing but a line.
+   */
+  private takesWebhook(link: LinkRow): boolean {
+    const recorded = this.getConnection(link.connection_id)?.capabilities;
+    const caps = recorded ? safeParse(recorded) : null;
+    return !(caps && typeof caps === 'object' && (caps as { push?: unknown }).push === 'none');
   }
 
   /**

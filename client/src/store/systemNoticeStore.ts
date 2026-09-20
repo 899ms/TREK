@@ -25,7 +25,12 @@ export const useSystemNoticeStore = create<SystemNoticeState>()((set, get) => ({
     if (get().fetching || get().loaded) return;
     set({ fetching: true });
     try {
-      const res = await axios.get('/system-notices/active');
+      // Names the layouts this bundle can draw. The server holds the release notice
+      // back from a bundle that does not say so: after an update the service worker
+      // serves the previous bundle until the new one is installed, and that bundle
+      // would draw the release notice as bare keys and let the reader dismiss it for
+      // good. It gets the notice after the reload, from this very line.
+      const res = await axios.get('/system-notices/active', { params: { supports: 'release' } });
       const notices = parseInDev(systemNoticeDtoSchema.array(), res.data, 'systemNotices.fetch');
       set({ notices, loaded: true, fetching: false });
     } catch (err) {

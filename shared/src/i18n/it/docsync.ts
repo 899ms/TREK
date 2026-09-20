@@ -179,6 +179,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Questo provider non è disponibile su questa istanza.',
   'docsync.error.provider_disabled': 'In pausa: un amministratore ha disattivato questo provider. La sincronizzazione riprende appena viene riattivato.',
+  'docsync.binding.reconnect': 'Riconnetti',
 };
 
 export default docsync;

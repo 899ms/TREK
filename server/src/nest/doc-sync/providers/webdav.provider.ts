@@ -21,6 +21,8 @@ import {
   encodePath,
   normalizeOrigin,
   normalizePath,
+  prefixOf,
+  stripPrefix,
   type WebdavCreds,
   type WebdavEntry,
   type WebdavFlavor,
@@ -113,10 +115,20 @@ export function flavorOf(conn: DocumentConnectionRef): WebdavFlavor | null {
   return null;
 }
 
+/**
+ * A usable base: scheme and host, then the install's own path if it has one.
+ * The second group is that path (`/nextcloud`), or '' for an install at the
+ * root, which is what most Docker and snap setups are. A Nextcloud under a
+ * sub-path is the ordinary package install, and refusing it here used to read
+ * as "wrong password" on the settings screen.
+ */
+const BASE_URL = /^(https?:\/\/[^/]+)((?:\/[^/]+)*)$/i;
+
 function credsOf(conn: DocumentConnectionRef): WebdavCreds | null {
   const flavor = flavorOf(conn);
   const origin = normalizeOrigin(conn.baseUrl);
-  if (!flavor || !/^https?:\/\/[^/]+$/i.test(origin)) return null;
+  const base = BASE_URL.exec(origin);
+  if (!flavor || !base) return null;
 
   const username =
     flavor === 'nextcloud'
@@ -128,7 +140,7 @@ function credsOf(conn: DocumentConnectionRef): WebdavCreds | null {
       : textSetting(conn.secrets, 'app_token');
   if (!username || !password) return null;
 
-  return { origin, username, password, allowInsecureTls: conn.allowInsecureTls, flavor };
+  return { origin, prefix: base[2], username, password, allowInsecureTls: conn.allowInsecureTls, flavor };
 }
 
 /** `/remote.php/dav/files/<login>`: the per-account root of Nextcloud's file DAV. */
@@ -759,9 +771,11 @@ export class WebdavDocumentProvider implements DocumentProvider {
     // The stored root is the space's own webDavUrl. Only its path is used, and
     // it is re-based on the connection's origin: the URL came out of a provider
     // response, and following the host in it would hand an attacker who can
-    // answer for that instance a way past the SSRF guard.
+    // answer for that instance a way past the SSRF guard. The origin already
+    // carries the install's prefix, so the path is stored with it and loses it
+    // here, or the request would spell it twice.
     const path = scope.remoteRootPath ? davPathOf(scope.remoteRootPath) : null;
-    const rootPath = path ?? `/dav/spaces/${encodeURIComponent(scopeId)}`;
+    const rootPath = path === null ? `/dav/spaces/${encodeURIComponent(scopeId)}` : stripPrefix(path, prefixOf(creds));
     let decoded: string;
     try {
       decoded = normalizePath(decodeURIComponent(rootPath));

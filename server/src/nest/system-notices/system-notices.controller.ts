@@ -1,9 +1,20 @@
-import { Controller, Get, HttpCode, HttpException, Param, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpException, Param, Post, Query, UseGuards } from '@nestjs/common';
 import type { SystemNoticeDto } from '@trek/shared';
 import type { User } from '../../types';
 import { SystemNoticesService } from './system-notices.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
+
+/**
+ * `?supports=release` names the layouts the calling bundle can draw, comma separated.
+ * A missing or malformed value means none, which is what every bundle before this
+ * parameter sent.
+ */
+function parseSupports(raw: string | string[] | undefined): Set<string> {
+  const values = Array.isArray(raw) ? raw : [raw];
+  const names = values.flatMap(v => (typeof v === 'string' ? v.split(',') : []));
+  return new Set(names.map(s => s.trim()).filter(Boolean));
+}
 
 /**
  * /api/system-notices — active announcements for the current user + dismissal.
@@ -19,8 +30,8 @@ export class SystemNoticesController {
   constructor(private readonly notices: SystemNoticesService) {}
 
   @Get('active')
-  active(@CurrentUser() user: User): SystemNoticeDto[] {
-    return this.notices.getActiveFor(user.id);
+  active(@CurrentUser() user: User, @Query('supports') supports?: string | string[]): SystemNoticeDto[] {
+    return this.notices.getActiveFor(user.id, parseSupports(supports));
   }
 
   @Post(':id/dismiss')

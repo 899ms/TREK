@@ -265,5 +265,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Без платних доріг',
   'roadtrip.alt.noFerry': 'Без порома',
   'roadtrip.summary.partial': 'Решта маршруту ще обчислюється',
+  'roadtrip.stay.releaseTitle': 'Прибрати ночівлю?',
+  'roadtrip.stay.releaseBody': 'Ночівлю в «{name}» буде вилучено. Зупинка залишиться на маршруті як пауза.',
+  'roadtrip.stay.releaseBookedBody': 'Ночівлю в «{name}» буде вилучено разом із бронюванням «{booking}» і пов’язаними витратами. Зупинка залишиться на маршруті як пауза.',
+  'roadtrip.stay.releaseAction': 'Зробити паузою',
 };
 export default roadtrip;

@@ -175,6 +175,102 @@ describe('upsertConnection secrets', () => {
     expect(count.n).toBe(1);
   });
 
+  /**
+   * A stored secret only ever goes to the address it was stored against.
+   *
+   * Merged under a new host, a blank form carried the token there: a trip
+   * changes hands with its connection, and the new owner or an instance admin
+   * could point the previous owner's Paperless token at a server of their own
+   * and read it off the first request. The probe route had this rule; the
+   * save route did not.
+   */
+  describe('under a new address', () => {
+    it('refuses to carry the stored secret over, and writes nothing', async () => {
+      const created = await connect();
+      const result = await svc.upsertConnection(TRIP, MEMBER, connectionInput({
+        baseUrl: 'https://attacker.example.net',
+        credentials: {},
+      }));
+
+      expect(docFailed(result)).toBe(true);
+      expect(docFailed(result) && result.error.code).toBe('unauthorized');
+      const row = svc.getConnection(created.id) as ConnectionRow;
+      expect(row.base_url).toBe('https://paperless.example.com');
+      expect(row.owner_user_id).toBe(OWNER);
+      expect(storedSecret(created.id)).toBe(TOKEN);
+    });
+
+    it('refuses the mask as well, since the mask is not the credential', async () => {
+      await connect();
+      const result = await svc.upsertConnection(TRIP, OWNER, connectionInput({
+        baseUrl: 'https://paperless.example.net',
+        credentials: { api_token: DOCSYNC_SECRET_MASK },
+      }));
+      expect(docFailed(result) && result.error.code).toBe('unauthorized');
+    });
+
+    it('takes a credential typed in for it', async () => {
+      const created = await connect();
+      const moved = await connect({ baseUrl: 'https://paperless.example.net', credentials: { api_token: 'new-token' } });
+      expect(moved.id).toBe(created.id);
+      expect(moved.base_url).toBe('https://paperless.example.net');
+      expect(storedSecret(created.id)).toBe('new-token');
+    });
+
+    it('drops a secret the provider earned for the old address, even when the form is complete', async () => {
+      const conn = await connect({ providerId: 'synologydrive', baseUrl: 'https://nas.example.com:5001', credentials: { username: 'anna', password: 'nas-pw' } });
+      svc.saveEarnedSecret(conn.id, 'device_token', 'a1b2c3:DEVICE-7');
+
+      await connect({ providerId: 'synologydrive', baseUrl: 'https://nas.example.net:5001', credentials: { username: 'anna', password: 'nas-pw' } });
+
+      expect(svc.toRef(svc.getConnection(conn.id) as ConnectionRow).secrets).toEqual({ password: 'nas-pw' });
+    });
+
+    it('reads a path or a trailing slash on the same server as the same address', async () => {
+      const created = await connect();
+      await connect({ baseUrl: 'https://paperless.example.com/paperless/', credentials: {} });
+      expect(storedSecret(created.id)).toBe(TOKEN);
+    });
+
+    it('reads another port or scheme as another server', async () => {
+      await connect();
+      const port = await svc.upsertConnection(TRIP, OWNER, connectionInput({ baseUrl: 'https://paperless.example.com:8443', credentials: {} }));
+      const scheme = await svc.upsertConnection(TRIP, OWNER, connectionInput({ baseUrl: 'http://paperless.example.com', credentials: {} }));
+      expect(docFailed(port)).toBe(true);
+      expect(docFailed(scheme)).toBe(true);
+    });
+  });
+
+  /**
+   * Who the credential belongs to is written down with it, and the orphan
+   * check reads it: a binding stands down once that person leaves the trip.
+   * The caller took the row over on every save, so an edit that kept the
+   * stored token read as the caller's own token from then on.
+   */
+  describe('the credential owner', () => {
+    it('stays with the person whose secret is stored when somebody else saves the form blank', async () => {
+      const created = await connect();
+      await connect({ credentials: {} }, MEMBER);
+      expect((svc.getConnection(created.id) as ConnectionRow).owner_user_id).toBe(OWNER);
+    });
+
+    it('moves to the person who typed a new secret in', async () => {
+      const created = await connect();
+      await connect({ credentials: { api_token: 'members-own-token' } }, MEMBER);
+      expect((svc.getConnection(created.id) as ConnectionRow).owner_user_id).toBe(MEMBER);
+    });
+
+    it('stays put when only an optional secret is typed, since that runs against the stored password', async () => {
+      const nas = { providerId: 'synologydrive' as const, baseUrl: 'https://nas.example.com:5001' };
+      const created = await connect({ ...nas, credentials: { username: 'anna', password: 'nas-pw' } });
+      await connect({ ...nas, credentials: { username: 'anna', otp_code: '123456' } }, MEMBER);
+
+      const row = svc.getConnection(created.id) as ConnectionRow;
+      expect(row.owner_user_id).toBe(OWNER);
+      expect(svc.toRef(row).secrets).toEqual({ password: 'nas-pw', otp_code: '123456' });
+    });
+  });
+
   it('carries a non-secret setting forward when a later save omits it', async () => {
     const created = await svc.upsertConnection(TRIP, OWNER, {
       providerId: 'nextcloud',

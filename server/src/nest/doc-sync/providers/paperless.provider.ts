@@ -177,15 +177,31 @@ export function documentFileName(doc: PaperlessDocument): string {
 }
 
 /**
+ * The longest title Paperless stores. `Document.title` is a 128-character
+ * column, and a PATCH with more is refused with a validation error that reaches
+ * TREK as a bare provider_error, on every run, for as long as the name stays
+ * that long. The consumer trims an upload's title on its own; the rename path
+ * has to do it here.
+ */
+export const PAPERLESS_TITLE_MAX_LENGTH = 128;
+
+/**
  * The title for a file name. Only an extension this adapter would have ADDED is
  * removed, so a document genuinely called `Vertrag 2026.2` keeps its name.
  */
 export function titleFromFileName(name: string): string {
   const trimmed = name.trim();
   const extension = extensionOf(trimmed);
-  if (extension === null || !KNOWN_EXTENSIONS.has(extension)) return trimmed;
-  const base = trimmed.slice(0, trimmed.length - extension.length).trim();
-  return base.length > 0 ? base : trimmed;
+  const base =
+    extension === null || !KNOWN_EXTENSIONS.has(extension)
+      ? trimmed
+      : trimmed.slice(0, trimmed.length - extension.length).trim();
+  const title = base.length > 0 ? base : trimmed;
+  // Counted in code points, the way Paperless counts them: a cut by UTF-16
+  // units would split a surrogate pair and send a title Paperless cannot store.
+  const glyphs = [...title];
+  if (glyphs.length <= PAPERLESS_TITLE_MAX_LENGTH) return title;
+  return glyphs.slice(0, PAPERLESS_TITLE_MAX_LENGTH).join('').trim();
 }
 
 export function formatScopeKey(tagId: number): string {
