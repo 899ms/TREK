@@ -27,6 +27,7 @@ const { mockGetActive, mockDismiss } = vi.hoisted(() => ({ mockGetActive: vi.fn(
 vi.mock('../../src/systemNotices/service', () => ({
   getActiveNoticesFor: mockGetActive,
   dismissNotice: mockDismiss,
+  getCurrentAppVersion: () => '4.3.0',
 }));
 
 import { SystemNoticesModule } from '../../src/nest/system-notices/system-notices.module';
@@ -95,11 +96,21 @@ describe('System-notices e2e (real auth guard + temp SQLite)', () => {
       expect(res.body).toEqual([notice]);
     });
 
-    it('delivers the release notice to a client that announces the layout', async () => {
+    it('holds it back from a bundle that announces the layout but was built for another version', async () => {
       mockGetActive.mockReturnValue([release, notice]);
       const res = await request(server)
         .get('/api/system-notices/active')
-        .query({ supports: 'release' })
+        .query({ supports: 'release', ui: '4.2.1' })
+        .set('Cookie', sessionCookie(1));
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual([notice]);
+    });
+
+    it('delivers the release notice to a client that announces the layout for the running version', async () => {
+      mockGetActive.mockReturnValue([release, notice]);
+      const res = await request(server)
+        .get('/api/system-notices/active')
+        .query({ supports: 'release', ui: '4.3.0' })
         .set('Cookie', sessionCookie(1));
       expect(res.status).toBe(200);
       expect(res.body).toEqual([release, notice]);
