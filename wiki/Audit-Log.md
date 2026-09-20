@@ -25,7 +25,7 @@ Actions are grouped by area below. The **Action key** is the raw value stored in
 | `user.password_reset_success` | Password reset completed |
 | `user.password_reset_fail` | Password reset attempt rejected (`reason` in details) |
 
-A request for an account that can actually be reset writes **two** rows: one with `delivered: "pending"` when the mail is handed off, one with the delivery result. Every other outcome writes a single row carrying a `reason` instead — `no_user`, `oidc_only`, `throttled_per_email` or `password_login_disabled`. Passkey logins are not a separate key: they land as `user.login` with `method: passkey` in the details.
+A request for an account that can actually be reset writes **two** rows: one with `delivered: "pending"` when the mail is handed off, one with the delivery result. Every other outcome writes a single row carrying a `reason` instead — `no_user`, `oidc_only`, `throttled_per_email` or `password_login_disabled`. Passkey logins are not a separate key: they land as `user.login` with `method: passkey` in the details, and SSO logins the same way with `method: oidc`.
 
 ### MFA
 

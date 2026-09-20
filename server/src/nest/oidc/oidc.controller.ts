@@ -182,6 +182,11 @@ export class OidcController {
       }
 
       this.oidc.touchLastLogin(result.user.id);
+      // The login row every other method writes (#2417). Here rather than at
+      // /exchange, because this is where the provider has vouched for the user
+      // and where the client IP is, the same place the role change is recorded;
+      // `method` names the way in, as the passkey login does.
+      this.audit.writeAudit({ userId: result.user.id, action: 'user.login', ip: getClientIp(req), details: { method: 'oidc' } });
       // Pass the flag through untouched: `undefined` must reach the token as
       // "absent", not `false`, or the sliding renewal would later downgrade the
       // default persistent cookie to a browser-session one (remember-me, #1927).
