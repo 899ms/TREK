@@ -1468,7 +1468,7 @@ img[alt="TREK"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 8 auto;
+  flex: 0 100 auto;
   min-width: 2.5em;
 }
 .collab-link-chip__actions {
