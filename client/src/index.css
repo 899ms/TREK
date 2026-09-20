@@ -1375,6 +1375,111 @@ img[alt="TREK"] {
   justify-content: center;
 }
 
+/* Shared links in the Collab tab: one chip per link, flowing like tags. The chip is
+   the link; edit, pin and delete sit folded into its tail and unfold on hover or
+   keyboard focus, and stay unfolded where there is no hover to speak of. */
+.collab-link-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 8px 5px 5px;
+  border-radius: 999px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-faint);
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.collab-link-chip:hover, .collab-link-chip:focus-within {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-primary);
+}
+.collab-link-chip--pinned {
+  background: var(--accent-subtle);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.collab-link-chip__main {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--text-primary);
+  text-decoration: none;
+  outline: none;
+}
+.collab-link-chip__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--bg-card);
+  color: var(--text-faint);
+}
+.collab-link-chip__icon img { width: 16px; height: 16px; object-fit: contain; }
+.collab-link-chip__text { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.collab-link-chip__title {
+  font-size: calc(12.5px * var(--fs-scale-body, 1));
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.collab-link-chip__host {
+  font-size: calc(10.5px * var(--fs-scale-caption, 1));
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+.collab-link-chip__open {
+  flex: 0 0 auto;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease;
+}
+.collab-link-chip:hover .collab-link-chip__open, .collab-link-chip:focus-within .collab-link-chip__open { opacity: 1; }
+.collab-link-chip__main:hover .collab-link-chip__open { color: var(--text-primary); }
+.collab-link-chip__actions {
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-width 0.2s ease, opacity 0.15s ease, margin-left 0.2s ease;
+}
+.collab-link-chip:hover .collab-link-chip__actions, .collab-link-chip:focus-within .collab-link-chip__actions {
+  max-width: 96px;
+  opacity: 1;
+  margin-left: 2px;
+}
+.collab-link-chip__action {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.collab-link-chip__action:hover, .collab-link-chip__action:focus-visible { background: var(--bg-hover); color: var(--text-primary); }
+.collab-link-chip__action--on { color: var(--accent); }
+@media (hover: none) {
+  .collab-link-chip__actions { max-width: 96px; opacity: 1; margin-left: 2px; }
+  .collab-link-chip__open { opacity: 1; }
+}
+
 /* Markdown in Collab Notes */
 .collab-note-md strong, .collab-note-md-full strong { font-weight: 700 !important; }
 .collab-note-md em, .collab-note-md-full em { font-style: italic !important; }

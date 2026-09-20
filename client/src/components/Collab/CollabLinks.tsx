@@ -18,12 +18,20 @@ interface CollabLink {
   pinned: boolean | number
 }
 
-function LinkIcon({ url, title }: { url: string; title: string }) {
+function LinkIcon({ url }: { url: string }) {
   const [failed, setFailed] = useState(false)
   let favicon = ''
   try { favicon = new URL('/favicon.ico', url).href } catch { /* not a parseable url, fall through to the glyph */ }
-  if (!favicon || failed) return <span aria-hidden="true" style={{ display: 'grid', placeItems: 'center', width: 28, height: 28, flex: '0 0 28px', borderRadius: 7, background: 'var(--bg-secondary)', color: 'var(--text-faint)' }}><Link2 size={15} /></span>
-  return <img src={favicon} alt="" aria-hidden="true" title={title} onError={() => setFailed(true)} style={{ width: 28, height: 28, flex: '0 0 28px', borderRadius: 7, objectFit: 'contain', background: 'var(--bg-secondary)' }} />
+  return (
+    <span className="collab-link-chip__icon" aria-hidden="true">
+      {!favicon || failed ? <Link2 size={13} /> : <img src={favicon} alt="" onError={() => setFailed(true)} />}
+    </span>
+  )
+}
+
+/** The part of the address worth a chip's width: the host, without a leading www. */
+function hostOf(url: string): string {
+  try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
 }
 
 /**
@@ -211,35 +219,36 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
         )}
       </div>
 
-      {/* Content */}
-      <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '0 12px 12px' }}>
+      {/* Content: one chip per link, flowing like tags (see .collab-link-chip). The chip
+          is the link, with the host beside the title; the actions unfold from its tail. */}
+      <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '2px 12px 12px' }}>
         {links.length === 0 ? (
           <EmptyState scene="links" title={t('collab.links.empty')} />
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
             {links.map(link => (
-              <div key={link.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 6px', borderBottom: '1px solid var(--border-faint)' }}>
-                <LinkIcon url={link.url} title={link.title} />
-                <a href={link.url} target="_blank" rel="noreferrer" style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', textDecoration: 'none' }}>
-                  <div style={{ fontSize: 'calc(13px * var(--fs-scale-body, 1))', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title}</div>
-                  <div style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.url}</div>
+              <div key={link.id} className={link.pinned ? 'collab-link-chip collab-link-chip--pinned' : 'collab-link-chip'}>
+                <a className="collab-link-chip__main" href={link.url} target="_blank" rel="noreferrer" title={t('collab.links.open')}>
+                  <LinkIcon url={link.url} />
+                  <span className="collab-link-chip__text">
+                    <span className="collab-link-chip__title">{link.title}</span>
+                    <span className="collab-link-chip__host">{hostOf(link.url)}</span>
+                  </span>
+                  <ExternalLink className="collab-link-chip__open" size={12} aria-hidden="true" />
                 </a>
-                {/* The glyph used to be decoration next to a row that was already a link,
-                    which read as a button that did nothing (#2414). */}
-                <a href={link.url} target="_blank" rel="noreferrer" aria-label={t('collab.links.open')} title={t('collab.links.open')} style={{ display: 'flex', color: 'var(--text-faint)' }}>
-                  <ExternalLink size={15} aria-hidden="true" />
-                </a>
-                {canEdit && <>
-                  <button type="button" onClick={() => setEditing(link)} aria-label={t('collab.links.edit')} style={{ border: 0, background: 'transparent', color: 'var(--text-faint)', cursor: 'pointer' }}>
-                    <Pencil size={15} aria-hidden="true" />
-                  </button>
-                  <button type="button" onClick={() => toggle(link)} aria-label={link.pinned ? t('collab.links.unpin') : t('collab.links.pin')} style={{ border: 0, background: 'transparent', color: link.pinned ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer' }}>
-                    <Pin size={15} fill={link.pinned ? 'currentColor' : 'none'} aria-hidden="true" />
-                  </button>
-                  <button type="button" onClick={() => remove(link.id)} aria-label={t('collab.links.delete')} style={{ border: 0, background: 'transparent', color: 'var(--text-faint)', cursor: 'pointer' }}>
-                    <Trash2 size={15} aria-hidden="true" />
-                  </button>
-                </>}
+                {canEdit && (
+                  <span className="collab-link-chip__actions">
+                    <button type="button" className="collab-link-chip__action" onClick={() => setEditing(link)} aria-label={t('collab.links.edit')} title={t('collab.links.edit')}>
+                      <Pencil size={13} aria-hidden="true" />
+                    </button>
+                    <button type="button" className={link.pinned ? 'collab-link-chip__action collab-link-chip__action--on' : 'collab-link-chip__action'} onClick={() => toggle(link)} aria-label={link.pinned ? t('collab.links.unpin') : t('collab.links.pin')} title={link.pinned ? t('collab.links.unpin') : t('collab.links.pin')}>
+                      <Pin size={13} fill={link.pinned ? 'currentColor' : 'none'} aria-hidden="true" />
+                    </button>
+                    <button type="button" className="collab-link-chip__action" onClick={() => remove(link.id)} aria-label={t('collab.links.delete')} title={t('collab.links.delete')}>
+                      <Trash2 size={13} aria-hidden="true" />
+                    </button>
+                  </span>
+                )}
               </div>
             ))}
           </div>

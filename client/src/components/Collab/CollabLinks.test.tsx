@@ -63,7 +63,8 @@ describe('CollabLinks', () => {
     );
     render(<CollabLinks tripId={1} />);
     expect(await screen.findByText('Ferry timetable')).toBeInTheDocument();
-    expect(screen.getByText('https://ferries.example/timetable')).toBeInTheDocument();
+    // The chip shows the host, not the whole address, and links to the address itself.
+    expect(screen.getByText('ferries.example')).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /ferry timetable/i })).toHaveAttribute('href', 'https://ferries.example/timetable');
   });
 
@@ -144,17 +145,19 @@ describe('CollabLinks', () => {
     await waitFor(() => expect(put).toEqual({ title: 'Ferry timetable 2026', url: 'https://ferries.example/2026' }));
     await waitFor(() => expect(screen.queryByLabelText(/link title|collab\.links\.titlePlaceholder/i)).not.toBeInTheDocument());
     expect(await screen.findByText('Ferry timetable 2026')).toBeInTheDocument();
-    expect(screen.getByText('https://ferries.example/2026')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /ferry timetable 2026/i })).toHaveAttribute('href', 'https://ferries.example/2026');
   });
 
-  it('FE-COMP-LINKS-010: the external-link glyph opens the address in a new tab', async () => {
+  it('FE-COMP-LINKS-010: the chip is the link and opens the address in a new tab', async () => {
     server.use(
       http.get('/api/trips/1/collab/links', () => HttpResponse.json({ links: [buildLink()] })),
     );
     render(<CollabLinks tripId={1} />);
-    const open = await screen.findByRole('link', { name: /open link|collab\.links\.open/i });
+    const open = await screen.findByRole('link', { name: /ferry timetable/i });
     expect(open).toHaveAttribute('href', 'https://ferries.example/timetable');
     expect(open).toHaveAttribute('target', '_blank');
+    // The host stands beside the title; the whole address would not fit a chip.
+    expect(screen.getByText('ferries.example')).toBeInTheDocument();
   });
 
   it('FE-COMP-LINKS-008: a viewer without edit rights gets no add button', async () => {
