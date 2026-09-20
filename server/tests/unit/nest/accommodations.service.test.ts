@@ -743,6 +743,38 @@ describe('the day stop a booking implies', () => {
     expect(stopsOn(day.id).map(a => a.place_id)).toEqual([afternoon.id, hotel.id]);
   });
 
+  it('ACC-022h an edit that leaves the check-in alone still corrects a night the clocks contradict', () => {
+    // Dragged behind a stop pinned to the afternoon, with a check-in at ten: a change of
+    // notes puts it back ahead of that stop, because a night sitting after an afternoon it
+    // was booked before is the plan reading back wrong. Dragged behind a stop without an
+    // hour, the same edit leaves it where the traveller put it.
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const [harbour, museum, hotel] = ['Hafen', 'Museum', 'Rostock'].map(name => createPlace(testDb, trip.id, { name }));
+    createDayAssignment(testDb, day.id, harbour.id);
+    const pinned = createDayAssignment(testDb, day.id, museum.id);
+    testDb.prepare("UPDATE day_assignments SET assignment_time = '14:00' WHERE id = ?").run(pinned.id);
+    const { accommodation } = svc.createAccommodation(trip.id, { place_id: hotel.id, start_day_id: day.id, end_day_id: day.id, check_in: '10:00' }) as any;
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([hotel.id, harbour.id, museum.id]);
+    const own = stopsOn(day.id).find(a => a.place_id === hotel.id)!;
+
+    // Behind the harbour only: allowed, and left alone.
+    testDb.prepare('UPDATE day_assignments SET order_index = 0 WHERE day_id = ? AND place_id = ?').run(day.id, harbour.id);
+    testDb.prepare('UPDATE day_assignments SET order_index = 1 WHERE id = ?').run(own.id);
+    let existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    expect((svc.updateAccommodation(accommodation.id, existing, { notes: 'late' }) as any).mirror.moved).toBeNull();
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([harbour.id, hotel.id, museum.id]);
+
+    // Behind the afternoon: contradicted by the clocks, and seated afresh, which is
+    // the front, ahead of the harbour that has no hour of its own.
+    testDb.prepare('UPDATE day_assignments SET order_index = 1 WHERE day_id = ? AND place_id = ?').run(day.id, museum.id);
+    testDb.prepare('UPDATE day_assignments SET order_index = 2 WHERE id = ?').run(own.id);
+    existing = svc.getAccommodation(accommodation.id, trip.id)!;
+    expect((svc.updateAccommodation(accommodation.id, existing, { notes: 'later' }) as any).mirror.moved).not.toBeNull();
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([hotel.id, harbour.id, museum.id]);
+  });
+
   it('ACC-023 the place is typed as lodging, so the rail draws it as a service stop', () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
