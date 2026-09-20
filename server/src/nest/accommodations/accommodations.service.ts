@@ -296,9 +296,12 @@ export class AccommodationsService {
     if (!checkIn) return 0;
     // excludeId leaves the row being re-seated out of the chain it is measured
     // against. Without it a night parked at the end of the day can find itself.
+    // Another booked night on the day counts by its check-in, so two bookings on
+    // one day settle by the clock.
     const rows = this.db.all<{ order_index: number; at: string | null }>(`
-      SELECT da.order_index, COALESCE(da.assignment_time, p.place_time) AS at
+      SELECT da.order_index, COALESCE(da.assignment_time, p.place_time, other.check_in) AS at
       FROM day_assignments da JOIN places p ON p.id = da.place_id
+      LEFT JOIN day_accommodations other ON other.id = da.accommodation_id
       WHERE da.day_id = ? AND da.id != ? ORDER BY da.order_index
     `, dayId, excludeId ?? -1);
     let seat = 0;
@@ -319,8 +322,9 @@ export class AccommodationsService {
   private seatedByCheckIn(dayId: number, ownId: number, checkIn: string | null | undefined): boolean {
     if (!checkIn) return true;
     const rows = this.db.all<{ id: number; at: string | null }>(`
-      SELECT da.id, COALESCE(da.assignment_time, p.place_time) AS at
+      SELECT da.id, COALESCE(da.assignment_time, p.place_time, other.check_in) AS at
       FROM day_assignments da JOIN places p ON p.id = da.place_id
+      LEFT JOIN day_accommodations other ON other.id = da.accommodation_id
       WHERE da.day_id = ? ORDER BY da.order_index
     `, dayId);
     const own = rows.findIndex(row => row.id === ownId);

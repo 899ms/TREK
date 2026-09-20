@@ -31,10 +31,13 @@ export function reseatBookedNights(db: Database.Database): number {
     JOIN day_accommodations a ON a.id = da.accommodation_id
     ORDER BY da.day_id, da.order_index, da.id
   `).all() as Array<{ id: number; day_id: number; check_in: string | null }>;
+  // Another night on the same day counts by its check-in, so two bookings on one
+  // day settle by the clock instead of by whichever was seated last.
   const dayRows = db.prepare(`
-    SELECT da.id, COALESCE(da.assignment_time, p.place_time) AS at,
+    SELECT da.id, COALESCE(da.assignment_time, p.place_time, other.check_in) AS at,
            (p.lat IS NOT NULL AND p.lng IS NOT NULL) AS located
     FROM day_assignments da JOIN places p ON p.id = da.place_id
+    LEFT JOIN day_accommodations other ON other.id = da.accommodation_id
     WHERE da.day_id = ?
     ORDER BY da.order_index ASC, da.created_at ASC, da.id ASC
   `);

@@ -177,6 +177,18 @@ describe('booked night reseat', () => {
     expect(vias(db).map((v) => v.id)).not.toContain(afterA);
   });
 
+  it('RESEAT-010: two nights on one day settle by their check-ins', () => {
+    const db = freshDb();
+    const [later, earlier] = [place(db, 'Rue de Paris'), place(db, 'Brandenburger Tor')];
+    stop(db, later, 0, null, night(db, later, '12:00'));
+    stop(db, earlier, 1, null, night(db, earlier, '10:00'));
+
+    reseatBookedNights(db);
+
+    expect(order(db)).toEqual([earlier, later]);
+    expect(reseatBookedNights(db)).toBe(0);
+  });
+
   it('RESEAT-008: runs again without moving anything', () => {
     const db = freshDb();
     const [fuel, hotel] = [place(db, 'Aral'), place(db, 'Rostock')];

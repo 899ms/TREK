@@ -743,6 +743,20 @@ describe('the day stop a booking implies', () => {
     expect(stopsOn(day.id).map(a => a.place_id)).toEqual([afternoon.id, hotel.id]);
   });
 
+  it('ACC-022i a second night on the day counts by its check-in', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    const [noon, morning] = ['Rue de Paris', 'Brandenburger Tor'].map(name => createPlace(testDb, trip.id, { name }));
+    svc.createAccommodation(trip.id, { place_id: noon.id, start_day_id: day.id, end_day_id: day.id, check_in: '12:00' });
+    svc.createAccommodation(trip.id, { place_id: morning.id, start_day_id: day.id, end_day_id: day.id, check_in: '10:00' });
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([morning.id, noon.id]);
+
+    const evening = createPlace(testDb, trip.id, { name: 'Late' });
+    svc.createAccommodation(trip.id, { place_id: evening.id, start_day_id: day.id, end_day_id: day.id, check_in: '18:00' });
+    expect(stopsOn(day.id).map(a => a.place_id)).toEqual([morning.id, noon.id, evening.id]);
+  });
+
   it('ACC-022h an edit that leaves the check-in alone still corrects a night the clocks contradict', () => {
     // Dragged behind a stop pinned to the afternoon, with a check-in at ten: a change of
     // notes puts it back ahead of that stop, because a night sitting after an afternoon it
