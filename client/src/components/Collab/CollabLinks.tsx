@@ -1,6 +1,6 @@
 import { CSSProperties, FormEvent, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ExternalLink, Link2, Pin, Plus, Trash2, X } from 'lucide-react'
+import { ExternalLink, Link2, Pencil, Pin, Plus, Trash2, X } from 'lucide-react'
 import { collabApi } from '../../api/client'
 import { addListener, removeListener } from '../../api/websocket'
 import { useTranslation } from '../../i18n'
@@ -27,14 +27,16 @@ function LinkIcon({ url, title }: { url: string; title: string }) {
 }
 
 /**
- * The add form as a modal, like the poll and note panels next to it. Inline it
- * pushed the list down and gave the panel a second header, which is what made
- * this tab read as a different app from its four siblings.
+ * The add and edit form as a modal, like the poll and note panels next to it.
+ * Inline it pushed the list down and gave the panel a second header, which is
+ * what made this tab read as a different app from its four siblings. With a
+ * link handed in it edits that link (#2414): a link used to be delete-and-add
+ * once its title or address needed a correction.
  */
-function AddLinkModal({ onClose, onCreate }: { onClose: () => void; onCreate: (link: { title: string; url: string }) => Promise<void> }) {
+function LinkModal({ link, onClose, onSave }: { link?: CollabLink; onClose: () => void; onSave: (link: { title: string; url: string }) => Promise<void> }) {
   const { t } = useTranslation()
-  const [title, setTitle] = useState('')
-  const [url, setUrl] = useState('')
+  const [title, setTitle] = useState(link?.title ?? '')
+  const [url, setUrl] = useState(link?.url ?? '')
   const [busy, setBusy] = useState(false)
   const valid = title.trim().length > 0 && url.trim().length > 0
 
@@ -43,10 +45,10 @@ function AddLinkModal({ onClose, onCreate }: { onClose: () => void; onCreate: (l
     if (!valid || busy) return
     setBusy(true)
     try {
-      await onCreate({ title: title.trim(), url: url.trim() })
+      await onSave({ title: title.trim(), url: url.trim() })
       onClose()
     } catch {
-      // add() already said what went wrong; the form stays open with the input in it.
+      // The caller already said what went wrong; the form stays open with the input in it.
     } finally {
       setBusy(false)
     }
@@ -66,7 +68,7 @@ function AddLinkModal({ onClose, onCreate }: { onClose: () => void; onCreate: (l
     <div role="presentation" style={{ position: 'fixed', inset: 0, background: 'var(--overlay-bg, rgba(0,0,0,0.35))', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999, padding: 16, fontFamily: FONT }} onClick={e => { if (e.target === e.currentTarget) onClose() }}>
       <form style={{ background: 'var(--bg-card)', borderRadius: 16, width: '100%', maxWidth: 400, maxHeight: '90vh', overflow: 'auto', border: '1px solid var(--border-faint)' }} onSubmit={submit}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 12px', borderBottom: '1px solid var(--border-faint)' }}>
-          <h3 style={{ fontSize: 'calc(14px * var(--fs-scale-body, 1))', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t('collab.links.add')}</h3>
+          <h3 style={{ fontSize: 'calc(14px * var(--fs-scale-body, 1))', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>{t(link ? 'collab.links.edit' : 'collab.links.add')}</h3>
           <button type="button" onClick={onClose} aria-label={t('collab.links.cancel')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-faint)', padding: 2, display: 'flex' }}><X size={16} /></button>
         </div>
         <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -99,6 +101,7 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
   const toast = useToast()
   const [links, setLinks] = useState<CollabLink[]>([])
   const [showForm, setShowForm] = useState(false)
+  const [editing, setEditing] = useState<CollabLink | null>(null)
 
   // Both are new objects on every render, so depending on them would reload the
   // list after each keystroke and drop a link that was just added back out of it.
@@ -168,6 +171,17 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
     }
   }
 
+  const edit = async (link: CollabLink, data: { title: string; url: string }) => {
+    try {
+      const d = await collabApi.updateLink(tripId, link.id, data)
+      setLinks(v => v.map(x => x.id === link.id ? d.link : x))
+    } catch (err) {
+      console.error('Failed to edit collab link:', err)
+      toast.error(t('common.error'))
+      throw err
+    }
+  }
+
   const remove = async (id: number) => {
     try {
       await collabApi.deleteLink(tripId, id)
@@ -210,8 +224,15 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
                   <div style={{ fontSize: 'calc(13px * var(--fs-scale-body, 1))', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.title}</div>
                   <div style={{ fontSize: 'calc(11px * var(--fs-scale-caption, 1))', color: 'var(--text-faint)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{link.url}</div>
                 </a>
-                <ExternalLink size={15} color="var(--text-faint)" aria-hidden="true" />
+                {/* The glyph used to be decoration next to a row that was already a link,
+                    which read as a button that did nothing (#2414). */}
+                <a href={link.url} target="_blank" rel="noreferrer" aria-label={t('collab.links.open')} title={t('collab.links.open')} style={{ display: 'flex', color: 'var(--text-faint)' }}>
+                  <ExternalLink size={15} aria-hidden="true" />
+                </a>
                 {canEdit && <>
+                  <button type="button" onClick={() => setEditing(link)} aria-label={t('collab.links.edit')} style={{ border: 0, background: 'transparent', color: 'var(--text-faint)', cursor: 'pointer' }}>
+                    <Pencil size={15} aria-hidden="true" />
+                  </button>
                   <button type="button" onClick={() => toggle(link)} aria-label={link.pinned ? t('collab.links.unpin') : t('collab.links.pin')} style={{ border: 0, background: 'transparent', color: link.pinned ? 'var(--accent)' : 'var(--text-faint)', cursor: 'pointer' }}>
                     <Pin size={15} fill={link.pinned ? 'currentColor' : 'none'} aria-hidden="true" />
                   </button>
@@ -225,8 +246,9 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
         )}
       </div>
 
-      {/* Create Modal */}
-      {showForm && <AddLinkModal onClose={() => setShowForm(false)} onCreate={add} />}
+      {/* Create and edit modals */}
+      {showForm && <LinkModal onClose={() => setShowForm(false)} onSave={add} />}
+      {editing && <LinkModal key={editing.id} link={editing} onClose={() => setEditing(null)} onSave={data => edit(editing, data)} />}
     </div>
   )
 }

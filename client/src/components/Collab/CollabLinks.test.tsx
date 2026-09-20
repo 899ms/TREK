@@ -118,6 +118,45 @@ describe('CollabLinks', () => {
     expect(screen.getByRole('button', { name: /delete link|collab\.links\.delete/i })).toBeInTheDocument();
   });
 
+  it('FE-COMP-LINKS-009: a link can be edited in place, title and address alike', async () => {
+    // #2414: a link used to be delete-and-add once it needed a correction.
+    const user = userEvent.setup();
+    let put: Record<string, unknown> | null = null;
+    server.use(
+      http.get('/api/trips/1/collab/links', () => HttpResponse.json({ links: [buildLink()] })),
+      http.put('/api/trips/1/collab/links/1', async ({ request }) => {
+        put = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ link: buildLink({ title: 'Ferry timetable 2026', url: 'https://ferries.example/2026' }) });
+      }),
+    );
+    render(<CollabLinks tripId={1} />);
+    await user.click(await screen.findByRole('button', { name: /edit link|collab\.links\.edit/i }));
+    const title = await screen.findByLabelText(/link title|collab\.links\.titlePlaceholder/i);
+    expect(title).toHaveValue('Ferry timetable');
+    await user.clear(title);
+    await user.type(title, 'Ferry timetable 2026');
+    const url = screen.getByLabelText(/https|collab\.links\.urlPlaceholder/i);
+    expect(url).toHaveValue('https://ferries.example/timetable');
+    await user.clear(url);
+    await user.type(url, 'https://ferries.example/2026');
+    await user.click(screen.getByRole('button', { name: /save link|collab\.links\.save/i }));
+
+    await waitFor(() => expect(put).toEqual({ title: 'Ferry timetable 2026', url: 'https://ferries.example/2026' }));
+    await waitFor(() => expect(screen.queryByLabelText(/link title|collab\.links\.titlePlaceholder/i)).not.toBeInTheDocument());
+    expect(await screen.findByText('Ferry timetable 2026')).toBeInTheDocument();
+    expect(screen.getByText('https://ferries.example/2026')).toBeInTheDocument();
+  });
+
+  it('FE-COMP-LINKS-010: the external-link glyph opens the address in a new tab', async () => {
+    server.use(
+      http.get('/api/trips/1/collab/links', () => HttpResponse.json({ links: [buildLink()] })),
+    );
+    render(<CollabLinks tripId={1} />);
+    const open = await screen.findByRole('link', { name: /open link|collab\.links\.open/i });
+    expect(open).toHaveAttribute('href', 'https://ferries.example/timetable');
+    expect(open).toHaveAttribute('target', '_blank');
+  });
+
   it('FE-COMP-LINKS-008: a viewer without edit rights gets no add button', async () => {
     // collab_edit reserved for the owner, on somebody else's trip.
     seedStore(usePermissionsStore, { permissions: { collab_edit: 'trip_owner' } });
