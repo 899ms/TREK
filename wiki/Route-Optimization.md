@@ -6,7 +6,7 @@ TREK calculates walking and driving times between your places and can reorder th
 
 ## Route calculation
 
-TREK uses **OSRM** (Open Source Routing Machine) to calculate routes between consecutive places in the selected day. No API key is required.
+TREK uses **OSRM** (Open Source Routing Machine) to calculate routes between consecutive places in the selected day. No API key is required. By default that is the public FOSSGIS OSRM, which allows about one request a second. An admin can point TREK at an OSRM of their own under **Admin → User Defaults** (**Own routing engine**, restart required); see [Road-Trip](Road-Trip#routing-engines).
 
 The route toggle in the day-plan footer offers a **Driving** and a **Walking** profile (each routed on the matching OSRM network). Installed plugins can add further profiles: a plugin with the `routeProvider` hook — for example an e-mobility plugin that plans charging stops — appears as an extra mode next to Driving/Walking. When such a profile is selected, that plugin computes the day's route: its geometry is drawn on the map, planned stops (e.g. chargers) appear as small dots on the line, and the leg connectors show the plugin's travel times plus any note it attaches ("25 min charge"). If the plugin fails or times out, TREK falls back to straight lines exactly as it does on an OSRM outage.
 
@@ -44,4 +44,8 @@ Two icon buttons in the day's route tools hand the current day to an external ma
 
 Both buttons are on mobile as well, in the day sheet.
 
-**See also:** [Day-Plans-and-Notes](Day-Plans-and-Notes) · [Map-Features](Map-Features) · [Display-Settings](Display-Settings)
+## Planning a whole drive
+
+For a trip that is one long drive, the [Road-Trip](Road-Trip) addon adds a **Road trip** view beside **Days**: the whole trip as one chain of legs with arrival times, daily travel times, driving limits, search along the route, via points and avoidance of toll roads, motorways and ferries.
+
+**See also:** [Day-Plans-and-Notes](Day-Plans-and-Notes) · [Map-Features](Map-Features) · [Display-Settings](Display-Settings) · [Road-Trip](Road-Trip)

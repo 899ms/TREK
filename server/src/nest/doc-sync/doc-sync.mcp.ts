@@ -98,6 +98,13 @@ export class DocSyncMcp {
     }
     const results = [];
     for (const link of links) {
+      // An orphaned binding stays stopped, as it does on the REST route and for
+      // the scheduler: its credential belongs to somebody who has left the trip,
+      // and a run would use it anyway.
+      if (this.config.isOrphaned(link)) {
+        results.push({ linkId: link.id, provider: link.provider_id, state: 'orphaned', errorCode: 'orphaned' });
+        continue;
+      }
       // Refused as the REST route refuses it, before the shelved rows below are
       // touched: a binding an admin switched off stays exactly as it was, so it
       // resumes where it stopped once the provider is back on.
@@ -115,6 +122,11 @@ export class DocSyncMcp {
     if (results.every((r) => r.errorCode === PROVIDER_DISABLED)) {
       return errorResult(
         `${PROVIDER_DISABLED}: an administrator has switched off the document store this trip is bound to, so nothing was synced. The binding and its documents are kept, and syncing resumes once the store is switched back on.`,
+      );
+    }
+    if (results.every((r) => r.errorCode === PROVIDER_DISABLED || r.errorCode === 'orphaned')) {
+      return errorResult(
+        "orphaned: the person whose account this trip's document store was connected with has left the trip, so nothing was synced. The trip owner has to connect the store again in the trip's file manager.",
       );
     }
     return ok({ runs: results });

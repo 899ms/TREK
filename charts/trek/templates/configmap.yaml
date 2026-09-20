@@ -43,6 +43,9 @@ data:
   {{- if .Values.env.ALLOW_INTERNAL_NETWORK }}
   ALLOW_INTERNAL_NETWORK: {{ .Values.env.ALLOW_INTERNAL_NETWORK | quote }}
   {{- end }}
+  {{- if .Values.env.ALLOW_LINK_LOCAL_IPS }}
+  ALLOW_LINK_LOCAL_IPS: {{ .Values.env.ALLOW_LINK_LOCAL_IPS | quote }}
+  {{- end }}
   {{- if .Values.env.OIDC_ISSUER }}
   OIDC_ISSUER: {{ .Values.env.OIDC_ISSUER | quote }}
   {{- end }}

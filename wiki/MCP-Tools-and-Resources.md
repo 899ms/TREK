@@ -2,7 +2,7 @@
 
 TREK exposes **tools** (read and write actions) and **resources** (read-only `trek://` URIs). Tools are registered per-session based on OAuth scopes and enabled addons.
 
-For addon-gated tools (Packing, To-Dos, Atlas, Collab, Collections, Vacay, Journey) and their resources, see [MCP-Addon-Tools](MCP-Addon-Tools).
+For addon-gated tools (Packing, To-Dos, Atlas, Collab, Collections, Vacay, Journey, Dawarich, Document sync, Road trip) and their resources, see [MCP-Addon-Tools](MCP-Addon-Tools).
 
 ## Tools
 
@@ -61,7 +61,7 @@ Requires `places:read` or `places:write` scope.
 | `bulk_delete_places` | Delete multiple places by ID. Removes all day assignments. Cannot be undone. |
 | `import_places_from_url` | Import all places from a publicly shared Google Maps or Naver Maps list URL. |
 | `list_categories` | List all available place categories with id, name, icon, and color. |
-| `search_place` | Search for a place by name or address. Returns `osm_id` and `google_place_id` for use in `create_place`. |
+| `search_place` | Search for a place by name or address, the way the full search in the app does: TREK's own place index and OpenStreetMap together, and Google or Amap only when both are empty. Returns `osm_id` (and `google_place_id` / `google_ftid` when Google answered) for use in `create_place`. Takes an optional `locationBias` to rank results around the trip's destination. |
 
 ### Day Planning
 
@@ -169,7 +169,8 @@ Requires `places:read` or `places:write` scope.
 |---|---|---|
 | `get_place_details` | `geo:read` | Fetch detailed information (hours, photos, ratings) about a place by its Google Place ID. |
 | `reverse_geocode` | `geo:read` | Get a human-readable address for given coordinates. |
-| `resolve_maps_url` | `geo:read` | Resolve a Google Maps share URL to coordinates and place name. |
+| `resolve_maps_url` | `geo:read` | Resolve a Google Maps or Amap (高德地图) share URL to coordinates and place name. |
+| `search_pois` | `geo:read` | List places of one or more categories inside a map rectangle, the MCP side of the category buttons on the trip map. Answers from TREK's place index where it can and from OpenStreetMap (Overpass) otherwise, names the source of each result, and never calls Google. |
 | `search_airports` | `geo:read` | Search for airports by name, city, or IATA code. Returns IATA code, name, city, country, timezone. |
 | `get_airport` | `geo:read` | Look up an airport by IATA code (e.g. `"ZRH"`, `"CDG"`). |
 | `get_weather` | `weather:read` | Get a weather forecast for a location and date. |

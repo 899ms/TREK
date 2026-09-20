@@ -54,6 +54,9 @@ env:
   # ALLOW_INTERNAL_NETWORK: "false"
   # Set to "true" if Immich or other integrated services are hosted on a private/RFC-1918 network address.
   # Loopback (127.x) and link-local/metadata addresses (169.254.x) are always blocked.
+  # ALLOW_LINK_LOCAL_IPS: ""
+  # Comma-separated single link-local addresses TREK may reach after all, e.g. "169.254.1.2" for a host gateway.
+  # 169.254.169.x and 169.254.170.x (cloud metadata) cannot be listed; an invalid entry aborts startup.
   # OIDC_ISSUER: ""
   # OpenID Connect provider URL.
   # OIDC_CLIENT_ID: ""

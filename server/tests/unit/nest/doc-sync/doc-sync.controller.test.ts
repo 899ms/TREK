@@ -668,6 +668,23 @@ describe('a manual run', () => {
     expect(sync.retryShelvedItems).not.toHaveBeenCalled();
     expect(sync.syncLink).not.toHaveBeenCalled();
   });
+
+  it('refuses a paused binding whose owner left, although the sweep never marked it', async () => {
+    const res = await config.upsertConnection(tripId, Number(member.id), connBody({ credentials: { api_token: 'member-token' } }));
+    if ('error' in res) throw new Error('fixture failed');
+    const created = (await controller.createLink(String(tripId), owner, linkBody(res.data.id, { syncEnabled: false }), makeReq())) as { id: number };
+    sync.syncLink.mockClear();
+    testDb.prepare('DELETE FROM trip_members WHERE trip_id = ? AND user_id = ?').run(tripId, member.id);
+    try {
+      const err = await thrown(() => controller.syncNow(String(tripId), String(created.id), { full: false }));
+
+      expect(err.getStatus()).toBe(409);
+      expect(sync.retryShelvedItems).not.toHaveBeenCalled();
+      expect(sync.syncLink).not.toHaveBeenCalled();
+    } finally {
+      testDb.prepare('INSERT INTO trip_members (trip_id, user_id) VALUES (?, ?)').run(tripId, member.id);
+    }
+  });
 });
 
 describe('the document list', () => {

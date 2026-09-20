@@ -354,10 +354,9 @@ export class DocSyncController {
     const link = this.config.getLink(Number(linkId));
     if (!link || link.trip_id !== Number(tripId)) throw new HttpException('Link not found', 404);
     // An orphaned binding stays orphaned: its credential belongs to somebody who
-    // is no longer on this trip, and a manual run would use it anyway. The
-    // scheduler already refuses it (sync_enabled is 0), so without this the
-    // button was a way around that.
-    if (link.last_sync_state === 'orphaned') {
+    // is no longer on this trip. The run itself would stand down as well; this
+    // says why, instead of answering with an empty run.
+    if (this.config.isOrphaned(link)) {
       throw new HttpException({ error: 'This binding lost its owner and has to be reconnected' }, 409);
     }
     // Refused before the shelved rows are touched, so a binding an admin

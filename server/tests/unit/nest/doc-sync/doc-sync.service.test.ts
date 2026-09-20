@@ -394,6 +394,16 @@ describe('DocSyncService', () => {
       const nearly = makeLink({ failureCount: LINK_CIRCUIT_OPEN_AFTER - 1 });
       expect(service.dueLinks().map((l) => l.id)).toEqual([nearly.id]);
     });
+
+    it('leaves out an orphaned binding even when Sync automatically was switched back on', () => {
+      // It would never run, so it would never get a last_sync_at and would take
+      // one of the slots on every tick.
+      const orphaned = makeLink({ lastSyncAt: null });
+      testDb.prepare("UPDATE trip_document_links SET last_sync_state = 'orphaned' WHERE id = ?").run(orphaned.id);
+      const live = makeLink({ lastSyncAt: sqlTime('-1 minute') });
+
+      expect(service.dueLinks().map((l) => l.id)).toEqual([live.id]);
+    });
   });
 
   describe('syncLink', () => {
@@ -1052,6 +1062,21 @@ describe('DocSyncService', () => {
 
       expect(res).toMatchObject({ state: 'ok', pulled: 1 });
       expect(fileRows()).toHaveLength(1);
+    });
+
+    it('never runs an orphaned binding, whoever asks', async () => {
+      // Sync automatically switched back on puts sync_enabled to 1 again, and a
+      // webhook or a resolved conflict calls syncLink without asking first.
+      const link = makeLink();
+      testDb.prepare("UPDATE trip_document_links SET last_sync_state = 'orphaned' WHERE id = ?").run(link.id);
+      const before = linkRow(link.id);
+
+      const res = await service.syncLink(config.getLink(link.id));
+
+      expect(res.state).toBe('orphaned');
+      expect(provider.resolveScope).not.toHaveBeenCalled();
+      expect(provider.list).not.toHaveBeenCalled();
+      expect(linkRow(link.id)).toEqual(before);
     });
 
     it('answers the same question for any caller that has to refuse up front', () => {

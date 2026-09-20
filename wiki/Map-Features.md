@@ -44,7 +44,7 @@ A card above the button lists the days: each one by its title, or by its number 
 
 The total is real routed distance summed over every leg — road geometry from the router, not straight lines between stops — which is what makes it worth building a fuel estimate on. It arrives a few legs at a time: while they are still coming in the total is followed by an ellipsis to say it is a partial sum, and it settles once every leg has answered. A leg the router refuses keeps its straight line on the map and contributes nothing to the total, so a trip with an unroutable hop reads low rather than wrong. Days with fewer than two located stops have no route and are left out of the list entirely.
 
-Road trip mode already draws the whole trip its own way, so the button is not offered while it is on.
+[Road trip mode](Road-Trip) already draws the whole trip its own way, so the button is not offered while it is on.
 
 ## GPX tracks
 

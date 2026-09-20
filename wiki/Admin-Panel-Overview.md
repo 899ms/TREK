@@ -19,24 +19,24 @@ The Admin Panel is divided into tabs. Most tabs are always visible; a few appear
 | **User Defaults** | Default settings applied to new users | No |
 | **Addons** | Enable or disable optional features instance-wide | No |
 | **Plugins** | Install, update, and manage plugins; rescan the plugins folder; view each plugin's error log. See [Admin-Plugins](Admin-Plugins) | No |
-| **Storage** | Storage backends, category assignment, replication, health | Hidden on managed instances |
+| **Storage** | Storage backends, category assignment, replication, health | No |
 | **Settings** | Authentication methods, MFA, allowed file types, API keys, OIDC/SSO configuration, and JWT secret rotation | No |
 | **Notifications** | SMTP, webhook, ntfy, and push notification channel configuration; trip reminder toggle; admin notification preferences | No |
-| **Backup** | Manual and scheduled full-instance backups: database, uploads, plugin data and plugin code. See [Backups](Backups) | Hidden on managed instances |
+| **Backup** | Manual and scheduled full-instance backups: database, uploads, plugin data and plugin code. See [Backups](Backups) | No |
 | **Audit** | Chronological activity log | No |
 | **MCP Access** | OAuth sessions and static API tokens | Only when the MCP addon is enabled |
-| **GitHub** | Release timeline and support links | Hidden on managed instances |
+| **GitHub** | Release timeline and support links | No |
 | **Dev: Notifications** | Test notification dispatch | Only in development mode (`NODE_ENV=development`) |
 
 ![Admin panel on the User Defaults tab, setting instance-wide defaults for colour mode, temperature unit, distance unit, time format, currency and blurred booking codes](assets/AdminUserDefaults.png)
 
 ### Routing services
 
-On desktop and mobile, **User Defaults** includes optional **Custom routing instance** and **Custom Valhalla instance** fields in the map section. Changes save when you leave the field; **reset** restores the built-in default. These fields are hidden on managed instances.
+On desktop and mobile, **User Defaults** includes optional **Own routing engine** and **Own Valhalla instance** fields in the map section. Changes save when you leave the field; **reset** restores the built-in default.
 
-With both fields empty, TREK uses public OSRM servers for routing and the public FOSSGIS Valhalla for avoiding toll roads, motorways and ferries. Configuring only a custom routing instance disables the public Valhalla fallback. After entering a custom server URL, restart TREK and reload the page.
+With both fields empty, TREK uses public OSRM servers for routing and the public FOSSGIS Valhalla for avoiding toll roads, motorways and ferries. Configuring only a custom routing instance disables the public Valhalla fallback. After entering a custom server URL, restart TREK and reload the page. See [Road-Trip](Road-Trip#routing-engines).
 
-> **AI / MCP:** These fields configure browser routing services and do not change stored trip data.
+> **AI / MCP:** These fields configure the routing services the planner and the road trip MCP tools use, and do not change stored trip data.
 
 ### Linking to a tab directly
 
@@ -50,7 +50,7 @@ Unlike the trip planner's `tab` parameter, this one stays in the address bar and
 
 | Tab | Id |
 |-----|-----|
-| Users | `users` (the default — carries no `?tab=`) |
+| Users | `users` (the default, carries no `?tab=`) |
 | Personalization | `config` |
 | User Defaults | `defaults` |
 | Addons | `addons` |
@@ -64,13 +64,13 @@ Unlike the trip planner's `tab` parameter, this one stays in the address bar and
 | GitHub | `github` |
 | Dev: Notifications | `dev-notifications` |
 
-An id with no panel behind it opens **Users**, and on a managed instance the three tabs hidden there — `storage`, `github` and `backup` — fall back to **Users** as well. The other two conditional tabs behave differently: `mcp-tokens` and `dev-notifications` open their panel even when the MCP addon is off or the instance is not in development mode, with nothing highlighted in the sidebar, because the entry is missing from it.
+An id with no panel behind it opens **Users**. The two conditional tabs behave differently: `mcp-tokens` and `dev-notifications` open their panel even when the MCP addon is off or the instance is not in development mode, with nothing highlighted in the sidebar, because the entry is missing from it.
 
 ## Plugin activity and audit
 
 Plugins that are granted data-access capabilities have every host-mediated action they take recorded in a tamper-evident, hash-chained log. This log is separate from the instance **Audit** tab described above.
 
-- **Admins** can review the per-plugin capability audit — every core-data read, broadcast, notification, and AI call a plugin made, with the acting user, the resource touched, and the outcome. It is served by `GET /api/admin/plugins/<id>/audit`; the admin plugin view itself currently surfaces only each plugin's error log (**View error log**).
+- **Admins** can review the per-plugin capability audit: every core-data read, broadcast, notification, and AI call a plugin made, with the acting user, the resource touched, and the outcome. It is served by `GET /api/admin/plugins/<id>/audit`; the admin plugin view itself currently surfaces only each plugin's error log (**View error log**).
 - **Every user** (not just admins) can see the plugin actions taken in their own name under **Settings → Plugins**. This is what keeps a plugin's broad read grants accountable to the person whose data was read.
 
 See [Audit-Log](Audit-Log) for details on the hash chain and how the two logs differ.

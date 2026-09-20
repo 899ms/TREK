@@ -27,8 +27,8 @@ import type { McpContext, McpTextResult, ToolOptions } from '../../../../src/nes
 
 const ctx = { userId: 7, scopes: null, isStaticToken: false } as McpContext;
 
-const link = (id: number, providerId = 'paperless'): LinkRow =>
-  ({ id, provider_id: providerId, trip_id: 3 } as LinkRow);
+const link = (id: number, providerId = 'paperless', lastSyncState: string | null = null): LinkRow =>
+  ({ id, provider_id: providerId, trip_id: 3, last_sync_state: lastSyncState } as LinkRow);
 
 const RUN = { state: 'ok', pulled: 2, pushed: 1, conflicts: 0, missing: 0 };
 
@@ -46,7 +46,12 @@ interface Setup {
 function makeMcp(over: Partial<Setup> = {}) {
   const setup: Setup = { access: true, links: [], status: {}, issues: [], addonOn: true, off: [], ...over };
   const files = { verifyTripAccess: vi.fn(() => (setup.access ? { id: 3, user_id: 7 } : undefined)) };
-  const config = { listLinks: vi.fn(() => setup.links) };
+  const config = {
+    listLinks: vi.fn(() => setup.links),
+    // The real helper also asks whether the owner is still on the trip; here
+    // the mark stands in for both.
+    isOrphaned: vi.fn((l: LinkRow) => l.last_sync_state === 'orphaned'),
+  };
   const sync = {
     status: vi.fn(() => setup.status),
     issues: vi.fn(() => setup.issues),
@@ -250,6 +255,29 @@ describe('sync_trip_documents', () => {
     const body = payload(await mcp.syncNow({ tripId: 3 }, ctx));
     expect(body.runs).toEqual([
       { linkId: 1, provider: 'paperless', state: 'disabled', errorCode: 'provider_disabled' },
+      { linkId: 2, provider: 'nextcloud', ...RUN },
+    ]);
+    expect(sync.retryShelvedItems.mock.calls).toEqual([[2]]);
+    expect(sync.syncLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses an orphaned binding as the REST route does, without touching it', async () => {
+    const { mcp, sync } = makeMcp({ links: [link(1, 'paperless', 'orphaned')] });
+    const text = refusal(await mcp.syncNow({ tripId: 3 }, ctx));
+    expect(text.startsWith('orphaned:')).toBe(true);
+    expect(text).toContain('connect the store again');
+    // The credential belongs to somebody who left the trip: no run, and the
+    // shelved rows stay shelved.
+    expect(sync.retryShelvedItems).not.toHaveBeenCalled();
+    expect(sync.syncLink).not.toHaveBeenCalled();
+  });
+
+  it('runs the bindings that still have an owner and reports the orphaned one by its code', async () => {
+    const links = [link(1, 'paperless', 'orphaned'), link(2, 'nextcloud')];
+    const { mcp, sync } = makeMcp({ links });
+    const body = payload(await mcp.syncNow({ tripId: 3 }, ctx));
+    expect(body.runs).toEqual([
+      { linkId: 1, provider: 'paperless', state: 'orphaned', errorCode: 'orphaned' },
       { linkId: 2, provider: 'nextcloud', ...RUN },
     ]);
     expect(sync.retryShelvedItems.mock.calls).toEqual([[2]]);

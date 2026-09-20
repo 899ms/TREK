@@ -21,6 +21,7 @@ import {
   numberOr,
   parseBool,
   parseDurationMs,
+  parseLinkLocalAllowList,
   positiveIntOr,
   positiveNumberOr,
   resolveDurability,
@@ -323,6 +324,7 @@ export function derivePaths(raw: RawEnv) {
 export function deriveNet(raw: RawEnv) {
   return {
     allowInternalNetwork: parseBool(raw.ALLOW_INTERNAL_NETWORK) === true,
+    allowLinkLocalIps: parseLinkLocalAllowList(raw.ALLOW_LINK_LOCAL_IPS).ips,
   };
 }
 
