@@ -219,13 +219,13 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
         )}
       </div>
 
-      {/* Content: one chip per link, flowing like tags (see .collab-link-chip). The chip
-          is the link, with the host beside the title; the actions unfold from its tail. */}
-      <div className="chat-scroll" style={{ flex: 1, overflowY: 'auto', padding: '2px 12px 12px' }}>
+      {/* Content: one chip per link, two to a row (see .collab-link-chip). The chip is
+          the link, with the host beside the title; the actions sit in its tail. */}
+      <div className="chat-scroll collab-link-grid" style={{ flex: 1, overflowY: 'auto', padding: '2px 12px 12px' }}>
         {links.length === 0 ? (
           <EmptyState scene="links" title={t('collab.links.empty')} />
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
+          <div className="collab-link-grid__cells">
             {links.map(link => (
               <div key={link.id} className={link.pinned ? 'collab-link-chip collab-link-chip--pinned' : 'collab-link-chip'}>
                 <a className="collab-link-chip__main" href={link.url} target="_blank" rel="noreferrer" title={t('collab.links.open')}>
