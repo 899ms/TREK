@@ -57,7 +57,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Une heure fixe est incompatible avec le trajet et les pauses. Les heures manuelles sont conservées ; la planification automatique est suspendue.',
   'roadtrip.window.tooLong':
-    'Ces horaires nécessitent plus de 365 jours supplémentaires. Élargissez la plage horaire quotidienne.',
+    'Ces horaires nécessitent plus de {days} jours supplémentaires. Élargissez la plage horaire quotidienne.',
   'roadtrip.mode.roadtrip': 'Road trip',
   'roadtrip.mode.days': 'Jours',
   'roadtrip.mode.label': 'Vue du plan',

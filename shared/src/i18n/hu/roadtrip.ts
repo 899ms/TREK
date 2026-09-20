@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Egy rögzített időpont ütközik az utazással és a szünetekkel. A kézi időpontok megmaradnak; az automatikus tervezés szünetel.',
   'roadtrip.window.tooLong':
-    'Ezek az időpontok több mint 365 további napot igényelnének. Válassz hosszabb napi időszakot.',
+    'Ezek az időpontok több mint {days} további napot igényelnének. Válassz hosszabb napi időszakot.',
   'roadtrip.mode.roadtrip': 'Autós út',
   'roadtrip.mode.days': 'Napok',
   'roadtrip.mode.label': 'Terv nézet',

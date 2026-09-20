@@ -53,7 +53,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Daily breaks cannot be calculated until all connecting routes are available.',
   'roadtrip.window.conflict':
     'A fixed time conflicts with the drive and daily breaks. Manual times are unchanged; automatic scheduling is paused.',
-  'roadtrip.window.tooLong': 'These travel times would require more than 365 extra days. Choose a longer daily window.',
+  'roadtrip.window.tooLong':
+    'These travel times would require more than {days} extra days. Choose a longer daily window.',
   'roadtrip.mode.roadtrip': 'Road trip',
   'roadtrip.mode.days': 'Days',
   'roadtrip.mode.label': 'Plan view',

@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Las pausas diarias necesitan todas las rutas de conexión para calcularse.',
   'roadtrip.window.conflict':
     'Una hora fija entra en conflicto con el trayecto y las pausas. Las horas manuales se conservan; la planificación automática está en pausa.',
-  'roadtrip.window.tooLong': 'Estos horarios requieren más de 365 días adicionales. Amplía el horario diario.',
+  'roadtrip.window.tooLong': 'Estos horarios requieren más de {days} días adicionales. Amplía el horario diario.',
   'roadtrip.mode.roadtrip': 'Viaje por carretera',
   'roadtrip.mode.days': 'Días',
   'roadtrip.mode.label': 'Vista del plan',

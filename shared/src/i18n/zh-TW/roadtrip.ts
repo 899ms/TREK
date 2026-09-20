@@ -49,7 +49,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.showPoint': '在地圖上顯示',
   'roadtrip.window.incomplete': '所有連接路線可用後才能計算每日休息。',
   'roadtrip.window.conflict': '固定時間與行車和休息安排衝突。手動時間保持不變，自動規劃已暫停。',
-  'roadtrip.window.tooLong': '這些時間需要超過365個額外天數。請延長每日出行時段。',
+  'roadtrip.window.tooLong': '這些時間需要超過{days}個額外天數。請延長每日出行時段。',
   'roadtrip.mode.roadtrip': '公路旅行',
   'roadtrip.mode.days': '依日',
   'roadtrip.mode.label': '計畫檢視',

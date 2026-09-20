@@ -55,7 +55,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Для розрахунку щоденних перерв потрібні всі сполучні маршрути.',
   'roadtrip.window.conflict':
     'Фіксований час суперечить поїздці та перервам. Ручні значення збережено; автоматичне планування призупинено.',
-  'roadtrip.window.tooLong': 'За цих налаштувань потрібно понад 365 додаткових днів. Збільште щоденний інтервал.',
+  'roadtrip.window.tooLong': 'За цих налаштувань потрібно понад {days} додаткових днів. Збільште щоденний інтервал.',
   'roadtrip.mode.roadtrip': 'Автоподорож',
   'roadtrip.mode.days': 'Дні',
   'roadtrip.mode.label': 'Вигляд плану',

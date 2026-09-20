@@ -55,7 +55,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Obliczenie codziennych przerw wymaga wszystkich tras łączących.',
   'roadtrip.window.conflict':
     'Stała godzina koliduje z jazdą i przerwami. Ręczne godziny pozostają bez zmian; automatyczne planowanie jest wstrzymane.',
-  'roadtrip.window.tooLong': 'Te godziny wymagają ponad 365 dodatkowych dni. Wybierz dłuższy dzienny przedział.',
+  'roadtrip.window.tooLong': 'Te godziny wymagają ponad {days} dodatkowych dni. Wybierz dłuższy dzienny przedział.',
   'roadtrip.mode.roadtrip': 'Podróż samochodowa',
   'roadtrip.mode.days': 'Dni',
   'roadtrip.mode.label': 'Widok planu',

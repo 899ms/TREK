@@ -22,7 +22,7 @@ import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
 import { useVehicleRange } from './useVehicleRange'
-import type { RoadtripStopType } from '@trek/shared'
+import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
 import type { QuietDay, RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
 import type { SpillMark } from './nightSpill'
 import { dayColor } from './dayColors'
@@ -1772,7 +1772,7 @@ export default function RoadtripSidebar({
         <TripSummary routes={routes} />
         {routes.dayWindowIssue ? (
           <p role="status" className="mx-3.5 mt-2 rounded-xl bg-warning-soft p-3 text-caption text-content">
-            {t(`roadtrip.window.${routes.dayWindowIssue}`)}
+            {t(`roadtrip.window.${routes.dayWindowIssue}`, { days: MAX_TRIP_DAYS })}
           </p>
         ) : null}
       </div>

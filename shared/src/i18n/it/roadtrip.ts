@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Un orario fisso è incompatibile con il tragitto e le pause. Gli orari manuali restano invariati; la pianificazione automatica è sospesa.',
   'roadtrip.window.tooLong':
-    'Questi orari richiederebbero oltre 365 giorni aggiuntivi. Scegli un intervallo giornaliero più lungo.',
+    'Questi orari richiederebbero oltre {days} giorni aggiuntivi. Scegli un intervallo giornaliero più lungo.',
   'roadtrip.mode.roadtrip': 'Viaggio su strada',
   'roadtrip.mode.days': 'Giorni',
   'roadtrip.mode.label': 'Vista del piano',

@@ -54,7 +54,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'يلزم توفر جميع المسارات الرابطة لحساب الاستراحات اليومية.',
   'roadtrip.window.conflict':
     'يتعارض وقت ثابت مع القيادة والاستراحات. تبقى الأوقات اليدوية كما هي؛ تم إيقاف التخطيط التلقائي مؤقتًا.',
-  'roadtrip.window.tooLong': 'تتطلب هذه الأوقات أكثر من 365 يومًا إضافيًا. اختر فترة يومية أطول.',
+  'roadtrip.window.tooLong': 'تتطلب هذه الأوقات أكثر من {days} يومًا إضافيًا. اختر فترة يومية أطول.',
   'roadtrip.mode.roadtrip': 'رحلة برية',
   'roadtrip.mode.days': 'الأيام',
   'roadtrip.mode.label': 'عرض الخطة',

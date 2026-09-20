@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Waktu tetap bertentangan dengan perjalanan dan jeda. Waktu manual tidak berubah; perencanaan otomatis dijeda.',
   'roadtrip.window.tooLong':
-    'Waktu ini memerlukan lebih dari 365 hari tambahan. Pilih rentang waktu harian yang lebih panjang.',
+    'Waktu ini memerlukan lebih dari {days} hari tambahan. Pilih rentang waktu harian yang lebih panjang.',
   'roadtrip.mode.roadtrip': 'Perjalanan darat',
   'roadtrip.mode.days': 'Hari',
   'roadtrip.mode.label': 'Tampilan rencana',

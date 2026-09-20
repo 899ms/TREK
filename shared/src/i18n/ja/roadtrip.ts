@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': '毎日の休憩を計算するには、すべての接続ルートが必要です。',
   'roadtrip.window.conflict':
     '固定時刻が移動や休憩と両立しません。手動の時刻は保持され、自動計画は一時停止しています。',
-  'roadtrip.window.tooLong': 'この設定では365日を超える追加日数が必要です。一日の移動時間を長くしてください。',
+  'roadtrip.window.tooLong': 'この設定では{days}日を超える追加日数が必要です。一日の移動時間を長くしてください。',
   'roadtrip.mode.roadtrip': 'ロードトリップ',
   'roadtrip.mode.days': '日ごと',
   'roadtrip.mode.label': 'プラン表示',

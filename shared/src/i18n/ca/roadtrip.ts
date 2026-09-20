@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Una hora fixa entra en conflicte amb el trajecte i les pauses. Es mantenen les hores manuals; la planificació automàtica està en pausa.',
   'roadtrip.window.tooLong':
-    'Aquests horaris requereixen més de 365 dies addicionals. Tria una franja diària més llarga.',
+    'Aquests horaris requereixen més de {days} dies addicionals. Tria una franja diària més llarga.',
   'roadtrip.mode.roadtrip': 'Viatge per carretera',
   'roadtrip.mode.days': 'Dies',
   'roadtrip.mode.label': 'Vista del pla',

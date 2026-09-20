@@ -1,3 +1,4 @@
+import { MAX_TRIP_DAYS } from '../trip/trip.schema';
 import { dayWindow, planDayWindow, roadtripInsertion } from './dayWindow';
 import type { RoadtripStop, RoutedLeg } from './planning-types';
 
@@ -360,9 +361,11 @@ describe('daily travel window', () => {
   });
 
   it('bounds extreme driving and stay durations', () => {
-    expect(calculate([stop(1), stop(2)], [600 * 367]).issue).toBe('tooLong');
-    // Counted against the clock, so a year of standing still is 1440 minutes a day.
-    expect(calculate([stop(1, { dwellMinutes: 1440 * 400 }), stop(2)], [1]).issue).toBe('tooLong');
+    expect(calculate([stop(1), stop(2)], [600 * (MAX_TRIP_DAYS + 2)]).issue).toBe('tooLong');
+    // Counted against the clock, so standing still is 1440 minutes a day.
+    expect(calculate([stop(1, { dwellMinutes: 1440 * (MAX_TRIP_DAYS + 35) }), stop(2)], [1]).issue).toBe('tooLong');
+    // A road trip may run as long as the trip itself.
+    expect(calculate([stop(1), stop(2)], [600 * 400]).issue).toBeNull();
   });
 
   it('maps insertions on generated days back to real stored stops', () => {

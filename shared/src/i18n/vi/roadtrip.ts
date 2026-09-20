@@ -55,7 +55,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Cần có tất cả tuyến đường nối để tính thời gian nghỉ hằng ngày.',
   'roadtrip.window.conflict':
     'Một giờ cố định xung đột với việc lái xe và nghỉ. Giờ thủ công được giữ nguyên; lập lịch tự động tạm dừng.',
-  'roadtrip.window.tooLong': 'Các giờ này cần hơn 365 ngày bổ sung. Hãy chọn khoảng thời gian mỗi ngày dài hơn.',
+  'roadtrip.window.tooLong': 'Các giờ này cần hơn {days} ngày bổ sung. Hãy chọn khoảng thời gian mỗi ngày dài hơn.',
   'roadtrip.mode.roadtrip': 'Chuyến đi đường bộ',
   'roadtrip.mode.days': 'Ngày',
   'roadtrip.mode.label': 'Chế độ xem kế hoạch',

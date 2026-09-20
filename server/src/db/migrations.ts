@@ -5146,6 +5146,72 @@ function runMigrations(db: Database.Database): void {
         .get();
       if (!hasColumn) db.exec('ALTER TABLE document_sync_items ADD COLUMN remote_trashed_at TEXT');
     },
+
+    /*
+     * Trips longer than a year lost every day past the 365th: generateDays
+     * clipped the day rows at the old limit while the trip kept its full end
+     * date, so the last days had a date but nothing to plan on (#2403). The
+     * limit is 999 now, and this gives the affected trips their missing days.
+     *
+     * Only a range whose dated days still run unbroken from the start date is
+     * extended; a trip that was re-dated by hand or lost a day in the middle is
+     * left as it is. Dateless days that still hold content stay behind the
+     * dated ones, where generateDays keeps them. The two-phase renumbering is
+     * the same dance generateDays does around UNIQUE(trip_id, day_number).
+     */
+    () => {
+      const dayAfter = (start: string, n: number) => {
+        const [y, m, d] = start.split('-').map(Number);
+        return new Date(Date.UTC(y, m - 1, d) + n * 86400000).toISOString().slice(0, 10);
+      };
+      const trips = db
+        .prepare(`
+          SELECT id, start_date, end_date,
+            CAST(julianday(end_date) - julianday(start_date) + 1 AS INTEGER) AS span
+          FROM trips
+          WHERE start_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+            AND end_date GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]'
+            AND julianday(end_date) - julianday(start_date) + 1 BETWEEN 366 AND 999
+        `)
+        .all() as { id: number; start_date: string; end_date: string; span: number }[];
+      const dayRows = db.prepare('SELECT id, date FROM days WHERE trip_id = ? ORDER BY day_number');
+      const setDayNumber = db.prepare('UPDATE days SET day_number = ? WHERE id = ?');
+      const insertDay = db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (?, ?, ?)');
+      for (const trip of trips) {
+        const rows = dayRows.all(trip.id) as { id: number; date: string | null }[];
+        const dated = rows.filter((r) => r.date);
+        if (dated.length >= trip.span) continue;
+        if (dated.some((r, i) => r.date !== dayAfter(trip.start_date, i))) continue;
+        const dateless = rows.filter((r) => !r.date);
+        rows.forEach((r, i) => setDayNumber.run(-(i + 1), r.id));
+        dated.forEach((r, i) => setDayNumber.run(i + 1, r.id));
+        for (let i = dated.length; i < trip.span; i++) insertDay.run(trip.id, i + 1, dayAfter(trip.start_date, i));
+        dateless.forEach((r, i) => setDayNumber.run(trip.span + i + 1, r.id));
+      }
+    },
+
+    /*
+     * The road-trip day boundaries carried the old trip limit as a CHECK on
+     * day_number. The limit lives in the contract now (MAX_TRIP_DAYS), so the
+     * table keeps only the floor. SQLite cannot alter a CHECK, hence the
+     * rebuild; nothing references the table, so the rows are simply copied.
+     */
+    () => {
+      db.exec(`
+        CREATE TABLE roadtrip_day_boundaries_new (
+          trip_id INTEGER NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          day_number INTEGER NOT NULL CHECK (day_number >= 1),
+          from_assignment_id INTEGER NOT NULL REFERENCES day_assignments(id) ON DELETE CASCADE,
+          to_assignment_id INTEGER REFERENCES day_assignments(id) ON DELETE CASCADE,
+          fraction REAL NOT NULL CHECK (fraction BETWEEN 0 AND 1),
+          PRIMARY KEY (trip_id, day_number)
+        );
+        INSERT INTO roadtrip_day_boundaries_new
+          SELECT trip_id, day_number, from_assignment_id, to_assignment_id, fraction FROM roadtrip_day_boundaries;
+        DROP TABLE roadtrip_day_boundaries;
+        ALTER TABLE roadtrip_day_boundaries_new RENAME TO roadtrip_day_boundaries;
+      `);
+    },
   ];
 
   if (currentVersion < migrations.length) {

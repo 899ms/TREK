@@ -54,7 +54,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Alla anslutande rutter behövs för att beräkna dagliga pauser.',
   'roadtrip.window.conflict':
     'En fast tid krockar med körningen och pauserna. Manuella tider behålls; automatisk planering är pausad.',
-  'roadtrip.window.tooLong': 'Dessa tider kräver fler än 365 extra dagar. Välj ett längre dagligt tidsintervall.',
+  'roadtrip.window.tooLong': 'Dessa tider kräver fler än {days} extra dagar. Välj ett längre dagligt tidsintervall.',
   'roadtrip.mode.roadtrip': 'Bilresa',
   'roadtrip.mode.days': 'Dagar',
   'roadtrip.mode.label': 'Planvy',

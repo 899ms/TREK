@@ -54,7 +54,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.conflict':
     'Eine feste Uhrzeit passt nicht zu Fahrzeit und Tagespausen. Manuelle Zeiten bleiben unverändert; die automatische Aufteilung pausiert.',
   'roadtrip.window.tooLong':
-    'Diese Reisezeiten erfordern mehr als 365 zusätzliche Tage. Wähle ein längeres Tagesfenster.',
+    'Diese Reisezeiten erfordern mehr als {days} zusätzliche Tage. Wähle ein längeres Tagesfenster.',
   'roadtrip.mode.roadtrip': 'Roadtrip',
   'roadtrip.mode.days': 'Tage',
   'roadtrip.mode.label': 'Plan-Ansicht',

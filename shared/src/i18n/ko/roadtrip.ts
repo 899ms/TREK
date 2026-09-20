@@ -55,7 +55,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': '매일 휴식을 계산하려면 모든 연결 경로가 필요합니다.',
   'roadtrip.window.conflict':
     '고정 시간이 이동 및 휴식과 충돌합니다. 수동 시간은 유지되며 자동 계획이 일시 중지됩니다.',
-  'roadtrip.window.tooLong': '이 시간 설정에는 365일이 넘는 추가 날짜가 필요합니다. 일일 이동 시간을 늘려 주세요.',
+  'roadtrip.window.tooLong': '이 시간 설정에는 {days}일이 넘는 추가 날짜가 필요합니다. 일일 이동 시간을 늘려 주세요.',
   'roadtrip.mode.roadtrip': '로드트립',
   'roadtrip.mode.days': '일자별',
   'roadtrip.mode.label': '계획 보기',

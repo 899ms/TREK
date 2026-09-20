@@ -55,7 +55,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Denní přestávky lze spočítat až po získání všech navazujících tras.',
   'roadtrip.window.conflict':
     'Pevný čas je v rozporu s jízdou a přestávkami. Ruční časy zůstávají zachovány; automatické plánování je pozastaveno.',
-  'roadtrip.window.tooLong': 'Tyto časy vyžadují více než 365 dalších dní. Zvolte delší denní interval.',
+  'roadtrip.window.tooLong': 'Tyto časy vyžadují více než {days} dalších dní. Zvolte delší denní interval.',
   'roadtrip.mode.roadtrip': 'Cesta autem',
   'roadtrip.mode.days': 'Dny',
   'roadtrip.mode.label': 'Zobrazení plánu',

@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
     'Dagelijkse pauzes kunnen pas worden berekend als alle verbindingsroutes beschikbaar zijn.',
   'roadtrip.window.conflict':
     'Een vaste tijd past niet bij de rit en pauzes. Handmatige tijden blijven behouden; automatische planning is gepauzeerd.',
-  'roadtrip.window.tooLong': 'Deze tijden vragen meer dan 365 extra dagen. Kies een langer dagelijks tijdvak.',
+  'roadtrip.window.tooLong': 'Deze tijden vragen meer dan {days} extra dagen. Kies een langer dagelijks tijdvak.',
   'roadtrip.mode.roadtrip': 'Roadtrip',
   'roadtrip.mode.days': 'Dagen',
   'roadtrip.mode.label': 'Planweergave',

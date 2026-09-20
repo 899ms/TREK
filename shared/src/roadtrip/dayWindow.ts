@@ -1,3 +1,4 @@
+import { MAX_TRIP_DAYS } from '../trip/trip.schema';
 import { lineMetres, projectOntoRoute, sliceAtMeters } from './corridor';
 import type { RoadtripDayBoundary } from './day-boundary.schema';
 import type { SpillChain } from './nightSpill';
@@ -191,7 +192,7 @@ export function planDayWindow(
     if (last) putLeg(last, end, stationary(at));
     if (final) return end;
     number += 1;
-    if (number - firstDay > 365) issue = 'tooLong';
+    if (number - firstDay > MAX_TRIP_DAYS) issue = 'tooLong';
     clock = window.start;
     const start: RoadtripStop = {
       ...end,

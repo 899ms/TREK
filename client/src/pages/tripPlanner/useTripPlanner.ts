@@ -54,7 +54,7 @@ import type { ManualStopTarget, ServiceStopMode } from '../../components/Roadtri
 import type { RoadtripStopDraft } from '../../components/Roadtrip/RoadtripStopPopup'
 import type { StayDraft } from '../../components/Roadtrip/RoadtripStayModal'
 import { inspectorStay } from '../../components/Roadtrip/stayReading'
-import type { RoadtripStopType } from '@trek/shared'
+import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
 import { usePlaceSelection } from '../../hooks/usePlaceSelection'
 import { usePlannerHistory } from '../../hooks/usePlannerHistory'
 import { useAirtrailConnection } from '../../hooks/useAirtrailConnection'
@@ -1429,7 +1429,7 @@ export function useTripPlanner() {
         const next = dayBoundaries.boundaries.filter(b => b.day_number !== day)
         if (boundary) next.push(boundary)
         const issue = roadtripRoutes.validateBoundaries?.(next)
-        if (boundary && issue) { toast.error(t(`roadtrip.window.${issue}`)); return false }
+        if (boundary && issue) { toast.error(t(`roadtrip.window.${issue}`, { days: MAX_TRIP_DAYS })); return false }
         try { return await dayBoundaries.save(day, boundary) }
         catch (err: unknown) { toast.error(err instanceof Error ? err.message : t('common.unknownError')); return false }
       },

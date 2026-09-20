@@ -56,7 +56,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.window.incomplete': 'Günlük molaları hesaplamak için tüm bağlantı rotaları gereklidir.',
   'roadtrip.window.conflict':
     'Sabit bir saat sürüş ve molalarla çakışıyor. Elle girilen saatler korunur; otomatik planlama duraklatıldı.',
-  'roadtrip.window.tooLong': 'Bu saatler 365 günden fazla ek süre gerektiriyor. Daha uzun bir günlük aralık seçin.',
+  'roadtrip.window.tooLong': 'Bu saatler {days} günden fazla ek süre gerektiriyor. Daha uzun bir günlük aralık seçin.',
   'roadtrip.mode.roadtrip': 'Yol gezisi',
   'roadtrip.mode.days': 'Günler',
   'roadtrip.mode.label': 'Plan görünümü',
