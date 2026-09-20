@@ -1376,8 +1376,10 @@ img[alt="TREK"] {
 }
 
 /* Shared links in the Collab tab: one chip per link, flowing like tags. The chip is
-   the link; edit, pin and delete sit folded into its tail and unfold on hover or
-   keyboard focus, and stay unfolded where there is no hover to speak of. */
+   the link; edit, pin and delete sit quietly in its tail and come forward on hover
+   or keyboard focus. They keep their width throughout: unfolding them reflowed the
+   row under the pointer, and a chip that grows as you reach for it is a chip you
+   cannot catch. */
 .collab-link-chip {
   display: inline-flex;
   align-items: center;
@@ -1451,16 +1453,11 @@ img[alt="TREK"] {
   display: flex;
   align-items: center;
   gap: 1px;
-  max-width: 0;
-  opacity: 0;
-  overflow: hidden;
-  transition: max-width 0.2s ease, opacity 0.15s ease, margin-left 0.2s ease;
-}
-.collab-link-chip:hover .collab-link-chip__actions, .collab-link-chip:focus-within .collab-link-chip__actions {
-  max-width: 96px;
-  opacity: 1;
   margin-left: 2px;
+  opacity: 0.45;
+  transition: opacity 0.15s ease;
 }
+.collab-link-chip:hover .collab-link-chip__actions, .collab-link-chip:focus-within .collab-link-chip__actions { opacity: 1; }
 .collab-link-chip__action {
   display: grid;
   place-items: center;
@@ -1476,7 +1473,7 @@ img[alt="TREK"] {
 .collab-link-chip__action:hover, .collab-link-chip__action:focus-visible { background: var(--bg-hover); color: var(--text-primary); }
 .collab-link-chip__action--on { color: var(--accent); }
 @media (hover: none) {
-  .collab-link-chip__actions { max-width: 96px; opacity: 1; margin-left: 2px; }
+  .collab-link-chip__actions { opacity: 1; }
   .collab-link-chip__open { opacity: 1; }
 }
 
