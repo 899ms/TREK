@@ -48,8 +48,20 @@ import { DOWNLOAD_MAX_BYTES, guardDownload, providerFetch, statusErrorCode } fro
 export type WebdavFlavor = 'nextcloud' | 'opencloud';
 
 export interface WebdavCreds {
-  /** Instance origin, already normalised: no trailing slash, no DAV suffix. */
+  /**
+   * Where the instance lives, already normalised: no trailing slash, no DAV
+   * suffix. It carries the install's own path when there is one, so
+   * `https://home.example.com/nextcloud` is as good a base as an origin, and
+   * every request path is appended to it as is.
+   */
   origin: string;
+  /**
+   * The path part of `origin` (`/nextcloud`), absent for an install at the
+   * root. The instance spells that prefix into every href it answers, and it
+   * comes off again before the href is used as a request path, or the next
+   * request would go to `/nextcloud/nextcloud/remote.php/...`.
+   */
+  prefix?: string;
   username: string;
   password: string;
   allowInsecureTls: boolean;
@@ -79,7 +91,7 @@ export class WebdavError extends Error {
 
 /** One `<d:response>` of a PROPFIND, reduced to what the sync core reads. */
 export interface WebdavEntry {
-  /** Path portion of the `d:href`, still percent-encoded, as sent. */
+  /** Path portion of the `d:href`, still percent-encoded, with the install's prefix taken off. */
   href: string;
   /** The same path decoded, for comparing against a requested path. */
   path: string;
@@ -112,8 +124,8 @@ export interface WebdavDrive {
    * Path of `root.webDavUrl`, never its origin: the instance answers with its
    * own configured `OC_URL` (`https://localhost:8804` for a host reached as
    * 127.0.0.1), and following a host that an untrusted response chose is how an
-   * SSRF guard gets walked around. Only the path survives, re-based on the
-   * connection's own origin.
+   * SSRF guard gets walked around. Only the path survives, minus the install's
+   * prefix, re-based on the connection's own origin.
    */
   webDavPath: string;
 }
@@ -193,11 +205,15 @@ export function normalizeFileId(raw: string | null, flavor: WebdavFlavor): strin
 }
 
 /**
- * What a user pastes into the URL field, reduced to an origin.
+ * What a user pastes into the URL field, reduced to the instance's base.
  *
- * People paste the address bar of their own file list, so the DAV and Graph
- * prefixes come off rather than turning into `/remote.php/dav/remote.php/dav`
- * 404s, which read like a wrong password.
+ * People paste the address bar of their own file list, so the DAV, Graph and
+ * web-app prefixes come off rather than turning into
+ * `/remote.php/dav/remote.php/dav` 404s, which read like a wrong password.
+ * What stays is the install's own path, if it has one: a Nextcloud under
+ * `/nextcloud` is addressed there, not at the host's root. Only the two pages
+ * a browser lands on are cut, the file list and the dashboard: a bare `/apps`
+ * rule would also eat an install that lives under `/apps/nextcloud`.
  */
 export function normalizeOrigin(baseUrl: string): string {
   return baseUrl
@@ -205,9 +221,27 @@ export function normalizeOrigin(baseUrl: string): string {
     .replace(/[?#].*$/, '')
     .replace(/\/+$/, '')
     .replace(/\/(?:remote|index)\.php(?:\/.*)?$/i, '')
+    .replace(/\/apps\/(?:files|dashboard)(?:\/.*)?$/i, '')
     .replace(/\/dav\/spaces(?:\/.*)?$/i, '')
     .replace(/\/graph(?:\/.*)?$/i, '')
     .replace(/\/+$/, '');
+}
+
+/**
+ * A path the instance answered, minus the install's own prefix, so it can be
+ * appended to `creds.origin` again. A path that does not start with the prefix
+ * is left alone: an instance that answers hrefs relative to the host root
+ * while being reached through a proxy path is not something to guess at.
+ */
+export function stripPrefix(path: string, prefix: string): string {
+  if (!prefix) return path;
+  if (path === prefix) return '/';
+  return path.startsWith(`${prefix}/`) ? path.slice(prefix.length) : path;
+}
+
+/** The install's prefix on this connection, '' when it lives at the host root. */
+export function prefixOf(creds: WebdavCreds): string {
+  return creds.prefix ?? '';
 }
 
 /** Percent-encode each segment of a decoded path, keeping the separators. */
@@ -246,18 +280,26 @@ function hrefPathname(href: string): string {
   }
 }
 
-/** The still-encoded path of an href, which is what the next request is built from. */
-function hrefPath(href: string): string {
-  return /^https?:\/\//i.test(href) ? hrefPathname(href) : href;
+/**
+ * The still-encoded path of an href, which is what the next request is built
+ * from: relative to the install, with the prefix the instance spelled into it
+ * taken off again.
+ */
+function hrefPath(href: string, prefix: string): string {
+  const path = /^https?:\/\//i.test(href) ? hrefPathname(href) : href;
+  return stripPrefix(path, prefix);
 }
 
-function decodeHrefPath(href: string): string {
-  const raw = hrefPath(href);
+function decodePath(raw: string): string {
   try {
     return normalizePath(decodeURIComponent(raw));
   } catch {
     return normalizePath(raw);
   }
+}
+
+function decodeHrefPath(href: string, prefix: string): string {
+  return decodePath(hrefPath(href, prefix));
 }
 
 /**
@@ -348,12 +390,13 @@ function sha256Of(checksums: unknown): string | null {
   return null;
 }
 
-function entryOf(response: Record<string, unknown>, flavor: WebdavFlavor): WebdavEntry | null {
+function entryOf(response: Record<string, unknown>, creds: WebdavCreds): WebdavEntry | null {
   const href = textOf(response.href);
   if (!href) return null;
 
+  const prefix = prefixOf(creds);
   const props = propsOf(response);
-  const path = decodeHrefPath(href);
+  const path = decodeHrefPath(href, prefix);
   const segments = path.split('/');
   const length = textOf(props.getcontentlength);
   const modified = textOf(props.getlastmodified);
@@ -362,12 +405,12 @@ function entryOf(response: Record<string, unknown>, flavor: WebdavFlavor): Webda
   const resourceType = asRecord(props.resourcetype);
 
   return {
-    href: hrefPath(href),
+    href: hrefPath(href, prefix),
     path,
     name: segments[segments.length - 1] ?? '',
     isCollection: resourceType !== null && 'collection' in resourceType,
     etag: textOf(props.getetag) ?? '',
-    fileId: normalizeFileId(textOf(props.fileid), flavor),
+    fileId: normalizeFileId(textOf(props.fileid), creds.flavor),
     size: length !== null && length !== '' && Number.isFinite(Number(length)) ? Number(length) : null,
     mimeType: mimeType ? mimeType.split(';')[0].trim() : null,
     lastModifiedIso:
@@ -376,16 +419,17 @@ function entryOf(response: Record<string, unknown>, flavor: WebdavFlavor): Webda
   };
 }
 
-function toDrive(value: unknown): WebdavDrive | null {
+function toDrive(value: unknown, prefix: string): WebdavDrive | null {
   const record = asRecord(value);
   const id = textOf(record?.id);
   if (!record || !id) return null;
   const webDavUrl = textOf(asRecord(record.root)?.webDavUrl);
+  const webDavPath = webDavUrl ? davPathOf(webDavUrl) : null;
   return {
     id,
     name: textOf(record.name) ?? id,
     driveType: textOf(record.driveType) ?? '',
-    webDavPath: (webDavUrl ? davPathOf(webDavUrl) : null) ?? `/dav/spaces/${encodeURIComponent(id)}`,
+    webDavPath: webDavPath === null ? `/dav/spaces/${encodeURIComponent(id)}` : stripPrefix(webDavPath, prefix),
   };
 }
 
@@ -469,7 +513,7 @@ export class WebdavClient {
     const entries: WebdavEntry[] = [];
     for (const element of asArray(multistatus.response)) {
       const record = asRecord(element);
-      const entry = record ? entryOf(record, creds.flavor) : null;
+      const entry = record ? entryOf(record, creds) : null;
       if (entry) entries.push(entry);
     }
     if (entries.length === 0) {
@@ -478,8 +522,9 @@ export class WebdavClient {
 
     // RFC 4918 puts the requested resource first, but it is matched by path
     // rather than trusted by position: the root must never end up in the
-    // document list, and one misordered server would put it there.
-    const wanted = decodeHrefPath(path);
+    // document list, and one misordered server would put it there. The
+    // requested path never carried the prefix, so it is only decoded.
+    const wanted = decodePath(path);
     const selfIndex = Math.max(
       entries.findIndex((entry) => entry.path === wanted),
       0,
@@ -670,7 +715,7 @@ export class WebdavClient {
     const parsed = asRecord(await this.graph(creds, 'GET', '/graph/v1.0/me/drives'));
     const drives: WebdavDrive[] = [];
     for (const value of asArray(parsed?.value)) {
-      const drive = toDrive(value);
+      const drive = toDrive(value, prefixOf(creds));
       if (drive) drives.push(drive);
     }
     return drives;
@@ -679,7 +724,10 @@ export class WebdavClient {
   /** One space, or null when it is gone, which is what makes `scope_missing` detectable. */
   async getDrive(creds: WebdavCreds, driveId: string): Promise<WebdavDrive | null> {
     try {
-      return toDrive(await this.graph(creds, 'GET', `/graph/v1.0/drives/${encodeURIComponent(driveId)}`));
+      return toDrive(
+        await this.graph(creds, 'GET', `/graph/v1.0/drives/${encodeURIComponent(driveId)}`),
+        prefixOf(creds),
+      );
     } catch (err: unknown) {
       if (err instanceof WebdavError && err.status === 404) return null;
       throw err;
@@ -689,6 +737,7 @@ export class WebdavClient {
   async createDrive(creds: WebdavCreds, name: string): Promise<WebdavDrive> {
     const drive = toDrive(
       await this.graph(creds, 'POST', '/graph/v1.0/drives', { name, driveType: 'project' }),
+      prefixOf(creds),
     );
     if (!drive) {
       throw new WebdavError('provider_error', 'OpenCloud created a space it then described incompletely');

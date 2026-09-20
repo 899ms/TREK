@@ -1,5 +1,6 @@
-// FE-DOCSYNC-BIND-001 to FE-DOCSYNC-BIND-026
+// FE-DOCSYNC-BIND-001 to FE-DOCSYNC-BIND-030
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import en from '@trek/shared/i18n/en'
 import { render, screen, fireEvent, waitFor, within } from '../../../../tests/helpers/render'
 import DocSyncBinding from './DocSyncBinding'
 import type { DocSyncLink, useDocSync } from './useDocSync'
@@ -64,6 +65,7 @@ function renderCard(
     sync?: Partial<Sync>
     canManage?: boolean
     providerName?: string
+    onReconnect?: () => void
   } = {},
 ) {
   const utils = render(
@@ -72,6 +74,7 @@ function renderCard(
       providerName={opts.providerName ?? 'Paperless'}
       sync={makeSync(opts.sync)}
       canManage={opts.canManage ?? true}
+      onReconnect={opts.onReconnect}
     />,
   )
   const header = utils.container.querySelector('header') as HTMLElement
@@ -81,6 +84,15 @@ function renderCard(
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
 
 const rowFor = (label: string) => screen.getByText(label).closest('div') as HTMLElement
+
+const UNLINK_QUESTION = 'Documents stay in TREK and at the store. Only the pairing between them goes.'
+
+/** The confirmation the disconnect button opens; it renders in a portal. */
+const unlinkDialog = () => within(screen.getByText(UNLINK_QUESTION).closest('.trek-modal-enter') as HTMLElement)
+
+/** Named through the same fallback chain `t()` uses, so the label can land in the locales later. */
+const reconnectButton = () =>
+  screen.queryByRole('button', { name: (en as unknown as Record<string, string>)['docsync.binding.reconnect'] ?? 'docsync.binding.reconnect' })
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -112,12 +124,75 @@ describe('DocSyncBinding: running a sync', () => {
     expect(screen.getByRole('button', { name: 'Sync now' })).toBeEnabled()
   })
 
-  it('FE-DOCSYNC-BIND-004: the disconnect button unlinks this binding', () => {
+  it('FE-DOCSYNC-BIND-004: the disconnect button asks first and unlinks once that is confirmed', () => {
+    // As the phone does. The button sits beside "Sync now", and a binding
+    // cannot be put back: rebinding the same folder starts from nothing.
     renderCard()
 
     fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
 
+    expect(removeLink).not.toHaveBeenCalled()
+    expect(screen.getByText(UNLINK_QUESTION)).toBeInTheDocument()
+
+    fireEvent.click(unlinkDialog().getByRole('button', { name: 'Disconnect' }))
+
     expect(removeLink).toHaveBeenCalledWith(4)
+    expect(screen.queryByText(UNLINK_QUESTION)).not.toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-BIND-027: cancelling the question leaves the binding as it was', () => {
+    renderCard()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Disconnect' }))
+    fireEvent.click(unlinkDialog().getByRole('button', { name: 'Cancel' }))
+
+    expect(removeLink).not.toHaveBeenCalled()
+    expect(screen.queryByText(UNLINK_QUESTION)).not.toBeInTheDocument()
+  })
+})
+
+describe('DocSyncBinding: a refused credential', () => {
+  it('FE-DOCSYNC-BIND-028: offers to sign in again beside the notice, and hands the click to the panel', () => {
+    // The sidebar opens the credential form only for a store with no
+    // connection yet, so a rotated token had no way back in from the app.
+    const onReconnect = vi.fn()
+    renderCard({ link: { lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' }, onReconnect })
+
+    expect(screen.getByText('Sign in again · The credentials were refused.')).toBeInTheDocument()
+    fireEvent.click(reconnectButton() as HTMLElement)
+
+    expect(onReconnect).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-DOCSYNC-BIND-029: a refusal recorded as a failed run offers it too', () => {
+    const onReconnect = vi.fn()
+    renderCard({ link: { lastSyncState: 'failed', lastSyncError: 'unauthorized' }, onReconnect })
+
+    expect(reconnectButton()).toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-BIND-030: is not offered to a member, for another failure, or while the provider is switched off', () => {
+    const onReconnect = vi.fn()
+    const refused = { lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' } as const
+
+    const member = renderCard({ link: refused, onReconnect, canManage: false })
+    expect(reconnectButton()).not.toBeInTheDocument()
+    member.unmount()
+
+    const other = renderCard({ link: { lastSyncState: 'failed', lastSyncError: 'unreachable' }, onReconnect })
+    expect(reconnectButton()).not.toBeInTheDocument()
+    other.unmount()
+
+    // An admin has switched the store off: the paused notice stands in front,
+    // and a new credential would change nothing until it is back on.
+    const paused = renderCard({ link: { ...refused, providerOff: true }, onReconnect })
+    expect(reconnectButton()).not.toBeInTheDocument()
+    paused.unmount()
+
+    // The panel could not find the provider's form: nothing to open.
+    renderCard({ link: refused })
+    expect(reconnectButton()).not.toBeInTheDocument()
+    expect(onReconnect).not.toHaveBeenCalled()
   })
 })
 

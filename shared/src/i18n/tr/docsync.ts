@@ -177,6 +177,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Bu sağlayıcı bu kurulumda kullanılamıyor.',
   'docsync.error.provider_disabled': 'Duraklatıldı: bir yönetici bu sağlayıcıyı kapattı. Yeniden açıldığında eşitleme kaldığı yerden devam eder.',
+  'docsync.binding.reconnect': 'Yeniden bağlan',
 };
 
 export default docsync;

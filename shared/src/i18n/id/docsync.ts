@@ -179,6 +179,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Penyedia ini tidak tersedia di instans ini.',
   'docsync.error.provider_disabled': 'Dijeda: administrator menonaktifkan penyedia ini. Sinkronisasi berlanjut setelah penyedia diaktifkan kembali.',
+  'docsync.binding.reconnect': 'Hubungkan ulang',
 };
 
 export default docsync;

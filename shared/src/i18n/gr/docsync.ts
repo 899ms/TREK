@@ -182,6 +182,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Αυτός ο πάροχος δεν είναι διαθέσιμος σε αυτή την εγκατάσταση.',
   'docsync.error.provider_disabled': 'Σε παύση: ένας διαχειριστής απενεργοποίησε αυτόν τον πάροχο. Ο συγχρονισμός θα συνεχιστεί μόλις ενεργοποιηθεί ξανά.',
+  'docsync.binding.reconnect': 'Επανασύνδεση',
 };
 
 export default docsync;

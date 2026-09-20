@@ -426,6 +426,16 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
         return docFail('provider_error', 'The resulting file path is not one DSM accepts');
       }
 
+      // Without a remoteId a name collision is a real conflict: the file at
+      // that path is somebody else's, and overwriting it would destroy it
+      // silently. The path is asked before a byte moves, because a successful
+      // upload says nothing about a file that was already there, and the
+      // checks below would read one as a transfer that arrived broken and
+      // send the whole file again on every retry.
+      if (req.remoteId === undefined && (await this.exists(creds, targetPath))) {
+        return docFail('conflict', `${targetPath} already exists on the NAS`);
+      }
+
       await this.client.upload(creds, {
         folderPath,
         fileName,
@@ -433,9 +443,9 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
         size: req.size,
         mimeType: req.mimeType,
         mtimeSeconds: req.mtimeSeconds,
-        // Replacing is only ever what the caller asked for. Without a remoteId a
-        // name collision is a real conflict: the file at that path is somebody
-        // else's, and overwriting it would destroy it silently.
+        // Replacing is only ever what the caller asked for. For a new file the
+        // flag stays off, so a namesake that appeared since the check above is
+        // not overwritten either.
         overwrite: req.remoteId !== undefined,
         createParents: true,
       });
@@ -517,20 +527,50 @@ export class SynologyDriveDocumentProvider implements DocumentProvider {
       const path = this.requireInScope(scope, remoteId);
       const trashPath = joinSynoPath(scopePath, TRASH_FOLDER);
       await this.client.createFolder(creds, scopePath, TRASH_FOLDER);
-      try {
-        await this.client.move(creds, path, trashPath, { overwrite: false });
-      } catch (error: unknown) {
-        if (!(error instanceof SynologyDriveError) || error.code !== 'conflict') throw error;
+      if (!(await this.moveIntoBin(creds, path, trashPath))) {
         // A file of that name is already in the bin. Overwriting it would throw
         // away the older copy, which is the one thing a bin exists to prevent,
         // so the older copy steps aside under a timestamped name.
         const occupant = joinSynoPath(trashPath, baseName(path));
         await this.client.rename(creds, occupant, this.archivedName(baseName(path)));
-        await this.client.move(creds, path, trashPath, { overwrite: false });
+        if (!(await this.moveIntoBin(creds, path, trashPath))) {
+          return docFail('conflict', `${path} is still in place after the bin made room for it`);
+        }
       }
       return docOk(undefined);
     } catch (error: unknown) {
       return this.failure(error);
+    }
+  }
+
+  /**
+   * One attempt to move a file into the bin without overwriting a namesake.
+   *
+   * False means something of that name is in the way. DSM can say so with a
+   * conflict, but a task that finished is only its word that the task ran, not
+   * that the file left its folder, so the source is asked afterwards: a file
+   * that is still there was not moved, whatever the task reported. Reporting
+   * success on its word alone would mark the document as binned in TREK while
+   * every NAS user still sees it in the trip's folder.
+   */
+  private async moveIntoBin(creds: SynologyDriveCreds, path: string, trashPath: string): Promise<boolean> {
+    try {
+      await this.client.move(creds, path, trashPath, { overwrite: false });
+    } catch (error: unknown) {
+      if (error instanceof SynologyDriveError && error.code === 'conflict') return false;
+      throw error;
+    }
+    return !(await this.exists(creds, path));
+  }
+
+  /** Whether the NAS has an entry at that path. A folder counts: nothing can be uploaded over one. */
+  private async exists(creds: SynologyDriveCreds, path: string): Promise<boolean> {
+    try {
+      await this.client.getInfo(creds, path);
+      return true;
+    } catch (error: unknown) {
+      if (error instanceof SynologyDriveError && error.code === 'not_found') return false;
+      throw error;
     }
   }
 

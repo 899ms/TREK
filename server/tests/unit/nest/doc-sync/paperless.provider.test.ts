@@ -65,6 +65,7 @@ import {
 } from '../../../../src/nest/doc-sync/providers/paperless.client';
 import {
   PaperlessDocumentProvider,
+  PAPERLESS_TITLE_MAX_LENGTH,
   PAPERLESS_WEBHOOK_SECRET_HEADER,
   TRIP_UID_FIELD_NAME,
   documentFileName,
@@ -857,6 +858,29 @@ describe('PaperlessProvider: renaming and trashing', () => {
   it('PAPERLESS-071: renaming a document that is gone is not_found', async () => {
     on('PATCH /api/documents/11/', reply({ detail: 'No Document matches the given query.' }, 404));
     expect(expectFail(await provider.rename(CONN, SCOPE, '11', 'neu.pdf')).code).toBe('not_found');
+  });
+
+  it('PAPERLESS-072: a name longer than the title column is cut to fit instead of refused on every run', async () => {
+    // Paperless keeps 128 characters of a title. Sending more is a 400 that
+    // repeats on each poll, with nothing in the message that names the file.
+    const long = `${'Reservierungsbestätigung Hotel Alpenblick Zermatt '.repeat(4)}Familie Mustermann final`;
+    expect(long.length).toBeGreaterThan(PAPERLESS_TITLE_MAX_LENGTH);
+    expect(titleFromFileName(`${long}.pdf`)).toBe(long.slice(0, PAPERLESS_TITLE_MAX_LENGTH).trim());
+    expect(titleFromFileName(`${long}.pdf`).length).toBeLessThanOrEqual(PAPERLESS_TITLE_MAX_LENGTH);
+    // Exactly the limit is still sent whole.
+    const exact = 'x'.repeat(PAPERLESS_TITLE_MAX_LENGTH);
+    expect(titleFromFileName(`${exact}.pdf`)).toBe(exact);
+    // The limit counts characters as Paperless does, so a cut never lands inside
+    // one: U+1D538 is two UTF-16 units, and a cut by units would end on half of it.
+    const wide = '\u{1D538}';
+    const glyphs = [...titleFromFileName(`${wide.repeat(PAPERLESS_TITLE_MAX_LENGTH + 2)}.pdf`)];
+    expect(glyphs).toHaveLength(PAPERLESS_TITLE_MAX_LENGTH);
+    expect(glyphs.every((glyph) => glyph === wide)).toBe(true);
+
+    on('PATCH /api/documents/11/', reply(docRow({ modified: '2026-09-18T19:00:00.000000+02:00' })));
+    expectOk(await provider.rename(CONN, SCOPE, '11', `${long}.pdf`));
+    const sent = JSON.parse(lastRequest('PATCH /api/documents/11/').body) as { title: string };
+    expect(sent.title.length).toBeLessThanOrEqual(PAPERLESS_TITLE_MAX_LENGTH);
   });
 
   it('PAPERLESS-080: trashing is a soft delete, and doing it twice is still success', async () => {

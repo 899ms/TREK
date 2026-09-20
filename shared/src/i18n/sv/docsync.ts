@@ -173,6 +173,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': 'Den här leverantören är inte tillgänglig på den här instansen.',
   'docsync.error.provider_disabled': 'Pausad: en administratör har stängt av den här leverantören. Synkroniseringen fortsätter när den slås på igen.',
+  'docsync.binding.reconnect': 'Anslut igen',
 };
 
 export default docsync;

@@ -260,5 +260,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'بدون رسوم',
   'roadtrip.alt.noFerry': 'بدون عبّارة',
   'roadtrip.summary.partial': 'لا يزال يجري حساب بقية الطريق',
+  'roadtrip.stay.releaseTitle': 'إلغاء المبيت؟',
+  'roadtrip.stay.releaseBody': 'ستُزال ليلة المبيت في "{name}". تبقى المحطة على الرحلة كاستراحة.',
+  'roadtrip.stay.releaseBookedBody': 'ستُزال ليلة المبيت في "{name}" مع الحجز "{booking}" وأي مصروف مرتبط به. تبقى المحطة على الرحلة كاستراحة.',
+  'roadtrip.stay.releaseAction': 'اجعلها استراحة',
 };
 export default roadtrip;

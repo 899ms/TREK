@@ -260,5 +260,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'No tolls',
   'roadtrip.alt.noFerry': 'No ferry',
   'roadtrip.summary.partial': 'Still working out the rest of the drive',
+  'roadtrip.stay.releaseTitle': 'Drop the overnight stay?',
+  'roadtrip.stay.releaseBody': 'The night at “{name}” will be removed. The stop stays on the drive as a pause.',
+  'roadtrip.stay.releaseBookedBody': 'The night at “{name}” will be removed together with the booking “{booking}” and any expense linked to it. The stop stays on the drive as a pause.',
+  'roadtrip.stay.releaseAction': 'Make it a pause',
 };
 export default roadtrip;

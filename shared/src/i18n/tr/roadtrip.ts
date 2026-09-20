@@ -266,5 +266,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Ucretsiz',
   'roadtrip.alt.noFerry': 'Feribotsuz',
   'roadtrip.summary.partial': 'Yolun geri kalanı hâlâ hesaplanıyor',
+  'roadtrip.stay.releaseTitle': 'Konaklama kaldırılsın mı?',
+  'roadtrip.stay.releaseBody': '“{name}” konumundaki gece kaldırılacak. Durak, yolculukta mola olarak kalır.',
+  'roadtrip.stay.releaseBookedBody': '“{name}” konumundaki gece, “{booking}” rezervasyonu ve ona bağlı tüm harcamalarla birlikte kaldırılacak. Durak, yolculukta mola olarak kalır.',
+  'roadtrip.stay.releaseAction': 'Molaya çevir',
 };
 export default roadtrip;

@@ -252,5 +252,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': '免收费',
   'roadtrip.alt.noFerry': '不乘轮渡',
   'roadtrip.summary.partial': '正在计算剩余路程',
+  'roadtrip.stay.releaseTitle': '取消这次过夜？',
+  'roadtrip.stay.releaseBody': '将取消在“{name}”的过夜。该停靠点会作为休息保留在行程中。',
+  'roadtrip.stay.releaseBookedBody': '将取消在“{name}”的过夜，并同时删除预订“{booking}”及其关联的费用。该停靠点会作为休息保留在行程中。',
+  'roadtrip.stay.releaseAction': '改为休息',
 };
 export default roadtrip;

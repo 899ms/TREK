@@ -2165,6 +2165,118 @@ describe('MapViewGL', () => {
     // in the wrong place.
     expect(layer.firstElementChild).not.toBe(handle)
   })
+
+  // Both GL libraries take their clicks from the canvas container, and the handle sits
+  // inside it, right on the route's hit band. Stopping pointerdown does not stop the click
+  // that follows, so a click on a handle also read as a click on the road under it and
+  // dropped a second via exactly there.
+  it('FE-COMP-MAPVIEWGL-VIA-003: a click on a via handle is the handle\'s, not the road\'s', async () => {
+    loadOnAttach()
+    glCanvasContainer.replaceChildren()
+    glMap.project.mockReturnValue({ x: 100, y: 80 })
+    glMap.getLayer.mockImplementation((id: string) => (id === 'trip-route-hit' ? { id } : null))
+    const onRouteClick = vi.fn()
+
+    const stored = { id: 5, day_id: 1, after_order_index: 0, sequence: 0, lat: 48.1, lng: 2.1 }
+    render(
+      <MapViewGL
+        places={[]}
+        fitKey={1}
+        glProvider="maplibre-gl"
+        roadtripVias={{ 1: [stored] }}
+        onMoveVia={() => {}}
+        onRouteClick={onRouteClick}
+      />,
+    )
+    await flushFrames()
+
+    const layer = glCanvasContainer.firstElementChild as HTMLElement
+    const handle = layer.firstElementChild as HTMLElement
+
+    const reachedMap = vi.fn()
+    glCanvasContainer.addEventListener('click', reachedMap)
+    try {
+      act(() => { handle.dispatchEvent(new MouseEvent('click', { bubbles: true })) })
+      expect(reachedMap).not.toHaveBeenCalled()
+    } finally {
+      glCanvasContainer.removeEventListener('click', reachedMap)
+    }
+
+    // And the road's own handler leaves a click that came through the handle alone.
+    const roadClick = layerHandler('click', 'trip-route-hit')
+    expect(roadClick).toBeTypeOf('function')
+    act(() => { roadClick({ lngLat: { lat: 48.1, lng: 2.1 }, point: { x: 100, y: 80 }, originalEvent: { target: handle } }) })
+    expect(onRouteClick).not.toHaveBeenCalled()
+    act(() => { roadClick({ lngLat: { lat: 48.1, lng: 2.1 }, point: { x: 100, y: 80 }, originalEvent: { target: glCanvasContainer } }) })
+    expect(onRouteClick).toHaveBeenCalledWith(48.1, 2.1)
+  })
+
+  it('FE-COMP-MAPVIEWGL-VIA-004: a right-click on a via handle removes it and opens nothing underneath', async () => {
+    loadOnAttach()
+    glCanvasContainer.replaceChildren()
+    glMap.project.mockReturnValue({ x: 100, y: 80 })
+    const onRemoveVia = vi.fn()
+
+    const stored = { id: 5, day_id: 1, after_order_index: 0, sequence: 0, lat: 48.1, lng: 2.1 }
+    render(
+      <MapViewGL
+        places={[]}
+        fitKey={1}
+        glProvider="maplibre-gl"
+        roadtripVias={{ 1: [stored] }}
+        onMoveVia={() => {}}
+        onRemoveVia={onRemoveVia}
+      />,
+    )
+    await flushFrames()
+
+    const layer = glCanvasContainer.firstElementChild as HTMLElement
+    const handle = layer.firstElementChild as HTMLElement
+
+    // The map's contextmenu is the add-place gesture; it must not fire for the spot the
+    // via has just been removed from.
+    const reachedMap = vi.fn()
+    glCanvasContainer.addEventListener('contextmenu', reachedMap)
+    try {
+      act(() => { handle.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true })) })
+    } finally {
+      glCanvasContainer.removeEventListener('contextmenu', reachedMap)
+    }
+
+    expect(onRemoveVia).toHaveBeenCalledWith(1, 5)
+    expect(reachedMap).not.toHaveBeenCalled()
+  })
+
+  it('FE-COMP-MAPVIEWGL-VIA-005: the handles go away below the zoom a via can be aimed at', async () => {
+    loadOnAttach()
+    glCanvasContainer.replaceChildren()
+    glMap.project.mockReturnValue({ x: 100, y: 80 })
+    // Country scale: a day's vias collapse into a heap of dots over one town, and a
+    // short drag on one of them moves the route by kilometres.
+    vi.mocked(glMap.getZoom).mockReturnValue(8)
+    try {
+      const stored = { id: 5, day_id: 1, after_order_index: 0, sequence: 0, lat: 48.1, lng: 2.1 }
+      render(
+        <MapViewGL places={[]} fitKey={1} glProvider="maplibre-gl" roadtripVias={{ 1: [stored] }} onMoveVia={() => {}} />,
+      )
+      await flushFrames()
+
+      const layer = glCanvasContainer.firstElementChild as HTMLElement
+      const handle = layer.firstElementChild as HTMLElement
+      expect(handle.style.display).toBe('none')
+
+      // Back in close enough, the zoom that settles brings them back.
+      vi.mocked(glMap.getZoom).mockReturnValue(12)
+      act(() => {
+        glMap.on.mock.calls
+          .filter(c => c[0] === 'zoomend' && typeof c[1] === 'function')
+          .forEach(c => (c[1] as () => void)())
+      })
+      expect(handle.style.display).toBe('block')
+    } finally {
+      vi.mocked(glMap.getZoom).mockReturnValue(10)
+    }
+  })
   // ── Satellite ───────────────────────────────────────────────────────────────
   //
   // Leaflet has had the imagery for a while and swaps its whole tile layer for it.

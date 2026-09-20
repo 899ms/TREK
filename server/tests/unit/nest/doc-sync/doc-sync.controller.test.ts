@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
-import { HttpException } from '@nestjs/common';
+import { HttpException, Logger } from '@nestjs/common';
 import type { Request } from 'express';
 
 /**
@@ -276,6 +276,19 @@ describe('storing a connection', () => {
     expect(config.listConnections(tripId)).toHaveLength(0);
   });
 
+  it('refuses to point the stored secret at another server when the form leaves it blank', async () => {
+    // The probe route had this rule; the save route let an instance admin, or
+    // whoever the trip was handed to, redirect the owner's token to a host of
+    // their own with an empty form.
+    const conn = await storedPaperless();
+    const err = await thrown(() =>
+      controller.upsertConnection(String(tripId), admin, connBody({ baseUrl: 'https://elsewhere.example', credentials: {} })),
+    );
+    expect(err.getStatus()).toBe(400);
+    expect(config.getConnection(conn.id)!.base_url).toBe('https://paperless.example.com');
+    expect(config.getConnection(conn.id)!.owner_user_id).toBe(Number(owner.id));
+  });
+
   it('refuses a provider the instance admin has not switched on, and names it', async () => {
     testDb.prepare("UPDATE document_providers SET enabled = 0 WHERE id = 'papra'").run();
     const err = await thrown(() =>
@@ -432,9 +445,41 @@ describe('removing a connection', () => {
         .run(tripId, 'stored.pdf', 'boarding.pdf').lastInsertRowid,
     );
 
-    expect(controller.deleteConnection(String(tripId), String(conn.id), owner)).toEqual({ success: true });
+    await expect(controller.deleteConnection(String(tripId), String(conn.id), owner)).resolves.toEqual({ success: true });
     expect(config.getConnection(conn.id)).toBeUndefined();
     expect(testDb.prepare('SELECT id FROM trip_files WHERE id = ?').get(fileId)).toBeTruthy();
+  });
+
+  it('takes down every subscription TREK registered for its bindings, before the credential goes', async () => {
+    // The bindings cascade away with the connection, and the rows were the
+    // only record of the Paperless workflows and Nextcloud listeners TREK had
+    // set up: left standing, they keep posting to a token that answers
+    // nothing, for good. Unbinding one binding already did this.
+    const conn = await storedPaperless();
+    const first = (await controller.createLink(
+      String(tripId), owner, linkBody(conn.id, { scopeKey: 'tag:1' }), makeReq({ host: 'trek.example' }),
+    )) as { id: number };
+    paperless.registerWebhook.mockResolvedValueOnce({ success: true, data: { subscriptionId: 'sub-8' } } as never);
+    await controller.createLink(String(tripId), owner, linkBody(conn.id, { scopeKey: 'tag:2' }), makeReq({ host: 'trek.example' }));
+    // One that never got a subscription, which must not be unregistered as ''.
+    await controller.createLink(String(tripId), owner, linkBody(conn.id, { scopeKey: 'tag:3' }), makeReq());
+    paperless.unregisterWebhook.mockClear();
+
+    await controller.deleteConnection(String(tripId), String(conn.id), owner);
+
+    expect(paperless.unregisterWebhook.mock.calls.map((c) => c[1]).sort()).toEqual(['sub-7', 'sub-8']);
+    expect(paperless.unregisterWebhook.mock.calls[0][0]).toMatchObject({ connectionId: conn.id, secrets: { api_token: 'stored-token' } });
+    expect(config.getConnection(conn.id)).toBeUndefined();
+    expect(config.getLink(first.id)).toBeUndefined();
+  });
+
+  it('still unbinds when the provider refuses to take a subscription down', async () => {
+    const conn = await storedPaperless();
+    await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq({ host: 'trek.example' }));
+    paperless.unregisterWebhook.mockResolvedValueOnce({ success: false, error: { code: 'unreachable' } } as never);
+
+    await expect(controller.deleteConnection(String(tripId), String(conn.id), owner)).resolves.toEqual({ success: true });
+    expect(config.getConnection(conn.id)).toBeUndefined();
   });
 
   it('refuses a connection that belongs to a different trip', async () => {
@@ -462,7 +507,7 @@ describe('removing a connection', () => {
     const second = bind(conn.id, 'tag:2');
     bind(cloud.data.id, 'folder:1');
 
-    controller.deleteConnection(String(tripId), String(conn.id), owner);
+    await controller.deleteConnection(String(tripId), String(conn.id), owner);
 
     expect(realtime.broadcast.mock.calls).toEqual([
       [tripId, 'docsync:changed', { linkId: first, pulled: 0, pushed: 0 }],
@@ -569,6 +614,27 @@ describe('creating a binding', () => {
     const row = config.getLink(link.id)!;
     expect(row.webhook_subscription_id).toBeNull();
     expect(row.sync_enabled).toBe(1);
+  });
+
+  it('says so in the log when the provider refuses the subscription, since nothing on screen will', async () => {
+    // The refusal used to go nowhere at all: not thrown, not logged, and the
+    // first run overwrites the link state a moment later. An admin whose
+    // Paperless kept declining the workflow had no way to find out why the
+    // binding only ever ran on the timer.
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      const conn = await storedPaperless();
+      paperless.registerWebhook.mockResolvedValueOnce({ success: false, error: { code: 'forbidden', detail: 'API key may not manage workflows' } } as never);
+
+      const link = (await controller.createLink(String(tripId), owner, linkBody(conn.id), makeReq({ host: 'trek.example' }))) as { id: number };
+
+      const lines = warn.mock.calls.map((c) => String(c[0])).filter((m) => m.includes(`link ${link.id}`));
+      expect(lines).toHaveLength(1);
+      expect(lines[0]).toContain('forbidden');
+      expect(lines[0]).toContain('API key may not manage workflows');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('does not offer a webhook when no host reaches TREK', async () => {
@@ -807,6 +873,22 @@ describe('the callback origin a provider is given', () => {
     await linkedTrip();
     const [link] = controller.listLinks(String(tripId), makeReq()) as Array<{ webhookUrl: string | null }>;
     expect(link.webhookUrl).toBeNull();
+  });
+
+  it('offers no callback URL for a store the probe found unable to call back at all', async () => {
+    // Synology takes no webhook. Showing the address with "paste this into
+    // your provider" next to it promised something there was nowhere to do.
+    const row = await linkedTrip();
+    config.recordProbe(row.connection_id, 'ok', null, { ...CAPS, push: 'none' });
+    const [link] = controller.listLinks(String(tripId), makeReq({ host: 'trek.example' })) as Array<{ webhookUrl: string | null }>;
+    expect(link.webhookUrl).toBeNull();
+  });
+
+  it('keeps offering it for a store the probe found able to take one', async () => {
+    const row = await linkedTrip();
+    config.recordProbe(row.connection_id, 'ok', null, { ...CAPS, push: 'webhook-manual' });
+    const [link] = controller.listLinks(String(tripId), makeReq({ host: 'trek.example' })) as Array<{ webhookUrl: string | null }>;
+    expect(link.webhookUrl).toBe(`http://trek.example/api/docsync/webhook/${row.webhook_token}`);
   });
 });
 

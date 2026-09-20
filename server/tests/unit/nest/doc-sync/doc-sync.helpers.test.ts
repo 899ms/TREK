@@ -134,6 +134,50 @@ describe('planReconcile', () => {
   });
 
   /**
+   * A version marker that moved over the same bytes. Paperless bumps
+   * `modified` for a tag, a correspondent or a title, and a pulled document
+   * has no `pushedSha256` for the echo guard to read: every such edit fetched
+   * the same bytes again, put them in a fresh row without the booking link the
+   * old one carried, and sent the old row to the trash.
+   */
+  it('treats a marker that moved over the agreed bytes as no change either', () => {
+    const p = plan({
+      items: [item({ contentSha256: 'aaa', pushedSha256: null })],
+      remote: [remote({ remoteVersion: 'v2', contentHash: 'aaa' })],
+      local: [local()],
+    });
+    expect(p.actions).toEqual([{ kind: 'touch', itemId: 10, remote: remote({ remoteVersion: 'v2', contentHash: 'aaa' }) }]);
+  });
+
+  it('still follows a rename that came with such an edit', () => {
+    const renamed = remote({ remoteVersion: 'v2', contentHash: 'aaa', name: 'hotel-booking.pdf' });
+    const p = plan({
+      items: [item({ contentSha256: 'aaa', pushedSha256: null })],
+      remote: [renamed],
+      local: [local()],
+    });
+    expect(p.actions).toEqual([{ kind: 'rename_local', itemId: 10, fileId: 1, name: 'hotel-booking.pdf' }]);
+  });
+
+  it('still pulls when the listing carries no hash to compare', () => {
+    const p = plan({
+      items: [item({ contentSha256: 'aaa', pushedSha256: null })],
+      remote: [remote({ remoteVersion: 'v2', contentHash: null })],
+      local: [local()],
+    });
+    expect(p.actions[0].kind).toBe('pull_update');
+  });
+
+  it('still retries a row in error over the same bytes, since touch would leave it there for good', () => {
+    const p = plan({
+      items: [item({ state: 'error', contentSha256: 'aaa', pushedSha256: null })],
+      remote: [remote({ remoteVersion: 'v2', contentHash: 'aaa' })],
+      local: [local()],
+    });
+    expect(p.actions[0].kind).toBe('pull_update');
+  });
+
+  /**
    * An unmounted share and a revoked token both answer with a short listing.
    * Reading that as a mass deletion would empty a trip, so the run refuses
    * everything rather than acting on a listing it cannot trust.
@@ -633,6 +677,51 @@ describe('planReconcile > a provider name TREK had to clean up', () => {
 });
 
 /**
+ * TREK's own name with a character the cleaning replaces.
+ *
+ * An upload keeps the name the browser sent, and on Linux and macOS that may
+ * be `Zugticket 08:15.pdf`. A push stores it as the agreed name, and the next
+ * run compared the raw TREK name with the cleaned agreed name, which never
+ * match: Paperless was sent the same title on every run, and on Nextcloud,
+ * which cleans the colon its own way, the row sat in a conflict that "keep
+ * TREK" could never settle, because the three names came out the same again.
+ */
+describe('planReconcile > a TREK name the cleaning would change', () => {
+  const pushed = item({ remoteName: 'Zugticket 08:15.pdf', contentSha256: 'aaa', pushedSha256: 'aaa' });
+  const mine = local({ fileId: 1, name: 'Zugticket 08:15.pdf' });
+
+  it('does not read the cleaning as a rename made in TREK', () => {
+    // Paperless keeps the title as it was sent, so the listing carries the colon.
+    const p = plan({ items: [pushed], remote: [remote({ name: 'Zugticket 08:15.pdf' })], local: [mine] });
+    expect(p.actions.map(a => a.kind)).toEqual(['touch']);
+  });
+
+  it('follows the name the store made of it where the store cleans differently', () => {
+    // Nextcloud stores a dash, which is the store's rename to follow, once.
+    const stored = remote({ name: 'Zugticket 08-15.pdf' });
+    const first = plan({ items: [pushed], remote: [stored], local: [mine] });
+    expect(first.actions).toEqual([{ kind: 'rename_local', itemId: 10, fileId: 1, name: 'Zugticket 08-15.pdf' }]);
+
+    const second = plan({
+      items: [item({ remoteName: 'Zugticket 08-15.pdf', contentSha256: 'aaa', pushedSha256: 'aaa' })],
+      remote: [stored],
+      local: [local({ fileId: 1, name: 'Zugticket 08-15.pdf' })],
+    });
+    expect(second.actions).toEqual([{ kind: 'touch', itemId: 10, remote: stored }]);
+  });
+
+  it('sends nothing upstream on a push-only binding either', () => {
+    const p = plan({ items: [pushed], remote: [remote({ name: 'Zugticket 08:15.pdf' })], local: [mine], direction: 'push' });
+    expect(p.actions.map(a => a.kind)).toEqual(['touch']);
+  });
+
+  it('still sends a real rename made in TREK', () => {
+    const p = plan({ items: [pushed], remote: [remote({ name: 'Zugticket 08:15.pdf' })], local: [local({ fileId: 1, name: 'Zugticket 09:15.pdf' })] });
+    expect(p.actions).toEqual([{ kind: 'rename_remote', itemId: 10, remoteId: 'r1', name: 'Zugticket 09:15.pdf' }]);
+  });
+});
+
+/**
  * A rename upstream where the id is the path, which is Synology FileStation.
  *
  * It bounced. The upstream-only loop re-paired the renamed copy with a `touch`,
@@ -981,6 +1070,35 @@ describe('planReconcile > a deletion TREK already acted on', () => {
       remoteUnchanged: true,
     });
     expect(p.actions).toEqual([]);
+  });
+
+  /**
+   * A copy on record as gone whose TREK copy was then purged.
+   *
+   * The row waited for a person to decide about the TREK copy, and nothing
+   * closed it once they had: the pair loop never sees a row with no listing
+   * entry, the unchanged branch skips the state by name, and the purge left
+   * `file_id` NULL with the row still counting under "Needs a look" for good.
+   * With nothing left on either side, the row closes, and without asking the
+   * provider to bin a copy that is not there.
+   */
+  it('closes a row whose copies are gone on both sides, without binning anything', () => {
+    const gone = item({ state: 'remote_missing', remoteMissingAt: '2026-09-17 08:00:00', fileId: null });
+    const p = plan({ items: [gone], remote: [], local: [] });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 10, remoteId: 'r1', remoteGone: true }]);
+    expect(p.missingCount).toBe(0);
+  });
+
+  it('does the same under an unchanged upstream', () => {
+    const gone = item({ state: 'remote_missing', remoteMissingAt: '2026-09-17 08:00:00', fileId: null });
+    const p = plan({ items: [gone], remote: [], local: [], remoteUnchanged: true });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 10, remoteId: 'r1', remoteGone: true }]);
+  });
+
+  it('treats a purged file as an ordinary deletion once the copy is listed again', () => {
+    const gone = item({ state: 'remote_missing', remoteMissingAt: '2026-09-17 08:00:00', fileId: null });
+    const p = plan({ items: [gone], remote: [remote()], local: [] });
+    expect(p.actions).toEqual([{ kind: 'local_deleted', itemId: 10, remoteId: 'r1' }]);
   });
 
   it('notices when the copy TREK binned is listed again', () => {

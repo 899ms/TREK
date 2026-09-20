@@ -264,5 +264,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Khong thu phi',
   'roadtrip.alt.noFerry': 'Không phà',
   'roadtrip.summary.partial': 'Vẫn đang tính phần còn lại của chặng đường',
+  'roadtrip.stay.releaseTitle': 'Bỏ đêm nghỉ này?',
+  'roadtrip.stay.releaseBody': 'Đêm nghỉ tại “{name}” sẽ bị xóa. Điểm dừng vẫn ở trên hành trình như một điểm nghỉ.',
+  'roadtrip.stay.releaseBookedBody': 'Đêm nghỉ tại “{name}” sẽ bị xóa cùng với đặt chỗ “{booking}” và mọi chi phí liên quan. Điểm dừng vẫn ở trên hành trình như một điểm nghỉ.',
+  'roadtrip.stay.releaseAction': 'Chuyển thành điểm nghỉ',
 };
 export default roadtrip;

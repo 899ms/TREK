@@ -75,6 +75,22 @@ export function isAllowedByOperator(name: string, allowedCsv: string): boolean {
     .includes(ext);
 }
 
+/**
+ * Whether two URLs address the same server, for deciding if a stored secret
+ * may be reused. Same scheme, same host, same port: a path may differ, because
+ * the token still only ever reaches the server it was issued for.
+ */
+export function sameOrigin(a: string | null | undefined, b: string): boolean {
+  if (!a) return false;
+  try {
+    const x = new URL(a);
+    const y = new URL(b);
+    return x.protocol === y.protocol && x.host === y.host;
+  } catch {
+    return false;
+  }
+}
+
 // ── The plan ─────────────────────────────────────────────────────────────────
 
 /** What the core knows about one pairing before the run. */
@@ -141,8 +157,13 @@ export type PlanAction =
   | { kind: 'conflict'; itemId: number; remote: RemoteDocument | null; local: LocalDocument | null }
   /** Present upstream last run, absent now. Recorded, never acted on. */
   | { kind: 'mark_remote_missing'; itemId: number }
-  /** Deleted in TREK; what happens upstream is the link's delete policy. */
-  | { kind: 'local_deleted'; itemId: number; remoteId: string }
+  /**
+   * Deleted in TREK; what happens upstream is the link's delete policy. With
+   * `remoteGone`, the provider copy was already on record as missing and the
+   * TREK copy has since been purged: the row closes, and no policy runs,
+   * because there is nothing left on either side for it to act on.
+   */
+  | { kind: 'local_deleted'; itemId: number; remoteId: string; remoteGone?: true }
   /**
    * Back out of TREK's trash while the provider copy stayed: the pairing counts
    * again. With `missing`, the copy is gone and TREK did not bin it, so the row
@@ -414,10 +435,26 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     if (it.fileId !== null) itemsByFile.set(it.fileId, it);
   }
 
+  /**
+   * A copy on record as gone whose TREK copy has been purged since.
+   *
+   * The row was kept for a person to decide about the TREK copy, and they
+   * did: it is out of the trash and cannot come back, so nothing is left to
+   * decide and nothing to restore. Only a purge closes the row. A TREK copy
+   * merely in the trash keeps it open, because binning the gap as TREK's own
+   * doing would let a later restore upload what somebody else deleted.
+   */
+  const goneOnBothSides = (it: SyncItemState): boolean =>
+    it.state === 'remote_missing' && it.fileId === null && it.remoteId !== null;
+
   // Upstream is unchanged: only what happened in TREK can need doing, and the
   // remote half of the plan would be reading a list the adapter did not fetch.
   if (input.remoteUnchanged) {
     for (const it of items) {
+      if (goneOnBothSides(it)) {
+        add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId, remoteGone: true });
+        continue;
+      }
       // A deletion already acted on stays acted on, as in the pair loop. A copy
       // on record as gone is absent from a full listing too, so a full run
       // plans nothing for it until it comes back; binning it here would also
@@ -466,6 +503,21 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
       r.contentHash !== null &&
       it.pushedSha256 !== null &&
       r.contentHash === it.pushedSha256;
+    // The same reading for bytes both sides agreed on: a version marker moves
+    // on a tag, a correspondent or a title as much as on a new revision, and
+    // where the listing carries a hash it says which. Downloading the same
+    // bytes again replaced the TREK file with a fresh row and sent the one
+    // that carried the booking link to the trash, on every edit of metadata.
+    // A row in error is left out: `touch` leaves that state alone, so it would
+    // sit in error for good over bytes that are in step, while the download
+    // it gets instead finds the same bytes and settles it without a new row.
+    const sameBytes =
+      remoteChanged &&
+      r.contentHash !== null &&
+      it.state !== 'error' &&
+      it.contentSha256 !== null &&
+      r.contentHash === it.contentSha256;
+    const remoteBytesChanged = remoteChanged && !isEcho && !sameBytes;
 
     const localChanged = !!l && l.sha256 !== null && it.contentSha256 !== null && l.sha256 !== it.contentSha256;
 
@@ -509,11 +561,11 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
       continue;
     }
 
-    if (remoteChanged && !isEcho && localChanged) {
+    if (remoteBytesChanged && localChanged) {
       settle(it, r, l ?? null);
       continue;
     }
-    if (remoteChanged && !isEcho) {
+    if (remoteBytesChanged) {
       if (direction === 'push') { add({ kind: 'touch', itemId: it.id, remote: r }); continue; }
       add({ kind: 'pull_update', remote: r, itemId: it.id });
       continue;
@@ -538,11 +590,19 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     // would have given it: a Paperless title with a slash in it used to land
     // in the file manager as it was, and the next run read that as a rename
     // made in TREK and sent it upstream again.
+    //
+    // TREK's own name goes through it too. An upload keeps whatever name the
+    // browser sent, and on Linux and macOS that may hold a colon or a question
+    // mark, which a push stores as the agreed name. Compared raw against the
+    // cleaned agreed name, such a file read as renamed in TREK on every run:
+    // Paperless got the same title again each time, and on Nextcloud, whose
+    // own cleaning differs, the row sat in a conflict that "keep TREK" could
+    // never settle.
     const incoming = sanitizeIncomingName(r.name);
     if (l && incoming !== l.name) {
       const agreed = it.remoteName === null ? null : sanitizeIncomingName(it.remoteName);
       const providerRenamed = agreed !== null && incoming !== agreed;
-      const localRenamed = agreed !== null && l.name !== agreed;
+      const localRenamed = agreed !== null && sanitizeIncomingName(l.name) !== agreed;
 
       if (providerRenamed && !localRenamed && direction !== 'push') {
         add({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: incoming });
@@ -559,6 +619,12 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
         settleName(it, r, l, incoming);
         continue;
       }
+      if (agreed !== null && !providerRenamed && !localRenamed) {
+        // Neither side renamed: the two names differ only by what the cleaning
+        // did to one of them, and there is nothing to send anywhere.
+        add({ kind: 'touch', itemId: it.id, remote: r });
+        continue;
+      }
       // No stored name to arbitrate with (a row from before this column, or a
       // freshly paired document): follow the binding's direction.
       if (direction === 'pull') add({ kind: 'rename_local', itemId: it.id, fileId: l.fileId, name: incoming });
@@ -568,6 +634,14 @@ export function planReconcile(input: ReconcileInput): ReconcilePlan {
     }
 
     add({ kind: 'touch', itemId: it.id, remote: r });
+  }
+
+  // ── Gone on both sides ────────────────────────────────────────────────────
+  // A copy listed again went through the pair loop, where a purged file is a
+  // deletion like any other.
+  for (const it of items) {
+    if (!goneOnBothSides(it) || remoteById.has(it.remoteId)) continue;
+    add({ kind: 'local_deleted', itemId: it.id, remoteId: it.remoteId, remoteGone: true });
   }
 
   // ── Upstream only ─────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-// FE-ADMIN-ADDON-001 to FE-ADMIN-ADDON-036
+// FE-ADMIN-ADDON-001 to FE-ADMIN-ADDON-037
 import { render, screen, waitFor } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
 import { delay, http, HttpResponse } from 'msw';
@@ -541,6 +541,22 @@ describe('AddonManager', () => {
 
     await screen.findByText('Collab');
     expect(screen.queryByText('Polls')).not.toBeInTheDocument();
+  });
+
+  it('FE-ADMIN-ADDON-037: the links row describes the feature, not an empty list', async () => {
+    // The row's tooltip is its description. The links tab's empty state read as a
+    // status here, and a status that never changes reads as a broken feature.
+    server.use(addonsRoute([buildAddon({ id: 'collab', name: 'Collab', enabled: true })]));
+    render(
+      <AddonManager
+        collabFeatures={{ chat: true, notes: true, links: true, polls: true, whatsnext: true }}
+        onToggleCollabFeature={vi.fn()}
+      />,
+    );
+
+    const links = await screen.findByText('Links');
+    expect(links).toHaveAttribute('title');
+    expect(links.getAttribute('title')).not.toBe('No shared links yet');
   });
 
   it('FE-ADMIN-ADDON-020: a disabled AI-parsing addon renders the row without its config block', async () => {

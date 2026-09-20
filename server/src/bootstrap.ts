@@ -148,9 +148,11 @@ export async function buildApp(): Promise<INestApplication> {
    * A list file is the same story at a smaller scale. Its contract allows a
    * megabyte and the import posts it whole, yet a list of a few hundred places
    * with notes is past a hundred kilobytes already, and so is the favourites
-   * GPX of anybody who uses OsmAnd (#2301). The two routes that carry one are
-   * measured against that megabyte, doubled for the JSON escaping of a
-   * document full of quotes. Everything else keeps the tighter limit.
+   * GPX of anybody who uses OsmAnd (#2301). The three routes that carry one,
+   * the import into a new list, the GPX reader and the import into a list that
+   * already exists, are measured against that megabyte, doubled for the JSON
+   * escaping of a document full of quotes. Everything else keeps the tighter
+   * limit.
    */
   const bookBody = express.json({ limit: '8mb', verify: rawBodyKeeper });
   const listFileBody = express.json({ limit: MAX_COLLECTION_FILE_BYTES * 2, verify: rawBodyKeeper });
@@ -159,8 +161,8 @@ export async function buildApp(): Promise<INestApplication> {
   const isMcp = (req: Request) => req.path === '/mcp' || req.path === '/mcp/';
   const isBookWrite = (req: Request) =>
     req.method === 'PUT' && /^\/api\/journeys\/\d+\/book$/.test(req.path);
-  const listFilePaths = new Set(['/api/addons/collections/import', '/api/addons/collections/gpx/read']);
-  const isListFile = (req: Request) => req.method === 'POST' && listFilePaths.has(req.path);
+  const isListFile = (req: Request) =>
+    req.method === 'POST' && /^\/api\/addons\/collections\/(import|gpx\/read|\d+\/import)$/.test(req.path);
 
   instance.use(function jsonParser(req: Request, res: Response, next: NextFunction) {
     if (isBookWrite(req)) return bookBody(req, res, next);

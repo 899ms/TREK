@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   HttpException,
+  Logger,
   Param,
   Patch,
   Post,
@@ -28,6 +29,7 @@ import { DocSyncConfigService, type LinkRow } from './doc-sync-config.service';
 import { DocSyncService } from './doc-sync.service';
 import { DocumentProviderRegistry } from './document-provider.registry';
 import { PROVIDER_DISABLED } from './doc-sync.constants';
+import { sameOrigin } from './doc-sync.helpers';
 import {
   DocsyncConnectionDto,
   DocsyncConnectionTestDto,
@@ -62,6 +64,8 @@ import {
 @UseGuards(AddonGuard, JwtAuthGuard, TripAccessGuard)
 @RequireAddon(ADDON_IDS.DOCUMENTS, 'Documents')
 export class DocSyncController {
+  private readonly logger = new Logger(DocSyncController.name);
+
   constructor(
     private readonly config: DocSyncConfigService,
     private readonly sync: DocSyncService,
@@ -205,7 +209,7 @@ export class DocSyncController {
 
   @Delete('connections/:connectionId')
   @HttpCode(200)
-  deleteConnection(
+  async deleteConnection(
     @Param('tripId') tripId: string,
     @Param('connectionId') connectionId: string,
     @CurrentUser() user: User,
@@ -213,8 +217,19 @@ export class DocSyncController {
     this.assertCanManage(tripId, user);
     const conn = this.config.getConnection(Number(connectionId));
     if (!conn || conn.trip_id !== Number(tripId)) throw new HttpException('Connection not found', 404);
-    // Its bindings go with it (ON DELETE CASCADE), so read them first.
+    // Its bindings go with it (ON DELETE CASCADE), so read them first. Every
+    // subscription TREK registered for one of them is taken down while the
+    // credential is still here to do it with, as unbinding one does: left
+    // standing, a Paperless workflow or a Nextcloud listener keeps posting to
+    // a token that answers nothing, for good.
     const unbound = this.config.listLinks(conn.trip_id).filter((l) => l.connection_id === conn.id);
+    const provider = this.registry.get(conn.provider_id);
+    if (provider?.unregisterWebhook) {
+      const ref = this.config.toRef(conn);
+      for (const link of unbound) {
+        if (link.webhook_subscription_id) await provider.unregisterWebhook(ref, link.webhook_subscription_id);
+      }
+    }
     this.config.deleteConnection(conn.id);
     for (const link of unbound) this.announceBinding(link);
     return { success: true };
@@ -280,7 +295,8 @@ export class DocSyncController {
 
     // Subscribe where the provider lets TREK do it itself. A failure here is
     // not a failure of the binding (polling still carries it), so it is logged
-    // into the link state rather than thrown at the user.
+    // rather than thrown at the user; the first run that follows would write
+    // over anything put into the link state.
     const conn = this.config.getConnection(res.data.connection_id);
     const provider = conn ? this.registry.get(conn.provider_id) : undefined;
     if (conn && provider?.registerWebhook) {
@@ -292,7 +308,11 @@ export class DocSyncController {
           `${base}/api/docsync/webhook/${res.data.webhook_token}`,
           this.config.webhookSecret(res.data),
         );
-        if (hook.success) {
+        if (docFailed(hook)) {
+          this.logger.warn(
+            `link ${res.data.id}: ${conn.provider_id} refused the webhook subscription (${hook.error.code}${hook.error.detail ? `: ${hook.error.detail}` : ''}), polling carries it`,
+          );
+        } else {
           this.db.connection
             .prepare('UPDATE trip_document_links SET webhook_subscription_id = ? WHERE id = ?')
             .run(hook.data.subscriptionId, res.data.id);
@@ -405,19 +425,6 @@ export class DocSyncController {
     const ok = await this.sync.resolveConflict(Number(itemId), body.keep, Number(tripId));
     if (!ok) throw new HttpException('Item is not in conflict', 400);
     return { success: true };
-  }
-}
-
-
-/** Whether two URLs address the same server, for deciding if a stored secret may be reused. */
-function sameOrigin(a: string | null | undefined, b: string): boolean {
-  if (!a) return false;
-  try {
-    const x = new URL(a);
-    const y = new URL(b);
-    return x.protocol === y.protocol && x.host === y.host;
-  } catch {
-    return false;
   }
 }
 

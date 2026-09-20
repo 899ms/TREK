@@ -1,4 +1,4 @@
-// FE-DOCSYNC-PANEL-001 to FE-DOCSYNC-PANEL-018
+// FE-DOCSYNC-PANEL-001 to FE-DOCSYNC-PANEL-022
 
 /**
  * The document-sync dialog shell (#2391).
@@ -25,6 +25,9 @@ const status = vi.fn()
 const deleteLink = vi.fn()
 const updateLink = vi.fn()
 const syncNow = vi.fn()
+const items = vi.fn()
+const resolve = vi.fn()
+const saveConnection = vi.fn()
 
 vi.mock('../../../api/client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../../api/client')>()
@@ -39,6 +42,9 @@ vi.mock('../../../api/client', async (importOriginal) => {
       deleteLink: (tripId: number | string, linkId: number) => deleteLink(tripId, linkId),
       updateLink: (tripId: number | string, linkId: number, patch: unknown) => updateLink(tripId, linkId, patch),
       syncNow: (tripId: number | string, linkId: number, full: boolean) => syncNow(tripId, linkId, full),
+      items: (tripId: number | string, state?: string) => items(tripId, state),
+      resolve: (tripId: number | string, itemId: number, keep: string) => resolve(tripId, itemId, keep),
+      saveConnection: (tripId: number | string, data: unknown) => saveConnection(tripId, data),
     },
   }
 })
@@ -76,21 +82,35 @@ const link = (id: number, providerId: string, overrides: Partial<DocSyncLink> = 
 /** What the server answers, as one object the tests reshape per case. */
 function serverHas({
   providers: p = [],
+  connections = [],
   links = [],
   items = {},
 }: {
   providers?: DocSyncProvider[]
+  connections?: Array<Record<string, unknown>>
   links?: DocSyncLink[]
   items?: Record<string, number>
 }): void {
   providers.mockResolvedValue(p)
-  listConnections.mockResolvedValue([])
+  listConnections.mockResolvedValue(connections)
   listLinks.mockResolvedValue(links)
   status.mockResolvedValue({
     items,
     links: links.map(l => ({ id: l.id, holdings: { inTrek: 3, atProvider: 3, paired: 3, missing: 0 } })),
   })
 }
+
+/** The stored connection a binding runs under. */
+const connection = (id: number, providerId: string) => ({
+  id,
+  providerId,
+  baseUrl: 'https://docs.example.org',
+  settings: {},
+  secrets: { token: '***' },
+  allowInsecureTls: false,
+  lastProbeState: 'ok',
+  lastProbeError: null,
+})
 
 function deferred<T>() {
   let resolve!: (value: T) => void
@@ -110,12 +130,25 @@ const sidebar = () => screen.getByRole('navigation')
 const group = (heading: string) =>
   within(screen.getByRole('heading', { name: heading }).parentElement as HTMLElement)
 
+/** The "needs a look" section under the binding card. */
+const issues = () =>
+  within(screen.getByRole('heading', { name: t('docsync.issues.title') }).closest('section') as HTMLElement)
+
+/** Disconnect asks first; this answers yes. The question renders in a portal. */
+const confirmUnlink = () => {
+  const dialog = screen.getByText(t('docsync.confirmUnlink')).closest('.trek-modal-enter') as HTMLElement
+  fireEvent.click(within(dialog).getByRole('button', { name: t('docsync.unlink') }))
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   serverHas({})
   deleteLink.mockResolvedValue({})
   updateLink.mockResolvedValue({})
   syncNow.mockResolvedValue({ state: 'ok', pulled: 0, pushed: 0, conflicts: 0, missing: 0 })
+  items.mockResolvedValue([])
+  resolve.mockResolvedValue({ success: true })
+  saveConnection.mockResolvedValue({ id: 1 })
 })
 
 describe('DocSyncPanel: first load', () => {
@@ -316,6 +349,7 @@ describe('DocSyncPanel: removing a binding', () => {
     expect(within(binding()).getByText('Folder 2')).toBeInTheDocument()
 
     fireEvent.click(within(binding()).getByRole('button', { name: t('docsync.unlink') }))
+    confirmUnlink()
 
     await waitFor(() => expect(deleteLink).toHaveBeenCalledWith(7, 2))
     await waitFor(() => expect(within(binding()).getByText('Folder 1')).toBeInTheDocument())
@@ -334,6 +368,7 @@ describe('DocSyncPanel: removing a binding', () => {
     await screen.findByRole('article')
 
     fireEvent.click(within(binding()).getByRole('button', { name: t('docsync.unlink') }))
+    confirmUnlink()
 
     expect(await screen.findByText(t('docsync.empty.title'))).toBeInTheDocument()
     expect(screen.getByText(t('docsync.empty.hintOwner'))).toBeInTheDocument()
@@ -387,6 +422,93 @@ describe('DocSyncPanel: what needs a look', () => {
     expect(within(rows[1]).getByText(t('docsync.state.too_large'))).toBeInTheDocument()
     expect(within(rows[1]).getByText('1')).toBeInTheDocument()
     expect(panel.queryByText(t('docsync.state.pending'))).not.toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-PANEL-019: a member is shown the conflict count but offered no choice', async () => {
+    // The server refuses a member's choice with 403, so the three buttons
+    // would only ever fail for them. The count is what they are owed.
+    serverHas({
+      providers: [provider('paperless', 'Paperless-ngx')],
+      links: [link(1, 'paperless')],
+      items: { conflict: 2 },
+    })
+
+    render(<DocSyncPanel tripId={7} canManage={false} onClose={onClose} />)
+    await screen.findByRole('article')
+
+    const row = issues().getAllByRole('listitem')[0]
+    expect(within(row).getByText(t('docsync.state.conflict'))).toBeInTheDocument()
+    expect(within(row).getByText('2')).toBeInTheDocument()
+    expect(within(row).queryByRole('button')).not.toBeInTheDocument()
+    expect(items).not.toHaveBeenCalled()
+  })
+
+  it('FE-DOCSYNC-PANEL-020: a choice the server refuses is said in the column, and the row stays', async () => {
+    serverHas({
+      providers: [provider('paperless', 'Paperless-ngx')],
+      links: [link(1, 'paperless')],
+      items: { conflict: 1 },
+    })
+    items.mockResolvedValue([{ id: 40, file_name: 'boarding-pass.pdf', remote_name: 'boarding-pass.pdf' }])
+    // Settled by the owner in another tab a moment ago.
+    resolve.mockRejectedValue({ response: { status: 400, data: { error: 'conflict' } } })
+
+    render(<DocSyncPanel tripId={7} canManage onClose={onClose} />)
+    await screen.findByRole('article')
+
+    fireEvent.click(issues().getByRole('button', { name: /Resolve/ }))
+    fireEvent.click(await issues().findByRole('button', { name: t('docsync.conflict.keepTrek') }))
+
+    await waitFor(() => expect(resolve).toHaveBeenCalledWith(7, 40, 'trek'))
+    expect(await screen.findByRole('alert')).toHaveTextContent(t('docsync.error.conflict'))
+    // The list is read back rather than trimmed by hand, so the row is still
+    // there, ready for another try.
+    await waitFor(() => expect(issues().getByRole('button', { name: t('docsync.conflict.keepTrek') })).toBeEnabled())
+    expect(issues().getByText('boarding-pass.pdf')).toBeInTheDocument()
+    expect(items).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('DocSyncPanel: what a click on the card reports', () => {
+  it('FE-DOCSYNC-PANEL-021: a refused run is said under the card rather than swallowed', async () => {
+    serverHas({ providers: [provider('paperless', 'Paperless-ngx')], links: [link(1, 'paperless')] })
+    syncNow.mockRejectedValue({ response: { status: 409, data: { error: 'provider_disabled' } } })
+
+    render(<DocSyncPanel tripId={7} canManage onClose={onClose} />)
+    await screen.findByRole('article')
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    fireEvent.click(within(binding()).getByRole('button', { name: t('docsync.syncNow') }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(t('docsync.error.provider_disabled'))
+    expect(screen.getByRole('article')).toBeInTheDocument()
+  })
+
+  it('FE-DOCSYNC-PANEL-022: a refused credential opens the form for the bound store, and saving runs the binding', async () => {
+    // The sidebar only ever opened the form for a store with no connection
+    // yet, and a bound store is not listed there, so a rotated token could
+    // only be entered through the API.
+    serverHas({
+      providers: [provider('paperless', 'Paperless-ngx')],
+      connections: [connection(5, 'paperless')],
+      links: [link(1, 'paperless', { lastSyncState: 'needs_reauth', lastSyncError: 'unauthorized' })],
+    })
+
+    render(<DocSyncPanel tripId={7} canManage onClose={onClose} />)
+    await screen.findByRole('article')
+
+    fireEvent.click(within(binding()).getByRole('button', { name: t('docsync.binding.reconnect') }))
+
+    // The credential form, for this store, not the folder picker.
+    expect(screen.getByRole('button', { name: t('docsync.connect.submit') })).toBeInTheDocument()
+    expect(screen.queryByText(t('docsync.scope.pickTitle'))).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: t('docsync.connect.submit') }))
+
+    await waitFor(() => expect(saveConnection).toHaveBeenCalledWith(7, expect.objectContaining({ providerId: 'paperless' })))
+    await waitFor(() => expect(syncNow).toHaveBeenCalledWith(7, 1, false))
+    await waitFor(() => expect(screen.queryByRole('button', { name: t('docsync.connect.submit') })).not.toBeInTheDocument())
+    expect(screen.queryByText(t('docsync.scope.pickTitle'))).not.toBeInTheDocument()
   })
 })
 

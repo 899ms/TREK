@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, Link2Off,
+  ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, FolderPlus, FolderSync, KeyRound, Link2Off,
   Loader2, Plus, RefreshCw,
 } from 'lucide-react'
 import MSheet from '../../../components/MSheet'
@@ -12,7 +12,7 @@ import { useTranslation } from '../../../../i18n'
 import { DOCUMENT_PROVIDER_ICONS } from '../../../../components/shared/DocumentProviderIcons'
 import TrekIcon from '../../../../components/shared/TrekIcon'
 import {
-  bindingNotice, storeName, useDocSync, type DocSyncLink, type DocSyncProvider,
+  bindingNotice, needsReauth, storeName, useDocSync, type DocSyncLink, type DocSyncProvider,
 } from '../../../../components/Files/docsync/useDocSync'
 import { useConnectForm } from '../../../../components/Files/docsync/useConnectForm'
 import { conflictPolicyKey, nextConflictPolicy } from '../../../../components/Files/docsync/DocSyncBits'
@@ -52,10 +52,18 @@ export default function MDocSyncSheet({
   const [selected, setSelected] = useState<number | null>(null)
   const [pending, setPending] = useState<DocSyncProvider | null>(null)
   const [confirmUnlink, setConfirmUnlink] = useState(false)
+  // The binding whose credentials are being entered again, while the connect
+  // view is open for it. Kept apart from `pending`, whose next step is the
+  // folder picker: here the folder is known and the next step is the run that
+  // the refusal stopped.
+  const [reconnectFor, setReconnectFor] = useState<number | null>(null)
 
   const bound = useMemo(() => new Set(sync.links.map(l => l.providerId)), [sync.links])
   const available = sync.providers.filter(p => !bound.has(p.id))
   const link = sync.links.find(l => l.id === selected) ?? null
+  // Undefined once an admin has switched the store off: the form needs the
+  // provider's field list, and the providers route no longer carries it.
+  const linkProvider = link ? sync.providers.find(p => p.id === link.providerId) : undefined
 
   // A store that was removed elsewhere must not leave the detail view pointing
   // at nothing.
@@ -66,12 +74,35 @@ export default function MDocSyncSheet({
   // Every open starts at the list: a sheet that reopens three steps deep is a
   // sheet somebody has to find their way out of.
   useEffect(() => {
-    if (!open) { setView('list'); setPending(null) }
+    if (!open) { setView('list'); setPending(null); setReconnectFor(null) }
   }, [open])
 
   const openStore = (p: DocSyncProvider) => {
+    setReconnectFor(null)
     setPending(p)
     setView(sync.connectionFor(p.id) ? 'scope' : 'connect')
+  }
+
+  const reconnect = (l: DocSyncLink, p: DocSyncProvider) => {
+    setReconnectFor(l.id)
+    setPending(p)
+    setView('connect')
+  }
+
+  /** The step before this one: the binding for a reconnect, the list otherwise. */
+  const back = () => {
+    if (reconnectFor !== null) { setReconnectFor(null); setView('detail') } else setView('list')
+  }
+
+  const connected = () => {
+    if (reconnectFor === null) { setView('scope'); return }
+    // Run straight away, as binding does: the card still reports the refusal
+    // until a run says otherwise, and the person has just done the one thing
+    // that could change the answer.
+    const id = reconnectFor
+    setReconnectFor(null)
+    setView('detail')
+    void sync.syncNow(id)
   }
 
   const title =
@@ -87,7 +118,7 @@ export default function MDocSyncSheet({
         <div className="flex-none px-[18px] pt-4">
           <div className="flex items-center gap-2">
             {view !== 'list' && (
-              <MIconBtn variant="neutral" size={34} onClick={() => setView('list')} ariaLabel={t('common.back')}>
+              <MIconBtn variant="neutral" size={34} onClick={back} ariaLabel={t('common.back')}>
                 <ChevronLeft size={16} strokeWidth={2.2} />
               </MIconBtn>
             )}
@@ -115,7 +146,7 @@ export default function MDocSyncSheet({
             <ConnectView
               provider={pending}
               sync={sync}
-              onDone={() => setView('scope')}
+              onDone={connected}
             />
           ) : view === 'scope' && pending && sync.connectionFor(pending.id) ? (
             <ScopeView
@@ -132,6 +163,7 @@ export default function MDocSyncSheet({
               sync={sync}
               canManage={canManage}
               onUnlink={() => setConfirmUnlink(true)}
+              onReconnect={linkProvider ? () => reconnect(link, linkProvider) : undefined}
             />
           ) : (
             <ListView
@@ -233,6 +265,7 @@ function DetailView({
   sync,
   canManage,
   onUnlink,
+  onReconnect,
 }: {
   link: DocSyncLink
   tripId: number | string
@@ -240,9 +273,19 @@ function DetailView({
   sync: ReturnType<typeof useDocSync>
   canManage: boolean
   onUnlink: () => void
+  /**
+   * Opens the credential form for this binding's store. Only the sheet can,
+   * because the form needs the provider's field list, which the card does
+   * not carry; left out, a refused credential is reported but not curable.
+   */
+  onReconnect?: () => void
 }) {
   const { t, language } = useTranslation()
   const busy = sync.busy === `sync-${link.id}`
+  // Not while the provider is switched off: the paused notice stands in front
+  // of the refusal then, and a new credential would change nothing until an
+  // admin turns the provider back on.
+  const reconnect = canManage && onReconnect && !link.providerOff && needsReauth(link) ? onReconnect : null
   const holdings = link.holdings ?? { inTrek: 0, atProvider: 0, paired: 0, missing: 0 }
   const pushOn = link.direction === 'both' || link.direction === 'push'
   const pullOn = link.direction === 'both' || link.direction === 'pull'
@@ -305,7 +348,30 @@ function DetailView({
         </p>
       )}
 
-      <MConflicts tripId={tripId} sync={sync} count={sync.itemCounts.conflict ?? 0} />
+      {/* The one state a person can act on from here. Without this the only
+          way past a rotated token was the API: the list opens the form for a
+          store that has no connection yet, and this one has. */}
+      {reconnect && (
+        <button
+          type="button"
+          onClick={reconnect}
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-2xl border border-[color:var(--m-rowbr)] text-[0.8125rem] font-bold text-m-ink"
+        >
+          <KeyRound size={15} strokeWidth={2.2} />
+          {t('docsync.binding.reconnect')}
+        </button>
+      )}
+
+      {/* Every action on this view reports here: a refused run, a switch that
+          flipped back, a conflict the server would not settle. Nothing said
+          what happened to a tap before. */}
+      {sync.error && (
+        <p role="alert" className="rounded-2xl bg-[color:var(--m-ic)] px-3 py-2 font-geist text-[0.6875rem] text-[color:var(--m-st-danger)]">
+          {t(`docsync.error.${sync.error}`)}
+        </p>
+      )}
+
+      <MConflicts tripId={tripId} sync={sync} count={sync.itemCounts.conflict ?? 0} canManage={canManage} />
 
       <button
         type="button"
@@ -767,33 +833,48 @@ function MConflicts({
   tripId,
   sync,
   count,
+  canManage,
 }: {
   tripId: number | string
   sync: ReturnType<typeof useDocSync>
   count: number
+  canManage: boolean
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
-  const conflicts = useConflicts(tripId, sync, open)
+  const conflicts = useConflicts(tripId, sync, canManage && open)
   if (count === 0) return null
+
+  const heading = (
+    <span className="min-w-0">
+      <span className="block font-geist text-[0.75rem] font-bold text-m-ink">{t('docsync.conflict.title')}</span>
+      <span className="mt-0.5 block font-geist text-[0.6875rem] text-m-muted">{t('docsync.issues.conflict')}</span>
+    </span>
+  )
 
   return (
     <section className="rounded-2xl bg-[color:var(--m-ic)] px-3 py-2.5">
-      <button
-        type="button"
-        onClick={() => setOpen(v => !v)}
-        className="flex w-full items-center justify-between gap-3 text-left"
-      >
-        <span className="min-w-0">
-          <span className="block font-geist text-[0.75rem] font-bold text-m-ink">{t('docsync.conflict.title')}</span>
-          <span className="mt-0.5 block font-geist text-[0.6875rem] text-m-muted">{t('docsync.issues.conflict')}</span>
-        </span>
-        <span className="shrink-0 font-geist text-[0.6875rem] font-bold text-m-ink">
-          {open ? t('common.close') : t('docsync.conflict.resolve', { count })}
-        </span>
-      </button>
+      {/* Only the owner gets to open it: the server refuses a member's choice,
+          so a member gets the count, as the desktop panel gives it. */}
+      {canManage ? (
+        <button
+          type="button"
+          onClick={() => setOpen(v => !v)}
+          className="flex w-full items-center justify-between gap-3 text-left"
+        >
+          {heading}
+          <span className="shrink-0 font-geist text-[0.6875rem] font-bold text-m-ink">
+            {open ? t('common.close') : t('docsync.conflict.resolve', { count })}
+          </span>
+        </button>
+      ) : (
+        <div className="flex w-full items-center justify-between gap-3 text-left">
+          {heading}
+          <span className="shrink-0 font-geist text-[0.6875rem] font-bold tabular-nums text-m-ink">{count}</span>
+        </div>
+      )}
 
-      {open && (
+      {canManage && open && (
         <ul className="mt-2.5 space-y-2">
           {conflicts.items === null && (
             <li className="flex justify-center py-2">

@@ -166,10 +166,16 @@ describe('Request body ceiling', () => {
     expect(res.status).not.toBe(413);
   });
 
-  // A list file may be a megabyte (#2198), and the two routes that carry one
-  // whole are measured against that instead (#2301). Only those two.
-  it('MISC-011: a list file over 100kb reaches the import and the GPX reader', async () => {
-    for (const route of ['/api/addons/collections/import', '/api/addons/collections/gpx/read']) {
+  // A list file may be a megabyte (#2198), and the three routes that carry one
+  // whole are measured against that instead (#2301): the import into a new
+  // list, the GPX reader, and the import into a list that already exists.
+  // Only those three.
+  it('MISC-011: a list file over 100kb reaches both imports and the GPX reader', async () => {
+    for (const route of [
+      '/api/addons/collections/import',
+      '/api/addons/collections/gpx/read',
+      '/api/addons/collections/7/import',
+    ]) {
       const res = await request(app)
         .post(route)
         .set('Content-Type', 'application/json')

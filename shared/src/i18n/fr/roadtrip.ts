@@ -267,5 +267,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.noToll': 'Sans peage',
   'roadtrip.alt.noFerry': 'Sans ferry',
   'roadtrip.summary.partial': 'Le reste du trajet est encore en cours de calcul',
+  'roadtrip.stay.releaseTitle': 'Supprimer la nuitée ?',
+  'roadtrip.stay.releaseBody': 'La nuit à « {name} » sera supprimée. L’arrêt reste sur le trajet comme pause.',
+  'roadtrip.stay.releaseBookedBody': 'La nuit à « {name} » sera supprimée avec la réservation « {booking} » et toute dépense qui y est liée. L’arrêt reste sur le trajet comme pause.',
+  'roadtrip.stay.releaseAction': 'En faire une pause',
 };
 export default roadtrip;

@@ -7,7 +7,7 @@ Complete reference for all environment variables TREK reads.
 - **Docker Compose** — use the `environment:` block or a `.env` file alongside `docker-compose.yml`
 - **Docker run** — pass each variable with `-e VARIABLE=value`
 - **Helm** — use `env:` for plain values and `secretEnv:` for sensitive values in `values.yaml`. The chart only
-  passes through the keys it declares (28 in `templates/configmap.yaml`, 5 in `templates/secret.yaml`), so a variable
+  passes through the keys it declares (31 in `templates/configmap.yaml`, the credentials in `templates/secret.yaml`), so a variable
   that is not one of them is dropped silently — patch it onto the Deployment or add it to the chart
 - **Unraid** — set in the container template editor
 - **Proxmox Community Script** — set in `/opt/trek/server/.env`
@@ -324,10 +324,10 @@ TREK's own place index, the [TREK Places API](TREK-Places-API), answers the sugg
 
 | Variable              | Description | Default |
 |-----------------------|-------------|---------|
-| `TREK_PLACES_ENABLED` | Set to `false` to stop asking the index. Search then works as it did before 4.3.0: OpenStreetMap on an install without a key, the keyed provider (Google or Amap) when one is set, the Overpass mirrors for the category buttons, and no places downloaded for offline search. Only the literal value `false` switches it off: `0`, `no`, `off` and `FALSE` pass startup validation and leave the index on, and a value that is not boolean-like aborts startup. | on |
+| `TREK_PLACES_ENABLED` | Set to `false` to stop asking the index. Search then works as it did before 4.3.0: OpenStreetMap on an install without a key, the keyed provider (Google or Amap) when one is set, the Overpass mirrors for the category buttons, and no places downloaded for offline search. It is a boolean switch like the others on this page: `false`, `0`, `off` and `no` in any casing switch it off, a value that is not boolean-like aborts startup, and unset or blank leaves the index on. | on |
 | `TREK_PLACES_URL`     | Base URL of a copy of the service you run yourself; it has to answer the same `/v1` API. Unset or blank uses the public service. A trailing slash is stripped, and a value that is not a full URL aborts startup. It is configuration rather than user input and is not run through the SSRF guard, so an address on your LAN or Docker network works without `ALLOW_INTERNAL_NETWORK`. | `https://places.liketrek.com` |
 
-Neither variable is among the keys the Helm chart declares yet, so on Helm patch them onto the Deployment (see [How to Set Variables](#how-to-set-variables)).
+On Helm both go under `env:` in `values.yaml`. The chart passes `TREK_PLACES_ENABLED` through whenever it is set at all, so an unquoted `false` or `--set env.TREK_PLACES_ENABLED=false` reaches the container as well.
 
 ---
 
@@ -351,7 +351,7 @@ type **Web 服务**. A **Web 端 (JS API)** key is a different kind of credentia
 
 **Two ways to configure it**, pick one; the env var wins if both are present:
 
-1. **Environment variable** (this page): instance-wide, ideal for Docker/Helm where you already manage config as env.
+1. **Environment variable** (this page): instance-wide, ideal for Docker/Helm where you already manage config as env. In the chart the key and the secret are credentials and go under `secretEnv:`, not `env:`; only `AMAP_API_BASE` is a plain `env:` value.
 2. **Admin → Settings → API Keys**: paste it into the **Amap (高德地图) API Key** field. Stored encrypted at rest.
 
 Setting a key is not enough on its own: **Admin → Settings → API Keys → Place search provider** decides which keyed

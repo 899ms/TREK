@@ -167,6 +167,7 @@ const docsync: TranslationStrings = {
 
   'docsync.error.unknown_provider': '這個提供者在此執行個體上無法使用。',
   'docsync.error.provider_disabled': '已暫停：管理員已停用此提供者。重新啟用後會繼續同步。',
+  'docsync.binding.reconnect': '重新連線',
 };
 
 export default docsync;

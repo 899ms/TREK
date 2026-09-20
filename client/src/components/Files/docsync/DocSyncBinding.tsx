@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   AlertTriangle, Check, ChevronDown, Clock, Copy, FolderOpen, Link2Off, RefreshCw,
 } from 'lucide-react'
+import ConfirmDialog from '../../shared/ConfirmDialog'
 import CustomSelect from '../../shared/CustomSelect'
 import ToggleSwitch from '../../Settings/ToggleSwitch'
 import Tooltip from '../../shared/Tooltip'
@@ -9,7 +10,7 @@ import { useTranslation } from '../../../i18n/TranslationContext'
 import { DOCUMENT_PROVIDER_ICONS } from '../../shared/DocumentProviderIcons'
 import DocSyncFlow, { type SyncDirection } from './DocSyncFlow'
 import { Badge, CONFLICT_POLICIES, conflictPolicyKey, LastRun, StateBadge } from './DocSyncBits'
-import { bindingNotice, type DocSyncLink, type useDocSync } from './useDocSync'
+import { bindingNotice, needsReauth, type DocSyncLink, type useDocSync } from './useDocSync'
 
 /**
  * One binding: where this trip's documents live, which way they move, and what
@@ -25,18 +26,30 @@ export default function DocSyncBinding({
   providerName,
   sync,
   canManage,
+  onReconnect,
 }: {
   link: DocSyncLink
   providerName: string
   sync: ReturnType<typeof useDocSync>
   canManage: boolean
+  /**
+   * Opens the credential form for this binding's store. Only the panel can,
+   * because the form needs the provider's field list, which the card does
+   * not carry; left out, a refused credential is reported but not curable.
+   */
+  onReconnect?: () => void
 }) {
   const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [confirmUnlink, setConfirmUnlink] = useState(false)
   const Icon = DOCUMENT_PROVIDER_ICONS[link.providerId]
   const busy = sync.busy === `sync-${link.id}`
   const notice = bindingNotice(link, t)
+  // Not while the provider is switched off: the paused notice stands in front
+  // of the refusal then, and a new credential would change nothing until an
+  // admin turns the provider back on.
+  const reconnect = canManage && onReconnect && !link.providerOff && needsReauth(link) ? onReconnect : null
 
   const copyWebhook = async () => {
     if (!link.webhookUrl) return
@@ -97,11 +110,15 @@ export default function DocSyncBinding({
                 text still changes to "Syncing". */}
             <span className="sr-only sm:not-sr-only">{busy ? t('docsync.syncing') : t('docsync.syncNow')}</span>
           </button>
+          {/* Asked first, as the phone does: the button sits a hand's width
+              from "Sync now", and a binding cannot be put back. Rebinding the
+              same folder starts from nothing and copies both sides over
+              again. */}
           {canManage && (
             <Tooltip label={t('docsync.unlink')}>
               <button
                 type="button"
-                onClick={() => void sync.removeLink(link.id)}
+                onClick={() => setConfirmUnlink(true)}
                 className="grid h-9 w-9 place-items-center rounded-lg border border-edge bg-surface text-content-muted transition-colors hover:bg-danger-soft hover:text-danger"
                 aria-label={t('docsync.unlink')}
               >
@@ -115,9 +132,30 @@ export default function DocSyncBinding({
       {notice && (
         <p className="mx-4 mb-3 flex items-start gap-2 rounded-lg bg-warning-soft px-3 py-2 text-caption text-warning">
           <AlertTriangle size={13} className="mt-px shrink-0" />
-          <span>{notice}</span>
+          <span className="min-w-0 flex-1">{notice}</span>
+          {/* The one state a person can act on from here. Without this the
+              only way past a rotated token was the API: the sidebar opens the
+              form for a store that has no connection yet, and this one has. */}
+          {reconnect && (
+            <button
+              type="button"
+              onClick={reconnect}
+              className="shrink-0 rounded-lg border border-edge bg-surface px-2.5 py-1 text-caption font-medium text-content transition-colors hover:bg-surface-hover"
+            >
+              {t('docsync.binding.reconnect')}
+            </button>
+          )}
         </p>
       )}
+
+      <ConfirmDialog
+        isOpen={confirmUnlink}
+        onClose={() => setConfirmUnlink(false)}
+        onConfirm={() => void sync.removeLink(link.id)}
+        title={t('docsync.unlink')}
+        message={t('docsync.confirmUnlink')}
+        confirmLabel={t('docsync.unlink')}
+      />
 
       <div className="px-4 pb-3">
         <DocSyncFlow

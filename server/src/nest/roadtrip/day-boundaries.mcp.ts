@@ -10,6 +10,7 @@ import { AddonsService } from '../addons/addons.service';
 import { addonGate } from '../addons/addon-gate';
 import { ADDON_IDS } from '../../addons';
 import { DayBoundariesService } from './day-boundaries.service';
+import { answeringRefusals } from './roadtrip-mcp.helpers';
 
 const when = addonGate(ADDON_IDS.ROADTRIP);
 
@@ -44,10 +45,13 @@ export class DayBoundariesMcp {
     if (this.auth.isDemoUser(ctx.userId)) return demoDenied();
     if (!this.db.canAccessTrip(tripId, ctx.userId)) return noAccess();
     if (!this.guards.hasTripPermission('day_edit', tripId, ctx.userId)) return permissionDenied();
-    const boundaries = boundary
-      ? this.boundaries.save(tripId, { ...boundary, day_number: dayNumber })
-      : this.boundaries.remove(tripId, dayNumber);
-    this.realtime.broadcast(String(tripId), 'roadtripBoundary:changed', { boundaries });
-    return ok({ boundaries });
+    // A stop from another trip is refused by the service, with the reason.
+    return answeringRefusals(() => {
+      const boundaries = boundary
+        ? this.boundaries.save(tripId, { ...boundary, day_number: dayNumber })
+        : this.boundaries.remove(tripId, dayNumber);
+      this.realtime.broadcast(String(tripId), 'roadtripBoundary:changed', { boundaries });
+      return ok({ boundaries });
+    });
   }
 }
