@@ -8,10 +8,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { mockGetActive, mockDismiss } = vi.hoisted(() => ({ mockGetActive: vi.fn(), mockDismiss: vi.fn() }));
+const { mockGetActive, mockDismiss, mockAppVersion } = vi.hoisted(() => ({ mockGetActive: vi.fn(), mockDismiss: vi.fn(), mockAppVersion: vi.fn(() => '4.3.0') }));
 vi.mock('../../../src/systemNotices/service', () => ({
   getActiveNoticesFor: mockGetActive,
   dismissNotice: mockDismiss,
+  getCurrentAppVersion: mockAppVersion,
 }));
 
 import { SystemNoticesService } from '../../../src/nest/system-notices/system-notices.service';
@@ -70,15 +71,37 @@ describe('SystemNoticesService', () => {
       expect(svc.getActiveFor(7, new Set(['banner'])).map(n => n.id)).toEqual(['outage']);
     });
 
-    it('delivers it, in place, once the client announces the release layout', () => {
+    it('delivers it, in place, once the client announces the release layout for the running version', () => {
       mockGetActive.mockReturnValue([release, generic]);
-      expect(svc.getActiveFor(7, new Set(['release'])).map(n => n.id)).toEqual(['release-notes', 'outage']);
+      expect(svc.getActiveFor(7, new Set(['release']), '4.3.0').map(n => n.id)).toEqual(['release-notes', 'outage']);
+    });
+
+    it('drops it for a bundle that announces the layout but was built for another version', () => {
+      // The shell the service worker serves right after an update: it can draw the
+      // layout, but with the texts of the version it was built for, and its X would
+      // use the notice up for the version now running.
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7, new Set(['release']), '4.2.1').map(n => n.id)).toEqual(['outage']);
+      mockAppVersion.mockReturnValueOnce('4.3.1');
+      expect(svc.getActiveFor(7, new Set(['release']), '4.3.0').map(n => n.id)).toEqual(['outage']);
+    });
+
+    it('drops it for a bundle that names no version at all', () => {
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7, new Set(['release'])).map(n => n.id)).toEqual(['outage']);
+      expect(svc.getActiveFor(7, new Set(['release']), '').map(n => n.id)).toEqual(['outage']);
+      expect(svc.getActiveFor(7, new Set(['release']), 'dev').map(n => n.id)).toEqual(['outage']);
+    });
+
+    it('reads the version loosely, as the server reads its own', () => {
+      mockGetActive.mockReturnValue([release, generic]);
+      expect(svc.getActiveFor(7, new Set(['release']), 'v4.3.0').map(n => n.id)).toEqual(['release-notes', 'outage']);
     });
 
     it('always delivers a notice without a release block', () => {
       mockGetActive.mockReturnValue([generic]);
       expect(svc.getActiveFor(7).map(n => n.id)).toEqual(['outage']);
-      expect(svc.getActiveFor(7, new Set(['release'])).map(n => n.id)).toEqual(['outage']);
+      expect(svc.getActiveFor(7, new Set(['release']), '4.3.0').map(n => n.id)).toEqual(['outage']);
     });
   });
 

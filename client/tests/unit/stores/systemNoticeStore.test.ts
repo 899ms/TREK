@@ -15,7 +15,7 @@ describe('systemNoticeStore', () => {
   // can draw the release layout, so an older bundle never shows it as bare keys and
   // never dismisses it for good. This bundle has to announce it on every fetch.
   describe('FE-SYSNOTICE-001: fetch() announces the layouts this bundle can draw', () => {
-    it('sends supports=release with the active-notices request', async () => {
+    it('sends supports=release and the version this bundle was built as', async () => {
       const urls: URL[] = [];
       server.use(
         http.get('/api/system-notices/active', ({ request }) => {
@@ -28,6 +28,10 @@ describe('systemNoticeStore', () => {
 
       expect(urls).toHaveLength(1);
       expect(urls[0].searchParams.get('supports')).toBe('release');
+      // The value `define` bakes in from client/package.json: the server compares it
+      // with its own version before it hands the release notice over.
+      expect(urls[0].searchParams.get('ui')).toBe(__TREK_UI_VERSION__);
+      expect(urls[0].searchParams.get('ui')).toMatch(/^\d+\.\d+\.\d+/);
       expect(useSystemNoticeStore.getState().loaded).toBe(true);
     });
 

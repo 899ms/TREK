@@ -6,9 +6,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 
 /**
- * `?supports=release` names the layouts the calling bundle can draw, comma separated.
- * A missing or malformed value means none, which is what every bundle before this
- * parameter sent.
+ * `?supports=release` names the layouts the calling bundle can draw, comma separated,
+ * and `?ui=4.3.0` the version the bundle was built as. A missing or malformed value
+ * means none, which is what every bundle before these parameters sent.
  */
 function parseSupports(raw: string | string[] | undefined): Set<string> {
   const values = Array.isArray(raw) ? raw : [raw];
@@ -30,8 +30,12 @@ export class SystemNoticesController {
   constructor(private readonly notices: SystemNoticesService) {}
 
   @Get('active')
-  active(@CurrentUser() user: User, @Query('supports') supports?: string | string[]): SystemNoticeDto[] {
-    return this.notices.getActiveFor(user.id, parseSupports(supports));
+  active(
+    @CurrentUser() user: User,
+    @Query('supports') supports?: string | string[],
+    @Query('ui') ui?: string | string[],
+  ): SystemNoticeDto[] {
+    return this.notices.getActiveFor(user.id, parseSupports(supports), typeof ui === 'string' ? ui.trim() : undefined);
   }
 
   @Post(':id/dismiss')
