@@ -25,6 +25,7 @@ function LinkIcon({ url }: { url: string }) {
   return (
     <span className="collab-link-chip__icon" aria-hidden="true">
       {!favicon || failed ? <Link2 size={13} /> : <img src={favicon} alt="" onError={() => setFailed(true)} />}
+      <span className="collab-link-chip__go"><ExternalLink size={13} /></span>
     </span>
   )
 }
@@ -234,7 +235,6 @@ export default function CollabLinks({ tripId }: { tripId: number }) {
                     <span className="collab-link-chip__title">{link.title}</span>
                     <span className="collab-link-chip__host">{hostOf(link.url)}</span>
                   </span>
-                  <ExternalLink className="collab-link-chip__open" size={12} aria-hidden="true" />
                 </a>
                 {canEdit && (
                   <span className="collab-link-chip__actions">

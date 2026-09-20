@@ -1435,7 +1435,23 @@ img[alt="TREK"] {
   color: var(--text-faint);
 }
 .collab-link-chip__icon img { width: 16px; height: 16px; object-fit: contain; }
+.collab-link-chip__icon > * { transition: opacity 0.15s ease; }
+/* Reaching for the chip turns its favicon into the open-in-new-tab glyph: the
+   affordance without a glyph of its own taking room from the title. */
+.collab-link-chip__go {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-primary);
+  opacity: 0;
+}
+.collab-link-chip__main:hover .collab-link-chip__go, .collab-link-chip__main:focus-visible .collab-link-chip__go { opacity: 1; }
+.collab-link-chip__main:hover .collab-link-chip__icon > :not(.collab-link-chip__go),
+.collab-link-chip__main:focus-visible .collab-link-chip__icon > :not(.collab-link-chip__go) { opacity: 0; }
 .collab-link-chip__text { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; }
+/* The title gives way last: the host shrinks first, down to a few letters and the
+   ellipsis, before the title loses a character. */
 .collab-link-chip__title {
   font-size: calc(12.5px * var(--fs-scale-body, 1));
   font-weight: 600;
@@ -1452,18 +1468,9 @@ img[alt="TREK"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 1 auto;
-  min-width: 0;
-  max-width: 45%;
+  flex: 0 8 auto;
+  min-width: 2.5em;
 }
-.collab-link-chip__open {
-  flex: 0 0 auto;
-  color: var(--text-faint);
-  opacity: 0;
-  transition: opacity 0.15s ease, color 0.15s ease;
-}
-.collab-link-chip:hover .collab-link-chip__open, .collab-link-chip:focus-within .collab-link-chip__open { opacity: 1; }
-.collab-link-chip__main:hover .collab-link-chip__open { color: var(--text-primary); }
 .collab-link-chip__actions {
   display: flex;
   align-items: center;
@@ -1477,8 +1484,8 @@ img[alt="TREK"] {
 .collab-link-chip__action {
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   border: 0;
   border-radius: 50%;
   background: transparent;
@@ -1490,7 +1497,6 @@ img[alt="TREK"] {
 .collab-link-chip__action--on { color: var(--accent); }
 @media (hover: none) {
   .collab-link-chip__actions { opacity: 1; }
-  .collab-link-chip__open { opacity: 1; }
 }
 
 /* Markdown in Collab Notes */
