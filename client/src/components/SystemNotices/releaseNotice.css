@@ -67,9 +67,20 @@
   line-height: normal;
 }
 
-/* Below the two-column breakpoint the halves stack and the panel scrolls. */
+/* Below the two-column breakpoint the halves stack and the panel scrolls. The
+   rows must go back to auto: with the single minmax row from above, the note took
+   the whole panel and the release half was left with nothing but its padding. */
 @media (max-width: 1080px) {
-  .rn-panel { grid-template-columns: 1fr; overflow-y: auto; }
+  .rn-panel { grid-template-columns: 1fr; grid-template-rows: auto; overflow-y: auto; }
+  .rn-release, .rn-release-inner, .rn-note-body { overflow: visible; }
+  /* Once the note has scrolled into view, the ask stays at the bottom edge. The
+     band's usual tint is translucent, so it gets a solid one here. */
+  .rn-support {
+    position: sticky;
+    bottom: 0;
+    z-index: 1;
+    background: color-mix(in srgb, var(--bg-card) 95%, var(--text-primary));
+  }
 }
 
 [data-reduce-motion='true'] .rn-overlay,
@@ -580,6 +591,15 @@
 }
 
 .rn-note-body::-webkit-scrollbar { display: none; }
+
+/*
+ * The two columns scroll; what is inside them must not give way instead. A flex
+ * item may shrink below its content, and one with overflow hidden may shrink to
+ * nothing, so on a 1080p screen at 100% the promise box was pressed down to its
+ * label while the paragraphs around it kept their height and the column scrolled.
+ */
+.rn-release-inner > *,
+.rn-note-body > * { flex-shrink: 0; }
 
 .rn-note-eyebrow {
   font-family: var(--font-subtext);
