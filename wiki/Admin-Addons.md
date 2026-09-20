@@ -21,9 +21,10 @@ The default trip addons are: **Lists**, **Costs**, **Documents** and **Collab** 
 **Sub-toggles on trip addons:**
 
 - **Lists**: when enabled, a nested **Bag Tracking** toggle appears. Bag Tracking lets users assign packed items to specific bags.
-- **Collab**: when enabled, four sub-toggles appear for individual collaboration features:
+- **Collab**: when enabled, five sub-toggles appear for individual collaboration features:
   - **Chat**: in-trip real-time chat
   - **Notes**: shared trip notes
+  - **Links**: shared trip links, on by default
   - **Polls**: trip polls
   - **What's Next**: the "what's next" widget
 - **Documents**: when enabled, one row per document store appears underneath: **Paperless-ngx**, **Papra**, **Nextcloud**, **OpenCloud** and **Synology Drive**. All of them are off by default. Switching a store on only lets trip owners offer it; the address and credentials are entered per trip, in the trip's file manager. Switching a store off pauses the trips bound to it without touching them. Switching **Documents** itself off switches every store off, and each has to be switched on again afterwards; a store cannot be switched on while **Documents** is off. See [Document-Sync](Document-Sync).

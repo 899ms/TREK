@@ -78,7 +78,7 @@ Amap does not supply place photos here. Its images come with no licence statemen
 
 A place remembers where it came from. One picked from Amap keeps its Amap id, one picked from Google keeps its Google id, and each keeps opening against the provider that knows it, whichever provider the admin selects later.
 
-Amap links can be pasted into the search box too; see [Pasting a map URL](#pasting-a-map-url).
+Amap links can be pasted into the search box too; see [Pasting a map URL](#pasting-a-map-url). A place in China also offers **高德地图** in its **Navigation** menu, whichever provider answers searches; see [Opening a place in a map app](#opening-a-place-in-a-map-app).
 
 ### Which provider answers
 
@@ -192,11 +192,29 @@ The expense belongs to the **place**, not to a day. Putting the same place on se
 
 Deleting the place deletes its linked expense too, the same way deleting a booking does.
 
+## Rating a place
+
+Every trip member can rate a place from 1 to 5 stars, even when place editing is restricted to certain members. Open the place's detail panel: the rating row shows the stars, the average with the number of votes in brackets, and the avatars of who voted; rest the pointer on it to see everyone's stars. Click a star to cast your vote, and click the same star again to clear it. A place nobody has rated reads **Not rated yet**.
+
+The average also sits beside the place's name in the places list and on a marker's hover card on the map; a marker that carries no order badge shows it as a small disc in its corner instead. To narrow the list, the star button in the sidebar header (**Filter by rating**) picks a floor from 1 to 5 stars and keeps only the places whose average reaches it.
+
+Saved places in [Collections](Collections) are rated the same way. Saving a trip place to a list or copying a list place into a trip carries the votes along, but only those of people who are members on both sides.
+
+> **AI / MCP:** `rate_place` sets or clears your own vote; see [MCP-Tools-and-Resources](MCP-Tools-and-Resources).
+
 ## Custom place image
 
 By default a place's thumbnail is fetched automatically (from Google or Wikimedia when the place was imported or matched, otherwise a category icon). To use your own photo instead, open the place's detail panel and click its round thumbnail. Pick an image and it becomes that place's thumbnail everywhere (list, map marker, itinerary, PDF export and shared trips). A small remove button on the thumbnail clears the custom image and restores the automatic default. Accepted formats are JPG, PNG, GIF and WebP (HEIC is converted automatically), up to 20 MB.
 
 The same control is available on saved places in [Collections](Collections#place-detail).
+
+## Opening a place in a map app
+
+The **Navigation** button in a place's detail panel, on the phone's place sheet and on a saved place in Collections opens a short menu of map apps, in this order: **Google Maps**, **Waze**, **Apple Maps**, **OpenStreetMap**, **CoMaps** and, for a place in China, **高德地图** (Amap). Waze starts navigating straight away; the others open the place, and starting navigation from there is one tap. When only one app is available the button opens it directly.
+
+Which entries appear depends on the place and on where you are, not on the search provider the admin picked. Apple Maps is left out on Android. Amap is offered by where the place is, because it only has a map of China: a stop in Shanghai gets it whoever is planning the trip, a stop in Lisbon never does. Waze, Apple Maps, CoMaps and Amap need the place's coordinates; Google Maps and OpenStreetMap can still open a place that has none, Google from its name and address, OpenStreetMap from its name. Coordinates handed to Amap are converted to its own datum on the way out, so the pin lands on the right street.
+
+In the installed app the map app takes over the current window rather than a new tab, so coming back lands you where you were.
 
 ## Importing multiple places
 

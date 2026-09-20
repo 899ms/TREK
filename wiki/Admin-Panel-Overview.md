@@ -15,7 +15,7 @@ The Admin Panel is divided into tabs. Most tabs are always visible; a few appear
 | Tab | Purpose | Conditional? |
 |-----|---------|--------------|
 | **Users** | Manage users, invite links, and permissions | No |
-| **Personalization** | Packing templates and place categories | No |
+| **Personalization** | Packing templates, place categories and the manually maintained school holiday catalog (see [Vacay](Vacay#manually-maintained-school-holidays)) | No |
 | **User Defaults** | Default settings applied to new users | No |
 | **Addons** | Enable or disable optional features instance-wide | No |
 | **Plugins** | Install, update, and manage plugins; rescan the plugins folder; view each plugin's error log. See [Admin-Plugins](Admin-Plugins) | No |
@@ -37,6 +37,12 @@ On desktop and mobile, **User Defaults** includes optional **Own routing engine*
 With both fields empty, TREK uses public OSRM servers for routing and the public FOSSGIS Valhalla for avoiding toll roads, motorways and ferries. Configuring only a custom routing instance disables the public Valhalla fallback. After entering a custom server URL, restart TREK and reload the page. See [Road-Trip](Road-Trip#routing-engines).
 
 > **AI / MCP:** These fields configure the routing services the planner and the road trip MCP tools use, and do not change stored trip data.
+
+### Routing usage counters
+
+Every route is calculated in the browser against the routing hosts, so the server never sees a routing request itself. To still know how much routing an instance does, the browser reports its tally in batches and the server keeps **daily counters**: how many requests, of what kind (route, segments, legs, alternatives), for which profile (driving, walking, cycling), how many waypoints, roughly how many kilometres, how many came back without a route, and whether a self-hosted engine answered. Counters only: no query, no coordinate, no route, no user and no trip is stored, and nothing leaves the instance. A day's row is kept for 400 days.
+
+Counting is **on by default** and has no switch in the admin panel. To turn it off, set the `route_usage_enabled` key to `false` in the `app_settings` table; reports are then acknowledged but nothing is written. There is no admin screen for the totals either: an admin reads them at `GET /api/route-usage/summary` and wipes them with `DELETE /api/route-usage`.
 
 ### Linking to a tab directly
 

@@ -18,6 +18,14 @@ When the trip has a start and an end date and you may edit the day, that menu al
 
 Route segments reset at any transport reservation (flight, train, car, bus, or cruise) between two places — that leg is not driven or walked, so no ground route is drawn across it.
 
+### Counting routing requests
+
+> **Admin:** counting is on by default. To switch it off, set `route_usage_enabled` to `false` in the `app_settings` table of the database; there is no screen for it.
+
+Every route is worked out in the browser against the routing host, so the server never sees a request of its own. The browser therefore tallies what it asks for and posts the totals in batches, and the instance keeps one row per day, routing profile and kind of request: how many requests, how many waypoints, roughly how many kilometres, how many came back without a route, and whether they went to the public hosts or to your own engine. Counters only: no coordinate, no route, no user and no trip are in them, and they never leave the instance.
+
+Signed in as an admin, `GET /api/route-usage/summary` returns the totals, the requests per day, the busiest day, the split per profile and per kind of request, and the share answered by a self-hosted engine. `DELETE /api/route-usage` wipes the counters. Rows older than 400 days are deleted every night, whether counting is on or off.
+
 ## Route display
 
 - Colored line segments connect consecutive places on the map.

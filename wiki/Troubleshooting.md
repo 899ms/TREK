@@ -115,9 +115,9 @@ There is no button for it: the Admin Panel UI has no per-user MFA reset (the use
 
 ---
 
-## Demo user cannot edit or create
+## Demo user cannot upload files or change account settings
 
-**Cause:** The instance is running with `DEMO_MODE=true`. All write operations are blocked for the demo account by design.
+**Cause:** The instance is running with `DEMO_MODE=true`. For the demo account, file uploads (avatar, trip cover, documents, place and collection images), password change, account deletion, MFA changes and the MCP write tools answer 403 by design. Everything else the demo user can create, edit and delete, trips, days, places and costs included; the hourly reset puts it all back to the saved baseline.
 
 **Fix:** This is intentional behavior for public demo deployments. If you are self-hosting and want full access, remove the `DEMO_MODE` variable (or set it to `false`). See [Demo Mode](Demo-Mode).
 

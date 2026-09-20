@@ -29,7 +29,7 @@ The dashboard stays reachable at `/dashboard` — only the root redirects.
 
 Shown once **Active trip** is selected: which tab of the trip planner to open on. Handy when you mostly reach for one thing on the road, for example entering expenses on the Costs tab.
 
-If the tab you picked belongs to an addon that is switched off, the trip opens on **Plan** instead.
+If the tab you picked belongs to an addon that is switched off, the trip opens on **Plan** instead. The same happens with **Road trip** on the desktop: that tab exists only on the phone, and the desktop reaches the drive through the **Days** / **Road trip** switch on **Plan**.
 
 ### Linking to a tab directly
 
@@ -44,6 +44,7 @@ The parameter takes the planner's internal tab ids, which are historic German na
 | Tab | Id |
 |-----|-----|
 | Plan | `plan` |
+| Road trip | `roadtrip` (phone only; on the desktop the trip opens on Plan, where the **Days** / **Road trip** switch sits) |
 | Transports | `transports` |
 | Bookings | `buchungen` |
 | Lists | `listen` |

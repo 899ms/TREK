@@ -17,7 +17,7 @@ The scopes required for Mapbox GL are:
 
 ## Satellite view
 
-A round button in the bottom-left corner of the Leaflet map flips the base layer between the normal map tiles and **satellite** imagery (ESRI World Imagery — no API key needed, usable up to zoom 19). The icon always shows the layer it switches to. Your choice is stored on your account (`map_base_layer`), so it carries over to every trip and survives a reload. Markers, route lines, tracks and booking overlays are drawn on top of either layer.
+A round button in the bottom-left corner of the map flips the base layer between the normal map tiles and **satellite** imagery (ESRI World Imagery — no API key needed, usable up to zoom 19). The icon always shows the layer it switches to. The button is on all three renderers: Leaflet swaps its tile layer for the imagery, while MapLibre GL and Mapbox GL put the same imagery on as a raster layer of their own beneath everything TREK draws, so the route, the pins and the tracks stay on top of it. Your choice is stored on your account (`map_base_layer`), the same setting whichever renderer you use, so it carries over to every trip and survives a reload. Markers, route lines, tracks and booking overlays are drawn on top of either layer.
 
 ## Place markers
 

@@ -34,7 +34,7 @@ Set the following environment variables before starting the server:
 
 | Variable | Required | Description |
 |---|---|---|
-| `APP_URL` | Yes | Base URL of your TREK instance (e.g. `https://trek.example.com`). Used to build the redirect URI. **Env var only — not configurable via the admin panel.** If it is unset (or not a parseable URL, in which case it is ignored), TREK falls back to the first `ALLOWED_ORIGINS` entry, and only if that one is missing or unparseable to `http://localhost:{PORT}` — which produces a redirect URI your IdP will reject. A scheme-less `ALLOWED_ORIGINS=trek.example.com` does not parse, so it ends up on localhost too. |
+| `APP_URL` | Yes | Base URL of your TREK instance (e.g. `https://trek.example.com`). Used to build the redirect URI. **Env var only — not configurable via the admin panel.** If it is unset, TREK falls back to the first `ALLOWED_ORIGINS` entry, and only if that one is missing or unparseable to `http://localhost:{PORT}` — which produces a redirect URI your IdP will reject. A scheme-less `ALLOWED_ORIGINS=trek.example.com` does not parse, so it ends up on localhost too. A set but unparseable `APP_URL` does not fall back: the server refuses to start with `Invalid environment configuration` naming `APP_URL`. |
 | `OIDC_ISSUER` | Yes | Issuer URL of your identity provider. Must use HTTPS in production. |
 | `OIDC_CLIENT_ID` | Yes | OAuth 2.0 client ID registered with your IdP. |
 | `OIDC_CLIENT_SECRET` | Yes | OAuth 2.0 client secret. |

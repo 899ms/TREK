@@ -8,7 +8,7 @@ Attach and manage documents, tickets, and other files for your trip.
 
 Open the **Files** tab inside the trip planner, or navigate directly to `/trips/:id/files`.
 
-> **Admin:** Files is an addon. Enable it in [Admin-Addons](Admin-Addons).
+> **Admin:** The Files tab belongs to the **Documents** addon. Enable it in [Admin-Addons](Admin-Addons).
 
 ## Uploading
 

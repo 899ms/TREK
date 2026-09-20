@@ -20,10 +20,10 @@ Under the strict guard, these ranges are blocked whatever `ALLOW_INTERNAL_NETWOR
 |---|---|
 | `127.0.0.0/8`, `::1` | Loopback |
 | `0.0.0.0/8` | Unspecified |
-| `169.254.0.0/16`, `fe80::/16` | Link-local / cloud metadata endpoints |
+| `169.254.0.0/16`, `fe80::/10` | Link-local / cloud metadata endpoints |
 | `::ffff:127.x.x.x`, `::ffff:169.254.x.x` | IPv4-mapped loopback and link-local |
 
-The IPv6 link-local rule here matches the `fe80:` hextet only, which is narrower than the nominal `fe80::/10` prefix (`fe80:` to `febf:`). In practice that is the same set of addresses, since RFC 4291 link-local addresses are always `fe80::/64`. The relaxed guard covers the whole `/10`.
+The IPv6 link-local rule covers the whole `fe80::/10` prefix (`fe80:` to `febf:`), under the relaxed guard as well.
 
 The one way past this table is `ALLOW_LINK_LOCAL_IPS`, for a single IPv4 link-local address, see [below](#a-link-local-address-you-need).
 

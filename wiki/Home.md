@@ -59,13 +59,13 @@ TREK is a self-hosted, real-time collaborative travel planner licensed under AGP
 - **MCP Server**: built-in Model Context Protocol server with OAuth 2.1 authentication
 - **150+ Tools**: create trips, plan itineraries, manage budgets, send messages, and more
 - **30 Resources**: read-only `trek://` URIs for trips, days, places, budget, packing, journeys, and more
-- **29 OAuth Scopes**: granular permissions across 14 permission groups
+- **35 OAuth Scopes**: granular permissions across 17 permission groups
 - **Pre-built Prompts**: `trip-summary`, `packing-list`, and `budget-overview` context loaders
 
 ### Admin
 - User management, invite links, packing templates, global categories
 - Addon management, API key storage, scheduled auto-backups
-- System notices for onboarding and announcements
+- System notices for onboarding and announcements, including a release notes notice every user sees once after each update (see [Admin-GitHub-Releases](Admin-GitHub-Releases#release-notes-notice))
 
 > **Admin:** Most configuration lives in the Admin Panel. On first boot TREK seeds an admin account automatically: credentials come from `ADMIN_EMAIL` / `ADMIN_PASSWORD` if set, otherwise a random password is printed to the container log.
 

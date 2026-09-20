@@ -1,6 +1,6 @@
 # MCP Addon Tools and Resources
 
-This page covers MCP tools and resources that require specific addons to be enabled on your TREK instance. For the rest of the surface (trips, places, day planning, accommodations, transport, reservations, tags, maps, and notifications — plus the Budget tools, which need the Budget addon but are documented there) see [MCP-Tools-and-Resources](MCP-Tools-and-Resources).
+This page covers MCP tools and resources that require specific addons to be enabled on your TREK instance. For the rest of the surface (trips, places, day planning, accommodations, transport, reservations, tags, maps, and notifications — plus the Budget tools, which need the Budget addon, listed as **Costs** under **Admin → Addons**, but are documented there) see [MCP-Tools-and-Resources](MCP-Tools-and-Resources).
 
 ---
 
@@ -8,12 +8,13 @@ This page covers MCP tools and resources that require specific addons to be enab
 
 ### Packing _(Packing addon required)_
 
-Requires `packing:read` or `packing:write` scope.
+Requires `packing:read` or `packing:write` scope. The Packing addon is listed as **Lists** under **Admin → Addons** (id `packing`) and covers packing lists and to-dos.
 
 | Tool | Description |
 |---|---|
 | `create_packing_item` | Add an item to the packing checklist with optional category. |
 | `update_packing_item` | Rename an item or change its category. |
+| `set_packing_item_sharing` | Move an item between the three sharing tiers: `common` puts it in the pool the whole trip packs from, `personal` keeps it to its owner, `shared` covers the trip members in `recipient_ids`. Only the item's owner may change this. |
 | `toggle_packing_item` | Check or uncheck a packing item. |
 | `delete_packing_item` | Remove a packing item. |
 | `reorder_packing_items` | Set the display order of packing items within a trip. |
@@ -55,6 +56,7 @@ Requires `atlas:read` or `atlas:write` scope.
 | `unmark_country_visited` | Remove a country from your visited list. |
 | `get_atlas_stats` | Get atlas statistics — visited country counts, region counts, and continent breakdown. |
 | `list_visited_regions` | List all manually visited sub-country regions for the current user. |
+| `locate_atlas_region` | Resolve a coordinate to the country and region codes the Atlas map can highlight, which is where the pair `mark_region_visited` expects comes from. A point outside every bundled polygon answers with `null` fields rather than an error. For a postal address use `reverse_geocode` instead. |
 | `mark_region_visited` | Mark a sub-country region as visited (e.g. `"US-CA"`). |
 | `unmark_region_visited` | Remove a region from the visited list. |
 | `get_country_atlas_places` | Get places saved in the user's atlas for a specific country. |
@@ -66,7 +68,7 @@ Requires `atlas:read` or `atlas:write` scope.
 
 Requires `collab:read` or `collab:write` scope.
 
-The addon alone is not enough. Collab has four sub-features an admin switches on and off independently in Admin → Addons — Notes, Polls, Chat and What's Next, all on by default — and three of them gate MCP entries. A tool or resource is only registered when its own sub-feature is enabled on top of the addon, so switching one off makes its entries vanish from the tool list rather than return an error. What's Next has no MCP tools or resources of its own, so toggling it changes nothing here.
+The addon alone is not enough. Collab has five sub-features an admin switches on and off independently in Admin → Addons — Notes, Polls, Chat, Links and What's Next, all on by default — and three of them gate MCP entries. A tool or resource is only registered when its own sub-feature is enabled on top of the addon, so switching one off makes its entries vanish from the tool list rather than return an error. Links and What's Next have no MCP tools or resources of their own, so toggling them changes nothing here.
 
 | Sub-feature | Tools it gates | Resource it gates |
 |---|---|---|
@@ -98,6 +100,7 @@ Requires `collections:read` or `collections:write` scope.
 | `list_collections` | List the saved-place collections the user owns or has accepted a share for, plus any pending incoming invites. |
 | `get_collection` | Get one collection with its members, labels, and all saved places, including the average rating and each member's vote. |
 | `available_collection_users` | List users who can still be invited to a collection (excludes current members and guests). |
+| `find_place_in_collections` | Answer whether a place is already on one of your lists, across the whole library in one call, naming each list and the status the place has there. Identify the place by `google_place_id` / `google_ftid` from `search_place` or by `lat` + `lng`; a name alone is never matched. |
 | `create_collection` | Create a new saved-place collection owned by the user. |
 | `update_collection` | Update a collection's name, description, colour, icon, cover, links, or sort order. Owner/admin only. |
 | `delete_collection` | Permanently delete a collection and all its saved places. Owner only, and it cannot be undone. |
@@ -106,6 +109,7 @@ Requires `collections:read` or `collections:write` scope.
 | `save_trip_places_to_collection` | Copy one or more existing trip places into a collection. Duplicates are skipped unless `force` is true. |
 | `update_collection_place` | Update a saved place's name, address, coordinates, description, notes, status, category, links, tags, labels, image, or move it to another collection. |
 | `set_collection_place_status` | Set a saved place's status: `idea`, `want`, or `visited`. |
+| `set_collection_place_status_from_trip` | Set a status on every saved copy of the given trip places, in every list they are on, for marking places visited after a day out. Ids are trip place ids. Lists you may only read are skipped. Returns how many saved places changed and how many of the trip places were found in at least one list. |
 | `rate_collection_place` | Set or clear the current user's 1-5 star rating on a saved place. Every member rates independently; pass `null` to remove the vote. |
 | `delete_collection_place` | Remove a saved place from its collection. Requires delete permission on the list. |
 | `copy_collection_places_to_trip` | Copy one or more saved places into a trip, ratings included. Requires edit access to the target trip. |
@@ -128,6 +132,7 @@ Requires `vacay:read` or `vacay:write` scope.
 | Tool | Description |
 |---|---|
 | `get_vacay_plan` | Get the current user's active vacation plan. |
+| `get_vacay_year_settings` | Read the caller's leave-year window: `calendar` runs January to December, `fiscal` starts on a configured month and day, `anniversary` on the hire date's month and day. Read it before interpreting a year in `get_vacay_stats` or `get_vacay_entries`, which count over that window. |
 | `update_vacay_plan` | Update vacation plan settings (weekend blocking, holidays, carry-over). |
 | `set_vacay_color` | Set the current user's color in the vacation plan calendar. |
 | `get_available_vacay_users` | List users who can be invited to the current vacation plan. |
@@ -144,15 +149,31 @@ Requires `vacay:read` or `vacay:write` scope.
 | `toggle_company_holiday` | Toggle a date as a company holiday for the whole plan. |
 | `get_vacay_stats` | Get vacation statistics for a specific year (days used, remaining, carried over). |
 | `update_vacay_stats` | Update the vacation day allowance for a specific user and year. |
-| `add_holiday_calendar` | Add a public holiday calendar (by region code) to the vacation plan. |
+| `add_holiday_calendar` | Add a public holiday calendar (by region code from `list_holiday_countries`) to the vacation plan, or a school-holiday calendar with `type: 'school_holiday'` and a region code from `list_school_holiday_regions` or `list_manual_school_holiday_regions`. A school-holiday calendar only shows up once `update_vacay_plan` has set `school_holidays_enabled`. |
 | `update_holiday_calendar` | Update label or color for a holiday calendar. |
 | `delete_holiday_calendar` | Remove a holiday calendar from the vacation plan. |
 | `list_holiday_countries` | List countries available for public holiday calendars. |
 | `list_holidays` | List public holidays for a country and year. |
+| `list_school_holiday_regions` | List a country's school-holiday regions. Pass `calendar_regions[].region` verbatim as the region of `add_holiday_calendar`; a group is stored as `COUNTRY\|group:CODE`, and a bare group code would leave the calendar empty. |
+| `list_school_holidays` | List school holidays for a country and year, narrowed to a subdivision or group code from `list_school_holiday_regions`. These are term breaks; a day off is normally counted against the public holidays from `list_holidays`. |
 | `list_vacay_shares` | List read-only calendar shares — who you share your calendar with, and which calendars are shared with you. |
+| `get_shareable_vacay_users` | List the users the caller can share their calendar with, for `share_vacay_calendar`. A wider set than `get_available_vacay_users`, which lists candidates for merging plans and so leaves out everyone already in a plan of their own. |
 | `share_vacay_calendar` | Share the current user's vacation calendar with another user (view only, no merge). |
 | `unshare_vacay_calendar` | Remove a read-only calendar share — revoke one you shared, or remove a calendar shared with you. |
 | `get_shared_vacay_calendars` | Get the read-only calendars shared with the current user for a year (entries and company holidays per sharer). |
+
+**Manual school holidays.** The catalog an admin maintains under **Admin → Personalization → School holidays** (see [Vacay](Vacay)) has tools of its own. They are registered whether or not the Vacay addon is on. Reading needs `vacay:read`; every write needs `vacay:write` and an admin account, and a non-admin gets `Admin access required`.
+
+| Tool | Scope | Description |
+|---|---|---|
+| `list_manual_school_holiday_regions` | `vacay:read` | List the manual catalog: countries with their regions. Pass `regions[].code` verbatim to `add_holiday_calendar` with `type: 'school_holiday'`. Needs no external API. |
+| `get_manual_school_holiday_region` | `vacay:read` | Read one region, its current revision and all named holiday periods. Read it before an update, which replaces the whole list of periods and needs the current revision. |
+| `list_manual_school_holidays` | `vacay:read` | Named school breaks of a manual region for one year, including breaks that span a year boundary. Both boundary dates are included. |
+| `create_manual_school_holiday_country` | `vacay:write`, admin only | Add a country to the catalog with its two-letter uppercase code and display name. Check the catalog first to avoid duplicates. |
+| `create_manual_school_holiday_region` | `vacay:write`, admin only | Add a region or school district to an existing country, with named periods as inclusive `YYYY-MM-DD` dates. Use revision `0` on creation. |
+| `update_manual_school_holiday_region` | `vacay:write`, admin only | Rename a region and replace its complete list of periods. Supply the current revision; a stale one is rejected. Every calendar using the region follows the change. |
+| `delete_manual_school_holiday_region` | `vacay:write`, admin only | Delete a region and its periods, with the current revision. A region a vacation calendar has selected cannot be deleted. |
+| `delete_manual_school_holiday_country` | `vacay:write`, admin only | Delete an empty country from the catalog. Remove its unused regions first. |
 
 ### Journey _(Journey addon required)_
 
@@ -162,14 +183,16 @@ Requires `journey:read` or `journey:write` scope.
 |---|---|
 | `list_journeys` | List all journeys owned or contributed to by the current user. |
 | `get_journey` | Get a full snapshot of a journey — metadata, entries, contributors, and linked trips. |
+| `get_journey_stats` | What a journey adds up to: distance travelled in metres, calendar days spanned, countries in visit order, the furthest point reached, and entry, photo and place counts. Entries switched off with `stats_excluded` count towards none of those and are listed under `excluded`. Pass `include_route` for the route itself, up to 400 stops with coordinates. |
 | `create_journey` | Create a new journey with title, optional subtitle, and an initial list of trip IDs. |
-| `update_journey` | Update a journey's title, subtitle, or status. |
+| `update_journey` | Update a journey's title, subtitle, cover or status, and whether its entries offer a pros/cons list, a mood and a weather note (`show_verdict`, `show_mood`, `show_weather`). Owner only. |
+| `restore_journey_suggestions` | Bring back every trip-derived suggestion that was dismissed from a journey. Answers with how many came back. |
 | `delete_journey` | Delete a journey. |
 | `add_journey_trip` | Link an existing trip to a journey. |
 | `remove_journey_trip` | Remove a trip from a journey. |
 | `list_journey_entries` | List all entries in a journey (date, text, mood, linked trip). |
 | `create_journey_entry` | Add an entry with date (required), optional title, story text, time of day, location name, mood, and sort order. |
-| `update_journey_entry` | Edit a journey entry's title, story, date, time of day, or mood. |
+| `update_journey_entry` | Edit a journey entry's title, story, date, time of day, place, coordinates, weather, tags, mood, pros/cons list or visibility. `stats_excluded: true` keeps the entry but takes it off the route and out of `get_journey_stats`; `dismissed: true` waves a trip-derived suggestion away without deleting it, so the trip sync does not offer it again. |
 | `delete_journey_entry` | Remove an entry from a journey. |
 | `reorder_journey_entries` | Reorder entries by providing the new ordered list of entry IDs. |
 | `list_journey_contributors` | List the contributors of a journey (owner and editors/viewers). |
@@ -177,6 +200,7 @@ Requires `journey:read` or `journey:write` scope.
 | `update_journey_contributor_role` | Change a contributor's role between `editor` and `viewer`. |
 | `remove_journey_contributor` | Remove a contributor from a journey. |
 | `update_journey_preferences` | Update display preferences for a journey. |
+| `add_journey_provider_photos` | Attach photos from a connected library (Immich or Synology Photos) to a journey, or to one entry when `entryId` is given. Find the asset ids first with `search_provider_photos` or `list_provider_album_photos`. No image data passes through: the journey stores a reference and the app fetches the picture. An asset already attached is skipped rather than duplicated. |
 | `get_journey_suggestions` | Get suggested trips to add to journeys based on recent trip history. |
 | `list_journey_available_trips` | List all trips available to the current user for linking to a journey. |
 | `get_journey_share_link` | Get the current public share link for a journey. Requires `journey:share`. |

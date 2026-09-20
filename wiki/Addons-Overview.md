@@ -36,6 +36,6 @@ The following addons are registered in the system (defined in `server/src/db/see
 
 ## Per-addon sub-features
 
-Some addons expose sub-features that an admin can independently toggle. The [Real-Time-Collaboration](Real-Time-Collaboration) addon, for example, lets an admin decide which of its four sub-features (chat, notes, polls, and what's next) are active across the instance. These are configured from the [Admin-Addons](Admin-Addons) panel alongside the addon's main toggle.
+Some addons expose sub-features that an admin can independently toggle. The [Real-Time-Collaboration](Real-Time-Collaboration) addon, for example, lets an admin decide which of its five sub-features (chat, notes, links, polls, and what's next) are active across the instance. These are configured from the [Admin-Addons](Admin-Addons) panel alongside the addon's main toggle.
 
 The **Documents** addon carries one switch per document store: Paperless-ngx, Papra, Nextcloud, OpenCloud and Synology Drive. They are off by default and only show while Documents is on, and switching Documents off switches all of them off. The stores themselves are connected per trip, in the trip's file manager. See [Document-Sync](Document-Sync).
