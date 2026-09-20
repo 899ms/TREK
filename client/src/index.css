@@ -1449,9 +1449,17 @@ img[alt="TREK"] {
 .collab-link-chip__main:hover .collab-link-chip__go, .collab-link-chip__main:focus-visible .collab-link-chip__go { opacity: 1; }
 .collab-link-chip__main:hover .collab-link-chip__icon > :not(.collab-link-chip__go),
 .collab-link-chip__main:focus-visible .collab-link-chip__icon > :not(.collab-link-chip__go) { opacity: 0; }
-.collab-link-chip__text { display: flex; align-items: baseline; gap: 6px; min-width: 0; flex: 1 1 auto; }
-/* The title gives way last: the host shrinks first, down to a few letters and the
-   ellipsis, before the title loses a character. */
+/* Title first, host with what is left: a max-content track takes its full width
+   before the fr track sees any, and shrinks only once the title alone no longer
+   fits. Two flex items shrank together and both ended in an ellipsis. */
+.collab-link-chip__text {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
 .collab-link-chip__title {
   font-size: calc(12.5px * var(--fs-scale-body, 1));
   font-weight: 600;
@@ -1459,7 +1467,6 @@ img[alt="TREK"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 1 auto;
   min-width: 0;
 }
 .collab-link-chip__host {
@@ -1468,8 +1475,7 @@ img[alt="TREK"] {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  flex: 0 100 auto;
-  min-width: 2.5em;
+  min-width: 0;
 }
 .collab-link-chip__actions {
   display: flex;
