@@ -187,6 +187,10 @@
 .trek-dash .hero-content {
   position: absolute; inset: 0; z-index: 2; padding: 32px 32px 26px;
   display: grid; grid-template-rows: auto 1fr auto; color: #fff;
+  /* The one column may not grow past the hero. An auto track takes the title's
+     min-content width, and a title that is one long word made the track, the tools
+     row and the boarding pass as wide as that word, with the tools off the card. */
+  grid-template-columns: minmax(0, 1fr);
 }
 .trek-dash .hero-top { display: flex; justify-content: space-between; align-items: start; }
 .trek-dash .hero-badge {
@@ -221,14 +225,21 @@
 }
 .trek-dash .hero-tool:hover { background: oklch(0.22 0.01 260 / .78); transform: scale(1.05); }
 .trek-dash .hero-tool svg { width: 17px; height: 17px; }
-.trek-dash .hero-title-block { align-self: end; padding-bottom: 24px; }
+.trek-dash .hero-title-block { align-self: end; padding-bottom: 24px; min-width: 0; }
 .trek-dash .hero-eyebrow {
   display: inline-flex; align-items: center; gap: 10px;
   font-size: 11.5px; letter-spacing: 0.22em; text-transform: uppercase;
   opacity: .88; margin-bottom: 16px; font-weight: 500;
 }
 .trek-dash .hero-eyebrow::before { content: ""; width: 28px; height: 1px; background: oklch(1 0 0 / .6); }
-.trek-dash .hero-title { font-size: 104px; font-weight: 600; line-height: 0.9; letter-spacing: -0.045em; margin: 0; text-shadow: 0 1px 12px oklch(0 0 0 / .32), 0 1px 3px oklch(0 0 0 / .4); }
+.trek-dash .hero-title {
+  font-size: 104px; font-weight: 600; line-height: 0.9; letter-spacing: -0.045em; margin: 0;
+  text-shadow: 0 1px 12px oklch(0 0 0 / .32), 0 1px 3px oklch(0 0 0 / .4);
+  /* Two lines at most, a word longer than the card broken inside it: the rows above
+     and below have a fixed budget and a third line would run into the badge row. */
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+}
 
 /* ----------------- boarding pass ----------------- */
 /* The pass is split into an outer wrapper (left notch) and an inner glass panel
