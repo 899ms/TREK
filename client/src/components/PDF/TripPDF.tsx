@@ -335,7 +335,13 @@ export async function downloadTripPDF({ trip, days, places, assignments = {}, ca
   }
   // Build day HTML
   const daysHtml = sorted.map((day, di) => {
-    const assigned = (assignments[String(day.id)] || []).slice()
+    // Without the stop a booked night wrote onto its check-in day: the day plan hides
+    // it (the day already carries the booking as its accommodation block) and the
+    // export lists what the plan lists. The desktop toolbar hands the export the
+    // store's own assignments, filter and all, and the stop sits at the head of its
+    // day, so the hotel printed above a morning flight (#2434).
+    const assigned = (assignments[String(day.id)] || [])
+      .filter((a: any) => a.accommodation_id == null)
       .sort((a: any, b: any) => (a.order_index ?? 0) - (b.order_index ?? 0))
     const notes = (dayNotes || []).filter(n => n.day_id === day.id).slice()
       .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))

@@ -253,6 +253,24 @@ describe('downloadTripPDF', () => {
     expect(iframe!.srcdoc).toContain('Air Italia · AI123 · CDG → FCO')
   })
 
+  it('FE-COMP-TRIPPDF-013f: the stop a booked night wrote is not listed, so a morning flight prints before the hotel (#2434)', async () => {
+    // The desktop toolbar hands the export the store's assignments, hidden stop and
+    // all, and that stop heads its check-in day. The day plan hides it and shows the
+    // booking as the accommodation block, and the print lists what the plan lists.
+    const hotelPlace = { id: 101, name: 'Hotel Hafen Hamburg', address: 'Seewartenstr. 9', place_time: null } as any
+    const hotelStop = { id: 201, day_id: 10, place_id: 101, order_index: 0, accommodation_id: 30, place: hotelPlace }
+    const flight = { ...transportReservation, title: 'Morning flight', reservation_time: '2025-06-01T08:00:00' }
+    await downloadTripPDF({
+      ...richArgs,
+      assignments: { '10': [hotelStop, { ...assignmentForDay, order_index: 1 }] } as any,
+      reservations: [flight],
+    })
+    const html = getIframe()!.srcdoc
+    expect(html).not.toContain('Seewartenstr. 9')
+    expect(html.indexOf('Morning flight')).toBeLessThan(html.indexOf('Colosseum'))
+    expect(html.indexOf('Morning flight')).toBeGreaterThan(-1)
+  })
+
   it('FE-COMP-TRIPPDF-013c: a flight that lands the same day shows both times (#1310)', async () => {
     const sameDay = { ...transportReservation, reservation_end_time: '2025-06-01T16:45:00' }
     await downloadTripPDF({ ...richArgs, reservations: [sameDay] })
