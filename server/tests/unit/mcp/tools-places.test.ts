@@ -559,7 +559,7 @@ describe('Tool: search_place', () => {
     await withHarness(user.id, async (h) => {
       const result = await h.client.callTool({ name: 'search_place', arguments: { query: 'Eiffel Tower' } });
       const data = parseToolResult(result) as any;
-      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Eiffel Tower', undefined, undefined);
+      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Eiffel Tower', undefined, undefined, { googleOnly: false });
       expect(data.places).toHaveLength(1);
       expect(data.places[0].osm_id).toBe('node:12345');
       expect(data.places[0].name).toBe('Eiffel Tower');
@@ -579,7 +579,7 @@ describe('Tool: search_place', () => {
     await withHarness(user.id, async (h) => {
       const result = await h.client.callTool({ name: 'search_place', arguments: { query: 'Eiffel Tower' } });
       const data = parseToolResult(result) as any;
-      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Eiffel Tower', undefined, undefined);
+      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Eiffel Tower', undefined, undefined, { googleOnly: false });
       expect(data.places).toHaveLength(1);
       expect(data.places[0].google_place_id).toBe('ChIJD3uTd9hx5kcR1IQvGfr8dbk');
       expect(data.places[0].name).toBe('Eiffel Tower');
@@ -617,6 +617,7 @@ describe('Tool: search_place', () => {
         'Central Station',
         'ja',
         { lat: 35.6812, lng: 139.7671, radius: 8000 },
+        { googleOnly: false },
       );
     });
   });
@@ -630,7 +631,22 @@ describe('Tool: search_place', () => {
         name: 'search_place',
         arguments: { query: 'Museum of Modern Art', locationBias: { lat: 40.7614, lng: -73.9776 } },
       });
-      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Museum of Modern Art', undefined, { lat: 40.7614, lng: -73.9776 });
+      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Museum of Modern Art', undefined, { lat: 40.7614, lng: -73.9776 }, { googleOnly: false });
+    });
+  });
+
+  it('sends one search to Google alone when asked to, and refuses any other provider', async () => {
+    const { user } = createUser(testDb);
+    searchPlacesMock.mockResolvedValue({ source: 'google', places: [] });
+
+    await withHarness(user.id, async (h) => {
+      await h.client.callTool({ name: 'search_place', arguments: { query: 'Tokyo Station', provider: 'google' } });
+      expect(searchPlacesMock).toHaveBeenCalledWith(user.id, 'Tokyo Station', undefined, undefined, { googleOnly: true });
+
+      searchPlacesMock.mockClear();
+      const refused = await h.client.callTool({ name: 'search_place', arguments: { query: 'Tokyo Station', provider: 'osm' } });
+      expect(refused.isError).toBe(true);
+      expect(searchPlacesMock).not.toHaveBeenCalled();
     });
   });
 
