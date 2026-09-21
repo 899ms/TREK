@@ -219,6 +219,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Pengayaan tempat',
   'admin.placesEnrich.subtitle':
     'Menampilkan gambar dan deskripsi saat menambahkan tempat. Wikipedia dan OpenStreetMap selalu digunakan; Google ditambahkan bila Foto Tempat atau Detail Tempat aktif.',
+  'admin.placesGoogleOnly.title': 'Cari hanya dengan Google',
+  'admin.placesGoogleOnly.subtitle': 'Setiap pencarian dan setiap saran dikirim ke Google Places. Nonaktif, indeks TREK dan OpenStreetMap menjawab lebih dulu, dan Google hanya ditanya jika keduanya tidak menemukan apa pun.',
+  'admin.placesGoogleOnly.missingKey': 'Memerlukan kunci API Google Maps. Tanpa kunci, pencarian memakai indeks TREK dan OpenStreetMap, apa pun posisi sakelar ini.',
   'admin.transitProvider.title': 'Penyedia transportasi umum',
   'admin.transitProvider.subtitle': 'Layanan mana yang menjawab pencarian transportasi umum.',
   'admin.transitProvider.transitous': 'Transitous (gratis)',

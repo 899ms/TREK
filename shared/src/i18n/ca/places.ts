@@ -87,6 +87,7 @@ const places: TranslationStrings = {
   'places.reservationNotesPlaceholder': 'Notes de reserva, número de confirmació...',
   'places.mapsSearchPlaceholder': 'Cerca llocs...',
   'places.mapsSearchError': 'La cerca de llocs ha fallat.',
+  'places.searchGoogleInstead': 'No és el lloc correcte? Cerca a Google',
   'places.loadingDetails': 'Carregant els detalls del lloc…',
   'places.osmHint':
     "S'està utilitzant la cerca amb OpenStreetMap (sense fotos, horaris ni valoracions). Afegeix una clau API de Google a Configuració per obtenir tots els detalls.",

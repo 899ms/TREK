@@ -177,6 +177,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Helyek gazdagítása',
   'admin.placesEnrich.subtitle':
     'Képeket és leírást mutat hely hozzáadásakor. A Wikipédia és az OpenStreetMap mindig használatban van; a Google akkor jön hozzá, ha a Helyfotók vagy a Helyadatok be vannak kapcsolva.',
+  'admin.placesGoogleOnly.title': 'Keresés csak a Google-lel',
+  'admin.placesGoogleOnly.subtitle': 'Minden keresés és minden javaslat a Google Places-hez megy. Kikapcsolva előbb a TREK saját indexe és az OpenStreetMap válaszol, a Google-t csak akkor kérdezzük, ha ők nem találnak semmit.',
+  'admin.placesGoogleOnly.missingKey': 'Google Maps API-kulcs kell hozzá. Nélküle a keresés a TREK indexén és az OpenStreetMapen fut, bárhogy áll is ez a kapcsoló.',
   'admin.transitProvider.title': 'Tömegközlekedési szolgáltató',
   'admin.transitProvider.subtitle': 'Melyik szolgáltatás válaszol a tömegközlekedési keresésre.',
   'admin.transitProvider.transitous': 'Transitous (ingyenes)',

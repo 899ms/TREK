@@ -175,6 +175,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Obohacení míst',
   'admin.placesEnrich.subtitle':
     'Zobrazí obrázky a popis při přidávání místa. Wikipedie a OpenStreetMap se používají vždy; Google se přidá, když jsou zapnuté Fotky míst nebo Detaily míst.',
+  'admin.placesGoogleOnly.title': 'Hledat pouze přes Google',
+  'admin.placesGoogleOnly.subtitle': 'Každé hledání a každý návrh jde do Google Places. Vypnuto: nejprve odpovídá index TREK a OpenStreetMap, Google se ptáme jen tehdy, když nic nenajdou.',
+  'admin.placesGoogleOnly.missingKey': 'Vyžaduje klíč Google Maps API. Bez něj hledání běží přes index TREK a OpenStreetMap bez ohledu na tento přepínač.',
   'admin.transitProvider.title': 'Poskytovatel veřejné dopravy',
   'admin.transitProvider.subtitle': 'Která služba odpovídá na vyhledávání veřejné dopravy.',
   'admin.transitProvider.transitous': 'Transitous (zdarma)',

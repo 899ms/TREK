@@ -221,6 +221,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Yer zenginleştirme',
   'admin.placesEnrich.subtitle':
     'Bir yer eklerken görseller ve açıklama gösterir. Wikipedia ve OpenStreetMap her zaman kullanılır; Yer Fotoğrafları veya Yer Ayrıntıları açıkken Google da eklenir.',
+  'admin.placesGoogleOnly.title': 'Yalnızca Google ile ara',
+  'admin.placesGoogleOnly.subtitle': 'Her arama ve her öneri Google Places\'e gider. Kapalıyken önce TREK dizini ve OpenStreetMap yanıtlar, Google yalnızca hiçbir şey bulamadıklarında sorulur.',
+  'admin.placesGoogleOnly.missingKey': 'Google Maps API anahtarı gerektirir. Anahtar yoksa arama, bu anahtar ne olursa olsun TREK dizini ve OpenStreetMap üzerinden çalışır.',
   'admin.transitProvider.title': 'Toplu taşıma sağlayıcısı',
   'admin.transitProvider.subtitle': 'Toplu taşıma aramasını hangi hizmetin yanıtlayacağı.',
   'admin.transitProvider.transitous': 'Transitous (ücretsiz)',

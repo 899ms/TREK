@@ -34,6 +34,7 @@ export default function MAdminSettingsSection({ admin, t }: MAdminSettingsSectio
     placesAutocompleteEnabled, setPlacesAutocompleteEnabledState,
     placesDetailsEnabled, setPlacesDetailsEnabledState,
     placesEnrichEnabled, setPlacesEnrichEnabledState,
+    placesGoogleOnly, handleTogglePlacesGoogleOnly,
     placeShadowEnabled, setPlaceShadowEnabledState,
     oidcConfig, setOidcConfig, savingOidc, setSavingOidc,
     passwordLogin, setPasswordLogin, passwordRegistration, setPasswordRegistration,
@@ -347,6 +348,17 @@ export default function MAdminSettingsSection({ admin, t }: MAdminSettingsSectio
                       setPlacesEnrichEnabled(!next)
                     }
                   }}
+                />
+              }
+            />
+            <MAdminRow
+              title={t('admin.placesGoogleOnly.title')}
+              hint={t(hasMapsKey ? 'admin.placesGoogleOnly.subtitle' : 'admin.placesGoogleOnly.missingKey')}
+              trailing={
+                <MToggle
+                  checked={placesGoogleOnly}
+                  ariaLabel={t('admin.placesGoogleOnly.title')}
+                  onChange={() => handleTogglePlacesGoogleOnly()}
                 />
               }
             />

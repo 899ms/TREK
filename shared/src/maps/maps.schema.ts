@@ -26,6 +26,13 @@ export const mapsSearchRequestSchema = z.object({
   // foreign-region queries. z.number() is finite-only (zod v4), matching the
   // legacy Number.isFinite() check; radius was never validated beyond "number".
   locationBias: latLng.extend({ radius: z.number().optional() }).optional(),
+  /**
+   * Ask one provider alone for this search. The index and OpenStreetMap answer
+   * first by default and Google is only asked when they find nothing; a caller
+   * whose results were not the place they meant can send the same query to
+   * Google instead. Ignored on an instance where Google holds no key.
+   */
+  provider: z.enum(['google']).optional(),
 });
 export type MapsSearchRequest = z.infer<typeof mapsSearchRequestSchema>;
 
@@ -39,7 +46,10 @@ export const mapsAutocompleteRequestSchema = z.object({
    * characters; anything else is dropped rather than forwarded, so a bad token
    * degrades to per-request billing instead of failing the search.
    */
-  sessionToken: z.string().regex(/^[A-Za-z0-9_-]{1,36}$/).optional(),
+  sessionToken: z
+    .string()
+    .regex(/^[A-Za-z0-9_-]{1,36}$/)
+    .optional(),
 });
 export type MapsAutocompleteRequest = z.infer<typeof mapsAutocompleteRequestSchema>;
 

@@ -664,6 +664,12 @@ type LocationBias = { low: { lat: number; lng: number }; high: { lat: number; ln
  * predates Amap, means `auto`, which keeps Google.
  */
 export const PLACES_PROVIDER_SETTING = 'places_provider';
+/**
+ * The admin switch that hands search and suggestions to Google alone. Off, the
+ * index and OpenStreetMap answer first and Google is only asked when they find
+ * nothing, which is what every install has had since 4.3.0.
+ */
+export const PLACES_GOOGLE_ONLY_SETTING = 'places_google_only';
 
 /**
  * Whoever holds the keyed slot beside the index for one request: Google's
@@ -761,8 +767,14 @@ export class MapsService {
 
   // ── Controller-facing surface (unchanged signatures) ───────────────────────
 
-  search(userId: number, query: string, lang?: string, locationBias?: { lat: number; lng: number; radius?: number }): Promise<MapsSearchResult> {
-    return this.searchPlaces(userId, query, lang, locationBias) as Promise<MapsSearchResult>;
+  search(
+    userId: number,
+    query: string,
+    lang?: string,
+    locationBias?: { lat: number; lng: number; radius?: number },
+    provider?: 'google',
+  ): Promise<MapsSearchResult> {
+    return this.searchPlaces(userId, query, lang, locationBias, { googleOnly: provider === 'google' }) as Promise<MapsSearchResult>;
   }
 
   autocomplete(userId: number, input: string, lang?: string, locationBias?: LocationBias, sessionToken?: string): Promise<MapsAutocompleteResult> {
@@ -1063,6 +1075,33 @@ export class MapsService {
     return amap.key
       ? { id: 'amap', provider: new AmapPlacesProvider({ key: amap.key, source: amap.source, userId }) }
       : null;
+  }
+
+  /**
+   * Whether this search goes to Google and nowhere else.
+   *
+   * Two ways to ask for that, both born of the same moment: the index answered
+   * a query with something that is not the place the traveller meant, and with
+   * the index and OpenStreetMap answering first, Google was never consulted as
+   * long as they found anything at all. The caller can send one search to
+   * Google (`requested`, the "search Google instead" link under the results),
+   * and the admin can make that the rule for every search and suggestion (the
+   * switch beside the key). Either way it only holds when Google holds the key
+   * slot: on an install without a Google key, or one that picked Amap or
+   * OpenStreetMap, both change nothing, and the admin panel says so.
+   *
+   * Read after the keyed provider on purpose: that lookup already walked the
+   * key chain, and a setting read ahead of it would shift the order of the
+   * app_settings reads every test of the chain stubs by position.
+   */
+  private googleOnly(keyed: KeyedProvider | null, requested = false): boolean {
+    if (keyed?.id !== 'google') return false;
+    if (requested) return true;
+    const row = this.database.get<{ value: string }>(
+      'SELECT value FROM app_settings WHERE key = ?',
+      PLACES_GOOGLE_ONLY_SETTING,
+    );
+    return row?.value === 'true';
   }
 
   /** The Amap provider, when Amap holds the keyed slot; null otherwise. */
@@ -2021,7 +2060,7 @@ export class MapsService {
     query: string,
     lang?: string,
     locationBias?: { lat: number; lng: number; radius?: number },
-    opts: { googleIdentityOnly?: boolean } = {},
+    opts: { googleIdentityOnly?: boolean; googleOnly?: boolean } = {},
   ): Promise<{ places: Record<string, unknown>[]; source: string }> {
     const keyed = this.keyedProvider(userId);
     const { key: apiKey, source: keySource } = keyed?.id === 'google' ? keyed : { key: null, source: null };
@@ -2048,7 +2087,10 @@ export class MapsService {
     // the same question twice. `null` means it never ran.
     let osmAnswer: Record<string, unknown>[] | null = null;
 
-    if (this.trekPlacesEnabled() && !(opts.googleIdentityOnly && apiKey)) {
+    // A search sent to Google on purpose, or the admin's "Google only" switch,
+    // skips the pair the same way: the search then reads exactly as it did
+    // before 4.3.0 on an install with a key.
+    if (this.trekPlacesEnabled() && !(opts.googleIdentityOnly && apiKey) && !this.googleOnly(keyed, opts.googleOnly)) {
       // Both at once. The index is a dataset of businesses and is very good
       // at those; OpenStreetMap is where the temples, bridges, riverside
       // walks and viewpoints are, and a travel search asks for those
@@ -2188,8 +2230,9 @@ export class MapsService {
     // could get every instance blocked at once. The index removes that.
     //
     // Same contract as search: never throws upward, falls through to what this
-    // method did before.
-    if (this.trekPlacesEnabled()) {
+    // method did before. The admin's "Google only" switch skips the index here
+    // too, so the suggestions and the search agree on where they come from.
+    if (this.trekPlacesEnabled() && !this.googleOnly(keyed)) {
       try {
         const centre = locationBias
           ? {

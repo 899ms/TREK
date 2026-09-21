@@ -166,6 +166,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Enriquiment de llocs',
   'admin.placesEnrich.subtitle':
     "Mostra imatges i una descripció en afegir un lloc. Wikipedia i OpenStreetMap s'usen sempre; Google s'hi afegeix si Fotos de llocs o Detalls de llocs estan actius.",
+  'admin.placesGoogleOnly.title': 'Cercar només amb Google',
+  'admin.placesGoogleOnly.subtitle': 'Cada cerca i cada suggeriment van a Google Places. Desactivat, responen primer l\'índex de TREK i OpenStreetMap, i Google només es consulta si no troben res.',
+  'admin.placesGoogleOnly.missingKey': 'Cal una clau d\'API de Google Maps. Sense clau, la cerca fa servir l\'índex de TREK i OpenStreetMap, sigui com sigui aquest interruptor.',
   'admin.transitProvider.title': 'Proveïdor de transport públic',
   'admin.transitProvider.subtitle': 'Quin servei respon la cerca de transport públic.',
   'admin.transitProvider.transitous': 'Transitous (gratuït)',

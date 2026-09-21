@@ -435,6 +435,20 @@ describe('AdminSettingsTab', () => {
     expect(toggleFor('Place Enrichment')).toHaveAttribute('aria-label', 'Place Enrichment');
   });
 
+  it('FE-ADMSET-030d: the Google-only switch sits with the Google options, says what it needs without a key, and toggles through the hook', () => {
+    const admin = renderTab({ placesGoogleOnly: false, hasMapsKey: false });
+    expect(screen.getByText(/Needs a Google Maps API key/)).toBeInTheDocument();
+    expect(toggleFor('Search with Google only')).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(toggleFor('Search with Google only'));
+    expect(admin.handleTogglePlacesGoogleOnly).toHaveBeenCalledTimes(1);
+  });
+
+  it('FE-ADMSET-030e: with a key the Google-only row explains what it changes', () => {
+    renderTab({ placesGoogleOnly: true, hasMapsKey: true });
+    expect(screen.getByText(/Every search and every suggestion goes to Google Places/)).toBeInTheDocument();
+    expect(toggleFor('Search with Google only')).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('FE-ADMSET-031: the API keys card leads with the TREK index and no weather panel', () => {
     renderTab();
 

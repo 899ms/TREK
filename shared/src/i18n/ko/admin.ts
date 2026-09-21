@@ -214,6 +214,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': '장소 정보 보강',
   'admin.placesEnrich.subtitle':
     '장소를 추가할 때 사진과 설명을 표시합니다. Wikipedia와 OpenStreetMap은 항상 사용되며, 장소 사진 또는 장소 세부정보가 켜져 있으면 Google도 함께 사용됩니다.',
+  'admin.placesGoogleOnly.title': 'Google로만 검색',
+  'admin.placesGoogleOnly.subtitle': '모든 검색과 제안이 Google Places로 갑니다. 끄면 TREK 자체 색인과 OpenStreetMap이 먼저 답하고, 둘 다 찾지 못할 때만 Google에 묻습니다.',
+  'admin.placesGoogleOnly.missingKey': 'Google Maps API 키가 필요합니다. 키가 없으면 이 스위치와 상관없이 TREK 색인과 OpenStreetMap으로 검색합니다.',
   'admin.transitProvider.title': '대중교통 제공자',
   'admin.transitProvider.subtitle': '대중교통 검색에 응답하는 서비스입니다.',
   'admin.transitProvider.transitous': 'Transitous (무료)',

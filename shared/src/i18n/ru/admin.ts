@@ -177,6 +177,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Обогащение мест',
   'admin.placesEnrich.subtitle':
     'Показывает изображения и описание при добавлении места. Wikipedia и OpenStreetMap используются всегда; Google добавляется, если включены «Фото мест» или «Детали мест».',
+  'admin.placesGoogleOnly.title': 'Искать только через Google',
+  'admin.placesGoogleOnly.subtitle': 'Каждый поиск и каждая подсказка идут в Google Places. Выключено: сначала отвечают индекс TREK и OpenStreetMap, Google спрашивается, только если они ничего не нашли.',
+  'admin.placesGoogleOnly.missingKey': 'Нужен ключ Google Maps API. Без него поиск идёт через индекс TREK и OpenStreetMap независимо от этого переключателя.',
   'admin.transitProvider.title': 'Поставщик общественного транспорта',
   'admin.transitProvider.subtitle': 'Какая служба отвечает на поиск общественного транспорта.',
   'admin.transitProvider.transitous': 'Transitous (бесплатно)',

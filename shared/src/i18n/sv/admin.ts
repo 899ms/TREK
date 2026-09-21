@@ -221,6 +221,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Platsberikning',
   'admin.placesEnrich.subtitle':
     'Visar bilder och en beskrivning när du lägger till en plats. Wikipedia och OpenStreetMap används alltid; Google tillkommer när Platsfoton eller Platsdetaljer är på.',
+  'admin.placesGoogleOnly.title': 'Sök bara med Google',
+  'admin.placesGoogleOnly.subtitle': 'Varje sökning och varje förslag går till Google Places. Av svarar TREK:s eget index och OpenStreetMap först, och Google tillfrågas bara när de inte hittar något.',
+  'admin.placesGoogleOnly.missingKey': 'Kräver en Google Maps API-nyckel. Utan nyckel söker TREK via sitt eget index och OpenStreetMap, oavsett hur den här brytaren står.',
   'admin.transitProvider.title': 'Kollektivtrafikleverantör',
   'admin.transitProvider.subtitle': 'Vilken tjänst som besvarar sökningar i kollektivtrafiken.',
   'admin.transitProvider.transitous': 'Transitous (gratis)',
