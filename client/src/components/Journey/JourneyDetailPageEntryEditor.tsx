@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useRef } from 'react'
 import { localIsoDate } from '../../utils/localDate'
-import { X, Plus, Image, Minus, Check, MapPin, Locate, Camera } from 'lucide-react'
+import { X, Plus, Image, Minus, Check, MapPin, Locate, Camera, Play } from 'lucide-react'
 import { normalizeImageFiles } from '../../utils/convertHeic'
 import { isVideoFile } from '../../utils/videoPoster'
 import { type ResilientResult, type UploadProgress } from '../../utils/uploadQueue'
@@ -11,7 +11,7 @@ import { getCurrentPositionOnce } from '../../hooks/useGeolocation'
 import { getApiErrorMessage } from '../../types'
 import type { JourneyEntry, JourneyPhoto, GalleryPhoto, JourneyTrip } from '../../store/journeyStore'
 import { MOOD_CONFIG, WEATHER_CONFIG } from '../../pages/journeyDetail/JourneyDetailPage.constants'
-import { photoUrl, isValidGeoPoint, geoOnceErrorKey } from '../../pages/journeyDetail/JourneyDetailPage.helpers'
+import { photoUrl, posterlessVideo, isValidGeoPoint, geoOnceErrorKey } from '../../pages/journeyDetail/JourneyDetailPage.helpers'
 import MarkdownToolbar from './MarkdownToolbar'
 import { DatePicker } from './JourneyDetailPageDatePicker'
 import CustomTimePicker from '../shared/CustomTimePicker'
@@ -527,7 +527,15 @@ export function EntryEditor({ entry, journeyId, tripDates, galleryPhotos, trips,
                 <div className="flex flex-wrap gap-2">
                   {photos.map((p, idx) => (
                     <div key={p.id} className={`w-20 h-20 rounded-xl overflow-hidden relative group ${idx === 0 && photos.length > 1 ? 'ring-2 ring-zinc-900 dark:ring-white ring-offset-1 dark:ring-offset-zinc-900' : ''}`}>
-                      <img src={photoUrl(p)} className="w-full h-full object-cover" alt="" onError={e => { const img = e.currentTarget; const orig = photoUrl(p, 'original'); if (!img.src.includes('/original')) img.src = orig }} />
+                      {posterlessVideo(p) ? (
+                        // No poster to show and falling back to /original would hand
+                        // an <img> the clip itself, so this tile stays a play badge.
+                        <div className="w-full h-full bg-black flex items-center justify-center text-white">
+                          <Play size={18} className="ml-0.5" fill="currentColor" />
+                        </div>
+                      ) : (
+                        <img src={photoUrl(p)} className="w-full h-full object-cover" alt="" onError={e => { const img = e.currentTarget; const orig = photoUrl(p, 'original'); if (!img.src.includes('/original')) img.src = orig }} />
+                      )}
                       {idx === 0 && photos.length > 1 && (
                         <span className="absolute bottom-0.5 left-0.5 px-1 py-px rounded text-[8px] font-bold bg-zinc-900/70 text-white">{t('journey.editor.photoFirst')}</span>
                       )}
