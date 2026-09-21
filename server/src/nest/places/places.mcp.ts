@@ -306,18 +306,19 @@ export class PlacesMcp {
       query: z.string().min(1).max(500).describe('Place name or address to search for'),
       locationBias: mapsSearchRequestSchema.shape.locationBias.describe('Centre the search on a coordinate: { lat, lng, radius? } with radius in metres (default 50000). Only the Google provider honours it; the OpenStreetMap fallback ignores it'),
       lang: z.string().max(35).optional().describe('BCP 47 language for the result names, e.g. "de" or "ja". Defaults to English'),
+      provider: mapsSearchRequestSchema.shape.provider.describe('"google" sends this one search to Google Places alone instead of the TREK index and OpenStreetMap, the same as the "search Google instead" link under the results in the app. Ignored when the instance has no Google key'),
     },
     annotations: TOOL_ANNOTATIONS_READONLY,
     access: { group: 'places', mode: 'read' },
   })
   async searchPlace(
-    { query, locationBias, lang }: {
-      query: string; locationBias?: { lat: number; lng: number; radius?: number }; lang?: string;
+    { query, locationBias, lang, provider }: {
+      query: string; locationBias?: { lat: number; lng: number; radius?: number }; lang?: string; provider?: 'google';
     },
     ctx: McpContext,
   ) {
     try {
-      const result = await this.maps.searchPlaces(ctx.userId, query, lang, locationBias);
+      const result = await this.maps.searchPlaces(ctx.userId, query, lang, locationBias, { googleOnly: provider === 'google' });
       return ok(result);
     } catch {
       return errorResult('Place search failed.');

@@ -105,6 +105,16 @@ export function useAdmin() {
   useEffect(() => { adminApi.getPlacesDetails().then(d => setPlacesDetailsEnabledState(d.enabled)).catch(() => {}) }, [])
   useEffect(() => { adminApi.getPlacesEnrich().then(d => setPlacesEnrichEnabledState(d.enabled)).catch(() => {}) }, [])
 
+  // Search and suggestions from Google alone. Admin-only state: the search itself
+  // reads the switch on the server, so nothing else in the client needs it.
+  const [placesGoogleOnly, setPlacesGoogleOnlyState] = useState<boolean>(false)
+  useEffect(() => { adminApi.getPlacesGoogleOnly().then(d => setPlacesGoogleOnlyState(d.enabled)).catch(() => {}) }, [])
+  const handleTogglePlacesGoogleOnly = async () => {
+    const next = !placesGoogleOnly
+    setPlacesGoogleOnlyState(next)
+    try { await adminApi.updatePlacesGoogleOnly(next) } catch { setPlacesGoogleOnlyState(!next) }
+  }
+
   // Transit backend (#1699). googleKeySource says where a Google key would come
   // from for this admin — null means picking Google changes nothing, since the
   // request-time fallback to Transitous is silent by design.
@@ -481,6 +491,7 @@ export function useAdmin() {
     placesAutocompleteEnabled, setPlacesAutocompleteEnabledState,
     placesDetailsEnabled, setPlacesDetailsEnabledState,
     placesEnrichEnabled, setPlacesEnrichEnabledState,
+    placesGoogleOnly, handleTogglePlacesGoogleOnly,
     transitProvider, setTransitProviderState,
     transitGoogleKeySource, setTransitGoogleKeySource,
     placeShadowEnabled, setPlaceShadowEnabledState,

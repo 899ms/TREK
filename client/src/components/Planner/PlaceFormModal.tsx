@@ -13,12 +13,12 @@ import { useSettingsStore } from '../../store/settingsStore'
 import CollectionPicker from '../Collections/CollectionPicker'
 import PlaceDetailsColumn, { type PlaceDetailsSelection } from './PlaceDetailsColumn'
 import { useToast } from '../shared/Toast'
-import { Search, Paperclip, X, AlertTriangle, Loader2, Plus } from 'lucide-react'
+import { Search, Paperclip, X, AlertTriangle, Loader2, Plus, RotateCcw } from 'lucide-react'
 import { useTranslation } from '../../i18n'
 import CustomTimePicker from '../shared/CustomTimePicker'
 import { DEFAULT_FORM, isMapUrl, mergeResult, type PlaceFormData, type ResultField } from './PlaceFormModal.helpers'
 import { getApiErrorMessage } from '../../utils/apiError'
-import { sourceLabelFor } from '../../utils/placeSource'
+import { offersGoogleRetry, sourceLabelFor } from '../../utils/placeSource'
 import { useLocationBias } from '../../hooks/useLocationBias'
 import { BookingCostsSection } from './BookingCostsSection'
 import type { BookingExpenseRequest } from './BookingCostsSection.types'
@@ -396,7 +396,7 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     setForm(prev => ({ ...prev, [field]: value }))
   }
 
-  const handleMapsSearch = async () => {
+  const handleMapsSearch = async (provider?: 'google') => {
     if (!mapsSearch.trim()) return
     setIsSearchingMaps(true)
     try {
@@ -419,7 +419,7 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
           return
         }
       }
-      const result = await mapsApi.search(mapsSearch, language, locationBiasPoint)
+      const result = await mapsApi.search(mapsSearch, language, locationBiasPoint, provider)
       searchMetaRef.current = { query: mapsSearch.trim(), source: result.source || 'unknown' }
       setMapsResults(result.places || [])
       setSearchSource(result.source || '')
@@ -1001,6 +1001,21 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
                 </button>
               ))}
             </div>
+          )}
+          {/* The index answers first and Google only when it finds nothing, so a
+              list with the wrong place on it never reaches Google by itself. One
+              quiet line under the list sends the same query there, on an instance
+              that has a key and for a list Google did not already produce. */}
+          {mapsResults.length > 0 && offersGoogleRetry(searchSource, hasMapsKey) && (
+            <button
+              type="button"
+              onClick={() => handleMapsSearch('google')}
+              disabled={isSearchingMaps}
+              className="mt-1.5 inline-flex items-center gap-1 text-caption text-content-faint hover:text-content transition-colors disabled:opacity-50"
+            >
+              <RotateCcw size={11} strokeWidth={2} aria-hidden="true" />
+              {t('places.searchGoogleInstead')}
+            </button>
           )}
         </div>
 

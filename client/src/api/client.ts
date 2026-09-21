@@ -671,6 +671,8 @@ export const adminApi = {
   updatePlacesAutocomplete: (enabled: boolean) => apiClient.put('/admin/places-autocomplete', { enabled }).then(r => r.data),
   getPlacesDetails: () => apiClient.get('/admin/places-details').then(r => r.data),
   updatePlacesDetails: (enabled: boolean) => apiClient.put('/admin/places-details', { enabled }).then(r => r.data),
+  getPlacesGoogleOnly: () => apiClient.get('/admin/places-google-only').then(r => r.data),
+  updatePlacesGoogleOnly: (enabled: boolean) => apiClient.put('/admin/places-google-only', { enabled }).then(r => r.data),
   getPlacesEnrich: () => apiClient.get('/admin/places-enrich').then(r => r.data),
   updatePlacesEnrich: (enabled: boolean) => apiClient.put('/admin/places-enrich', { enabled }).then(r => r.data),
   getTransitProvider: () => apiClient.get('/admin/transit-provider').then(r => r.data),
@@ -1215,13 +1217,18 @@ export const mapsApi = {
    * than interleaved: the core list is ordered by relevance and has earned that order,
    * and a plugin's row carries its own `source` for a caller that wants to mark it.
    */
-  search: (query: string, lang?: string, locationBias?: { lat: number; lng: number; radius?: number }) =>
+  /**
+   * `provider: 'google'` sends this one search to Google alone, the "search Google
+   * instead" link under a list the index answered with the wrong place. The
+   * server ignores it on an instance without a Google key.
+   */
+  search: (query: string, lang?: string, locationBias?: { lat: number; lng: number; radius?: number }, provider?: 'google') =>
     withCachedPlaces(query, (places) => ({ places, source: 'offline-cache' }), async () => {
       // Side by side, so the wait is the slower of the two rather than their sum. Only
       // the core call may reject: that rejection is what hands withCachedPlaces the
       // offline path, and a plugin failure must never trigger it.
       const [core, extra] = await Promise.all([
-        apiClient.post(`/maps/search?lang=${lang || 'en'}`, { query, locationBias }).then(r => checkInDev(mapsSearchResultSchema, r.data, 'maps.search')),
+        apiClient.post(`/maps/search?lang=${lang || 'en'}`, { query, locationBias, ...(provider ? { provider } : {}) }).then(r => checkInDev(mapsSearchResultSchema, r.data, 'maps.search')),
         pluginSearchPlaces(query, lang, locationBias),
       ])
       if (extra.length === 0) return core

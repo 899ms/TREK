@@ -215,6 +215,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Place Enrichment',
   'admin.placesEnrich.subtitle':
     'Show pictures and a description while adding a place. Wikipedia and OpenStreetMap are always used; Google is added on top when Place Photos or Place Details are on.',
+  'admin.placesGoogleOnly.title': 'Search with Google only',
+  'admin.placesGoogleOnly.subtitle': 'Every search and every suggestion goes to Google Places. Off, TREK\\\\\\\'s own index and OpenStreetMap answer first and Google is only asked when they find nothing.',
+  'admin.placesGoogleOnly.missingKey': 'Needs a Google Maps API key. Without one, search runs on TREK\\\\\\\'s own index and OpenStreetMap whatever this switch says.',
   'admin.transitProvider.title': 'Transit Provider',
   'admin.transitProvider.subtitle': 'Which service answers public transit search.',
   'admin.transitProvider.transitous': 'Transitous (free)',

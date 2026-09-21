@@ -211,6 +211,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': '地點資訊補充',
   'admin.placesEnrich.subtitle':
     '新增地點時顯示圖片與描述。一律使用維基百科與 OpenStreetMap；開啟「地點照片」或「地點詳細資料」時會額外使用 Google。',
+  'admin.placesGoogleOnly.title': '僅使用 Google 搜尋',
+  'admin.placesGoogleOnly.subtitle': '所有搜尋和建議都會送到 Google Places。關閉時，TREK 自有索引和 OpenStreetMap 先回答，只有兩者都沒有結果時才詢問 Google。',
+  'admin.placesGoogleOnly.missingKey': '需要 Google Maps API 金鑰。沒有金鑰時，無論此開關如何，搜尋都透過 TREK 索引和 OpenStreetMap 進行。',
   'admin.transitProvider.title': '公共運輸資料來源',
   'admin.transitProvider.subtitle': '由哪個服務回應大眾運輸搜尋。',
   'admin.transitProvider.transitous': 'Transitous（免費）',

@@ -176,6 +176,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Plaatsverrijking',
   'admin.placesEnrich.subtitle':
     "Toont afbeeldingen en een beschrijving bij het toevoegen van een plaats. Wikipedia en OpenStreetMap worden altijd gebruikt; Google komt erbij als Plaatsfoto's of Plaatsdetails aanstaan.",
+  'admin.placesGoogleOnly.title': 'Alleen met Google zoeken',
+  'admin.placesGoogleOnly.subtitle': 'Elke zoekopdracht en elke suggestie gaat naar Google Places. Uit, antwoorden eerst de TREK-index en OpenStreetMap; Google wordt alleen gevraagd als die niets vinden.',
+  'admin.placesGoogleOnly.missingKey': 'Vereist een Google Maps API-sleutel. Zonder sleutel zoekt TREK via de eigen index en OpenStreetMap, wat deze schakelaar ook zegt.',
   'admin.transitProvider.title': 'Ov-provider',
   'admin.transitProvider.subtitle': 'Welke dienst het ov-zoeken beantwoordt.',
   'admin.transitProvider.transitous': 'Transitous (gratis)',

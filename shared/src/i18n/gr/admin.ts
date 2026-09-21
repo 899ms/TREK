@@ -223,6 +223,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Εμπλουτισμός τοποθεσιών',
   'admin.placesEnrich.subtitle':
     'Εμφανίζει εικόνες και περιγραφή κατά την προσθήκη τοποθεσίας. Η Wikipedia και το OpenStreetMap χρησιμοποιούνται πάντα· η Google προστίθεται όταν είναι ενεργές οι Φωτογραφίες ή οι Λεπτομέρειες τοποθεσίας.',
+  'admin.placesGoogleOnly.title': 'Αναζήτηση μόνο με Google',
+  'admin.placesGoogleOnly.subtitle': 'Κάθε αναζήτηση και κάθε πρόταση πηγαίνει στο Google Places. Απενεργοποιημένο, απαντούν πρώτα το ευρετήριο του TREK και το OpenStreetMap, και το Google ρωτιέται μόνο αν δεν βρουν τίποτα.',
+  'admin.placesGoogleOnly.missingKey': 'Χρειάζεται κλειδί Google Maps API. Χωρίς αυτό η αναζήτηση τρέχει στο ευρετήριο του TREK και στο OpenStreetMap, όπως κι αν είναι ο διακόπτης.',
   'admin.transitProvider.title': 'Πάροχος μέσων μεταφοράς',
   'admin.transitProvider.subtitle': 'Ποια υπηρεσία απαντά στην αναζήτηση μέσων μεταφοράς.',
   'admin.transitProvider.transitous': 'Transitous (δωρεάν)',

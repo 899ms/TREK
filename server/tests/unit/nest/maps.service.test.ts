@@ -2721,7 +2721,9 @@ describe('controller-facing wrappers delegate to the folded methods', () => {
     try {
       const circleBias = { lat: 1, lng: 2, radius: 5 };
       await svc.search(3, 'berlin', 'de', circleBias);
-      expect(spies.searchPlaces).toHaveBeenCalledWith(3, 'berlin', 'de', circleBias);
+      expect(spies.searchPlaces).toHaveBeenCalledWith(3, 'berlin', 'de', circleBias, { googleOnly: false });
+      await svc.search(3, 'berlin', 'de', circleBias, 'google');
+      expect(spies.searchPlaces).toHaveBeenLastCalledWith(3, 'berlin', 'de', circleBias, { googleOnly: true });
 
       const rectBias = { low: { lat: 1, lng: 2 }, high: { lat: 3, lng: 4 } };
       await svc.autocomplete(3, 'be', 'en', rectBias);

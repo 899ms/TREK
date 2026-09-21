@@ -177,6 +177,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Збагачення місць',
   'admin.placesEnrich.subtitle':
     'Показує зображення та опис під час додавання місця. Wikipedia та OpenStreetMap використовуються завжди; Google додається, якщо ввімкнено «Фото місць» або «Деталі місць».',
+  'admin.placesGoogleOnly.title': 'Шукати лише через Google',
+  'admin.placesGoogleOnly.subtitle': 'Кожен пошук і кожна підказка йдуть до Google Places. Вимкнено: спершу відповідають індекс TREK та OpenStreetMap, Google запитується лише тоді, коли вони нічого не знайшли.',
+  'admin.placesGoogleOnly.missingKey': 'Потрібен ключ Google Maps API. Без нього пошук іде через індекс TREK та OpenStreetMap незалежно від цього перемикача.',
   'admin.transitProvider.title': 'Постачальник громадського транспорту',
   'admin.transitProvider.subtitle': 'Яка служба відповідає на пошук громадського транспорту.',
   'admin.transitProvider.transitous': 'Transitous (безкоштовно)',

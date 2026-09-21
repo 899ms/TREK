@@ -176,6 +176,9 @@ const admin: TranslationStrings = {
   'admin.placesEnrich.title': 'Ortsanreicherung',
   'admin.placesEnrich.subtitle':
     'Bilder und eine Beschreibung beim Hinzufügen eines Ortes anzeigen. Wikipedia und OpenStreetMap werden immer genutzt; Google kommt zusätzlich dazu, wenn Ortsfotos oder Ortsdetails aktiv sind.',
+  'admin.placesGoogleOnly.title': 'Nur mit Google suchen',
+  'admin.placesGoogleOnly.subtitle': 'Jede Suche und jeder Vorschlag geht an Google Places. Aus, antworten zuerst der TREK-Index und OpenStreetMap, Google wird nur gefragt, wenn beide nichts finden.',
+  'admin.placesGoogleOnly.missingKey': 'Braucht einen Google-Maps-API-Schlüssel. Ohne ihn läuft die Suche über den TREK-Index und OpenStreetMap, egal wie dieser Schalter steht.',
   'admin.transitProvider.title': 'Verkehrsanbieter',
   'admin.transitProvider.subtitle': 'Welcher Dienst die ÖPNV-Suche beantwortet.',
   'admin.transitProvider.transitous': 'Transitous (kostenlos)',

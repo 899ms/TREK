@@ -89,6 +89,7 @@ const places: TranslationStrings = {
   'places.reservationNotesPlaceholder': 'Σημειώσεις κράτησης, αριθμός επιβεβαίωσης...',
   'places.mapsSearchPlaceholder': 'Αναζήτηση μερών...',
   'places.mapsSearchError': 'Η αναζήτηση μέρους απέτυχε.',
+  'places.searchGoogleInstead': 'Δεν είναι το σωστό μέρος; Αναζήτηση στο Google',
   'places.loadingDetails': 'Φόρτωση λεπτομερειών μέρους…',
   'places.osmHint':
     'Χρήση αναζήτησης OpenStreetMap (χωρίς φωτογραφίες, ώρες λειτουργίας ή αξιολογήσεις). Προσθέστε ένα κλειδί Google API στις ρυθμίσεις για πλήρεις λεπτομέρειες.',
