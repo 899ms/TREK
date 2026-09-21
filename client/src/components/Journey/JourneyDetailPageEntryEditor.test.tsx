@@ -1028,4 +1028,21 @@ describe('EntryEditor', () => {
     expect(onClose).not.toHaveBeenCalled()
     confirmSpy.mockRestore()
   })
+  it('FE-JRN-EDITOR-056: a clip without a poster is a play badge, not a request for its thumbnail (#2341)', () => {
+    // The thumbnail route answers 404 for such a clip on purpose, and the old
+    // fallback to /original would have handed an <img> the video file itself.
+    const clip = { ...buildPhoto(100), media_type: 'video', provider: 'local', thumbnail_path: null }
+    const { container } = mountEditor(buildEntry({ id: 10, photos: [clip] }))
+
+    expect(container.querySelector('img[src="/api/photos/100/thumbnail"]')).not.toBeInTheDocument()
+    expect(container.querySelector('svg.lucide-play')).toBeInTheDocument()
+  })
+
+  it('FE-JRN-EDITOR-057: a clip with its poster shows the poster like any photo', () => {
+    const clip = { ...buildPhoto(100), media_type: 'video', provider: 'local', thumbnail_path: 'journey/poster.jpg' }
+    const { container } = mountEditor(buildEntry({ id: 10, photos: [clip] }))
+
+    expect(container.querySelector('img[src="/api/photos/100/thumbnail"]')).toBeInTheDocument()
+    expect(container.querySelector('svg.lucide-play')).not.toBeInTheDocument()
+  })
 })
