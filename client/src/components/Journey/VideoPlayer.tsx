@@ -1,6 +1,11 @@
 import React, { useEffect, useRef } from 'react'
 import Plyr from 'plyr'
 import 'plyr/dist/plyr.css'
+// The control icons, served from this origin. Plyr's default points at cdn.plyr.io,
+// which connect-src refuses: the player worked but every button in it was blank.
+// A file, not a data URL, because Plyr tells same-origin from cross-origin by the
+// host and would fetch a data URL over XHR, which connect-src refuses as well.
+import plyrSprite from 'plyr/dist/plyr.svg?no-inline'
 
 /**
  * Video player for gallery/lightbox playback (#823), built on Plyr over a native
@@ -40,6 +45,12 @@ export default function VideoPlayer({
       autoplay: autoPlay,
       clickToPlay: true,
       hideControls: false,
+      iconUrl: plyrSprite,
+      // On teardown Plyr points the element at a blank clip to abort the stream,
+      // by default one on cdn.plyr.io, which media-src refuses. An empty source
+      // aborts the stream just the same, and the element is unmounted in the same
+      // tick, so the error it would otherwise report has nowhere to show.
+      blankVideo: '',
     })
 
     return () => {
