@@ -102,6 +102,46 @@ describe('buildDayRouteRuns', () => {
     expect(runs.flat().some(p => p.lat === 48.80)).toBe(false)
   })
 
+  it('FE-MAP-DRP-009: the stop a booked night wrote is no waypoint; the hotel is the bookend, behind the flight (#2430)', () => {
+    // Check-in at four, a flight in the morning, nothing else: the day plan hides the
+    // hotel's own stop and shows the flight, then the hotel. The road used to start at
+    // the hotel and drive to the departure airport, because the untimed stop kept
+    // its stored place ahead of the timed booking.
+    const hotel = { id: 30, trip_id: 1, place_lat: 53.5465, place_lng: 9.9727, start_day_id: 1, end_day_id: 3, check_in: '16:00', check_out: '11:00' } as unknown as Accommodation
+    const flight = {
+      id: 7, trip_id: 1, type: 'flight', title: 'KL 1783', status: 'confirmed', day_id: 1, end_day_id: 1,
+      reservation_time: '2026-10-19T10:00', reservation_end_time: '2026-10-19T11:00',
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'AMS', lat: 52.3105, lng: 4.7683 },
+        { role: 'to', sequence: 1, name: 'HAM', lat: 53.6304, lng: 9.9882 },
+      ],
+    } as unknown as Reservation
+    const runs = buildDayRouteRuns(1, inputs({
+      days: [buildDay({ id: 1, day_number: 1 }), buildDay({ id: 2, day_number: 2 }), buildDay({ id: 3, day_number: 3 })],
+      assignments: { '1': [at(53.5465, 9.9727, 0, { accommodation_id: 30 })] },
+      reservations: [flight],
+      accommodations: [hotel],
+      optimizeFromAccommodation: true,
+    }))
+    // One road: from the arrival airport to the hotel. None out of the hotel.
+    expect(runs).toHaveLength(1)
+    expect(runs[0].map(p => [p.lat, p.lng])).toEqual([[53.6304, 9.9882], [53.5465, 9.9727]])
+  })
+
+  it('FE-MAP-DRP-010: a hotel the traveller placed as a stop of their own still ends the road (#2430)', () => {
+    // The same day, but the hotel stop is not the booking's: it stays a waypoint, and
+    // the bookend rule declines the zero-kilometre leg onto itself as before.
+    const hotel = { id: 30, trip_id: 1, place_lat: 53.5465, place_lng: 9.9727, start_day_id: 1, end_day_id: 3, check_in: '16:00', check_out: '11:00' } as unknown as Accommodation
+    const runs = buildDayRouteRuns(1, inputs({
+      days: [buildDay({ id: 1, day_number: 1 }), buildDay({ id: 3, day_number: 3 })],
+      assignments: { '1': [at(53.5503, 9.9937, 0), at(53.5465, 9.9727, 1)] },
+      accommodations: [hotel],
+      optimizeFromAccommodation: true,
+    }))
+    expect(runs).toHaveLength(1)
+    expect(runs[0].map(p => p.lat)).toEqual([53.5503, 53.5465])
+  })
+
   it('FE-MAP-DRP-008: a day that is not in the trip has no route', () => {
     expect(buildDayRouteRuns(99, inputs({ assignments: { '1': [at(48.86, 2.35, 0)] } }))).toEqual([])
   })

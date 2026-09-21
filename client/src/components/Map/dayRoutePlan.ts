@@ -34,7 +34,18 @@ export interface DayRouteInputs {
  */
 export function buildDayRouteRuns(dayId: number, input: DayRouteInputs): DayRoutePoint[][] {
   const { days: allDays, assignments, reservations: allReservations, accommodations, optimizeFromAccommodation } = input
-  const da = (assignments[String(dayId)] || []).slice().sort((a, b) => a.order_index - b.order_index)
+  // Without the stop a booked night wrote. The day plan hides that stop (the list
+  // and `useTripPlanner` both filter it) and draws the hotel as the day's bookends
+  // instead, so the road has to be built from the same stops the list shows. Left
+  // in, the stop sat first on a day that opened with a flight, since it carries no
+  // time of its own and a timed booking is seated behind the last timed stop: the
+  // map then drove from the hotel to the airport the traveller had not landed at
+  // yet, and back after the flight (#2430). Road trip mode keeps the stop; it plans
+  // its own drive and never comes through here.
+  const da = (assignments[String(dayId)] || [])
+    .filter(a => a.accommodation_id == null)
+    .slice()
+    .sort((a, b) => a.order_index - b.order_index)
   const dayOrder = (id: number | null | undefined): number | null => {
     if (id == null) return null
     const d = allDays.find(x => x.id === id)
