@@ -536,23 +536,50 @@ describe('roadtripRows with a ride (#2428)', () => {
       legs: [seg(0), ride, seg(2)],
     })
 
-  it('FE-RTROW-045: the terminals are stop rows without a number, and the numbering skips them', () => {
-    const rows = stopRows(roadtripRows(flightDay()))
-    expect(rows.map(r => [r.stop.name, r.number])).toEqual([
+  it('FE-RTROW-045: a same-day ride is one row holding both terminals, unnumbered, and the numbering skips them', () => {
+    const rows = roadtripRows(flightDay())
+    expect(stopRows(rows).map(r => [r.stop.name, r.number])).toEqual([
       ['Bremen', 1],
-      ['Munich Airport', null],
-      ['Hamburg Airport', null],
       ['Hotel', 2],
     ])
+    const rideRow = rows.find(r => r.kind === 'ride')
+    expect(rideRow?.kind === 'ride' && [rideRow.departure.stop.name, rideRow.departure.number, rideRow.arrival.stop.name, rideRow.arrival.number])
+      .toEqual(['Munich Airport', null, 'Hamburg Airport', null])
     expect(destinationCount(flightDay())).toBe(2)
   })
 
-  it('FE-RTROW-046: between a departure and its arrival the row is the ride, not a leg; the road out of the arrival is a leg', () => {
+  it('FE-RTROW-046: the ride row stands where the departure stood and carries the booking; the road out of the arrival follows it as a leg', () => {
     const rows = roadtripRows(flightDay())
-    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'stop', 'ride', 'stop', 'leg', 'stop'])
-    const rideRow = rows[3]
+    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'ride', 'leg', 'stop'])
+    const rideRow = rows[2]
     expect(rideRow.kind === 'ride' && rideRow.carrier.title).toBe('LH 2020')
     expect(rideRow.kind === 'ride' && rideRow.seg).toBe(ride)
+    expect(rideRow.kind === 'ride' && rideRow.arrival.time).toBe(rideRow.kind === 'ride' ? rideRow.arrival.entry?.arrival ?? null : null)
+    // The leg after the ride is the arrival's, at the arrival's index.
+    expect(rows[3]).toMatchObject({ kind: 'leg', index: 2 })
+  })
+
+  it('FE-RTROW-049: a ride landing tomorrow leaves its departure as a lone stop row, and the arrival opens the next day as one', () => {
+    const rows = roadtripRows(day([stop('Bremen'), terminal('Munich Airport', 'departure')], { legs: [seg(0)] }))
+    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'stop'])
+    const landing = roadtripRows(day([terminal('Hamburg Airport', 'arrival', '07:00'), stop('Hotel')], { legs: [seg(0)] }))
+    expect(landing.map(r => r.kind)).toEqual(['stop', 'leg', 'stop'])
+    expect(stopRows(landing).map(r => [r.stop.name, r.number])).toEqual([['Hamburg Airport', null], ['Hotel', 1]])
+  })
+
+  it('FE-RTROW-050: a hire car\'s desks are unnumbered stop rows the road runs through', () => {
+    const desk = (name: string, role: 'pickup' | 'return') =>
+      stop(name, {
+        assignmentId: role === 'pickup' ? -3000000018 : -3000000019,
+        placeId: -9,
+        carrier: { reservationId: 9, type: 'car', role, title: 'Sixt', code: null, at: '09:00' },
+      })
+    const rows = roadtripRows(day([desk('Sixt Hbf', 'pickup'), stop('Bremen'), desk('Sixt Airport', 'return')], { legs: [seg(0), seg(1)] }))
+    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'stop', 'leg', 'stop'])
+    expect(stopRows(rows).map(r => [r.stop.name, r.number])).toEqual([['Sixt Hbf', null], ['Bremen', 1], ['Sixt Airport', null]])
+    const d = day([desk('Sixt Hbf', 'pickup'), stop('Bremen'), desk('Sixt Airport', 'return')], { legs: [seg(0), seg(1)] })
+    expect(legReroutable(d, 0)).toBe(false)
+    expect(legReroutable(d, 1)).toBe(true)
   })
 
   it('FE-RTROW-047: the road into a departure terminal can be offered other ways, nothing leaving a terminal can', () => {

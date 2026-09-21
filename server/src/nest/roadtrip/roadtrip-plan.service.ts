@@ -121,15 +121,16 @@ export class RoadtripPlanService {
   }
 
   /**
-   * The bookings that seam the drive: a flight, train, ferry, cruise or bus on a day, with
-   * its terminals and the slots the day plan gave it. The reservation service reads the
-   * same three tables for the booking list; this is the road trip's own cut of them, so
-   * the module stays out of the reservations graph.
+   * The bookings that seam the drive, a flight, train, ferry, cruise or bus on a day, and
+   * the hire cars whose desks stand on it, with their terminals and the slots the day
+   * plan gave them. The reservation service reads the same three tables for the booking
+   * list; this is the road trip's own cut of them, so the module stays out of the
+   * reservations graph.
    */
   private carriers(tripId: number): CarrierBooking[] {
     const rows = this.db.all<CarrierRow>(
       `SELECT id, type, title, day_id, end_day_id, reservation_time, reservation_end_time, metadata, day_plan_position
-       FROM reservations WHERE trip_id = ? AND type IN ('flight', 'train', 'ferry', 'cruise', 'bus') AND day_id IS NOT NULL`,
+       FROM reservations WHERE trip_id = ? AND type IN ('flight', 'train', 'ferry', 'cruise', 'bus', 'car') AND day_id IS NOT NULL`,
       tripId,
     );
     if (!rows.length) return [];
@@ -171,7 +172,7 @@ export class RoadtripPlanService {
     );
     if (preferences.roadtrip_day_start && preferences.roadtrip_day_end && !window)
       throw new HttpException({ error: 'Day end must be later than day start.' }, 400);
-    const seams = context.carriers.map(carrierSeam).filter((seam): seam is CarrierSeam => seam !== null);
+    const seams = context.carriers.map((booking) => carrierSeam(booking)).filter((seam): seam is CarrierSeam => seam !== null);
     const dayNumberOf = (dayId: number): number => context.days.find((d) => d.id === dayId)?.day_number ?? 0;
     const plan: PlanDay[] = context.days.map((day) => {
       const visits = context.visits.filter((v) => v.day_id === day.id && v.lat !== null && v.lng !== null);

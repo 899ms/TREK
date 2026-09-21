@@ -269,6 +269,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': 'Gör till en paus',
   'roadtrip.ride.departure': 'Avgång {time}',
   'roadtrip.ride.arrival': 'Ankomst {time}',
+  'roadtrip.ride.pickup': 'Upphämtning {time}',
+  'roadtrip.ride.return': 'Återlämning {time}',
   'roadtrip.ride.open': 'Öppna bokning',
+  'roadtrip.bookings.loose': 'Även bokat denna dag',
 };
 export default roadtrip;

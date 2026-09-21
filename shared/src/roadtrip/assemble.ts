@@ -1,5 +1,5 @@
 import { spurFor } from './accessSpur';
-import { carriesTheCar, isCarrierMode } from './carriers';
+import { carriesTheCar, isCarrierMode, isPickupStop } from './carriers';
 import { pointAtMeters } from './corridor';
 import type { RoadtripDayBoundary } from './day-boundary.schema';
 import { planDayWindow, type DayWindow } from './dayWindow';
@@ -226,6 +226,8 @@ export function assembleRoadtrip({
         }
         if (!incoming.seg.mode || incoming.seg.mode === 'driving') drivingSeconds += incoming.seg.duration ?? 0;
       }
+      // A hire car is picked up full: whatever the drive had spent before, this tank is new.
+      if (isPickupStop(stops[i])) carryKm = 0;
       const leg = routed[i];
       if (leg && isCarrierMode(leg.seg.mode)) {
         if (!carriesTheCar(leg.seg.mode!)) carryKm = 0;

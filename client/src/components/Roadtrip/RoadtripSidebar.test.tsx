@@ -8,7 +8,7 @@ import type { RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRou
 import type { DryPoint } from './roadtripModel'
 import type { RefuelSearch } from './useRefuelSearch'
 import type { RefuelCandidate, RefuelOutcome } from './refuelSuggestion'
-import type { RouteSegment } from '../../types'
+import type { Reservation, RouteSegment } from '../../types'
 
 const wrap = (ui: React.ReactElement) => render(<TranslationProvider>{ui}</TranslationProvider>)
 
@@ -1131,7 +1131,7 @@ describe('RoadtripSidebar with a ride (#2428)', () => {
     })
   }
 
-  it('FE-ROADTRIP-SIDEBAR-049: the terminals carry the timetable and no number, the ride carries the booking and its minutes', () => {
+  it('FE-ROADTRIP-SIDEBAR-049: a same-day ride is one block: the booking and its minutes over both terminals with their timetable, and no number', () => {
     wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} />)
     expect(screen.getByText('Hamburg Airport')).toBeInTheDocument()
     expect(screen.getByText('HAM')).toBeInTheDocument()
@@ -1144,16 +1144,107 @@ describe('RoadtripSidebar with a ride (#2428)', () => {
     expect(screen.getByText('2 stops')).toBeInTheDocument()
   })
 
-  it('FE-ROADTRIP-SIDEBAR-050: a terminal and the ride open the booking; the road out of the arrival offers no other ways', () => {
-    const onOpenCarrier = vi.fn()
+  it('FE-ROADTRIP-SIDEBAR-050: the ride block opens the booking; the road out of the arrival offers no other ways', () => {
+    const onOpenBooking = vi.fn()
     const onAskAlternatives = vi.fn()
-    wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} onOpenCarrier={onOpenCarrier} onAskAlternatives={onAskAlternatives} />)
+    wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} onOpenBooking={onOpenBooking} onAskAlternatives={onAskAlternatives} />)
+    // One control for the whole ride, not one per terminal and one for the band.
+    expect(screen.getAllByLabelText('Open booking')).toHaveLength(1)
     fireEvent.click(screen.getByText('Hamburg Airport'))
     fireEvent.click(screen.getByText('LH 2020 · 1 h 10 min'))
-    expect(onOpenCarrier).toHaveBeenCalledTimes(2)
-    expect(onOpenCarrier).toHaveBeenCalledWith(70)
+    expect(onOpenBooking).toHaveBeenCalledTimes(2)
+    expect(onOpenBooking).toHaveBeenCalledWith(70)
     // One shuffle: the road into the departure terminal. Not the ride, not the road out
     // of the arrival, whose via would be filed at the terminal's index.
     expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-051: a ride landing tomorrow leaves its departure as a row of its own, with the road into it', () => {
+    const stops = [stop({ assignmentId: 1, name: 'Hamburg' }), terminal('departure')]
+    const overnight = day({
+      stops,
+      legs: [leg()],
+      schedule: {
+        entries: [
+          { arrival: '18:00', departure: '18:00', anchored: true, dayOffset: 0 },
+          { arrival: '21:00', departure: '22:00', anchored: true, dayOffset: 0 },
+        ],
+        warnings: [],
+      },
+    })
+    wrap(<RoadtripSidebar routes={routes({ days: [overnight], totalStops: 1 })} onOpenBooking={vi.fn()} onAskAlternatives={vi.fn()} />)
+    expect(screen.getByText('Hamburg Airport')).toBeInTheDocument()
+    expect(screen.getByText('Departure 13:20')).toBeInTheDocument()
+    expect(screen.queryByText('LH 2020 · 1 h 10 min')).not.toBeInTheDocument()
+    expect(screen.getAllByLabelText('Open booking')).toHaveLength(1)
+    expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
+  })
+})
+
+describe('RoadtripSidebar with a hire car and the day\'s bookings (#2428)', () => {
+  const desk = (role: 'pickup' | 'return') =>
+    stop({
+      assignmentId: role === 'pickup' ? -3000000180 : -3000000181,
+      name: role === 'pickup' ? 'Sixt Hauptbahnhof' : 'Sixt Airport',
+      placeId: -90,
+      time: role === 'pickup' ? '09:00' : '11:30',
+      dwellMinutes: 0,
+      carrier: { reservationId: 90, type: 'car', role, title: 'Sixt Hamburg', code: role === 'return' ? 'HAM' : null, at: role === 'pickup' ? '09:00' : '11:30' },
+    })
+  const booking = (over: Partial<Reservation>): Reservation =>
+    ({ id: 1, trip_id: 1, title: 'Booking', type: 'restaurant', status: 'confirmed', day_id: 1, ...over }) as Reservation
+
+  it('FE-ROADTRIP-SIDEBAR-052: the desks are rows on the road with the booking\'s clock, unnumbered, and the road between them is offered other ways only where it leaves a stored stop', () => {
+    const stops = [desk('pickup'), stop({ assignmentId: 1, name: 'Hamburg' }), stop({ assignmentId: 2, name: 'Lübeck' }), desk('return')]
+    const rental = day({
+      stops,
+      legs: [leg(), leg(), leg()],
+      schedule: {
+        entries: [
+          { arrival: '09:00', departure: '09:00', anchored: true, dayOffset: 0 },
+          { arrival: '09:20', departure: '09:50', anchored: false, dayOffset: 0 },
+          { arrival: '10:50', departure: '11:20', anchored: false, dayOffset: 0 },
+          { arrival: '11:30', departure: '11:30', anchored: true, dayOffset: 0 },
+        ],
+        warnings: [],
+      },
+    })
+    const onOpenBooking = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [rental], totalStops: 2 })} onOpenBooking={onOpenBooking} onAskAlternatives={vi.fn()} />)
+    expect(screen.getByText('Pick-up 09:00')).toBeInTheDocument()
+    expect(screen.getByText('Return 11:30')).toBeInTheDocument()
+    expect(screen.getByText('HAM')).toBeInTheDocument()
+    expect(screen.queryByText('3')).not.toBeInTheDocument()
+    expect(screen.getByText('2 stops')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Sixt Airport'))
+    expect(onOpenBooking).toHaveBeenCalledWith(90)
+    // Hamburg to Lübeck and Lübeck to the desk leave stored stops; the road out of the
+    // pick-up desk does not.
+    expect(screen.getAllByLabelText('Other ways')).toHaveLength(2)
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-053: a table pinned to a stop, or booked at its place on its day, hangs under the stop as a chip that opens it; one for no stop is listed under the day', () => {
+    const stops = [stop({ assignmentId: 1, name: 'Hamburg' }), stop({ assignmentId: 2, name: 'Lübeck' })]
+    const reservations = [
+      booking({ id: 11, title: 'Tisch Bullerei', reservation_time: '2026-10-05T19:30', assignment_id: 1 }),
+      booking({ id: 12, title: 'Café Niederegger', type: 'restaurant', reservation_time: '2026-10-05T11:30', place_id: 20 }),
+      booking({ id: 13, title: 'Elbphilharmonie', type: 'event', reservation_time: '2026-10-05T20:00', place_id: 999 }),
+      booking({ id: 14, title: 'Tomorrow', type: 'event', day_id: 2, place_id: 10 }),
+      booking({ id: 15, title: 'Hotel Hafen', type: 'hotel', place_id: 10 }),
+    ]
+    const onOpenBooking = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [day({ stops })], totalStops: 2 })} reservations={reservations} onOpenBooking={onOpenBooking} />)
+    expect(screen.getByText('Tisch Bullerei')).toBeInTheDocument()
+    expect(screen.getByText('19:30')).toBeInTheDocument()
+    expect(screen.getByText('Café Niederegger')).toBeInTheDocument()
+    expect(screen.getByText('Also booked this day')).toBeInTheDocument()
+    expect(screen.getByText('Elbphilharmonie')).toBeInTheDocument()
+    // Another day's booking is not this day's, and the night is the stay, not a chip.
+    expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument()
+    expect(screen.queryByText('Hotel Hafen')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Tisch Bullerei'))
+    expect(onOpenBooking).toHaveBeenCalledWith(11)
+    // The chips are the stop's, not stops: the count stays at two.
+    expect(screen.getByText('2 stops')).toBeInTheDocument()
   })
 })

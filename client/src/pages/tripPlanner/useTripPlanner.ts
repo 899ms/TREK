@@ -30,7 +30,7 @@ import { useAutomaticDayPoints } from '../../components/Roadtrip/useAutomaticDay
 import { useDayBoundaries } from '../../components/Roadtrip/useDayBoundaries'
 import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
-import { carrierReservationIds } from '@trek/shared/roadtrip'
+import { carrierReservationIds, type CarrierTerminal } from '@trek/shared/roadtrip'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { collapsedDayDates } from '../../components/Map/dawarichTrail'
@@ -1663,7 +1663,7 @@ export function useTripPlanner() {
     // (#2428). Nothing can be filed against a terminal: it stands in for no assignment,
     // so a via anchored to it would be stored at a position that belongs to the stop
     // after it and bend that stop's road instead. The callers decide what to refuse.
-    let best: { dayId: number; afterIndex: number; offRouteKm: number; terminal: 'departure' | 'arrival' | null } | null = null
+    let best: { dayId: number; afterIndex: number; offRouteKm: number; terminal: CarrierTerminal['role'] | null } | null = null
     for (const day of roadtripRoutes.days) {
       // NOT `day.dayId !== onlyDayId`. A dragged via has to stay on the day it is stored
       // on, but that day's stops are no longer all on the card of the same name: after a
@@ -1737,8 +1737,8 @@ export function useTripPlanner() {
    */
   const manualStopTargetFor = useCallback((lat: number, lng: number): ManualStopTarget | null => {
     const anchor = anchorFor(lat, lng)
-    // Nothing is stopped at on a flight. Behind an arrival terminal is a road, and a stop
-    // there is the first stop after landing.
+    // Nothing is stopped at on a flight. Behind an arrival terminal or a hire car's desk
+    // is a road, and a stop there is the first stop after landing or after the pick-up.
     if (!anchor || anchor.terminal === 'departure') return null
     for (const day of roadtripRoutes.days) {
       const at = day.stops.findIndex(stop => stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)

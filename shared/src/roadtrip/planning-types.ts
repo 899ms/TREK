@@ -5,18 +5,21 @@ import type { SpillMark } from './nightSpill';
 import type { Schedule, ScheduleWarning, DayWarning, DryPoint } from './roadtripModel';
 
 /**
- * A terminal of a booking the traveller rides rather than drives: the airport, station or
- * port a flight, train, ferry, cruise or bus leaves from or lands at.
+ * A point a booking puts on the drive: the airport, station or port a flight, train,
+ * ferry, cruise or bus leaves from or lands at, or the desk a hire car is picked up at
+ * or handed back at.
  *
- * The drive ends at the departure terminal and starts again at the arrival one. What
- * happens in between is the booking's business, not the road's: the leg between the
- * two carries the ride's minutes and nothing else, and no road is ever asked for it.
+ * For a ride the drive ends at the departure terminal and starts again at the arrival
+ * one; what happens in between is the booking's business, not the road's, and the leg
+ * between the two carries the ride's minutes and nothing else. A hire car's pick-up and
+ * return are points ON the road: the drive runs through them, it just starts or ends
+ * there.
  */
 export interface CarrierTerminal {
   reservationId: number;
-  /** flight | train | ferry | cruise | bus, the booking's own type. */
+  /** flight | train | ferry | cruise | bus for a ride, car for a hire car. */
   type: string;
-  role: 'departure' | 'arrival';
+  role: 'departure' | 'arrival' | 'pickup' | 'return';
   /** The booking's title, which is what the rail prints on the ride. */
   title: string;
   /** IATA code or station code, when the booking carries one. */

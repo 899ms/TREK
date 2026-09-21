@@ -22,10 +22,11 @@ export type RoadtripRow =
   | StopRow
   | { kind: 'leg'; index: number; seg: RouteSegment | undefined; mode: string | null }
   /**
-   * The ride between a departure terminal and its arrival (#2428): the booking, not a
-   * drive. Drawn in place of the leg row, with the booking's minutes and no distance.
+   * A ride that leaves and lands on the day (#2428), as one row: the booking with both
+   * its terminals inside it, in place of two stop rows and the leg between them. The
+   * booking's minutes, no distance, and the road goes on from `arrival`.
    */
-  | { kind: 'ride'; index: number; carrier: CarrierTerminal; seg: RouteSegment | undefined }
+  | { kind: 'ride'; index: number; carrier: CarrierTerminal; seg: RouteSegment | undefined; departure: StopRow; arrival: StopRow }
   | { kind: 'dry'; legIndex: number; intoLegKm: number; sinceKm: number }
   | { kind: 'auto'; phase: 'end' | 'resume'; time: string | null }
 
@@ -153,6 +154,13 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
       })
     }
 
+    const next = day.stops[i + 1]
+    const prev = day.stops[i - 1]
+    const sameRide = (other: RoadtripStop | undefined): boolean =>
+      !!stop.carrier && other?.carrier?.reservationId === stop.carrier.reservationId
+    // The arrival of a same-day ride is inside the ride row its departure made.
+    if (stop.carrier?.role === 'arrival' && prev?.carrier?.role === 'departure' && sameRide(prev)) return
+
     const automatic = !!stop.automaticNight
     if (automatic) {
       rows.push({
@@ -160,28 +168,44 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
         phase: stop.automaticNight?.phase === 'start' ? 'resume' : 'end',
         time: day.schedule.entries[i]?.arrival ?? null,
       })
+    } else if (stop.carrier?.role === 'departure' && next?.carrier?.role === 'arrival' && sameRide(next)) {
+      rows.push({
+        kind: 'ride',
+        index: i,
+        carrier: stop.carrier,
+        seg: day.legs[i],
+        departure: stopRow(stop, i, null, day.schedule, day.driveWarnings),
+        arrival: stopRow(next!, i + 1, null, day.schedule, day.driveWarnings),
+      })
+      // The road out of the arrival belongs to this row too; the pass below only
+      // looks at the index it is on.
+      pushLeg(i + 1)
+      return
     } else {
-      // A terminal is where the drive stops or resumes, not a place the trip is for: it
-      // carries no number, the way a service stop carries none.
+      // A terminal or a hire car's desk is where the drive stops or resumes, not a
+      // place the trip is for: it carries no number, the way a service stop carries none.
       const unnumbered = isServiceStopType(stop.stopType) || !!stop.carrier
       if (!unnumbered) number += 1
       rows.push(stopRow(stop, i, unnumbered ? null : number, day.schedule, day.driveWarnings))
     }
 
-    // The leg AFTER this stop, plus the dry point that falls on it. Both belong
-    // between two stops, so they are emitted here rather than in their own pass.
+    pushLeg(i)
+  })
+
+  // The leg AFTER stop `i`, plus the dry point that falls on it. Both belong between
+  // two stops, so they are emitted with the stop before them rather than in a pass of
+  // their own.
+  function pushLeg(i: number): void {
+    const stop = day.stops[i]!
     const seg = day.legs[i]
-    const next = day.stops[i + 1]
-    if (stop.carrier?.role === 'departure' && next?.carrier?.reservationId === stop.carrier.reservationId) {
-      rows.push({ kind: 'ride', index: i, carrier: stop.carrier, seg })
-    } else if (i < day.stops.length - 1 && !isStationary(seg)) {
+    if (i < day.stops.length - 1 && !isStationary(seg)) {
       rows.push({ kind: 'leg', index: i, seg, mode: day.stops[i + 1]?.incomingLegMode ?? stop.legMode ?? null })
       const dry = (day.dryPoints ?? []).find(p => p.legIndex === i)
       if (dry) {
         rows.push({ kind: 'dry', legIndex: i, intoLegKm: dry.intoLegKm, sinceKm: dry.sinceKm })
       }
     }
-  })
+  }
 
   return rows
 }

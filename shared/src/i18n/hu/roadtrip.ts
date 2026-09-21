@@ -270,6 +270,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': 'Legyen szünet',
   'roadtrip.ride.departure': 'Indulás {time}',
   'roadtrip.ride.arrival': 'Érkezés {time}',
+  'roadtrip.ride.pickup': 'Felvétel {time}',
+  'roadtrip.ride.return': 'Visszaadás {time}',
   'roadtrip.ride.open': 'Foglalás megnyitása',
+  'roadtrip.bookings.loose': 'Erre a napra még lefoglalva',
 };
 export default roadtrip;

@@ -599,9 +599,14 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                       onFocusPoint={focusRoadtripPoint}
                       selectedAssignmentId={selectedAssignmentId}
                       onSelectStop={(placeId, assignmentId) => handlePlaceClick(placeId, assignmentId)}
-                      onOpenCarrier={(rid) => {
+                      reservations={reservations}
+                      onOpenBooking={(rid) => {
                         const r = reservations.find(x => x.id === rid)
-                        if (r) setMapTransportDetail(r)
+                        if (!r) return
+                        // The day plan's own split: a transport has a detail view with
+                        // an edit button on it, a table or a ticket only has its editor.
+                        if (TRANSPORT_TYPES.has(r.type)) setMapTransportDetail(r)
+                        else openLinkedReservation?.(r)
                       }}
                       onReorderStop={can('day_edit', trip) ? reorderRoadtripStop : undefined}
                       onMoveStopToDay={can('day_edit', trip) ? moveRoadtripStopToDay : undefined}

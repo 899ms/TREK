@@ -268,6 +268,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': '休憩にする',
   'roadtrip.ride.departure': '出発 {time}',
   'roadtrip.ride.arrival': '到着 {time}',
+  'roadtrip.ride.pickup': '受取 {time}',
+  'roadtrip.ride.return': '返却 {time}',
   'roadtrip.ride.open': '予約を開く',
+  'roadtrip.bookings.loose': 'この日のその他の予約',
 };
 export default roadtrip;

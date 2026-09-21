@@ -270,6 +270,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': 'Zamień na postój',
   'roadtrip.ride.departure': 'Odjazd {time}',
   'roadtrip.ride.arrival': 'Przyjazd {time}',
+  'roadtrip.ride.pickup': 'Odbiór {time}',
+  'roadtrip.ride.return': 'Zwrot {time}',
   'roadtrip.ride.open': 'Otwórz rezerwację',
+  'roadtrip.bookings.loose': 'Zarezerwowane też tego dnia',
 };
 export default roadtrip;

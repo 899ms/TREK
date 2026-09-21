@@ -257,6 +257,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': '改為休息',
   'roadtrip.ride.departure': '出發 {time}',
   'roadtrip.ride.arrival': '抵達 {time}',
+  'roadtrip.ride.pickup': '取車 {time}',
+  'roadtrip.ride.return': '還車 {time}',
   'roadtrip.ride.open': '開啟預訂',
+  'roadtrip.bookings.loose': '當天的其他預訂',
 };
 export default roadtrip;

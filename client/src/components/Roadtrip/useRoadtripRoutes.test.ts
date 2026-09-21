@@ -931,14 +931,40 @@ describe('a booking the traveller rides (#2428)', () => {
     expect(result.current.days[1].arrivingLeg).toMatchObject({ mode: 'flight', duration: 9 * 3600, distance: 0 })
   })
 
-  it('FE-ROADTRIP-ROUTES-042: a booking without located terminals, or one the traveller drives, changes nothing', async () => {
+  it('FE-ROADTRIP-ROUTES-042: a booking without located terminals, or a taxi, changes nothing', async () => {
     calculateRouteWithLegs.mockImplementation(async (points: { lat: number; lng: number }[]) => hourly(points))
     const stops: StopSpec[] = [{ id: 1, at: HAMBURG }, { id: 2, at: BERLIN }]
     const unlocated = flight({ endpoints: [] })
-    const hireCar = flight({ id: 71, type: 'car' })
-    const { result } = renderHook(() => useRoadtripRoutes(7, [day(1, 1)], map(1, stops), 'driving', {}, [], [], [unlocated, hireCar]))
+    const taxi = flight({ id: 71, type: 'taxi' })
+    const { result } = renderHook(() => useRoadtripRoutes(7, [day(1, 1)], map(1, stops), 'driving', {}, [], [], [unlocated, taxi]))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.days[0].stops.every(s => !s.carrier)).toBe(true)
     expect(calculateRouteWithLegs).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-ROADTRIP-ROUTES-043: a hire car puts its desks on the road, one run through both, and no ride', async () => {
+    calculateRouteWithLegs.mockImplementation(async (points: { lat: number; lng: number }[]) => hourly(points))
+    const stops: StopSpec[] = [{ id: 1, at: LUENEBURG, time: '10:00', dwell: 0 }, { id: 2, at: BERLIN, time: '14:00', dwell: 0 }]
+    const hireCar = flight({
+      id: 71,
+      type: 'car',
+      title: 'Sixt',
+      reservation_time: '09:00',
+      reservation_end_time: '18:00',
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'Sixt Hamburg', code: null, lat: HAMBURG[0], lng: HAMBURG[1], timezone: null, local_time: null, local_date: null },
+        { role: 'to', sequence: 1, name: 'Sixt Berlin', code: null, lat: BERLIN[0] + 0.01, lng: BERLIN[1], timezone: null, local_time: null, local_date: null },
+      ],
+    })
+    const { result } = renderHook(() => useRoadtripRoutes(7, [day(1, 1)], map(1, stops), 'driving', {}, [], [], [hireCar]))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const d = result.current.days[0]
+    expect(d.stops.map(s => s.carrier?.role ?? s.name)).toEqual(['pickup', 'Stop 1', 'Stop 2', 'return'])
+    // One road, the whole day, desk to desk.
+    expect(calculateRouteWithLegs).toHaveBeenCalledTimes(1)
+    expect(d.legs.map(l => l?.mode)).toEqual(['driving', 'driving', 'driving'])
+    expect(d.schedule.entries[0]).toMatchObject({ arrival: '09:00', departure: '09:00' })
+    expect(result.current.totalStops).toBe(2)
+    expect(result.current.lines).toHaveLength(3)
   })
 })

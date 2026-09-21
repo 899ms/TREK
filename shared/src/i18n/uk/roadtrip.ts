@@ -271,6 +271,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': 'Зробити паузою',
   'roadtrip.ride.departure': 'Відправлення {time}',
   'roadtrip.ride.arrival': 'Прибуття {time}',
+  'roadtrip.ride.pickup': 'Отримання {time}',
+  'roadtrip.ride.return': 'Повернення {time}',
   'roadtrip.ride.open': 'Відкрити бронювання',
+  'roadtrip.bookings.loose': 'Також заброньовано цього дня',
 };
 export default roadtrip;

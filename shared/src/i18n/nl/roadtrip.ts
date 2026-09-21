@@ -272,6 +272,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': 'Maak er een pauze van',
   'roadtrip.ride.departure': 'Vertrek {time}',
   'roadtrip.ride.arrival': 'Aankomst {time}',
+  'roadtrip.ride.pickup': 'Ophalen {time}',
+  'roadtrip.ride.return': 'Inleveren {time}',
   'roadtrip.ride.open': 'Boeking openen',
+  'roadtrip.bookings.loose': 'Ook geboekt op deze dag',
 };
 export default roadtrip;

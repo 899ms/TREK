@@ -1,11 +1,12 @@
-import { Bus, Plane, Sailboat, Ship, Train, type LucideIcon } from 'lucide-react'
+import { Bus, Car, Plane, Sailboat, Ship, Train, type LucideIcon } from 'lucide-react'
 import { formatDurationShort } from './roadtripModel'
 import { formatClockTime } from '../../utils/formatters'
 import type { CarrierTerminal, RouteSegment } from '@trek/shared/roadtrip'
 import type { TranslationFn } from '../../types'
 
 /**
- * How a ride and its two terminals read on the rail and in the phone chain (#2428).
+ * How a ride and its two terminals, and a hire car's two desks, read on the rail and in
+ * the phone chain (#2428).
  *
  * One module for both shells, because the two would otherwise carry the same icon table
  * and the same three sentences each, and the duplication budget does not stretch to that.
@@ -18,6 +19,7 @@ const CARRIER_ICON: Record<string, LucideIcon> = {
   ferry: Sailboat,
   cruise: Ship,
   bus: Bus,
+  car: Car,
 }
 
 export function carrierIcon(type: string): LucideIcon {
@@ -31,7 +33,7 @@ export function carrierIcon(type: string): LucideIcon {
 export function terminalLine(carrier: CarrierTerminal, t: TranslationFn, is12h: boolean): string | null {
   if (!carrier.at) return null
   const time = formatClockTime(carrier.at, is12h)
-  return carrier.role === 'departure' ? t('roadtrip.ride.departure', { time }) : t('roadtrip.ride.arrival', { time })
+  return t(`roadtrip.ride.${carrier.role}`, { time })
 }
 
 /**

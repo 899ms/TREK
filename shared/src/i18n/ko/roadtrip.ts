@@ -266,6 +266,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseAction': '휴식으로 바꾸기',
   'roadtrip.ride.departure': '출발 {time}',
   'roadtrip.ride.arrival': '도착 {time}',
+  'roadtrip.ride.pickup': '픽업 {time}',
+  'roadtrip.ride.return': '반납 {time}',
   'roadtrip.ride.open': '예약 열기',
+  'roadtrip.bookings.loose': '이날의 다른 예약',
 };
 export default roadtrip;

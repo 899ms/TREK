@@ -172,15 +172,57 @@ describe('a booking the traveller rides (#2428)', () => {
     expect(calculated.totalStops).toBe(3);
   });
 
-  it('lets a booking without located terminals fall through, and ignores a hire car', async () => {
+  it('lets a booking without located terminals fall through, a hire car without a desk among them', async () => {
     const { user, trip, visits, plans } = setup();
     const day = db.prepare('SELECT day_id FROM day_assignments WHERE id = ?').get(visits[0].id) as { day_id: number };
     db.prepare("INSERT INTO reservations (trip_id, title, type, day_id) VALUES (?, 'Hire car', 'car', ?)").run(trip.id, day.day_id);
     db.prepare("INSERT INTO reservations (trip_id, title, type, day_id, reservation_time) VALUES (?, 'Somewhere', 'train', ?, '11:00')").run(trip.id, day.day_id);
+    db.prepare("INSERT INTO reservations (trip_id, title, type, day_id, reservation_time) VALUES (?, 'Cab', 'taxi', ?, '11:00')").run(trip.id, day.day_id);
 
     const { context, calculated } = await plans.calculate(trip.id, user.id);
 
-    expect(context.carriers.map((c) => c.type)).toEqual(['train']);
+    expect(context.carriers.map((c) => c.type).sort()).toEqual(['car', 'train']);
     expect(calculated.days[0].stops.every((s) => !s.carrier)).toBe(true);
+  });
+
+  it("puts a hire car's desks on the road: the pick-up opens the day, the return closes it, one run through both", async () => {
+    const { user, trip, visits, plans } = setup();
+    db.prepare("UPDATE day_assignments SET assignment_time = '10:00' WHERE id = ?").run(visits[1].id);
+    db.prepare("UPDATE day_assignments SET assignment_time = '12:00' WHERE id = ?").run(visits[2].id);
+    const day = db.prepare('SELECT day_id FROM day_assignments WHERE id = ?').get(visits[0].id) as { day_id: number };
+    const result = db
+      .prepare(
+        `INSERT INTO reservations (trip_id, title, type, day_id, end_day_id, reservation_time, reservation_end_time)
+         VALUES (?, 'Sixt', 'car', ?, ?, '08:00', '18:00')`,
+      )
+      .run(trip.id, day.day_id, day.day_id);
+    const carId = Number(result.lastInsertRowid);
+    const endpoint = db.prepare(
+      'INSERT INTO reservation_endpoints (reservation_id, role, sequence, name, code, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    endpoint.run(carId, 'from', 0, 'Sixt Hauptbahnhof', null, 53.55, 10.0);
+    endpoint.run(carId, 'to', 1, 'Sixt Airport', 'HAM', 53.63, 9.99);
+    const router = hourlyRouter();
+    const service = new RoadtripPlanService(
+      new DatabaseService(db),
+      { getUserSettings: () => ({}) } as never,
+      { read: () => ({}) } as never,
+      router as never,
+      { listForTrip: () => [], tracksForTrip: () => [] } as never,
+      { list: () => [] } as never,
+    );
+
+    const { calculated } = await service.calculate(trip.id, user.id);
+
+    const card = calculated.days[0];
+    expect(card.stops.map((s) => s.carrier?.role ?? s.name)).toEqual(['pickup', 'Hamburg', 'Lueneburg', 'Celle', 'return']);
+    expect(card.stops[0].carrier).toMatchObject({ reservationId: carId, type: 'car', at: '08:00' });
+    expect(card.stops[4].carrier).toMatchObject({ role: 'return', code: 'HAM', at: '18:00' });
+    // One road, desk to desk: no ride, no seam, one routing run.
+    expect(router.route).toHaveBeenCalledTimes(1);
+    expect(card.legs.map((l) => l?.mode)).toEqual(['driving', 'driving', 'driving', 'driving']);
+    expect(card.schedule.entries[0]).toMatchObject({ arrival: '08:00', departure: '08:00' });
+    expect(card.distance).toBe(240_000);
+    expect(calculated.totalStops).toBe(3);
   });
 });

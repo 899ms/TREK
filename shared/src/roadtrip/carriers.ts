@@ -18,6 +18,15 @@ export function isCarrierType(type: string | null | undefined): boolean {
   return !!type && (CARRIER_TYPES as readonly string[]).includes(type);
 }
 
+/**
+ * A hire car: the traveller drives it, so its booking is no seam. Its pick-up and return
+ * desks are still where the drive starts and ends, and the day plan routes to them the
+ * same way, so they take their place on the road as points of their own.
+ */
+export function isRentalType(type: string | null | undefined): boolean {
+  return type === 'car';
+}
+
 /** A leg mode that is a ride rather than a road: the booking's own type is the mode. */
 export function isCarrierMode(mode: string | null | undefined): boolean {
   return isCarrierType(mode);
@@ -88,8 +97,15 @@ export interface CarrierSeam {
   reservationId: number;
   type: string;
   title: string;
+  /** A ride seams the drive; a rental only puts its two desks on it. */
+  kind: 'ride' | 'rental';
   departure: CarrierEnd;
-  arrival: CarrierEnd;
+  /**
+   * A ride always has both ends. A hire car has a return only when the booking says
+   * when and where: without a return day or a located return desk, nothing is guessed
+   * and only the pick-up stands on the road.
+   */
+  arrival: CarrierEnd | null;
 }
 
 interface LegRecord {
@@ -142,22 +158,37 @@ function positionOn(positions: Record<string, number> | null | undefined, dayId:
  * change of planes happens inside the ride, and the drive has no say in it.
  */
 export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
-  if (!isCarrierType(booking.type)) return null;
+  const kind: CarrierSeam['kind'] | null = isCarrierType(booking.type)
+    ? 'ride'
+    : isRentalType(booking.type)
+      ? 'rental'
+      : null;
+  if (!kind) return null;
   const located = (booking.endpoints ?? [])
     .filter(
       (e) => typeof e.lat === 'number' && typeof e.lng === 'number' && Number.isFinite(e.lat) && Number.isFinite(e.lng),
     )
     .sort((a, b) => (a.sequence ?? 0) - (b.sequence ?? 0));
   const from = located.find((e) => e.role === 'from') ?? located[0];
-  const to = [...located].reverse().find((e) => e.role === 'to') ?? located[located.length - 1];
-  if (!from || !to || from === to) return null;
+  // A ride needs both ends to say where the drive stops and where it resumes, and takes
+  // the last located stop for its arrival when no endpoint is marked as one. A hire car's
+  // return is only ever the desk marked as such: guessing one would put a stop on the
+  // road nobody booked. The same desk twice is fine for a car, and no seam for a ride.
+  const to =
+    kind === 'ride'
+      ? ([...located].reverse().find((e) => e.role === 'to') ?? located[located.length - 1])
+      : [...located].reverse().find((e) => e.role === 'to');
+  if (!from) return null;
+  if (kind === 'ride' && (!to || from === to)) return null;
 
   const legs = legsOf(booking);
   const first = legs[0];
   const last = legs[legs.length - 1];
   const depDayId = first?.dep_day_id ?? booking.day_id ?? null;
   if (depDayId == null) return null;
-  const arrDayId = last?.arr_day_id ?? booking.end_day_id ?? depDayId;
+  // A ride lands on the day it left unless the booking says otherwise. A hire car is
+  // handed back on the day the booking names, and on no day when it names none.
+  const arrDayId = last?.arr_day_id ?? booking.end_day_id ?? (kind === 'ride' ? depDayId : null);
   const depClock = carrierClock(first?.dep_time ?? booking.reservation_time);
   const arrClock = carrierClock(last?.arr_time ?? booking.reservation_end_time);
   const bookingPosition = (dayId: number): number | null =>
@@ -168,6 +199,7 @@ export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
     reservationId: booking.id,
     type: booking.type,
     title: booking.title,
+    kind,
     departure: {
       dayId: depDayId,
       position: positionOn(first?.day_positions, depDayId) ?? bookingPosition(depDayId),
@@ -177,15 +209,18 @@ export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
       lat: from.lat!,
       lng: from.lng!,
     },
-    arrival: {
-      dayId: arrDayId,
-      position: positionOn(last?.day_positions, arrDayId) ?? bookingPosition(arrDayId),
-      clock: arrClock,
-      name: to.name,
-      code: to.code ?? null,
-      lat: to.lat!,
-      lng: to.lng!,
-    },
+    arrival:
+      to && arrDayId != null
+        ? {
+            dayId: arrDayId,
+            position: positionOn(last?.day_positions, arrDayId) ?? bookingPosition(arrDayId),
+            clock: arrClock,
+            name: to.name,
+            code: to.code ?? null,
+            lat: to.lat!,
+            lng: to.lng!,
+          }
+        : null,
   };
 }
 
@@ -199,7 +234,7 @@ export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
  */
 export function carrierRideMinutes(seam: CarrierSeam, dayDelta: number): number | null {
   const dep = parseClock(seam.departure.clock);
-  const arr = parseClock(seam.arrival.clock);
+  const arr = parseClock(seam.arrival?.clock);
   if (dep === null || arr === null) return null;
   return Math.max(0, arr + Math.max(0, dayDelta) * 1440 - dep);
 }
@@ -208,7 +243,12 @@ export function carrierRideMinutes(seam: CarrierSeam, dayDelta: number): number 
 const TERMINAL_ID_BASE = -3_000_000_000;
 
 export function terminalAssignmentId(reservationId: number, role: CarrierTerminal['role']): number {
-  return TERMINAL_ID_BASE - reservationId * 2 - (role === 'arrival' ? 1 : 0);
+  return TERMINAL_ID_BASE - reservationId * 2 - (role === 'arrival' || role === 'return' ? 1 : 0);
+}
+
+/** The two roles of a seam, by which end of it a terminal stands at. */
+function rolesOf(seam: CarrierSeam): { start: CarrierTerminal['role']; end: CarrierTerminal['role'] } {
+  return seam.kind === 'rental' ? { start: 'pickup', end: 'return' } : { start: 'departure', end: 'arrival' };
 }
 
 /** Whether a stop is a carrier terminal, which is what every writer has to refuse. */
@@ -222,12 +262,14 @@ function terminalStop(
   dayId: number,
   ownerIndex: number,
 ): RoadtripStop {
-  const end = role === 'departure' ? seam.departure : seam.arrival;
+  // The callers only ask for an arrival or a return the seam has.
+  const end = role === 'departure' || role === 'pickup' ? seam.departure : seam.arrival!;
   const checkIn = CHECK_IN_MINUTES[seam.type] ?? 0;
   const depart = parseClock(end.clock);
   // The departure terminal is pinned a check-in ahead of the timetable and left at the
   // timetable's minute; the arrival one is pinned at the timetable's minute and left at
-  // once. Neither has a stay of its own.
+  // once. Neither has a stay of its own. A hire car's desks are pinned at the booking's
+  // own clock, and the drive goes on from them without a stay.
   const time = role === 'departure' && depart !== null ? formatClock(depart - checkIn) : end.clock;
   return {
     carrier: {
@@ -258,8 +300,14 @@ function terminalStop(
   };
 }
 
+/** Whether a terminal opens a day it has no timed stop before it on: an arrival or a pick-up. */
+function opensTheDay(role: CarrierTerminal['role']): boolean {
+  return role === 'arrival' || role === 'pickup';
+}
+
 /**
- * The day's stops with the terminals of its rides seated among them.
+ * The day's stops with the terminals of its rides, and the desks of its hire cars, seated
+ * among them.
  *
  * Each terminal takes the slot the day plan shows the booking in, worked out by the same
  * rules (`getMergedItems` in the client): a position somebody dragged it to wins, otherwise
@@ -271,7 +319,10 @@ function terminalStop(
  *
  * A ride that leaves and lands on the same day seats its arrival right behind its
  * departure: nothing is visited in between. One that lands on a later day seats the
- * arrival on that day, where it opens the drive.
+ * arrival on that day, where it opens the drive. A hire car's pick-up opens the day the
+ * same way when nothing timed comes before it, and its return closes the day it is
+ * handed back on; the two are seated on their own, because the drive itself runs
+ * between them.
  *
  * `orderIndex` is each stop's stored `order_index`, which is what a dragged position is
  * measured against; `clockOf` its time in minutes, or null.
@@ -283,7 +334,12 @@ export function seatCarrierStops(
   seams: CarrierSeam[],
 ): RoadtripStop[] {
   const departing = seams.filter((s) => s.departure.dayId === dayId);
-  const arriving = seams.filter((s) => s.arrival.dayId === dayId && s.departure.dayId !== dayId);
+  // A ride landing on the day it left seats its arrival behind its departure below. A
+  // hire car handed back on the day it was picked up has two desks with nothing tying
+  // them together, so both are seated on their own.
+  const arriving = seams.filter(
+    (s) => s.arrival?.dayId === dayId && (s.departure.dayId !== dayId || s.kind === 'rental'),
+  );
   if (!departing.length && !arriving.length) return stops;
 
   type Item =
@@ -296,8 +352,8 @@ export function seatCarrierStops(
     minutes: parseClock(stop.time ?? stop.checkInTime ?? null),
   }));
   const ends: { seam: CarrierSeam; role: CarrierTerminal['role']; end: CarrierEnd }[] = [
-    ...departing.map((seam) => ({ seam, role: 'departure' as const, end: seam.departure })),
-    ...arriving.map((seam) => ({ seam, role: 'arrival' as const, end: seam.arrival })),
+    ...departing.map((seam) => ({ seam, role: rolesOf(seam).start, end: seam.departure })),
+    ...arriving.map((seam) => ({ seam, role: rolesOf(seam).end, end: seam.arrival! })),
   ];
   const items: Item[] = [...base];
   const lastKey = base.length ? Math.max(...base.map((b) => b.key)) : 0;
@@ -316,7 +372,7 @@ export function seatCarrierStops(
         // lists it. An arrival that landed overnight OPENS the day it lands on: the day
         // plan happens to file it last there too, but read as a drive that puts the
         // morning's stops on the road before the traveller has landed.
-        const opens = e.role === 'arrival';
+        const opens = opensTheDay(e.role);
         key =
           after === -Infinity
             ? opens
@@ -344,7 +400,7 @@ export function seatCarrierStops(
   const emit = (slot: (typeof slots)[number]): void => {
     const insertAt = out.filter((s) => !s.carrier).length;
     out.push(terminalStop(slot.seam, slot.role, dayId, insertAt));
-    if (slot.role === 'departure' && slot.seam.arrival.dayId === dayId) {
+    if (slot.role === 'departure' && slot.seam.arrival?.dayId === dayId) {
       out.push(terminalStop(slot.seam, 'arrival', dayId, insertAt));
     }
   };
@@ -428,9 +484,19 @@ export function viasLeaving<V extends { day_id: number; after_order_index: numbe
     .sort((a, b) => a.sequence - b.sequence);
 }
 
-/** The bookings whose ride the days draw, for the map to show their arcs beside the roads. */
+/**
+ * The bookings whose ride the days draw, for the map to show their arcs beside the roads.
+ * A hire car is left out: its line on the map is the road the drive already draws.
+ */
 export function carrierReservationIds(days: readonly { stops: readonly Pick<RoadtripStop, 'carrier'>[] }[]): number[] {
   const ids = new Set<number>();
-  for (const day of days) for (const stop of day.stops) if (stop.carrier) ids.add(stop.carrier.reservationId);
+  for (const day of days)
+    for (const stop of day.stops)
+      if (stop.carrier && isCarrierType(stop.carrier.type)) ids.add(stop.carrier.reservationId);
   return [...ids];
+}
+
+/** Whether a stop is where a hire car is picked up: the tank the drive goes on with is full. */
+export function isPickupStop(stop: Pick<RoadtripStop, 'carrier'> | null | undefined): boolean {
+  return stop?.carrier?.role === 'pickup';
 }
