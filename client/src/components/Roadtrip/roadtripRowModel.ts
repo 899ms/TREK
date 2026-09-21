@@ -138,6 +138,20 @@ function isStationary(seg: RouteSegment | undefined): boolean {
     && seg.from[1] === seg.to[1]
 }
 
+/**
+ * A leg too short to be a drive: the hire desk beside the terminal, the car park beside
+ * the gate. Under 150 m and two minutes it is a hop, and a pill reading "0 km in 0 min"
+ * under it is noise where the eye wants the next stop. The line still joins the two,
+ * and a note a plugin attached is still worth the row.
+ */
+export function isHop(seg: RouteSegment | undefined): boolean {
+  return !!seg
+    && Number.isFinite(seg.distance)
+    && seg.distance < 150
+    && seg.duration < 120
+    && !seg.noteText
+}
+
 export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
   const rows: RoadtripRow[] = []
   const spills = day.spills ?? []
@@ -198,7 +212,7 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
   function pushLeg(i: number): void {
     const stop = day.stops[i]!
     const seg = day.legs[i]
-    if (i < day.stops.length - 1 && !isStationary(seg)) {
+    if (i < day.stops.length - 1 && !isStationary(seg) && !isHop(seg)) {
       rows.push({ kind: 'leg', index: i, seg, mode: day.stops[i + 1]?.incomingLegMode ?? stop.legMode ?? null })
       const dry = (day.dryPoints ?? []).find(p => p.legIndex === i)
       if (dry) {
@@ -226,6 +240,7 @@ export function legReroutable(day: RoadtripDay, index: number): boolean {
   return index >= 0
     && index < day.stops.length - 1
     && !!day.legs[index]
+    && !isHop(day.legs[index])
     && !day.stops[index].automaticNight
     && !day.stops[index + 1].automaticNight
     // A leg leaving a terminal is either the ride, which has no other way, or the road

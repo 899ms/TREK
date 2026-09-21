@@ -17,7 +17,7 @@ import { formatDistance } from '../../utils/units'
 import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
-import { destinationCount, legReroutable } from './roadtripRowModel'
+import { destinationCount, isHop, legReroutable } from './roadtripRowModel'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -693,6 +693,18 @@ function DriveBand({ leg, onAskAlternatives, alternativesOpen }: {
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   const mode = leg?.mode ?? 'driving'
   const Icon = mode.startsWith('plugin:') ? Zap : MODE_ICON[mode] ?? CarFront
+  // A hop (the hire desk beside the terminal) keeps the line and drops the pill: there is
+  // nothing to say about it and no other way to drive it.
+  if (isHop(leg)) {
+    return (
+      <div className="grid" style={RAIL_GRID}>
+        <span className="relative z-[1] flex min-h-[10px] flex-col items-center" aria-hidden>
+          <span className="flex-1" style={RAIL_DASH} />
+        </span>
+        <span />
+      </div>
+    )
+  }
   // The band's contents, shared by the clickable and the read-only shape so the two can
   // never drift apart in what they say.
   const band = (

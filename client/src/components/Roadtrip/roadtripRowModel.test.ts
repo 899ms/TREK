@@ -567,6 +567,17 @@ describe('roadtripRows with a ride (#2428)', () => {
     expect(stopRows(landing).map(r => [r.stop.name, r.number])).toEqual([['Hamburg Airport', null], ['Hotel', 1]])
   })
 
+  it('FE-RTROW-051: a hop, the desk beside the terminal, is no leg row and is offered no other ways', () => {
+    const hop: RouteSegment = { ...seg(0), distance: 120, duration: 45, distanceText: '0 km', durationText: '0 min' }
+    const d = day([stop('Sixt Airport'), stop('Hamburg Airport'), stop('Hotel')], { legs: [hop, seg(1)] })
+    expect(roadtripRows(d).map(r => r.kind)).toEqual(['stop', 'stop', 'leg', 'stop'])
+    expect(legReroutable(d, 0)).toBe(false)
+    expect(legReroutable(d, 1)).toBe(true)
+    // A note a plugin attached keeps the row, however short the hop.
+    const noted = day([stop('A'), stop('B')], { legs: [{ ...hop, noteText: '10 min charge' }] })
+    expect(roadtripRows(noted).map(r => r.kind)).toEqual(['stop', 'leg', 'stop'])
+  })
+
   it('FE-RTROW-050: a hire car\'s desks are unnumbered stop rows the road runs through', () => {
     const desk = (name: string, role: 'pickup' | 'return') =>
       stop(name, {
