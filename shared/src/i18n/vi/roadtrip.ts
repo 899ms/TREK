@@ -268,5 +268,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseBody': 'Đêm nghỉ tại “{name}” sẽ bị xóa. Điểm dừng vẫn ở trên hành trình như một điểm nghỉ.',
   'roadtrip.stay.releaseBookedBody': 'Đêm nghỉ tại “{name}” sẽ bị xóa cùng với đặt chỗ “{booking}” và mọi chi phí liên quan. Điểm dừng vẫn ở trên hành trình như một điểm nghỉ.',
   'roadtrip.stay.releaseAction': 'Chuyển thành điểm nghỉ',
+  'roadtrip.ride.departure': 'Khởi hành {time}',
+  'roadtrip.ride.arrival': 'Đến nơi {time}',
+  'roadtrip.ride.open': 'Mở đặt chỗ',
+  'roadtrip.ride.beThere': 'Có mặt trước {time}',
 };
 export default roadtrip;

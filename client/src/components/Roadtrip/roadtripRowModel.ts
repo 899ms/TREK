@@ -1,5 +1,5 @@
 import { isServiceStopType, type ScheduleEntry, type ScheduleWarning } from './roadtripModel'
-import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
+import type { CarrierTerminal, RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 import { readStay } from './stayReading'
 
 /**
@@ -21,13 +21,18 @@ export type RoadtripRow =
   | { kind: 'spill'; fromDayNumber: number; departs: string | null; stops: StopRow[] }
   | StopRow
   | { kind: 'leg'; index: number; seg: RouteSegment | undefined; mode: string | null }
+  /**
+   * The ride between a departure terminal and its arrival (#2428): the booking, not a
+   * drive. Drawn in place of the leg row, with the booking's minutes and no distance.
+   */
+  | { kind: 'ride'; index: number; carrier: CarrierTerminal; seg: RouteSegment | undefined }
   | { kind: 'dry'; legIndex: number; intoLegKm: number; sinceKm: number }
   | { kind: 'auto'; phase: 'end' | 'resume'; time: string | null }
 
 export interface StopRow {
   kind: 'stop'
   stop: RoadtripStop
-  /** Position in the day's numbering, or null for a service stop and an automatic night. */
+  /** Position in the day's numbering, or null for a service stop, a terminal and an automatic night. */
   number: number | null
   service: boolean
   entry: ScheduleEntry | undefined
@@ -156,14 +161,20 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
         time: day.schedule.entries[i]?.arrival ?? null,
       })
     } else {
-      if (!isServiceStopType(stop.stopType)) number += 1
-      rows.push(stopRow(stop, i, isServiceStopType(stop.stopType) ? null : number, day.schedule, day.driveWarnings))
+      // A terminal is where the drive stops or resumes, not a place the trip is for: it
+      // carries no number, the way a service stop carries none.
+      const unnumbered = isServiceStopType(stop.stopType) || !!stop.carrier
+      if (!unnumbered) number += 1
+      rows.push(stopRow(stop, i, unnumbered ? null : number, day.schedule, day.driveWarnings))
     }
 
     // The leg AFTER this stop, plus the dry point that falls on it. Both belong
     // between two stops, so they are emitted here rather than in their own pass.
     const seg = day.legs[i]
-    if (i < day.stops.length - 1 && !isStationary(seg)) {
+    const next = day.stops[i + 1]
+    if (stop.carrier?.role === 'departure' && next?.carrier?.reservationId === stop.carrier.reservationId) {
+      rows.push({ kind: 'ride', index: i, carrier: stop.carrier, seg })
+    } else if (i < day.stops.length - 1 && !isStationary(seg)) {
       rows.push({ kind: 'leg', index: i, seg, mode: day.stops[i + 1]?.incomingLegMode ?? stop.legMode ?? null })
       const dry = (day.dryPoints ?? []).find(p => p.legIndex === i)
       if (dry) {
@@ -193,11 +204,16 @@ export function legReroutable(day: RoadtripDay, index: number): boolean {
     && !!day.legs[index]
     && !day.stops[index].automaticNight
     && !day.stops[index + 1].automaticNight
+    // A leg leaving a terminal is either the ride, which has no other way, or the road
+    // out of an arrival, whose via would be filed at the terminal's index, which is the
+    // index of the stop after it. The road INTO a departure terminal leaves a stored
+    // stop and can be offered other ways like any other.
+    && !day.stops[index].carrier
 }
 
 /** Stops that carry a number, for a count that agrees with the numbering above. */
 export function destinationCount(day: RoadtripDay): number {
-  return day.stops.filter(s => !s.automaticNight && !isServiceStopType(s.stopType)).length
+  return day.stops.filter(s => !s.automaticNight && !s.carrier && !isServiceStopType(s.stopType)).length
 }
 
 /**
@@ -276,7 +292,7 @@ export function stageEnd(rows: readonly RoadtripRow[]): StopRow | null {
  */
 export function firstStopOfPlace(days: readonly RoadtripDay[], placeId: number): RoadtripStop | null {
   for (const day of days) {
-    const stop = day.stops.find(s => !s.automaticNight && s.placeId === placeId)
+    const stop = day.stops.find(s => !s.automaticNight && !s.carrier && s.placeId === placeId)
     if (stop) return stop
   }
   return null

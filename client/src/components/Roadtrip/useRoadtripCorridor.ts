@@ -119,7 +119,21 @@ export function useRoadtripCorridor(
     return day.stops.map(s => ({ lat: s.lat, lng: s.lng }))
   }, [day])
 
-  const search = useCorridorPois(line, categories, widthKm, options)
+  // The rides on this day: between a departure terminal and its arrival the car is not
+  // on the road, so that stretch of the line is not searched (#2428).
+  const gaps = useMemo(() => {
+    if (!day) return []
+    const out: { from: LatLng; to: LatLng }[] = []
+    day.stops.forEach((stop, i) => {
+      const next = day.stops[i + 1]
+      if (stop.carrier?.role === 'departure' && next?.carrier?.reservationId === stop.carrier.reservationId) {
+        out.push({ from: { lat: stop.lat, lng: stop.lng }, to: { lat: next.lat, lng: next.lng } })
+      }
+    })
+    return out
+  }, [day])
+
+  const search = useCorridorPois(line, categories, widthKm, useMemo(() => ({ ...options, gaps }), [options, gaps]))
 
   /**
    * Whether what the panel looks for has been decided yet.

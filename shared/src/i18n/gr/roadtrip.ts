@@ -273,5 +273,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseBody': 'Η διανυκτέρευση στο «{name}» θα αφαιρεθεί. Η στάση παραμένει στη διαδρομή ως παύση.',
   'roadtrip.stay.releaseBookedBody': 'Η διανυκτέρευση στο «{name}» θα αφαιρεθεί μαζί με την κράτηση «{booking}» και κάθε συνδεδεμένο έξοδο. Η στάση παραμένει στη διαδρομή ως παύση.',
   'roadtrip.stay.releaseAction': 'Κάνε το παύση',
+  'roadtrip.ride.departure': 'Αναχώρηση {time}',
+  'roadtrip.ride.arrival': 'Άφιξη {time}',
+  'roadtrip.ride.open': 'Άνοιγμα κράτησης',
+  'roadtrip.ride.beThere': 'Να είστε εκεί μέχρι τις {time}',
 };
 export default roadtrip;

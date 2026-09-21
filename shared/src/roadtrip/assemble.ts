@@ -1,4 +1,5 @@
 import { spurFor } from './accessSpur';
+import { carriesTheCar, isCarrierMode } from './carriers';
 import { pointAtMeters } from './corridor';
 import type { RoadtripDayBoundary } from './day-boundary.schema';
 import { planDayWindow, type DayWindow } from './dayWindow';
@@ -160,7 +161,8 @@ export function assembleRoadtrip({
         const opening = chain.stops[i]?.automaticNight;
         lineJoins.push(opening?.phase === 'start' && Number.isInteger(opening.position ?? 0));
       }
-      segments.push(leg.seg);
+      // A ride has no road to label: the map draws the booking's own arc for it.
+      if (!isCarrierMode(leg.seg.mode)) segments.push(leg.seg);
     }
 
     const geometry: [number, number][] = [];
@@ -171,10 +173,15 @@ export function assembleRoadtrip({
     }
     const legs = routed.map((l) => l?.seg);
     const inbound = [...inboundAt.values()].map((l) => l.seg);
+    // The day's figures are the drive's: a ride's hours belong to the booking, not to the
+    // wheel, and its distance was never measured (`carrierLeg` stores none).
+    const driven = (l: RouteSegment | undefined): boolean => !!l && !isCarrierMode(l.mode);
     const distance =
-      legs.reduce((sum, l) => sum + (l?.distance ?? 0), 0) + inbound.reduce((sum, l) => sum + (l?.distance ?? 0), 0);
+      legs.filter(driven).reduce((sum, l) => sum + (l?.distance ?? 0), 0) +
+      inbound.filter(driven).reduce((sum, l) => sum + (l?.distance ?? 0), 0);
     const duration =
-      legs.reduce((sum, l) => sum + (l?.duration ?? 0), 0) + inbound.reduce((sum, l) => sum + (l?.duration ?? 0), 0);
+      legs.filter(driven).reduce((sum, l) => sum + (l?.duration ?? 0), 0) +
+      inbound.filter(driven).reduce((sum, l) => sum + (l?.duration ?? 0), 0);
     const schedule = chain.schedule;
     const legVias = routed.map((l) => l?.vias ?? []);
     const stops = chain.stops.map((s) => {
@@ -194,7 +201,11 @@ export function assembleRoadtrip({
     let drivingSeconds = 0;
     for (let i = 0; i < stops.length; i++) {
       const incoming = inboundAt.get(i);
-      if (incoming?.seg) {
+      if (incoming?.seg && isCarrierMode(incoming.seg.mode)) {
+        // The night's ride into this day: no fuel spent, and after one the car could not
+        // take, the tank the drive goes on with is another car's.
+        if (!carriesTheCar(incoming.seg.mode!)) carryKm = 0;
+      } else if (incoming?.seg) {
         // Slot 1 is the stop the leg ARRIVES at, which for an inbound leg is this
         // one. Hard-coded false, the range warning could never be suppressed by
         // the very charger or petrol station that resolves it.
@@ -216,6 +227,10 @@ export function assembleRoadtrip({
         if (!incoming.seg.mode || incoming.seg.mode === 'driving') drivingSeconds += incoming.seg.duration ?? 0;
       }
       const leg = routed[i];
+      if (leg && isCarrierMode(leg.seg.mode)) {
+        if (!carriesTheCar(leg.seg.mode!)) carryKm = 0;
+        continue;
+      }
       const outgoing = deriveDriveWarnings(
         i < stops.length - 1 ? [leg?.seg] : [],
         // Departure, then arrival: this leg leaves stop i and reaches stop i + 1,
@@ -313,7 +328,7 @@ export function assembleRoadtrip({
     totalDuration: drives.reduce((s, d) => s + d.duration, 0),
 
     totalStops: drives.reduce(
-      (s, d) => s + d.stops.filter((st) => !st.automaticNight && !isServiceStopType(st.stopType)).length,
+      (s, d) => s + d.stops.filter((st) => !st.automaticNight && !st.carrier && !isServiceStopType(st.stopType)).length,
       0,
     ),
 

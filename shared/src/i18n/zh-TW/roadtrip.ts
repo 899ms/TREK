@@ -255,5 +255,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseBody': '將取消在「{name}」的過夜。該停靠點會作為休息保留在行程中。',
   'roadtrip.stay.releaseBookedBody': '將取消在「{name}」的過夜，並同時刪除預訂「{booking}」及其關聯的費用。該停靠點會作為休息保留在行程中。',
   'roadtrip.stay.releaseAction': '改為休息',
+  'roadtrip.ride.departure': '出發 {time}',
+  'roadtrip.ride.arrival': '抵達 {time}',
+  'roadtrip.ride.open': '開啟預訂',
+  'roadtrip.ride.beThere': '請於 {time} 前抵達',
 };
 export default roadtrip;

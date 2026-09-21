@@ -30,6 +30,7 @@ import { useAutomaticDayPoints } from '../../components/Roadtrip/useAutomaticDay
 import { useDayBoundaries } from '../../components/Roadtrip/useDayBoundaries'
 import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
+import { carrierReservationIds } from '@trek/shared/roadtrip'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { collapsedDayDates } from '../../components/Map/dawarichTrail'
@@ -76,6 +77,7 @@ import { plannedPlaceIds, plannedPlaceIdsForDay } from '../../utils/plannedPlace
 
 /** Stable empty list so the road trip hook stays inert while its mode is off. */
 const EMPTY_DAYS: Day[] = []
+const EMPTY_RESERVATIONS: Reservation[] = []
 
 /**
  * Trip planner page logic — the big one. Owns the trip store wiring, addon
@@ -743,7 +745,18 @@ export function useTripPlanner() {
     roadtripVias.byDay,
     dayBoundaries.boundaries,
     tripAccommodations,
+    roadtripFeedActive ? reservations : EMPTY_RESERVATIONS,
   )
+  /**
+   * The bookings the drive is seamed by, drawn as their own arcs beside the roads: a
+   * flight's route on the road trip map is the booking's line, the same one the day plan
+   * draws, so the ride shows where the road stops (#2428). On top of whatever the reader
+   * switched on by hand under Days.
+   */
+  const roadtripConnections = useMemo(() => {
+    const rides = carrierReservationIds(roadtripRoutes.days)
+    return rides.length ? [...new Set([...visibleConnections, ...rides])] : visibleConnections
+  }, [roadtripRoutes.days, visibleConnections])
   // Lives here rather than in the panel because the map draws what it finds.
   // The trip comes with it for the vehicle: an electric car looks for chargers rather
   // than for pumps, and that preference is stored per trip.
@@ -1646,7 +1659,11 @@ export function useTripPlanner() {
    * looks exactly like a drag that did nothing.
    */
   const anchorFor = useCallback((lat: number, lng: number, onlyDayId?: number) => {
-    let best: { dayId: number; afterIndex: number; offRouteKm: number } | null = null
+    // `terminal` names the anchor when it is one end of a ride rather than a stored stop
+    // (#2428). Nothing can be filed against a terminal: it stands in for no assignment,
+    // so a via anchored to it would be stored at a position that belongs to the stop
+    // after it and bend that stop's road instead. The callers decide what to refuse.
+    let best: { dayId: number; afterIndex: number; offRouteKm: number; terminal: 'departure' | 'arrival' | null } | null = null
     for (const day of roadtripRoutes.days) {
       // NOT `day.dayId !== onlyDayId`. A dragged via has to stay on the day it is stored
       // on, but that day's stops are no longer all on the card of the same name: after a
@@ -1682,7 +1699,7 @@ export function useTripPlanner() {
       if (arrivedFrom && hit.alongKm < (stopsAlong[0] ?? 0)) {
         const owner = arrivedFrom.ownerDayId ?? day.dayId
         if (onlyDayId !== undefined && owner !== onlyDayId) continue
-        best = { dayId: owner, afterIndex: arrivedFrom.ownerIndex ?? 0, offRouteKm: hit.offRouteKm }
+        best = { dayId: owner, afterIndex: arrivedFrom.ownerIndex ?? 0, offRouteKm: hit.offRouteKm, terminal: arrivedFrom.carrier?.role ?? null }
         continue
       }
       const at = insertIndexForAlong(stopsAlong, hit.alongKm) - 1
@@ -1699,7 +1716,7 @@ export function useTripPlanner() {
       const owner = anchor.ownerDayId ?? day.dayId
       // A drag stays on its own day; a fresh click may land wherever it landed.
       if (onlyDayId !== undefined && owner !== onlyDayId) continue
-      best = { dayId: owner, afterIndex: anchor.ownerIndex ?? at, offRouteKm: hit.offRouteKm }
+      best = { dayId: owner, afterIndex: anchor.ownerIndex ?? at, offRouteKm: hit.offRouteKm, terminal: anchor.carrier?.role ?? null }
     }
     return best
   }, [roadtripRoutes.days])
@@ -1720,7 +1737,9 @@ export function useTripPlanner() {
    */
   const manualStopTargetFor = useCallback((lat: number, lng: number): ManualStopTarget | null => {
     const anchor = anchorFor(lat, lng)
-    if (!anchor) return null
+    // Nothing is stopped at on a flight. Behind an arrival terminal is a road, and a stop
+    // there is the first stop after landing.
+    if (!anchor || anchor.terminal === 'departure') return null
     for (const day of roadtripRoutes.days) {
       const at = day.stops.findIndex(stop => stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
       if (at >= 0) return { dayId: day.dayId, position: at + 1, offRouteKm: anchor.offRouteKm }
@@ -1805,8 +1824,10 @@ export function useTripPlanner() {
   const addRoadtripVia = useCallback(async (lat: number, lng: number) => {
     if (!can('day_edit', trip)) return
     const best = anchorFor(lat, lng)
-    // A click that landed on some other line is not a via anywhere.
-    if (!best || best.offRouteKm > 2) return
+    // A click that landed on some other line is not a via anywhere. Neither is one on a
+    // ride, or on the road out of a terminal: a via is filed by the position of a stored
+    // stop, and a terminal is not one.
+    if (!best || best.offRouteKm > 2 || best.terminal) return
     try {
       await roadtripVias.add(best.dayId, best.afterIndex, lat, lng)
     } catch (err: unknown) {
@@ -1826,7 +1847,7 @@ export function useTripPlanner() {
     // just says which leg gets bent, and the router answers the rest.
     const anchor = anchorFor(lat, lng, dayId)
     try {
-      await roadtripVias.move(dayId, id, lat, lng, anchor?.afterIndex)
+      await roadtripVias.move(dayId, id, lat, lng, anchor && !anchor.terminal ? anchor.afterIndex : undefined)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'))
     }
@@ -2642,7 +2663,7 @@ export function useTripPlanner() {
     routeShown, setRouteShown, autoShowRoute, transitRoutesShown, routeProfile, setRouteProfile, routeVias, fitKey, setFitKey,
     mobileSidebarOpen, setMobileSidebarOpen, mobilePlanScrollTopRef, mobilePlacesScrollTopRef,
     deletePlaceId, setDeletePlaceId, deletePlaceIds, setDeletePlaceIds, deletePlaceNote, deletePlacesNote,
-    visibleConnections, toggleConnection, allConnectionsShown, toggleAllConnections, mapTransportDetail, setMapTransportDetail,
+    visibleConnections, roadtripConnections, toggleConnection, allConnectionsShown, toggleAllConnections, mapTransportDetail, setMapTransportDetail,
     isMobile, isTouch,
     expandedDayIds, setExpandedDayIds, mapPlaces,
     route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay,

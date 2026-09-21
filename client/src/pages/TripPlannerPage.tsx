@@ -296,7 +296,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
     mobileSidebarOpen, setMobileSidebarOpen, mobilePlanScrollTopRef, mobilePlacesScrollTopRef,
     deletePlaceId, setDeletePlaceId, deletePlaceIds, setDeletePlaceIds, deletePlaceNote, deletePlacesNote,
     stayRelease, setStayRelease, confirmStayRelease,
-    visibleConnections, toggleConnection, allConnectionsShown, toggleAllConnections, mapTransportDetail, setMapTransportDetail,
+    visibleConnections, roadtripConnections, toggleConnection, allConnectionsShown, toggleAllConnections, mapTransportDetail, setMapTransportDetail,
     isMobile, isTouch,
     expandedDayIds, setExpandedDayIds, mapPlaces,
     route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay,
@@ -445,7 +445,9 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
               hasDayDetail={!!showDayDetail && !selectedPlace}
               reservations={reservations}
               showReservationStats={true}
-              visibleConnectionIds={visibleConnections}
+              // In road trip mode the rides that seam the drive are drawn as their own arcs
+              // beside the roads, on top of what the reader switched on under Days.
+              visibleConnectionIds={roadtripActive ? roadtripConnections : visibleConnections}
               onReservationClick={(rid) => {
                 const r = reservations.find(x => x.id === rid)
                 if (r) setMapTransportDetail(r)
@@ -596,6 +598,10 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                       onFocusPoint={focusRoadtripPoint}
                       selectedAssignmentId={selectedAssignmentId}
                       onSelectStop={(placeId, assignmentId) => handlePlaceClick(placeId, assignmentId)}
+                      onOpenCarrier={(rid) => {
+                        const r = reservations.find(x => x.id === rid)
+                        if (r) setMapTransportDetail(r)
+                      }}
                       onReorderStop={can('day_edit', trip) ? reorderRoadtripStop : undefined}
                       onMoveStopToDay={can('day_edit', trip) ? moveRoadtripStopToDay : undefined}
                       onAskAlternatives={can('day_edit', trip) ? askRouteAlternatives : undefined}

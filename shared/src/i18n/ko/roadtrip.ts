@@ -264,5 +264,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseBody': '“{name}”에서의 숙박이 삭제됩니다. 이 정차지는 휴식으로 경로에 남습니다.',
   'roadtrip.stay.releaseBookedBody': '“{name}”에서의 숙박이 예약 “{booking}” 및 연결된 지출과 함께 삭제됩니다. 이 정차지는 휴식으로 경로에 남습니다.',
   'roadtrip.stay.releaseAction': '휴식으로 바꾸기',
+  'roadtrip.ride.departure': '출발 {time}',
+  'roadtrip.ride.arrival': '도착 {time}',
+  'roadtrip.ride.open': '예약 열기',
+  'roadtrip.ride.beThere': '{time}까지 도착',
 };
 export default roadtrip;

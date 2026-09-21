@@ -6,7 +6,7 @@ import { useMRtCorridor } from './useMRtCorridor'
 import { useMRtAlternatives } from './useMRtAlternatives'
 import MRtCorridorBar from './MRtCorridorBar'
 import MRtAlternativesBar from './MRtAlternativesBar'
-import { RtAutoRow, RtDryRow, RtLegRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
+import { RtAutoRow, RtDryRow, RtLegRow, RtRideRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
 import MBadge from '../../../components/MBadge'
 import MDancingTrek from '../../../components/MDancingTrek'
 import { formatDurationShort } from '../../../../components/Roadtrip/roadtripModel'
@@ -77,7 +77,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   const canEditPlaces = planner.can('place_edit', planner.trip)
 
   const openStop = (row: StopRow) => {
-    shell.openSheet('rtstop', { dayId: row.stop.ownerDayId, assignmentId: row.stop.assignmentId })
+    // A terminal is the booking's, and opens it: there is no stop sheet for an airport.
+    if (row.stop.carrier) shell.openSheet('transport', { reservationId: row.stop.carrier.reservationId })
+    else shell.openSheet('rtstop', { dayId: row.stop.ownerDayId, assignmentId: row.stop.assignmentId })
   }
 
   // The search bar sits in the same band on both halves, at the same offset, so the
@@ -230,7 +232,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                       row={row}
                       chrome={chrome}
                       onOpen={() => openStop(row)}
-                      onPickKind={canEditPlaces
+                      onPickKind={canEditPlaces && !row.stop.carrier
                         ? () => shell.openSheet('rtkind', {
                             placeId: row.stop.placeId,
                             stopType: row.stop.stopType ?? null,
@@ -255,6 +257,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                       alternativesDisabled={!alts.editable}
                     />
                   )
+                }
+                if (row.kind === 'ride') {
+                  return <RtRideRow key={`r${i}`} carrier={row.carrier} seg={row.seg} onOpen={() => shell.openSheet('transport', { reservationId: row.carrier.reservationId })} />
                 }
                 if (row.kind === 'auto') return <RtAutoRow key={`a${i}`} phase={row.phase} time={row.time} chrome={chrome} />
                 if (row.kind === 'spill') {

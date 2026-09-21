@@ -85,9 +85,22 @@ export function useCorridorPois(
    * is not a desk and a search that keeps the radio warm for a minute is a search that
    * costs battery somebody is navigating on.
    */
-  options?: { budget?: CorridorBudget },
+  options?: {
+    budget?: CorridorBudget
+    /**
+     * Stretches of the line the car never drives (#2428): a flight, a ferry, a train
+     * between two terminals. The line runs straight from one terminal to the other
+     * there, and boxing that would search open sea, or the countryside under a flight
+     * path, and offer what it found as being on the way. Each pair is projected onto the
+     * spine and the stretch between the two is left out of the search, and a hit that
+     * lands in it is dropped.
+     */
+    gaps?: { from: LatLng; to: LatLng }[]
+  },
 ): CorridorSearch {
   const budget = options?.budget ?? DESKTOP_CORRIDOR_BUDGET
+  const gaps = options?.gaps
+  const gapKey = (gaps ?? []).map(g => `${g.from.lat.toFixed(5)},${g.from.lng.toFixed(5)}>${g.to.lat.toFixed(5)},${g.to.lng.toFixed(5)}`).join(';')
   const { locale } = useTranslation()
   const [results, setResults] = useState<CorridorPoi[]>([])
   const [progress, setProgress] = useState({ done: 0, total: 0 })
@@ -139,7 +152,31 @@ export function useCorridorPois(
     // spine would renumber both the moment the window moved, and a hit would land at the
     // wrong position in the day's chain.
     const tileLine = window ? sliceAtMeters(spine, window.fromKm * 1000, window.toKm * 1000) : spine
-    const allTiles = corridorTiles(tileLine, widthKm)
+    // The ridden stretches, as kilometres along the spine, in order.
+    const skipped = (gaps ?? [])
+      .map(gap => {
+        const a = projectOntoRoute(gap.from, spine)?.alongKm
+        const b = projectOntoRoute(gap.to, spine)?.alongKm
+        return a === undefined || b === undefined ? null : { fromKm: Math.min(a, b), toKm: Math.max(a, b) }
+      })
+      .filter((g): g is { fromKm: number; toKm: number } => g !== null && g.toKm > g.fromKm)
+      .sort((a, b) => a.fromKm - b.fromKm)
+    const inGap = (alongKm: number): boolean => skipped.some(g => alongKm > g.fromKm + 0.05 && alongKm < g.toKm - 0.05)
+    // The tile line cut around the gaps: one piece per driven stretch.
+    const pieces: LatLng[][] = []
+    if (skipped.length) {
+      const start = window?.fromKm ?? 0
+      const end = window?.toKm ?? Number.POSITIVE_INFINITY
+      let cursor = start
+      for (const gap of skipped) {
+        if (gap.fromKm > cursor) pieces.push(sliceAtMeters(spine, cursor * 1000, Math.min(gap.fromKm, end) * 1000))
+        cursor = Math.max(cursor, gap.toKm)
+      }
+      if (cursor < end) pieces.push(Number.isFinite(end) ? sliceAtMeters(spine, cursor * 1000, end * 1000) : sliceAtMeters(spine, cursor * 1000, Number.MAX_SAFE_INTEGER))
+    } else {
+      pieces.push(tileLine)
+    }
+    const allTiles = pieces.filter(piece => piece.length > 1).flatMap(piece => corridorTiles(piece, widthKm))
     const tiles = allTiles.slice(0, budget.maxTiles)
     const startedAt = Date.now()
     const outOfTime = (): boolean => budget.deadlineMs != null && Date.now() - startedAt > budget.deadlineMs
@@ -184,7 +221,7 @@ export function useCorridorPois(
           for (const poi of data.pois) {
             if (seen.has(poi.osm_id)) continue
             const hit = projectOntoRoute({ lat: poi.lat, lng: poi.lng }, spine)
-            if (!hit || hit.offRouteKm > widthKm) continue
+            if (!hit || hit.offRouteKm > widthKm || inGap(hit.alongKm)) continue
             seen.set(poi.osm_id, {
               ...poi, address: poi.address ?? null, website: poi.website ?? null, phone: poi.phone ?? null,
               opening_hours: poi.opening_hours ?? null, cuisine: poi.cuisine ?? null,
@@ -251,7 +288,10 @@ export function useCorridorPois(
       setError(failures === jobs.length && failures > 0)
       setLoading(false)
     })()
-  }, [spine, categories, widthKm, locale, budget.maxTiles, budget.maxRetries, budget.deadlineMs])
+  // gapKey stands in for `gaps`: the same terminals mean the same gaps, and a fresh
+  // array every render would make every search a new function.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spine, categories, widthKm, locale, budget.maxTiles, budget.maxRetries, budget.deadlineMs, gapKey])
 
   useEffect(() => () => abortRef.current?.abort(), [])
 

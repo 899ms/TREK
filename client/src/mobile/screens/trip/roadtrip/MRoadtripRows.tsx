@@ -3,13 +3,14 @@ import type { CSSProperties, ReactNode } from 'react'
 import MDancingTrek from '../../../components/MDancingTrek'
 import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
+import { carrierIcon, rideText, terminalLine } from '../../../../components/Roadtrip/carrierRide'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
 import { formatClockTime } from '../../../../utils/formatters'
 import type { StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import type { RefuelSearch } from '../../../../components/Roadtrip/useRefuelSearch'
 import { REFUEL_EMPTY_KEY, REFUEL_WORDS, refuelBandState, type RefuelCandidate } from '../../../../components/Roadtrip/refuelSuggestion'
-import type { DistanceUnit, RouteSegment, ScheduleWarning } from '@trek/shared/roadtrip'
+import type { CarrierTerminal, DistanceUnit, RouteSegment, ScheduleWarning } from '@trek/shared/roadtrip'
 import type { TranslationFn } from '../../../../types'
 
 /**
@@ -52,6 +53,16 @@ export interface RowChrome {
  */
 function Disc({ row, t, onPickKind }: { row: StopRow; t: TranslationFn; onPickKind?: () => void }) {
   const kind = row.stop.stopType ? STOP_KIND_BY_KEY[row.stop.stopType] : undefined
+  // A terminal wears the booking's icon and is not a control: nobody turns an airport
+  // into a petrol station.
+  if (row.stop.carrier) {
+    const Icon = carrierIcon(row.stop.carrier.type)
+    return (
+      <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[color:var(--m-ic)] text-m-ink">
+        <Icon size={15} strokeWidth={2.1} aria-hidden="true" />
+      </span>
+    )
+  }
   const face = row.service && kind
     ? (
       <span
@@ -134,6 +145,8 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
     )
   }
   if (row.warning) marks.push(<span key="warn">{warningMark(row.warning, chrome)}</span>)
+  const terminal = row.stop.carrier ? terminalLine(row.stop.carrier, t, chrome.is12h) : null
+  if (terminal) marks.push(<span key="terminal" className="font-geist text-[0.65625rem] font-medium text-m-muted">{terminal}</span>)
   if (!marks.length && row.offRoadMeters) {
     marks.push(
       <Mark key="off" icon={<Footprints size={10} strokeWidth={2} />}>
@@ -171,6 +184,40 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
 const LEG_ICONS: Record<string, typeof CarFront> = {
   walking: Footprints,
   cycling: Bike,
+}
+
+/**
+ * The ride between two terminals, where a leg pill would be (#2428): the booking and its
+ * minutes, no distance and no other ways of driving it. The pill is the tap target and
+ * opens the booking, the same sheet the map's endpoint badge opens.
+ */
+export function RtRideRow({ carrier, seg, onOpen }: {
+  carrier: CarrierTerminal
+  seg: RouteSegment | undefined
+  onOpen?: () => void
+}) {
+  const Icon = carrierIcon(carrier.type)
+  const body = (
+    <>
+      <Icon size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
+      <span className="truncate text-[0.75rem] font-semibold tabular-nums text-m-ink">{rideText(carrier, seg)}</span>
+    </>
+  )
+  return (
+    <div className="grid items-center gap-x-[10px]" style={{ gridTemplateColumns: '34px 1fr auto' }}>
+      <span className="flex min-h-[40px] flex-col items-center" aria-hidden="true">
+        <span className="w-[2px] flex-1" style={{ backgroundImage: 'repeating-linear-gradient(var(--m-conn) 0 4px, transparent 4px 8px)' }} />
+      </span>
+      {onOpen ? (
+        <button type="button" onClick={onOpen} className="my-1.5 flex min-w-0 items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px] text-start">
+          {body}
+        </button>
+      ) : (
+        <span className="my-1.5 flex min-w-0 items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px]">{body}</span>
+      )}
+      <span className="h-10 w-10 flex-none" aria-hidden="true" />
+    </div>
+  )
 }
 
 /**

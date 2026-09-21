@@ -178,6 +178,8 @@ export function planDayWindow(
     const last = chain.stops[chain.stops.length - 1]!;
     const end: RoadtripStop = {
       ...at,
+      // A marker placed where a terminal stands is a marker, not the terminal.
+      carrier: undefined,
       assignmentId: -2000000000 - number * 2,
       name: labels.end,
       time: null,
@@ -215,6 +217,33 @@ export function planDayWindow(
     // When the drive into this stop set out, on this day's clock: for one a night broke
     // up, the morning it went on.
     let setOut: number | null = null;
+    // A ride from its departure terminal to its arrival runs on the booking's clock and
+    // through the night if it must: no day end is placed on a flight and no morning
+    // resumes on one. The clock follows the ride, and the day counter follows the clock,
+    // to the day the booking lands on. A road leg gets the window's treatment below.
+    if (
+      previous?.carrier?.role === 'departure' &&
+      stop.carrier?.role === 'arrival' &&
+      previous.carrier.reservationId === stop.carrier.reservationId
+    ) {
+      const leg = legs[i - 1]!;
+      clock += leg.seg.duration / 60;
+      while (number < day.dayNumber && clock >= 1440) {
+        clock -= 1440;
+        number += 1;
+      }
+      // The booking's days are what it says they are, whatever its clocks add up to.
+      if (number !== day.dayNumber) {
+        number = day.dayNumber;
+        clock = ((clock % 1440) + 1440) % 1440;
+      }
+      if (pin !== null) clock = pin;
+      putLeg(previous, stop, leg);
+      position = i;
+      append(stop, clock);
+      previous = stop;
+      continue;
+    }
     if (previous && number < day.dayNumber && !targets.has(number)) {
       if (window.endMode !== 'stop') clock = Math.max(clock, window.end);
       previous = night(previous);
@@ -312,7 +341,9 @@ export function planDayWindow(
     }
     let dwell = left ? left.departure - clock : Math.max(0, stop.dwellMinutes ?? 0);
     while (dwell > 0) {
-      const remaining = targets.has(number) ? dwell : Math.max(0, window.end - clock);
+      // The wait at a terminal is the booking's, not the window's: a check-in that runs
+      // past the travel hours is not a day ending at the airport.
+      const remaining = targets.has(number) || stop.carrier ? dwell : Math.max(0, window.end - clock);
       const spend = Math.min(dwell, remaining);
       clock += spend;
       dwell -= spend;

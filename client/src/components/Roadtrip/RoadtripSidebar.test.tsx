@@ -1087,3 +1087,73 @@ describe('RoadtripModeSwitch', () => {
     expect(onChange).toHaveBeenCalledWith(false)
   })
 })
+
+describe('RoadtripSidebar with a ride (#2428)', () => {
+  const terminal = (role: 'departure' | 'arrival') =>
+    stop({
+      assignmentId: role === 'departure' ? -3000000140 : -3000000141,
+      name: role === 'departure' ? 'Hamburg Airport' : 'Munich Airport',
+      placeId: -70,
+      lat: role === 'departure' ? 53.63 : 48.35,
+      lng: role === 'departure' ? 9.99 : 11.78,
+      time: role === 'departure' ? '12:20' : '14:30',
+      dwellMinutes: role === 'departure' ? 60 : 0,
+      legMode: role === 'departure' ? 'flight' : null,
+      incomingLegMode: role === 'arrival' ? 'flight' : null,
+      carrier: {
+        reservationId: 70,
+        type: 'flight',
+        role,
+        title: 'LH 2020',
+        code: role === 'departure' ? 'HAM' : 'MUC',
+        at: role === 'departure' ? '13:20' : '14:30',
+      },
+    })
+  const flightDay = () => {
+    const stops = [
+      stop({ assignmentId: 1, name: 'Hamburg' }),
+      terminal('departure'),
+      terminal('arrival'),
+      stop({ assignmentId: 2, name: 'Munich' }),
+    ]
+    return day({
+      stops,
+      legs: [leg(), leg({ mode: 'flight', distance: 0, duration: 4200, distanceText: '', durationText: '1 h 10 min' }), leg()],
+      schedule: {
+        entries: [
+          { arrival: '09:00', departure: '09:00', anchored: true, dayOffset: 0 },
+          { arrival: '12:20', departure: '13:20', anchored: true, dayOffset: 0 },
+          { arrival: '14:30', departure: '14:30', anchored: true, dayOffset: 0 },
+          { arrival: '15:30', departure: '15:30', anchored: false, dayOffset: 0 },
+        ],
+        warnings: [],
+      },
+    })
+  }
+
+  it('FE-ROADTRIP-SIDEBAR-049: the terminals carry the timetable and no number, the ride carries the booking and its minutes', () => {
+    wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} />)
+    expect(screen.getByText('Hamburg Airport')).toBeInTheDocument()
+    expect(screen.getByText('HAM')).toBeInTheDocument()
+    expect(screen.getByText('Departure 13:20')).toBeInTheDocument()
+    expect(screen.getByText('Arrival 14:30')).toBeInTheDocument()
+    expect(screen.getByText('LH 2020 · 1 h 10 min')).toBeInTheDocument()
+    // Hamburg is 1 and Munich is 2: the terminals between them take no number, and
+    // the day header counts two stops.
+    expect(screen.queryByText('3')).not.toBeInTheDocument()
+    expect(screen.getByText('2 stops')).toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-050: a terminal and the ride open the booking; the road out of the arrival offers no other ways', () => {
+    const onOpenCarrier = vi.fn()
+    const onAskAlternatives = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} onOpenCarrier={onOpenCarrier} onAskAlternatives={onAskAlternatives} />)
+    fireEvent.click(screen.getByText('Hamburg Airport'))
+    fireEvent.click(screen.getByText('LH 2020 · 1 h 10 min'))
+    expect(onOpenCarrier).toHaveBeenCalledTimes(2)
+    expect(onOpenCarrier).toHaveBeenCalledWith(70)
+    // One shuffle: the road into the departure terminal. Not the ride, not the road out
+    // of the arrival, whose via would be filed at the terminal's index.
+    expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
+  })
+})

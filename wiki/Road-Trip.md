@@ -282,6 +282,19 @@ A night booked anywhere, whether in the day panel, the booking form, on the phon
 
 See [Accommodations](Accommodations#on-the-route) for the details.
 
+## Flights, trains and ferries on the drive
+
+A **Flight**, **Train**, **Ferry**, **Cruise** or **Bus** booking on a day is a seam in the drive: the road ends at the terminal the booking leaves from and starts again at the one it lands at. Nothing is routed across the ride, so a flight from Hamburg to Munich no longer turns into an eight-hour drive on the road trip map.
+
+- The two terminals appear on the day card as their own rows, with the booking's icon instead of a number and the timetable under the name (*Departure 13:20*, *Arrival 14:30*). Between them sits the ride: the booking and how long it takes. All three open the booking.
+- The departure terminal is pinned a check-in ahead of the timetable (an hour for a flight or a cruise, half an hour for a ferry, ten minutes for a train or a bus). A drive that cannot get there by then is late, the way a missed pinned time is. The arrival terminal is pinned at the timetable's arrival, and the drive continues from it.
+- The map draws the ride as the booking's own line, the same arc the day plan draws, beside the roads.
+- The ride's hours and kilometres are the booking's, not the drive's: the day's distance and driving time count the roads only, the range budget spends nothing on a flight, and after a ride the car cannot take (a flight, a cruise, a bus) the range starts afresh, because the next road is driven in another car. A car ferry or a motorail keeps the budget.
+- A booking that lands on a later day seats its arrival at the start of that day. With **Connect the days** on, the join between the two days is the ride. With daily travel times set, the ride runs on the booking's clock: no day ends at the airport and no morning resumes on the plane.
+- The terminals sit where the day plan lists the booking: a position you dragged it to under Days, otherwise behind the last stop whose time is before the departure, otherwise at the end of the day. Move the booking under Days to move the seam.
+
+What the seam does not do: it never plans the ride itself, and a booking without located terminals (an airport TREK could not place, a train with no station coordinates) makes no seam and is left to the day plan. Via points and other ways of driving are offered for the road into a departure terminal, not for the ride or for the road out of an arrival, and the search along the route skips the ride. A hire car, a taxi or a transit hop is not a seam: you stay on the road.
+
 ## Car bookings with stops
 
 A **Car** booking can carry the stops of its drive between pick-up and return, the way a flight carries its layovers. In the booking form, **Stops along the way** lists them, each with a place and a time; **Add stop** adds one and the arrows put them in order. The booking's line on the map runs through them in that order. This works on the desktop and on the phone, and does not need the addon. See [Transport-Flights-Trains-Cars](Transport-Flights-Trains-Cars).

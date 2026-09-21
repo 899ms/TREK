@@ -266,5 +266,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stay.releaseBody': '「{name}」での宿泊を取り消します。停車地は休憩として行程に残ります。',
   'roadtrip.stay.releaseBookedBody': '「{name}」での宿泊を、予約「{booking}」と関連する支出とともに取り消します。停車地は休憩として行程に残ります。',
   'roadtrip.stay.releaseAction': '休憩にする',
+  'roadtrip.ride.departure': '出発 {time}',
+  'roadtrip.ride.arrival': '到着 {time}',
+  'roadtrip.ride.open': '予約を開く',
+  'roadtrip.ride.beThere': '{time} までに到着',
 };
 export default roadtrip;

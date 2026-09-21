@@ -4,8 +4,31 @@ import type { AutomaticNight } from './dayWindow';
 import type { SpillMark } from './nightSpill';
 import type { Schedule, ScheduleWarning, DayWarning, DryPoint } from './roadtripModel';
 
+/**
+ * A terminal of a booking the traveller rides rather than drives: the airport, station or
+ * port a flight, train, ferry, cruise or bus leaves from or lands at.
+ *
+ * The drive ends at the departure terminal and starts again at the arrival one. What
+ * happens in between is the booking's business, not the road's: the leg between the
+ * two carries the ride's minutes and nothing else, and no road is ever asked for it.
+ */
+export interface CarrierTerminal {
+  reservationId: number;
+  /** flight | train | ferry | cruise | bus, the booking's own type. */
+  type: string;
+  role: 'departure' | 'arrival';
+  /** The booking's title, which is what the rail prints on the ride. */
+  title: string;
+  /** IATA code or station code, when the booking carries one. */
+  code: string | null;
+  /** The timetable's clock at this terminal, 'HH:mm' local, null when the booking names none. */
+  at: string | null;
+}
+
 export interface RoadtripStop {
   automaticNight?: AutomaticNight;
+  /** Set on the two ends of a carrier ride. Such a stop is no place and belongs to no assignment. */
+  carrier?: CarrierTerminal;
   assignmentId: number;
 
   ownerDayId: number;

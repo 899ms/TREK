@@ -520,3 +520,50 @@ describe('legReroutable', () => {
     expect(legReroutable(extra, -1)).toBe(false)
   })
 })
+
+describe('roadtripRows with a ride (#2428)', () => {
+  const terminal = (name: string, role: 'departure' | 'arrival', at: string | null = '13:20') =>
+    stop(name, {
+      assignmentId: role === 'departure' ? -3000000014 : -3000000015,
+      placeId: -7,
+      carrier: { reservationId: 7, type: 'flight', role, title: 'LH 2020', code: role === 'departure' ? 'MUC' : 'HAM', at },
+      legMode: role === 'departure' ? 'flight' : null,
+      incomingLegMode: role === 'arrival' ? 'flight' : null,
+    })
+  const ride: RouteSegment = { ...seg(9), distance: 0, duration: 4200, mode: 'flight', distanceText: '', durationText: '1 h 10 min' }
+  const flightDay = () =>
+    day([stop('Bremen'), terminal('Munich Airport', 'departure'), terminal('Hamburg Airport', 'arrival', '14:30'), stop('Hotel')], {
+      legs: [seg(0), ride, seg(2)],
+    })
+
+  it('FE-RTROW-045: the terminals are stop rows without a number, and the numbering skips them', () => {
+    const rows = stopRows(roadtripRows(flightDay()))
+    expect(rows.map(r => [r.stop.name, r.number])).toEqual([
+      ['Bremen', 1],
+      ['Munich Airport', null],
+      ['Hamburg Airport', null],
+      ['Hotel', 2],
+    ])
+    expect(destinationCount(flightDay())).toBe(2)
+  })
+
+  it('FE-RTROW-046: between a departure and its arrival the row is the ride, not a leg; the road out of the arrival is a leg', () => {
+    const rows = roadtripRows(flightDay())
+    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'stop', 'ride', 'stop', 'leg', 'stop'])
+    const rideRow = rows[3]
+    expect(rideRow.kind === 'ride' && rideRow.carrier.title).toBe('LH 2020')
+    expect(rideRow.kind === 'ride' && rideRow.seg).toBe(ride)
+  })
+
+  it('FE-RTROW-047: the road into a departure terminal can be offered other ways, nothing leaving a terminal can', () => {
+    const d = flightDay()
+    expect(legReroutable(d, 0)).toBe(true)
+    expect(legReroutable(d, 1)).toBe(false)
+    expect(legReroutable(d, 2)).toBe(false)
+  })
+
+  it('FE-RTROW-048: a terminal never answers for a place, however its id reads', () => {
+    expect(firstStopOfPlace([flightDay()], -7)).toBeNull()
+    expect(firstStopOfPlace([flightDay()], 100)?.name).toBe('Bremen')
+  })
+})
