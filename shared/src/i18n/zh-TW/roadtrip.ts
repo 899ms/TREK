@@ -258,6 +258,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': '出發 {time}',
   'roadtrip.ride.arrival': '抵達 {time}',
   'roadtrip.ride.open': '開啟預訂',
-  'roadtrip.ride.beThere': '請於 {time} 前抵達',
 };
 export default roadtrip;

@@ -273,6 +273,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Kalkış {time}',
   'roadtrip.ride.arrival': 'Varış {time}',
   'roadtrip.ride.open': 'Rezervasyonu aç',
-  'roadtrip.ride.beThere': '{time} itibarıyla orada olun',
 };
 export default roadtrip;

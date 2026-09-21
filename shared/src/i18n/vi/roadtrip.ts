@@ -271,6 +271,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Khởi hành {time}',
   'roadtrip.ride.arrival': 'Đến nơi {time}',
   'roadtrip.ride.open': 'Mở đặt chỗ',
-  'roadtrip.ride.beThere': 'Có mặt trước {time}',
 };
 export default roadtrip;

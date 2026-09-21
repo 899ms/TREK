@@ -269,6 +269,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': '出発 {time}',
   'roadtrip.ride.arrival': '到着 {time}',
   'roadtrip.ride.open': '予約を開く',
-  'roadtrip.ride.beThere': '{time} までに到着',
 };
 export default roadtrip;

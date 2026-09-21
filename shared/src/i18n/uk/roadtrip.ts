@@ -272,6 +272,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Відправлення {time}',
   'roadtrip.ride.arrival': 'Прибуття {time}',
   'roadtrip.ride.open': 'Відкрити бронювання',
-  'roadtrip.ride.beThere': 'Бути на місці до {time}',
 };
 export default roadtrip;

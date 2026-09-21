@@ -276,6 +276,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Αναχώρηση {time}',
   'roadtrip.ride.arrival': 'Άφιξη {time}',
   'roadtrip.ride.open': 'Άνοιγμα κράτησης',
-  'roadtrip.ride.beThere': 'Να είστε εκεί μέχρι τις {time}',
 };
 export default roadtrip;

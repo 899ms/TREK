@@ -272,6 +272,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Loc\'hañ {time}',
   'roadtrip.ride.arrival': 'Erruout {time}',
   'roadtrip.ride.open': 'Digeriñ ar mirout',
-  'roadtrip.ride.beThere': 'Bezañ eno a-raok {time}',
 };
 export default roadtrip;

@@ -271,6 +271,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Indulás {time}',
   'roadtrip.ride.arrival': 'Érkezés {time}',
   'roadtrip.ride.open': 'Foglalás megnyitása',
-  'roadtrip.ride.beThere': 'Legyél ott {time}-ig',
 };
 export default roadtrip;

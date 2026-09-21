@@ -269,6 +269,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Abfahrt {time}',
   'roadtrip.ride.arrival': 'Ankunft {time}',
   'roadtrip.ride.open': 'Buchung öffnen',
-  'roadtrip.ride.beThere': 'Bis {time} da sein',
 };
 export default roadtrip;

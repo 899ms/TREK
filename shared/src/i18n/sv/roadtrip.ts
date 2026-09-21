@@ -270,6 +270,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Avgång {time}',
   'roadtrip.ride.arrival': 'Ankomst {time}',
   'roadtrip.ride.open': 'Öppna bokning',
-  'roadtrip.ride.beThere': 'Var på plats senast {time}',
 };
 export default roadtrip;

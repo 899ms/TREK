@@ -259,6 +259,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': '出发 {time}',
   'roadtrip.ride.arrival': '到达 {time}',
   'roadtrip.ride.open': '打开预订',
-  'roadtrip.ride.beThere': '请于 {time} 前到达',
 };
 export default roadtrip;

@@ -267,6 +267,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': '출발 {time}',
   'roadtrip.ride.arrival': '도착 {time}',
   'roadtrip.ride.open': '예약 열기',
-  'roadtrip.ride.beThere': '{time}까지 도착',
 };
 export default roadtrip;

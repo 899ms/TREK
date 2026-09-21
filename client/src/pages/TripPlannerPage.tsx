@@ -10,6 +10,7 @@ import { TripRouteOverviewPill, TripRouteOverviewPanel } from '../components/Map
 import { DawarichTrailPill } from '../components/Map/DawarichTrailPill'
 import { getCached, fetchPhoto } from '../services/photoService'
 import DayPlanSidebar from '../components/Planner/DayPlanSidebar'
+import { DayPlanSidebarTransportDetailModal } from '../components/Planner/DayPlanSidebarTransportDetailModal'
 import RoadtripModeSwitch from '../components/Roadtrip/RoadtripModeSwitch'
 import TripLoadingSplash from '../components/shared/TripLoadingSplash'
 import PlacesSidebar from '../components/Planner/PlacesSidebar'
@@ -254,7 +255,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
   // Page = wiring container: the entire planner state machine (store, tabs,
   // selection, CRUD handlers with undo, map filters, splash) lives in the hook.
   const {
-    tripId, navigate, toast, t, language, placesPhotosEnabled,
+    tripId, navigate, toast, t, language, locale, settings, placesPhotosEnabled,
     trip, days, places, assignments, packingItems, todoItems, categories, reservations, budgetItems, files,
     selectedDayId, isLoading, tripActions, can, canUploadFiles,
     pushUndo, undo, canUndo, lastActionLabel, handleUndo,
@@ -617,6 +618,18 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
                       onAcceptRefuel={can('day_edit', trip) ? acceptRefuel : undefined}
                       collapsedDayIds={collapsedRoadtripDays}
                       onToggleDay={toggleRoadtripDay}
+                    />
+                    {/* The booking a terminal, a ride pill or a map endpoint opens. Under
+                        Days the day panel owns this dialog; here the day panel is not
+                        mounted, so the rail has to bring it along (#2428). */}
+                    <DayPlanSidebarTransportDetailModal
+                      transportDetail={mapTransportDetail}
+                      setTransportDetail={setMapTransportDetail}
+                      onNavigateToFiles={() => handleTabChange('dateien')}
+                      onEdit={can('day_edit', trip) ? (reservation) => { setMapTransportDetail(null); setEditingTransport(reservation); setTransportModalDayId(reservation.day_id ?? null); setShowTransportModal(true) } : undefined}
+                      t={t}
+                      locale={locale}
+                      timeFormat={settings.time_format || '24h'}
                     />
                   </LazyPanel>
                 ) : (

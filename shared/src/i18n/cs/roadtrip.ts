@@ -270,6 +270,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Odjezd {time}',
   'roadtrip.ride.arrival': 'Příjezd {time}',
   'roadtrip.ride.open': 'Otevřít rezervaci',
-  'roadtrip.ride.beThere': 'Být na místě do {time}',
 };
 export default roadtrip;

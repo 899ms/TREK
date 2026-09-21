@@ -95,7 +95,7 @@ export function useTripPlanner() {
   const tripId = id ? Number(id) : Number.NaN
   const navigate = useNavigate()
   const toast = useToast()
-  const { t, language } = useTranslation()
+  const { t, language, locale } = useTranslation()
   const { settings } = useSettingsStore()
   const roadtripSettings = useRoadtripSettings(s => s, tripId)
   // trip-page plugins mount as tabs inside this trip planner (tripId-scoped).
@@ -2613,7 +2613,7 @@ export function useTripPlanner() {
   }, [isLoading, trip])
 
   return {
-    tripId, navigate, toast, t, language, settings, placesPhotosEnabled,
+    tripId, navigate, toast, t, language, locale, settings, placesPhotosEnabled,
     trip, days, places, assignments, storedAssignments, packingItems, todoItems, categories, reservations, budgetItems, files,
     selectedDayId, isLoading, tripActions, can, canUploadFiles,
     pushUndo, undo, canUndo, lastActionLabel, handleUndo,

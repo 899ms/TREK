@@ -273,6 +273,5 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.departure': 'Vertrek {time}',
   'roadtrip.ride.arrival': 'Aankomst {time}',
   'roadtrip.ride.open': 'Boeking openen',
-  'roadtrip.ride.beThere': 'Uiterlijk om {time} aanwezig zijn',
 };
 export default roadtrip;
