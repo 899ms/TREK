@@ -9,12 +9,13 @@ import { MAP_LAYER_SWITCHER_INSET, MAP_ROUND_CONTROL_SIZE } from '../../../../sr
 import { useSettingsStore } from '../../../../src/store/settingsStore'
 import { useTripStore } from '../../../../src/store/tripStore'
 import { seedStore } from '../../../helpers/store'
-import type { Place } from '../../../../src/types'
+import type { Day, Place, Reservation } from '../../../../src/types'
+import { visibleRouteReservations, type RouteVisibilityOptions } from '../../../../src/utils/reservationRoutes'
 import type { AlternativeOverlay } from '../../../../src/components/Roadtrip/alternativeOverlays'
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { RT_ALT_BAR_LIFT } from '../../../../src/mobile/screens/trip/roadtrip/useMRtAlternatives'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-037
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-042
 //
 // The stage's pins come out of the trip store rather than the planner's map list, so the
 // stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
@@ -791,10 +792,99 @@ describe('MMapArea', () => {
     const { rerender } = render(<MMapArea planner={planner} shell={shell} />)
 
     expect(mocks.props.visibleConnectionIds).toEqual([70])
+    // A seamed ride joins the road whatever day it was booked on, so the stage does not
+    // hold bookings to the selected day the way the plan map does.
+    expect(mocks.props.scopeConnectionsToDay).toBe(false)
 
     // The plan tab keeps the traveller's own toggles, as the desktop does off road trip mode.
     rerender(<MMapArea planner={planner} shell={{ ...shell, trTab: 'plan' }} />)
     expect(mocks.props.visibleConnectionIds).toBe(planner.visibleConnections)
     expect(mocks.props.visibleConnectionIds).toEqual([])
+    expect(mocks.props.scopeConnectionsToDay).toBe(true)
+  })
+})
+
+/**
+ * #2456: the phone map is one day's picture. A day chip frames the day, draws its route
+ * and drops the other days' pins (MTripShell.selectDayOnMap), and the automated
+ * transports ride the day since #2019. A booking switched on through its own toggle
+ * ("On map") stayed on every day's map, though, because the per-booking branch of
+ * visibleRouteReservations is trip-wide.
+ *
+ * The renderer is mocked here, so what it WOULD draw is worked out the way both engines
+ * work it out: MapView and MapViewGL hand their own props to visibleRouteReservations.
+ * The whole prop bag goes in, so a day-scoping option added to the renderers under the
+ * util's own name is picked up as well as a filtered id list is.
+ */
+describe('MMapArea booking routes on the day-scoped plan map (#2456)', () => {
+  const DAYS = [
+    { id: 10, trip_id: 1, day_number: 1, date: '2026-05-01' },
+    { id: 11, trip_id: 1, day_number: 2, date: '2026-05-02' },
+    { id: 12, trip_id: 1, day_number: 3, date: '2026-05-03' },
+  ] as Day[]
+
+  function flight(over: Partial<Reservation> = {}): Reservation {
+    return {
+      id: 7, trip_id: 1, type: 'flight', title: 'FRA → LIS', status: 'confirmed',
+      day_id: 10, end_day_id: 10,
+      reservation_time: '2026-05-01T09:00', reservation_end_time: '2026-05-01T11:00',
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'Frankfurt', code: 'FRA', lat: 50.03, lng: 8.57, timezone: null, local_time: null, local_date: null },
+        { role: 'to', sequence: 1, name: 'Lisbon', code: 'LIS', lat: 38.77, lng: -9.13, timezone: null, local_time: null, local_date: null },
+      ],
+      ...over,
+    } as unknown as Reservation
+  }
+
+  /** The plan tab's map in front, a booking switched on, and the given day on the chips. */
+  function renderPlanMap(selectedDayId: number | null, booking: Reservation = flight()) {
+    const planner = buildPlanner({
+      days: DAYS,
+      selectedDayId,
+      reservations: [booking],
+      visibleConnections: [booking.id],
+      transitRoutesShown: false,
+    } as unknown as Partial<TripPlanner>)
+    render(<MMapArea planner={planner} shell={buildShell({ view: 'map', mapFront: true, trTab: 'plan' })} />)
+  }
+
+  /** The booking ids either renderer would draw a route for, from the props it was handed. */
+  const drawnBookingIds = () => visibleRouteReservations(
+    (mocks.props.reservations as Reservation[]) ?? [],
+    mocks.props as unknown as RouteVisibilityOptions,
+  ).map(r => r.id)
+
+  it('FE-MOB-MAPAREA-038: a booking switched on for day 1 is not drawn on the map of day 3', () => {
+    renderPlanMap(12)
+
+    expect(drawnBookingIds()).toEqual([])
+  })
+
+  it('FE-MOB-MAPAREA-039: the booking stays drawn on the day it runs on', () => {
+    renderPlanMap(10)
+
+    expect(drawnBookingIds()).toEqual([7])
+  })
+
+  it('FE-MOB-MAPAREA-040: an overnight booking is drawn on both of its days and on no other', () => {
+    const overnight = flight({ day_id: 10, end_day_id: 11 })
+
+    renderPlanMap(11, overnight)
+    expect(drawnBookingIds()).toEqual([7])
+
+    renderPlanMap(12, overnight)
+    expect(drawnBookingIds()).toEqual([])
+  })
+
+  it('FE-MOB-MAPAREA-041: the all days view keeps every switched-on booking', () => {
+    renderPlanMap(null)
+
+    expect(drawnBookingIds()).toEqual([7])
+  })
+
+  it('FE-MOB-MAPAREA-042: a booking bound to no day keeps drawing on every day', () => {
+    renderPlanMap(12, flight({ day_id: null, end_day_id: null }))
+
+    expect(drawnBookingIds()).toEqual([7])
   })
 })

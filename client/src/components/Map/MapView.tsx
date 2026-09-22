@@ -699,6 +699,9 @@ export const MapView = memo(function MapView({
   showTransitRoutes = true,
   days = [] as Day[],
   selectedDayId = null,
+  // Whether a booking switched on by hand also has to run on the selected day to be
+  // drawn. Only the phone's plan map asks for it; see RouteVisibilityOptions.
+  scopeConnectionsToDay = false,
   onReservationClick,
   pois = [] as Poi[],
   onPoiClick,
@@ -762,8 +765,8 @@ export const MapView = memo(function MapView({
     </Marker>
   )), [pois, onPoiClick, onPoiDropOnRoute])
   const visibleReservations = useMemo(() => (
-    visibleRouteReservations(reservations, { visibleConnectionIds, showTransitRoutes, selectedDayId, days })
-  ), [reservations, visibleConnectionIds, showTransitRoutes, selectedDayId, days])
+    visibleRouteReservations(reservations, { visibleConnectionIds, showTransitRoutes, selectedDayId, days, scopeConnectionsToDay })
+  ), [reservations, visibleConnectionIds, showTransitRoutes, selectedDayId, days, scopeConnectionsToDay])
   // Real road geometry for car/bus/taxi/bicycle bookings (straight line until it loads/if it fails).
   const transportRoutes = useTransportRoutes(visibleReservations)
   // Dynamic padding: account for sidebars + bottom inspector + day detail panel

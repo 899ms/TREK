@@ -164,6 +164,11 @@ interface Props {
   showTransitRoutes?: boolean
   days?: Day[]
   selectedDayId?: number | null
+  /**
+   * Whether a booking switched on by hand also has to run on the selected day to be
+   * drawn. Only the phone's plan map asks for it; see RouteVisibilityOptions.
+   */
+  scopeConnectionsToDay?: boolean
   showReservationStats?: boolean
   onReservationClick?: (reservationId: number) => void
   pois?: Poi[]
@@ -695,6 +700,7 @@ export function MapViewGL({
   showTransitRoutes = true,
   days = NO_DAYS,
   selectedDayId = null,
+  scopeConnectionsToDay = false,
   showReservationStats = false,
   onReservationClick,
   pois = NO_POIS,
@@ -2186,8 +2192,8 @@ export function MapViewGL({
   // DayPlanSidebar — nothing is rendered until the user enables a
   // booking's route, matching the Leaflet MapView's behaviour.
   const visibleReservations = useMemo(() => (
-    visibleRouteReservations(reservations, { visibleConnectionIds, showTransitRoutes, selectedDayId, days })
-  ), [reservations, visibleConnectionIds, showTransitRoutes, selectedDayId, days])
+    visibleRouteReservations(reservations, { visibleConnectionIds, showTransitRoutes, selectedDayId, days, scopeConnectionsToDay })
+  ), [reservations, visibleConnectionIds, showTransitRoutes, selectedDayId, days, scopeConnectionsToDay])
   // Real road geometry for car/bus/taxi/bicycle bookings (straight line until it loads/if it fails).
   const transportRoutes = useTransportRoutes(visibleReservations)
 
