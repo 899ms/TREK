@@ -14,6 +14,7 @@ import { resolvePluginIcon } from '../../components/shared/PluginIcon'
 import { useTranslation, translateApiError } from '../../i18n'
 import { addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi, healthApi, airtrailApi, mapsApi, placesApi } from '../../api/client'
 import { getDayOrder } from '../../utils/dayOrder'
+import { TRANSPORT_TYPES } from '../../utils/dayMerge'
 import { isOvernightCategory } from '../../components/Roadtrip/stopKinds'
 import { parsedItemToDraft, isTransportItem, isUnplaceableItem, type BookingReviewDraft } from '../../components/Planner/parsedItemToDraft'
 import type { BookingImportPreviewItem } from '@trek/shared'
@@ -215,7 +216,6 @@ export function useTripPlanner() {
     }).catch(() => {})
   }, [])
 
-  const TRANSPORT_TYPES = new Set(['flight', 'train', 'bus', 'car', 'taxi', 'bicycle', 'cruise', 'ferry', 'transit', 'transport_other'])
 
   const tripPagePlugins = allPlugins.filter(p => p.type === 'trip-page')
   const tripPluginIds = tripPagePlugins.map(p => p.id).join(',')
