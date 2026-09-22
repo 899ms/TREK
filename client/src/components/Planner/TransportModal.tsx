@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { Plane, Train, Car, Ship, Bus, Sailboat, Bike, CarTaxiFront, Route, TramFront, Paperclip, FileText, X, ExternalLink, Link2, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react'
 import Modal from '../shared/Modal'
 import CustomSelect from '../shared/CustomSelect'
+import { BookingCodeInput } from '../shared/BookingCode'
 import CustomTimePicker from '../shared/CustomTimePicker'
 import AirportSelect, { type Airport } from './AirportSelect'
 import LocationSelect, { type LocationPoint } from './LocationSelect'
@@ -903,7 +904,7 @@ export function TransportModal({ isOpen, onClose, onSave, reservation, days, sel
                           {writesFlightLegs && (
                             <div>
                               <label className={labelClass}>{t('reservations.confirmationCode')}</label>
-                              <input type="text" value={wp.confirmation_number} onChange={e => updateWp({ confirmation_number: e.target.value })}
+                              <BookingCodeInput value={wp.confirmation_number} onChange={e => updateWp({ confirmation_number: e.target.value })}
                                 placeholder={t('reservations.confirmationPlaceholder')} className={inputClass} />
                             </div>
                           )}
@@ -984,7 +985,7 @@ export function TransportModal({ isOpen, onClose, onSave, reservation, days, sel
                           {writesTrainLegs && (
                             <div>
                               <label className={labelClass}>{t('reservations.confirmationCode')}</label>
-                              <input type="text" value={wp.confirmation_number} onChange={e => updateWp({ confirmation_number: e.target.value })}
+                              <BookingCodeInput value={wp.confirmation_number} onChange={e => updateWp({ confirmation_number: e.target.value })}
                                 placeholder={t('reservations.confirmationPlaceholder')} className={inputClass} />
                             </div>
                           )}
@@ -1119,7 +1120,7 @@ export function TransportModal({ isOpen, onClose, onSave, reservation, days, sel
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
             <label className={labelClass}>{t('reservations.confirmationCode')}</label>
-            <input type="text" value={form.confirmation_number} onChange={e => set('confirmation_number', e.target.value)}
+            <BookingCodeInput value={form.confirmation_number} onChange={e => set('confirmation_number', e.target.value)}
               placeholder={t('reservations.confirmationPlaceholder')} className={inputClass} />
           </div>
           <div>

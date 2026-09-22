@@ -1,11 +1,13 @@
-// FE-PLANNER-RESMODAL-001 to FE-PLANNER-RESMODAL-095
-import { render, screen, waitFor, fireEvent, within } from '../../../tests/helpers/render';
+// FE-PLANNER-RESMODAL-001 to FE-PLANNER-RESMODAL-100
+import { render, screen, waitFor, fireEvent, within, act } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../tests/helpers/msw/server';
 import { useAuthStore } from '../../store/authStore';
 import { useTripStore } from '../../store/tripStore';
 import { useAddonStore } from '../../store/addonStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { isBlurred } from '../../../tests/helpers/bookingCodeBlur';
 import { resetAllStores, seedStore } from '../../../tests/helpers/store';
 import {
   buildUser,
@@ -1565,5 +1567,58 @@ describe('ReservationModal', () => {
     const times = screen.getAllByTestId('time-picker') as HTMLInputElement[];
     expect(times[0].value).toBe('16:00');
     expect(times[2].value).toBe('10:30');
+  });
+
+  // ── Blur booking codes in the edit form (#2457) ─────────────────────────────
+
+  describe('blur booking codes (#2457)', () => {
+    const blurOn = (on: boolean) => seedStore(useSettingsStore, { settings: { time_format: '24h', blur_booking_codes: on } });
+
+    it('FE-PLANNER-RESMODAL-096: the booking code field is blurred while the setting is on and the field is not focused', () => {
+      blurOn(true);
+      const res = buildReservation({ type: 'restaurant', confirmation_number: 'PNR-SECRET' });
+      render(<ReservationModal {...defaultProps} reservation={res} />);
+      const code = screen.getByDisplayValue('PNR-SECRET');
+      expect(isBlurred(code)).toBe(true);
+    });
+
+    it('FE-PLANNER-RESMODAL-097: a hotel booking hides its code the same way', () => {
+      blurOn(true);
+      const res = buildReservation({ type: 'hotel', title: 'Hotel Adlon', confirmation_number: 'HOTEL-SECRET' });
+      render(<ReservationModal {...defaultProps} reservation={res} />);
+      expect(isBlurred(screen.getByDisplayValue('HOTEL-SECRET'))).toBe(true);
+    });
+
+    it('FE-PLANNER-RESMODAL-098: focusing the field reveals the code for editing, leaving it hides it again', () => {
+      blurOn(true);
+      const res = buildReservation({ type: 'restaurant', confirmation_number: 'PNR-SECRET' });
+      render(<ReservationModal {...defaultProps} reservation={res} />);
+      const code = screen.getByDisplayValue('PNR-SECRET') as HTMLInputElement;
+      expect(isBlurred(code)).toBe(true);
+      act(() => code.focus());
+      expect(isBlurred(code)).toBe(false);
+      act(() => code.blur());
+      expect(isBlurred(code)).toBe(true);
+    });
+
+    it('FE-PLANNER-RESMODAL-099: with the setting off the code stays plain', () => {
+      blurOn(false);
+      const res = buildReservation({ type: 'restaurant', confirmation_number: 'PNR-PLAIN' });
+      render(<ReservationModal {...defaultProps} reservation={res} />);
+      expect(isBlurred(screen.getByDisplayValue('PNR-PLAIN'))).toBe(false);
+    });
+
+    it('FE-PLANNER-RESMODAL-100: a blurred code still saves unchanged, and an edit typed into it is kept', async () => {
+      blurOn(true);
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      const res = buildReservation({ type: 'restaurant', title: 'Dinner', confirmation_number: 'PNR-SECRET' });
+      render(<ReservationModal {...defaultProps} onSave={onSave} reservation={res} />);
+      const code = screen.getByDisplayValue('PNR-SECRET');
+      await userEvent.clear(code);
+      await userEvent.type(code, 'PNR-NEW');
+      await userEvent.click(screen.getByRole('button', { name: /^Update$/i }));
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+      expect(onSave.mock.calls[0][0].confirmation_number).toBe('PNR-NEW');
+    });
   });
 });

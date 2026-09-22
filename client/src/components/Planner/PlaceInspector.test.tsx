@@ -12,6 +12,7 @@ import { usePermissionsStore } from '../../store/permissionsStore';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../tests/helpers/msw/server';
 import type { AssignmentsMap } from '../../types';
+import { isBlurred } from '../../../tests/helpers/bookingCodeBlur';
 
 // ── Module mocks ──────────────────────────────────────────────────────────────
 
@@ -1565,3 +1566,25 @@ describe('PlaceInspector', () => {
     expect(screen.queryByText('Remove from Day')).toBeNull();
   });
 })
+
+// ── Blur booking codes on the linked-booking strip (#2457) ────────────────────
+
+describe('PlaceInspector blur booking codes (#2457)', () => {
+  const renderWithBooking = (blur: boolean) => {
+    seedStore(useSettingsStore, { settings: { time_format: '24h', temperature_unit: 'celsius', blur_booking_codes: blur } });
+    const res = { ...buildReservation({ id: 3, title: 'Dinner at Jules Verne', status: 'confirmed', confirmation_number: 'TABLE-SECRET' }), assignment_id: 9 };
+    render(<PlaceInspector {...defaultProps} selectedDayId={1} selectedAssignmentId={9}
+      assignments={{ '1': [{ id: 9, place, place_id: place.id, day_id: 1, order_index: 0, notes: null }] }}
+      reservations={[res]} onEditReservation={vi.fn()} />);
+  };
+
+  it('FE-PLANNER-INSPECTOR-103: the booking code on the linked-booking strip is blurred while the setting is on', () => {
+    renderWithBooking(true);
+    expect(isBlurred(screen.getByText(/TABLE-SECRET/))).toBe(true);
+  });
+
+  it('FE-PLANNER-INSPECTOR-104: with the setting off the strip shows the code plainly', () => {
+    renderWithBooking(false);
+    expect(isBlurred(screen.getByText(/TABLE-SECRET/))).toBe(false);
+  });
+});

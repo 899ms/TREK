@@ -1,4 +1,4 @@
-// FE-PLANNER-DAYDETAIL-001 to FE-PLANNER-DAYDETAIL-080
+// FE-PLANNER-DAYDETAIL-001 to FE-PLANNER-DAYDETAIL-084
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within, act } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
@@ -12,6 +12,7 @@ import { usePluginStore } from '../../store/pluginStore';
 import { resetAllStores, seedStore } from '../../../tests/helpers/store';
 import { buildUser, buildAdmin, buildTrip, buildDay, buildPlace, buildReservation } from '../../../tests/helpers/factories';
 import DayDetailPanel from './DayDetailPanel';
+import { isBlurred } from '../../../tests/helpers/bookingCodeBlur';
 
 const day = buildDay({ id: 1, trip_id: 1, date: '2025-06-15', title: 'Day in Paris' });
 
@@ -1894,5 +1895,82 @@ describe('DayDetailPanel time format', () => {
 
     expect(await screen.findByText('15:00')).toBeInTheDocument();
     expect(screen.getByText('11:00')).toBeInTheDocument();
+  });
+});
+
+// ── Blur booking codes: the stay's own code and the hotel editor (#2457) ────
+
+describe('DayDetailPanel blur booking codes (#2457)', () => {
+  beforeEach(() => {
+    server.use(http.get('/api/view-contributions/:view/:tripId', () => HttpResponse.json({ contributions: [] })));
+  });
+
+  const blurOn = (on: boolean) => seedStore(useSettingsStore, {
+    settings: { time_format: '24h', temperature_unit: 'celsius', blur_booking_codes: on },
+  });
+  const stayWithCode = (confirmation: string) => server.use(
+    http.get('/api/trips/1/accommodations', () =>
+      HttpResponse.json({
+        accommodations: [{
+          id: 1, place_id: 5, place_name: 'Code Hotel', place_address: 'Paris',
+          start_day_id: 1, end_day_id: 3, check_in: '14:00', check_out: '11:00', confirmation,
+        }],
+      })
+    ),
+  );
+  const openHotelEditor = async () => {
+    await screen.findByText('Code Hotel');
+    // header collapse (0), header close (1), pencil (2), remove (3), as in DAYDETAIL-032
+    await userEvent.click(screen.getAllByRole('button')[2]);
+    await waitFor(() => {
+      expect(document.body.querySelector('[style*="z-index: 99999"]')?.textContent).toMatch(/Edit accommodation/i);
+    });
+  };
+
+  it('FE-PLANNER-DAYDETAIL-081: the confirmation code of the stay itself is blurred in the details grid', async () => {
+    blurOn(true);
+    stayWithCode('HOTEL-SECRET');
+    render(<DayDetailPanel {...defaultProps} />);
+    const code = await screen.findByText('HOTEL-SECRET');
+    expect(isBlurred(code)).toBe(true);
+  });
+
+  it('FE-PLANNER-DAYDETAIL-082: the confirmation field of the hotel editor is blurred until focused', async () => {
+    blurOn(true);
+    stayWithCode('HOTEL-SECRET');
+    render(<DayDetailPanel {...defaultProps} />);
+    await openHotelEditor();
+    const field = screen.getByDisplayValue('HOTEL-SECRET') as HTMLInputElement;
+    expect(isBlurred(field)).toBe(true);
+    act(() => field.focus());
+    expect(isBlurred(field)).toBe(false);
+    act(() => field.blur());
+    expect(isBlurred(field)).toBe(true);
+  });
+
+  it('FE-PLANNER-DAYDETAIL-083: with the setting off the stay code and the editor field stay plain', async () => {
+    blurOn(false);
+    stayWithCode('HOTEL-PLAIN');
+    render(<DayDetailPanel {...defaultProps} />);
+    expect(isBlurred(await screen.findByText('HOTEL-PLAIN'))).toBe(false);
+    await openHotelEditor();
+    expect(isBlurred(screen.getByDisplayValue('HOTEL-PLAIN'))).toBe(false);
+  });
+
+  it('FE-PLANNER-DAYDETAIL-084: a blurred code in the hotel editor still saves unchanged', async () => {
+    blurOn(true);
+    let body: Record<string, unknown> | null = null;
+    stayWithCode('HOTEL-SECRET');
+    server.use(
+      http.put('/api/trips/1/accommodations/1', async ({ request }) => {
+        body = await request.json() as Record<string, unknown>;
+        return HttpResponse.json({ accommodation: { id: 1, place_id: 5, place_name: 'Code Hotel', start_day_id: 1, end_day_id: 3, confirmation: 'HOTEL-SECRET' } });
+      }),
+    );
+    render(<DayDetailPanel {...defaultProps} places={[buildPlace({ id: 5, name: 'Code Hotel' })]} />);
+    await openHotelEditor();
+    await userEvent.click(screen.getByText(/Save/i));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body!.confirmation).toBe('HOTEL-SECRET');
   });
 });

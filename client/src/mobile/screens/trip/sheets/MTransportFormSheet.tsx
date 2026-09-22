@@ -8,6 +8,7 @@ import { orderedEndpoints, parseReservationMetadata } from '../../../../utils/fl
 import { typeToCostCategory } from '@trek/shared'
 import CustomSelect from '../../../../components/shared/CustomSelect'
 import CustomTimePicker from '../../../../components/shared/CustomTimePicker'
+import { BookingCodeInput } from '../../../../components/shared/BookingCode'
 import AirportSelect, { type Airport } from '../../../../components/Planner/AirportSelect'
 import LocationSelect, { type LocationPoint } from '../../../../components/Planner/LocationSelect'
 import TransitSearchPanel from '../../../../components/Planner/TransitSearchPanel'
@@ -809,8 +810,7 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
                               {writesFlightLegs && (
                                 <div className="mt-2">
                                   <Eyebrow className="mb-[5px] uppercase">{t('reservations.confirmationCode')}</Eyebrow>
-                                  <input
-                                    type="text"
+                                  <BookingCodeInput
                                     value={wp.confirmation_number}
                                     onChange={e => updateWp({ confirmation_number: e.target.value })}
                                     placeholder={t('reservations.confirmationPlaceholder')}
@@ -899,8 +899,7 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
                               {writesTrainLegs && (
                                 <div className="mt-2">
                                   <Eyebrow className="mb-[5px] uppercase">{t('reservations.confirmationCode')}</Eyebrow>
-                                  <input
-                                    type="text"
+                                  <BookingCodeInput
                                     value={wp.confirmation_number}
                                     onChange={e => updateWp({ confirmation_number: e.target.value })}
                                     placeholder={t('reservations.confirmationPlaceholder')}
@@ -1029,8 +1028,7 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
             <div className="mt-3 flex gap-2">
               <div className="min-w-0 flex-1">
                 <Eyebrow className="mb-[5px] uppercase">{t('reservations.confirmationCode')}</Eyebrow>
-                <input
-                  type="text"
+                <BookingCodeInput
                   value={form.confirmation_number}
                   onChange={e => set('confirmation_number', e.target.value)}
                   placeholder={t('reservations.confirmationPlaceholder')}

@@ -4,6 +4,7 @@ import MSheet from '../../../components/MSheet'
 import MIconBtn from '../../../components/MIconBtn'
 import CustomSelect from '../../../../components/shared/CustomSelect'
 import CustomTimePicker from '../../../../components/shared/CustomTimePicker'
+import { BookingCodeInput } from '../../../../components/shared/BookingCode'
 import { accommodationsApi } from '../../../../api/client'
 import { applyStayStops } from '../../../../store/stayStops'
 import { useTranslation } from '../../../../i18n'
@@ -204,8 +205,7 @@ export default function MAccommodationSheet({ planner, shell }: MTripSheetsProps
 
         {/* Confirmation */}
         <Eyebrow className="mb-[5px] mt-3">{t('day.confirmation')}</Eyebrow>
-        <input
-          type="text"
+        <BookingCodeInput
           value={form.confirmation}
           onChange={e => setForm(f => ({ ...f, confirmation: e.target.value }))}
           placeholder="ABC-12345"

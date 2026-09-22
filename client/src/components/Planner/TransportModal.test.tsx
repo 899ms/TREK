@@ -1,11 +1,13 @@
-// FE-PLANNER-TRANSMODAL-001 to FE-PLANNER-TRANSMODAL-064
-import { render, screen, waitFor, fireEvent, within } from '../../../tests/helpers/render';
+// FE-PLANNER-TRANSMODAL-001 to FE-PLANNER-TRANSMODAL-070
+import { render, screen, waitFor, fireEvent, within, act } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../tests/helpers/msw/server';
 import { useAuthStore } from '../../store/authStore';
 import { useTripStore } from '../../store/tripStore';
 import { useAddonStore } from '../../store/addonStore';
+import { useSettingsStore } from '../../store/settingsStore';
+import { isBlurred } from '../../../tests/helpers/bookingCodeBlur';
 import { resetAllStores, seedStore } from '../../../tests/helpers/store';
 import {
   buildUser,
@@ -1356,5 +1358,84 @@ describe('TransportModal', () => {
     expect(screen.getByText('Eiffel Tower')).toBeInTheDocument();
     expect(screen.getByText(/Orsay/)).toBeInTheDocument();
     expect(screen.queryByText('Louvre')).not.toBeInTheDocument();
+  });
+
+  // ── Blur booking codes in the edit form (#2457) ─────────────────────────────
+
+  describe('blur booking codes (#2457)', () => {
+    const blurOn = (on: boolean) => seedStore(useSettingsStore, { settings: { time_format: '24h', blur_booking_codes: on } });
+    const codeFields = () => screen.getAllByPlaceholderText('e.g. ABC12345') as HTMLInputElement[];
+
+    function multiLegTrain(): Reservation {
+      const res = buildReservation({ id: 32, title: 'Osaka → Kyoto → Nara', type: 'train' });
+      return Object.assign(res, {
+        day_id: 10,
+        end_day_id: 10,
+        confirmation_number: 'RAIL-BOOK',
+        metadata: {
+          legs: [
+            { from: 'Osaka', to: 'Kyoto', train_number: 'JR 1', confirmation_number: 'RAIL-LEG1', dep_day_id: 10, dep_time: '08:00', arr_day_id: 10, arr_time: '08:30' },
+            { from: 'Kyoto', to: 'Nara', train_number: 'JR 2', confirmation_number: 'RAIL-LEG2', dep_day_id: 10, dep_time: '09:00', arr_day_id: 10, arr_time: '09:45' },
+          ],
+        },
+        endpoints: [
+          { id: 11, reservation_id: 32, role: 'from', sequence: 0, name: 'Osaka Station', code: null, lat: 34.7, lng: 135.5, timezone: 'Asia/Tokyo', local_date: '2026-08-01', local_time: '08:00' },
+          { id: 12, reservation_id: 32, role: 'stop', sequence: 1, name: 'Kyoto Station', code: null, lat: 34.98, lng: 135.75, timezone: 'Asia/Tokyo', local_date: '2026-08-01', local_time: '09:00' },
+          { id: 13, reservation_id: 32, role: 'to', sequence: 2, name: 'Nara Station', code: null, lat: 34.68, lng: 135.82, timezone: 'Asia/Tokyo', local_date: '2026-08-01', local_time: '09:45' },
+        ],
+      }) as unknown as Reservation;
+    }
+
+    it('FE-PLANNER-TRANSMODAL-065: the flight booking code field is blurred while the setting is on', () => {
+      blurOn(true);
+      const res = buildReservation({ title: 'LH 400', type: 'flight', confirmation_number: 'FLY-SECRET' });
+      render(<TransportModal {...defaultProps} reservation={res} />);
+      expect(isBlurred(screen.getByDisplayValue('FLY-SECRET'))).toBe(true);
+    });
+
+    it('FE-PLANNER-TRANSMODAL-066: every per-segment code of a stopover flight is blurred as well', () => {
+      blurOn(true);
+      render(<TransportModal {...defaultProps} days={routeDays} reservation={multiLegFlight()} />);
+      const codes = codeFields();
+      expect(codes.map(i => i.value)).toEqual(['ABC123', 'XYZ789', 'BOOK1']);
+      expect(codes.map(i => isBlurred(i))).toEqual([true, true, true]);
+    });
+
+    it('FE-PLANNER-TRANSMODAL-067: every per-segment code of a multi-leg train is blurred as well', () => {
+      blurOn(true);
+      render(<TransportModal {...defaultProps} days={routeDays} reservation={multiLegTrain()} />);
+      const codes = codeFields();
+      expect(codes.map(i => i.value)).toEqual(['RAIL-LEG1', 'RAIL-LEG2', 'RAIL-BOOK']);
+      expect(codes.map(i => isBlurred(i))).toEqual([true, true, true]);
+    });
+
+    it('FE-PLANNER-TRANSMODAL-068: focusing a code field reveals it for editing, leaving it hides it again', () => {
+      blurOn(true);
+      const res = buildReservation({ title: 'LH 400', type: 'flight', confirmation_number: 'FLY-SECRET' });
+      render(<TransportModal {...defaultProps} reservation={res} />);
+      const code = screen.getByDisplayValue('FLY-SECRET') as HTMLInputElement;
+      expect(isBlurred(code)).toBe(true);
+      act(() => code.focus());
+      expect(isBlurred(code)).toBe(false);
+      act(() => code.blur());
+      expect(isBlurred(code)).toBe(true);
+    });
+
+    it('FE-PLANNER-TRANSMODAL-069: with the setting off every code field stays plain', () => {
+      blurOn(false);
+      render(<TransportModal {...defaultProps} days={routeDays} reservation={multiLegFlight()} />);
+      expect(codeFields().map(i => isBlurred(i))).toEqual([false, false, false]);
+    });
+
+    it('FE-PLANNER-TRANSMODAL-070: blurred codes still save unchanged', async () => {
+      blurOn(true);
+      const onSave = vi.fn().mockResolvedValue(undefined);
+      render(<TransportModal {...defaultProps} days={routeDays} reservation={multiLegFlight()} onSave={onSave} />);
+      await userEvent.click(screen.getByRole('button', { name: /^Update$/i }));
+      await waitFor(() => expect(onSave).toHaveBeenCalled());
+      const payload = onSave.mock.calls[0][0];
+      expect(payload.metadata.legs.map((l: { confirmation_number?: string }) => l.confirmation_number)).toEqual(['ABC123', 'XYZ789']);
+      expect(payload.confirmation_number).toBe('BOOK1');
+    });
   });
 });

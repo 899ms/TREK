@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import MReservationSheet from '../../../../src/mobile/screens/trip/sheets/MReservationSheet'
 import { useAddonStore } from '../../../../src/store/addonStore'
 import { useTripStore } from '../../../../src/store/tripStore'
+import { useSettingsStore } from '../../../../src/store/settingsStore'
+import { isBlurred } from '../../../helpers/bookingCodeBlur'
 import type { Accommodation, Assignment, Day, Place, Reservation, TripMember } from '../../../../src/types'
 import { buildPlanner } from '../../../helpers/mobileTrip'
 import { resetAllStores } from '../../../helpers/store'
-import { fireEvent, render, screen, waitFor } from '../../../helpers/render'
+import { act, fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-RESSH-001 to FE-MOB-RESSH-051
+// FE-MOB-RESSH-001 to FE-MOB-RESSH-061
 
 // Date/time/select pickers have their own suites — here they only have to be
 // addressable, so they render as plain controls.
@@ -806,5 +808,47 @@ describe('MReservationSheet', () => {
     pick(screen.getByLabelText('reservations.meta.pickHotel') as HTMLSelectElement, 102)
     expect(titleField()).toHaveValue('Cafe Central')
     expect(screen.getByPlaceholderText('reservations.locationPlaceholder')).toHaveValue('Manual 3')
+  })
+
+  // ── Blur booking codes in the edit sheet (#2457) ───────────────────────────
+
+  describe('blur booking codes (#2457)', () => {
+    /** Both sources the phone reads the preference from: the settings store and planner.settings. */
+    function plannerWithBlur(on: boolean, overrides: Record<string, unknown> = {}) {
+      useSettingsStore.setState({ settings: { ...useSettingsStore.getState().settings, blur_booking_codes: on } })
+      return makePlanner({
+        settings: { time_format: '24h', date_format: 'DD.MM.YYYY', default_currency: 'EUR', distance_unit: 'km', blur_booking_codes: on },
+        ...overrides,
+      })
+    }
+    const codeField = () => screen.getByPlaceholderText('reservations.confirmationPlaceholder') as HTMLInputElement
+
+    it('FE-MOB-RESSH-058: the booking code field is blurred while the setting is on', () => {
+      setup(plannerWithBlur(true, { editingReservation: DINNER }))
+      expect(codeField()).toHaveValue('C1')
+      expect(isBlurred(codeField())).toBe(true)
+    })
+
+    it('FE-MOB-RESSH-059: focusing the field reveals the code for editing, leaving it hides it again', () => {
+      setup(plannerWithBlur(true, { editingReservation: DINNER }))
+      const field = codeField()
+      expect(isBlurred(field)).toBe(true)
+      act(() => field.focus())
+      expect(isBlurred(field)).toBe(false)
+      act(() => field.blur())
+      expect(isBlurred(field)).toBe(true)
+    })
+
+    it('FE-MOB-RESSH-060: with the setting off the code stays plain', () => {
+      setup(plannerWithBlur(false, { editingReservation: DINNER }))
+      expect(isBlurred(codeField())).toBe(false)
+    })
+
+    it('FE-MOB-RESSH-061: a blurred code still saves unchanged', async () => {
+      const { planner } = setup(plannerWithBlur(true, { editingReservation: DINNER }))
+      fireEvent.click(submitBtn())
+      await waitFor(() => expect(planner.handleSaveReservation).toHaveBeenCalled())
+      expect(savedPayload(planner).confirmation_number).toBe('C1')
+    })
   })
 })

@@ -9,6 +9,7 @@ import { typeToCostCategory } from '@trek/shared'
 import CustomSelect from '../../../../components/shared/CustomSelect'
 import CustomTimePicker from '../../../../components/shared/CustomTimePicker'
 import { CustomDatePicker } from '../../../../components/shared/CustomDateTimePicker'
+import { BookingCodeInput } from '../../../../components/shared/BookingCode'
 import { Eyebrow, FIELD_AREA_CLS, FIELD_CLS, FormSheetFooter, FormSheetHeader } from './PlSheetChrome'
 import PlFileAttach from './PlFileAttach'
 import { buildAssignmentOptions } from '../../../../components/Planner/assignmentOptions'
@@ -513,8 +514,7 @@ export default function MReservationSheet({ planner, onOpenExpense }: MReservati
         <div className="mt-3 flex gap-2">
           <div className="min-w-0 flex-1">
             <Eyebrow className="mb-[5px] uppercase">{t('reservations.confirmationCode')}</Eyebrow>
-            <input
-              type="text"
+            <BookingCodeInput
               value={form.confirmation_number}
               onChange={e => set('confirmation_number', e.target.value)}
               placeholder={t('reservations.confirmationPlaceholder')}
