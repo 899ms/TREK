@@ -3344,6 +3344,64 @@ describe('DayPlanSidebar', () => {
     expect(updateReservation).toHaveBeenCalledWith(1, 501, { day_id: 11, end_day_id: 11 })
   })
 
+  // #2455. The list draws a timed stop by its start, the road trip drives the stored
+  // order. A stop with a start moved onto another day has to be stored where the list
+  // will draw it, or the road trip visits it somewhere else and, behind a later start,
+  // reaches it late.
+  describe('a timed stop moved onto another day is stored where the list shows it (#2455)', () => {
+    const setup = (extra: Record<string, unknown> = {}) => {
+      const moveAssignment = vi.fn(async () => undefined)
+      stubTripActions({ moveAssignment })
+      const days = [
+        buildDay({ id: 10, date: '2025-06-01', title: 'Day 1' }),
+        buildDay({ id: 11, date: '2025-06-02', title: 'Day 2' }),
+      ]
+      const moved = buildPlace({ id: 1, name: 'Travemuende Strand', place_time: '10:00' })
+      const early = buildPlace({ id: 2, name: 'Luebeck Dom', place_time: '09:00' })
+      const middle = buildPlace({ id: 3, name: 'Wismar Hafen', place_time: '11:00' })
+      const late = buildPlace({ id: 4, name: 'Rostock Markt', place_time: '14:00' })
+      const assignments = {
+        '10': [buildAssignment({ id: 21, day_id: 10, order_index: 0, place: moved })],
+        '11': [
+          buildAssignment({ id: 31, day_id: 11, order_index: 0, place: early }),
+          buildAssignment({ id: 32, day_id: 11, order_index: 1, place: middle }),
+          buildAssignment({ id: 33, day_id: 11, order_index: 2, place: late }),
+        ],
+      }
+      render(<DayPlanSidebar {...makeDefaultProps({ days, places: [moved, early, middle, late], assignments, ...extra })} />)
+      return moveAssignment
+    }
+
+    it('FE-PLANNER-DAYPLAN-215: dropped on the day body, it lands between the stops its start falls between', () => {
+      const moveAssignment = setup()
+      fireEvent.dragStart(dragRow(screen.getByText('Travemuende Strand')), { dataTransfer: emptyDataTransfer })
+      fireEvent.drop(document.querySelectorAll('[style*="padding-top: 6px"]')[1], { dataTransfer: { getData: vi.fn(() => '') } })
+      // 10:00 sits between 09:00 (index 0) and 11:00, so index 1, not the end of the day.
+      expect(moveAssignment).toHaveBeenCalledWith(1, 21, 10, 11, 1)
+    })
+
+    it('FE-PLANNER-DAYPLAN-216: dropped on a later stop, it still lands where its start puts it', () => {
+      const moveAssignment = setup()
+      fireEvent.dragStart(dragRow(screen.getByText('Travemuende Strand')), { dataTransfer: emptyDataTransfer })
+      fireEvent.drop(dragRow(screen.getByText('Rostock Markt')), { dataTransfer: { getData: vi.fn(() => '') } })
+      expect(moveAssignment).toHaveBeenCalledWith(1, 21, 10, 11, 1)
+    })
+
+    it('FE-PLANNER-DAYPLAN-217: with the planner wired in, the move goes through it so the day keeps its vias', async () => {
+      // Landing in the middle of a day shifts the legs behind it, which only the planner
+      // can correct: it holds the vias. The list still decides where the stop goes.
+      const onMoveToDay = vi.fn(async () => undefined)
+      const pushUndo = vi.fn()
+      const moveAssignment = setup({ onMoveToDay, pushUndo })
+      fireEvent.dragStart(dragRow(screen.getByText('Travemuende Strand')), { dataTransfer: emptyDataTransfer })
+      fireEvent.drop(dayHeader('Day 2'), { dataTransfer: { getData: vi.fn(() => '') } })
+      expect(onMoveToDay).toHaveBeenCalledWith(21, 10, 11, 1)
+      expect(moveAssignment).not.toHaveBeenCalled()
+      // Still offered back once the planner has made the move.
+      await waitFor(() => expect(pushUndo).toHaveBeenCalledTimes(1))
+    })
+  })
+
   it('FE-PLANNER-DAYPLAN-149: the note context menu edits and asks before deleting', async () => {
     const user = userEvent.setup()
     const note = buildDayNote({ id: 70, day_id: 10, text: 'A note' })

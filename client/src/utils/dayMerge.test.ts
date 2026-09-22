@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems } from './dayMerge'
+import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems, timedSlot } from './dayMerge'
 
 describe('parseTimeToMinutes', () => {
   it('parses HH:MM string', () => {
@@ -301,5 +301,54 @@ describe('getMergedItems', () => {
     const dayNotes = [{ id: 10, sort_order: 0.5, time: '12:00' }]
     const result = getMergedItems({ dayAssignments, dayNotes, dayTransports: [], dayId: 5 })
     expect(result.map(i => i.data.id)).toEqual([1, 3, 10, 2])
+  })
+})
+
+// A stop with a start is drawn by it, and the road trip drives the stored order, so a
+// stop joining a day from elsewhere is stored where the list will draw it.
+describe('timedSlot', () => {
+  const visit = (order_index: number, place_time: string | null, accommodation_id: number | null = null) =>
+    ({ order_index, accommodation_id, place: { place_time } })
+  const day = [visit(0, '09:00'), visit(1, '11:00'), visit(2, '14:00')]
+
+  it('leaves a stop without a start to the drop', () => {
+    expect(timedSlot(day, [], null, 1)).toBeNull()
+    expect(timedSlot(day, [], undefined)).toBeNull()
+    expect(timedSlot(day, [], 'soon')).toBeNull()
+  })
+
+  it('puts a stop between the stored stops its start falls between, wherever it was dropped', () => {
+    expect(timedSlot(day, [], '10:00')).toBe(1)
+    expect(timedSlot(day, [], '10:00', 2)).toBe(1)
+    expect(timedSlot(day, [], '10:00', 0)).toBe(1)
+    expect(timedSlot(day, [], '08:00')).toBe(0)
+    expect(timedSlot(day, [], '15:00', 0)).toBe(3)
+  })
+
+  it('keeps the drop among the stops without a time behind the same start', () => {
+    const loose = [visit(0, '09:00'), visit(1, null), visit(2, '11:00')]
+    expect(timedSlot(loose, [], '10:00')).toBe(2)
+    expect(timedSlot(loose, [], '10:00', 1)).toBe(1)
+  })
+
+  it('reads the day by order_index, not by the order the rows come in', () => {
+    const shuffled = [visit(2, '14:00'), visit(0, '09:00'), visit(1, '11:00')]
+    expect(timedSlot(shuffled, [], '12:00')).toBe(2)
+    expect(timedSlot([], [], '12:00')).toBe(0)
+  })
+
+  it('stores it right behind the stop the list draws it after on a day stored against its hours', () => {
+    // Stored 11:00 then 09:00: the list draws 09:00, 10:00, 11:00, so 10:00 goes behind 09:00.
+    expect(timedSlot([visit(0, '11:00'), visit(1, '09:00')], [], '10:00')).toBe(2)
+  })
+
+  it('counts the booked night the list hides, timed by its check-in', () => {
+    const nights = [{ id: 7, check_in: '15:00' }, { id: 8, check_in: null }]
+    const withCheckIn = [visit(0, '09:00'), visit(1, null, 7), visit(2, '16:00')]
+    expect(timedSlot(withCheckIn, nights, '12:00')).toBe(1)
+    expect(timedSlot(withCheckIn, nights, '15:30')).toBe(2)
+    // Without a check-in the night leads the day and stays in front.
+    const leading = [visit(0, null, 8), visit(1, '09:00')]
+    expect(timedSlot(leading, nights, '08:00')).toBe(1)
   })
 })

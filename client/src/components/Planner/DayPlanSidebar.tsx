@@ -35,7 +35,7 @@ import { isDayInAccommodationRange, getAccommodationAnchors, getDayBookendHotels
 import {
   TRANSPORT_TYPES, parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getDisplayTimeForDay, getTransportRouteEndpoints,
   getTransportForDay as _getTransportForDay, getMergedItems as _getMergedItems, isCarrierTransport, hasCarrierEndpointOnDay,
-  getAssignmentReservations,
+  getAssignmentReservations, timedSlot,
   type MergedItem,
 } from '../../utils/dayMerge'
 import { withinDriveRange } from '../../utils/geo'
@@ -81,6 +81,12 @@ interface DayPlanSidebarProps {
   /** The day route is computed by the planner page itself; kept for the existing call sites. */
   onRouteCalculated: (route: RouteResult | null) => void
   onAssignToDay: (placeId: number, dayId: number, position?: number) => void
+  /**
+   * Moves a stop over from another day, at a row index of that day or at its end, and
+   * keeps the vias drawn on that day on their legs. Without it the list moves the stop
+   * in the store and leaves the vias as they are.
+   */
+  onMoveToDay?: (assignmentId: number, fromDayId: number, toDayId: number, position?: number) => Promise<void>
   onRemoveAssignment: (dayId: number, assignmentId: number) => void
   onEditPlace: (place: Place, assignmentId?: number) => void
   onDeletePlace: (placeId: number) => void
@@ -141,7 +147,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   selectedDayId, selectedPlaceId, selectedAssignmentId,
   onSelectDay, onPlaceClick, onDayDetail, accommodations = [],
   onReorder, onReorderDays, onAddDay,
-  onAssignToDay, onRemoveAssignment, onEditPlace, onDeletePlace,
+  onAssignToDay, onMoveToDay, onRemoveAssignment, onEditPlace, onDeletePlace,
   reservations = [],
   visibleConnectionIds = [],
   onToggleConnection,
@@ -508,6 +514,19 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     const stored = (assignments[String(dayId)] || []).slice().sort((a, b) => a.order_index - b.order_index)
     const idx = target ? stored.findIndex(a => a.id === target.id) : -1
     return idx >= 0 ? idx : stored.length
+  }
+
+  // Moving a stop over from another day. One with a start is drawn by it wherever it
+  // is stored, and the road trip drives the stored order, so it is stored where the
+  // list will draw it rather than at the drop. One without a start makes the same call
+  // it always has, dropped where it was dropped or at the end of the day.
+  const moveToDay = (assignmentId: number, fromDayId: number, toDayId: number, dropAt?: number) => {
+    const moving = (assignments[String(fromDayId)] || []).find(a => a.id === assignmentId)
+    const slot = timedSlot(assignments[String(toDayId)] || [], accommodations, moving?.place?.place_time, dropAt) ?? dropAt
+    if (onMoveToDay) return onMoveToDay(assignmentId, fromDayId, toDayId, slot)
+    return slot === undefined
+      ? tripActions.moveAssignment(tripId, assignmentId, fromDayId, toDayId)
+      : tripActions.moveAssignment(tripId, assignmentId, fromDayId, toDayId, slot)
   }
 
   // The stop a drop on a note lands ahead of: the next place below the note.
@@ -1061,7 +1080,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
       const srcAssignment = (useTripStore.getState().assignments[String(fromDayId)] || []).find(a => a.id === Number(assignmentId))
       const capturedFromDayId = fromDayId
       const capturedOrderIndex = srcAssignment?.order_index ?? 0
-      tripActions.moveAssignment(tripId, Number(assignmentId), fromDayId, dayId)
+      moveToDay(Number(assignmentId), fromDayId, dayId)
         .then(() => {
           pushUndo?.(t('undo.moveDay'), async () => {
             await tripActions.moveAssignment(tripId, Number(assignmentId), dayId, capturedFromDayId, capturedOrderIndex)
@@ -1216,6 +1235,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     getMergedItems,
     storedPositionBefore,
     placeBelowNote,
+    moveToDay,
     mergedItemsMap,
     applyMergedOrder,
     handleMergedDrop,
@@ -1417,6 +1437,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     getMergedItems,
     storedPositionBefore,
     placeBelowNote,
+    moveToDay,
     mergedItemsMap,
     applyMergedOrder,
     handleMergedDrop,
@@ -1876,7 +1897,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                       } else if (fromReservationId) {
                         handleMergedDrop(day.id, 'transport', Number(fromReservationId), 'transport', transportId, isAfter, toLegIndex)
                       } else if (assignmentId && fromDayId !== day.id) {
-                        tripActions.moveAssignment(tripId, Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                        moveToDay(Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                       } else if (assignmentId) {
                         handleMergedDrop(day.id, 'place', Number(assignmentId), 'transport', transportId, isAfter, toLegIndex)
                       } else if (noteId && fromDayId !== day.id) {
@@ -1899,7 +1920,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                       setDropTargetKey(null); window.__dragData = null; return
                     }
                     if (assignmentId && fromDayId !== day.id) {
-                      tripActions.moveAssignment(tripId, Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                      moveToDay(Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                       setDraggingId(null); setDropTargetKey(null); dragDataRef.current = null; return
                     }
                     if (noteId && fromDayId !== day.id) {
@@ -2059,7 +2080,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                               } else if (fromReservationId) {
                                 handleMergedDrop(day.id, 'transport', Number(fromReservationId), 'place', assignment.id)
                               } else if (fromAssignmentId && fromDayId !== day.id) {
-                                tripActions.moveAssignment(tripId, Number(fromAssignmentId), fromDayId, day.id, storedPositionBefore(day.id, assignment)).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                                moveToDay(Number(fromAssignmentId), fromDayId, day.id, storedPositionBefore(day.id, assignment)).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                                 setDraggingId(null); setDropTargetKey(null); dragDataRef.current = null
                               } else if (fromAssignmentId) {
                                 handleMergedDrop(day.id, 'place', Number(fromAssignmentId), 'place', assignment.id)
@@ -2483,7 +2504,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                               } else if (fromReservationId) {
                                 handleMergedDrop(day.id, 'transport', Number(fromReservationId), 'transport', res.id, insertAfter, res.__leg?.index ?? null)
                               } else if (fromAssignmentId && fromDayId !== day.id) {
-                                tripActions.moveAssignment(tripId, Number(fromAssignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                                moveToDay(Number(fromAssignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                               } else if (fromAssignmentId) {
                                 handleMergedDrop(day.id, 'place', Number(fromAssignmentId), 'transport', res.id, insertAfter, res.__leg?.index ?? null)
                               } else if (noteId && fromDayId !== day.id) {
@@ -2667,7 +2688,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                             } else if (fromNoteId && fromNoteId !== String(note.id)) {
                               handleMergedDrop(day.id, 'note', Number(fromNoteId), 'note', note.id)
                             } else if (fromAssignmentId && fromDayId !== day.id) {
-                              tripActions.moveAssignment(tripId, Number(fromAssignmentId), fromDayId, day.id, storedPositionBefore(day.id, placeBelowNote(day.id, note.id))).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                              moveToDay(Number(fromAssignmentId), fromDayId, day.id, storedPositionBefore(day.id, placeBelowNote(day.id, note.id))).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                               setDraggingId(null); setDropTargetKey(null)
                             } else if (fromAssignmentId) {
                               handleMergedDrop(day.id, 'place', Number(fromAssignmentId), 'note', note.id)
@@ -2778,7 +2799,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                       }
                       if (!assignmentId && !noteId && !fromReservationId) { dragDataRef.current = null; window.__dragData = null; return }
                       if (assignmentId && fromDayId !== day.id) {
-                        tripActions.moveAssignment(tripId, Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
+                        moveToDay(Number(assignmentId), fromDayId, day.id).catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
                         setDraggingId(null); setDropTargetKey(null); dragDataRef.current = null; return
                       }
                       if (noteId && fromDayId !== day.id) {

@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-112
+// FE-TP-ROAD-001 to FE-TP-ROAD-115
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -2262,6 +2262,60 @@ describe('useTripPlanner road trip: corrections measured on the stored day', () 
 
     // Row 2 is stop 1: the via on the only leg is now behind the new stop.
     expect(rt.vias.reanchor).toHaveBeenCalledWith(5, { vias: [{ id: 1, after_order_index: 1 }], remove: [] })
+  })
+})
+
+describe('useTripPlanner road trip: a stop moved over under Days', () => {
+  const twoDays = () => {
+    seedTrip({
+      days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })],
+      assignments: {
+        '5': [stopAt(11, 5, 0), stopAt(13, 5, 1)],
+        '6': [stopAt(21, 6, 0), stopAt(22, 6, 1), stopAt(23, 6, 2)],
+      },
+    })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    // One via on each leg of the day the stop moves onto.
+    rt.vias.byDay = { 6: [via(1, 6, 0), via(2, 6, 1)] }
+  }
+
+  it('FE-TP-ROAD-113: landing in the middle of a day moves the vias behind it along', async () => {
+    // A stop with a start is stored among the stops its hour falls between, which is
+    // no longer the end of the day. Left alone, the via drawn for the second leg would
+    // shape the first leg out of the new stop.
+    twoDays()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.handleMoveToDay(13, 5, 6, 1) })
+
+    expect(actions.moveAssignment).toHaveBeenCalledWith(42, 13, 5, 6, 1)
+    expect(rt.vias.reanchor).toHaveBeenCalledWith(6, { vias: [{ id: 2, after_order_index: 2 }], remove: [] })
+    const moved = actions.moveAssignment.mock.invocationCallOrder[0] ?? 0
+    const corrected = rt.vias.reanchor.mock.invocationCallOrder[0] ?? 0
+    expect(moved).toBeLessThan(corrected)
+  })
+
+  it('FE-TP-ROAD-114: landing at the end of a day moves no via', async () => {
+    twoDays()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.handleMoveToDay(13, 5, 6) })
+
+    expect(actions.moveAssignment).toHaveBeenCalledWith(42, 13, 5, 6, undefined)
+    expect(rt.vias.reanchor).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-115: a move that fails is handed back and corrects nothing', async () => {
+    // The list reports it and leaves the undo out, so the planner must not swallow it.
+    twoDays()
+    actions.moveAssignment.mockRejectedValue(new Error('gone'))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => {
+      await expect(result.current.handleMoveToDay(13, 5, 6, 1)).rejects.toThrow('gone')
+    })
+
+    expect(rt.vias.reanchor).not.toHaveBeenCalled()
   })
 })
 

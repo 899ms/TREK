@@ -14,7 +14,7 @@ import { resolvePluginIcon } from '../../components/shared/PluginIcon'
 import { useTranslation, translateApiError } from '../../i18n'
 import { addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi, healthApi, airtrailApi, mapsApi, placesApi } from '../../api/client'
 import { getDayOrder } from '../../utils/dayOrder'
-import { TRANSPORT_TYPES } from '../../utils/dayMerge'
+import { TRANSPORT_TYPES, timedSlot } from '../../utils/dayMerge'
 import { isOvernightCategory } from '../../components/Roadtrip/stopKinds'
 import { parsedItemToDraft, isTransportItem, isUnplaceableItem, type BookingReviewDraft } from '../../components/Planner/parsedItemToDraft'
 import type { BookingImportPreviewItem } from '@trek/shared'
@@ -1007,6 +1007,24 @@ export function useTripPlanner() {
       return viaAt === undefined || viaAt === null ? true : viaAt < insertAt
     }
   }, [roadtripRoutes.days])
+
+  /**
+   * How a day's vias move when a place at `at` lands on it at row `position`, or at its
+   * end without one. Null when none do: appending moves nothing, and a place without
+   * coordinates is never a stop.
+   *
+   * Worked out before the stop lands, the same way the road-trip popup does it: once the
+   * list has shifted there is no record of which leg each via was drawn for. The
+   * predicate decides which side of the new stop a via falls on when it is dropped into
+   * the middle of a leg.
+   */
+  const viasAfterInsert = useCallback((dayId: number, position: number | undefined, at: { lat?: number | null; lng?: number | null } | undefined) => {
+    const stopsBefore = roadtripStopsOf(dayId)
+    // The position is a row index in the day list, the anchors count stops.
+    const insertAt = position === undefined ? stopsBefore.length : roadtripIndexOf(dayId, position)
+    if (insertAt >= stopsBefore.length || typeof at?.lat !== 'number' || typeof at?.lng !== 'number') return null
+    return reanchorAfterInsert(roadtripVias.byDay[dayId] ?? [], insertAt, viaLiesBefore(dayId, { lat: at.lat, lng: at.lng }))
+  }, [roadtripStopsOf, roadtripIndexOf, roadtripVias.byDay, viaLiesBefore])
 
   /**
    * Saves a corridor hit as a stop: the place itself, then its position in the day.
@@ -2234,24 +2252,13 @@ export function useTripPlanner() {
   const handleAssignToDay = useCallback(async (placeId: number, dayId?: number, position?: number) => {
     const target = dayId || selectedDayId
     if (!target) { toast.error(t('trip.toast.selectDay')); return }
-    // Worked out before the stop lands, the same way the road-trip popup does it:
-    // once the list has shifted there is no record of which leg each via was
-    // drawn for. Appending to the end moves nothing, so only a real insert needs
-    // the correction — and the predicate decides which side of the new stop a
-    // via falls on when it is dropped into the middle of a leg.
-    const stopsBefore = roadtripStopsOf(target)
-    // The position is a row index in the day list, the anchors count stops.
-    const insertAt = position === undefined ? stopsBefore.length : roadtripIndexOf(target, position)
     const place = places.find(p => p.id === placeId)
-    const plan = insertAt >= stopsBefore.length || typeof place?.lat !== 'number' || typeof place?.lng !== 'number'
-      ? null
-      : reanchorAfterInsert(
-        roadtripVias.byDay[target] ?? [],
-        insertAt,
-        viaLiesBefore(target, { lat: place.lat, lng: place.lng }),
-      )
+    // A place with a start of its own is drawn by it, so it is stored there too, the
+    // way a stop moved over from another day is. Without one it goes where it was put.
+    const slot = timedSlot(storedAssignments[String(target)] ?? [], tripAccommodations, place?.place_time, position) ?? position
+    const plan = viasAfterInsert(target, slot, place)
     try {
-      const assignment = await tripActions.assignPlaceToDay(tripId, target, placeId, position)
+      const assignment = await tripActions.assignPlaceToDay(tripId, target, placeId, slot)
       toast.success(t('trip.toast.assignedToDay'))
       if (plan) await roadtripVias.reanchor(target, plan)
       updateRouteForDay(target)
@@ -2263,7 +2270,24 @@ export function useTripPlanner() {
         })
       }
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : t('common.unknownError')) }
-  }, [selectedDayId, tripId, toast, updateRouteForDay, pushUndo, t, places, roadtripVias, roadtripStopsOf, roadtripIndexOf, viaLiesBefore])
+  }, [selectedDayId, tripId, toast, updateRouteForDay, pushUndo, t, places, storedAssignments, tripAccommodations, roadtripVias, viasAfterInsert])
+
+  /**
+   * Moves a stop from the day list onto another day, at a row of that day or at its
+   * end without one.
+   *
+   * It can land in the middle of a day whose road has been drawn, on the row it was
+   * dropped on or among the stops its start falls between. The vias of that day count
+   * stops, so every one behind the new stop would shape the leg before the one it was
+   * drawn on. They are moved the way a place added to the day moves them. Rejects when
+   * a write fails, so the list can say so and leave its undo out.
+   */
+  const handleMoveToDay = useCallback(async (assignmentId: number, fromDayId: number, toDayId: number, position?: number) => {
+    const place = (storedAssignments[String(fromDayId)] ?? []).find(a => a.id === assignmentId)?.place
+    const plan = viasAfterInsert(toDayId, position, place)
+    await tripActions.moveAssignment(tripId, assignmentId, fromDayId, toDayId, position)
+    if (plan) await roadtripVias.reanchor(toDayId, plan)
+  }, [tripId, tripActions, storedAssignments, roadtripVias, viasAfterInsert])
 
   const handleRemoveAssignment = useCallback(async (dayId: number, assignmentId: number) => {
     const state = useTripStore.getState()
@@ -2671,7 +2695,7 @@ export function useTripPlanner() {
     route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay,
     handleSelectDay, handlePlaceClick, handleMarkerClick, handleMapClick, handleMapContextMenu, openAddPlaceFromPoi, handlePoiClick,
     handleSavePlace, openPlaceEditor, handleDeletePlace, confirmDeletePlace, confirmDeletePlaces, confirmChangeCategory,
-    handleAssignToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, handleUpdateDayTitle,
+    handleAssignToDay, handleMoveToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, handleUpdateDayTitle,
     handleSaveReservation, handleSaveTransport, handleDeleteReservation,
     selectedPlace, dayOrderMap, dayPlaces,
     mapTileUrl, fontStyle, splashDone,

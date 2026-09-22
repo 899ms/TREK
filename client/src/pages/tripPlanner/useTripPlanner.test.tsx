@@ -1400,6 +1400,30 @@ describe('useTripPlanner — day plan CRUD', () => {
     expect(toasts.some(t => t.message === 'day is full')).toBe(true)
   })
 
+  it('FE-TP-HOOK-121: a place with a start of its own is stored where the day list draws it', async () => {
+    // The list sorts the day by start and the road trip drives the stored order, so
+    // 10:00 goes between 09:00 and 11:00 whether it was dropped at the end or on top.
+    const place = buildPlace({ id: 1, place_time: '10:00' })
+    const early = buildPlace({ id: 2, place_time: '09:00' })
+    const late = buildPlace({ id: 3, place_time: '11:00' })
+    seedTrip({
+      places: [place, early, late],
+      assignments: {
+        '7': [
+          buildAssignment({ id: 20, day_id: 7, place: early, order_index: 0 }),
+          buildAssignment({ id: 21, day_id: 7, place: late, order_index: 1 }),
+        ],
+      },
+    })
+
+    const { result } = await renderPlanner()
+    await act(async () => { await result.current.handleAssignToDay(1, 7) })
+    await act(async () => { await result.current.handleAssignToDay(1, 7, 0) })
+
+    expect(actions.assignPlaceToDay).toHaveBeenNthCalledWith(1, 42, 7, 1, 1)
+    expect(actions.assignPlaceToDay).toHaveBeenNthCalledWith(2, 42, 7, 1, 1)
+  })
+
   it('FE-TP-HOOK-066: removing an assignment can be undone back to its old position', async () => {
     const place = buildPlace({ id: 1, lat: 1, lng: 2 })
     seedTrip({

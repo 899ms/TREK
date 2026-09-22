@@ -356,3 +356,49 @@ export function getMergedItems(opts: {
 
   return applyChronoOrder(result.sort((a, b) => a.sortKey - b.sortKey), dayId, getDisplayTime)
 }
+
+/** A stored day row, as far as `timedSlot` reads it. */
+interface StoredVisit {
+  order_index: number
+  accommodation_id?: number | null
+  place?: { place_time?: string | null } | null
+}
+
+/**
+ * Where a stop joining a day is stored when it carries a start of its own, as an index
+ * into the day's stored rows sorted by order_index. Null when it has none: that stop
+ * goes where it was dropped, as it always has.
+ *
+ * The list draws a day by time (`applyChronoOrder`) and the road trip drives it in the
+ * order it is stored. Put at the end of the day, or wherever it was dropped, a stop with
+ * a start sat in one place on the list and in another on the road, and behind a later
+ * start the road trip reached it late. So it is stored right behind the row it will be
+ * drawn after. Among stops without a time it keeps the spot it was dropped on; where the
+ * drop and the start disagree, the start wins.
+ *
+ * Read over every stored row, the ones the list hides included, because those are what
+ * the index counts. A booked night is timed by its check-in, the way the server's time
+ * sort reads it, so a stop pinned before the check-in lands ahead of the hotel and one
+ * pinned after it behind. A night without one counts as a stop without a time, so a
+ * night that leads its day keeps leading it.
+ */
+export function timedSlot(
+  day: readonly StoredVisit[],
+  nights: readonly { id: number; check_in?: string | null }[],
+  start: string | null | undefined,
+  dropAt?: number | null,
+): number | null {
+  const minutes = parseTimeToMinutes(start)
+  if (minutes === null) return null
+  const stored = [...day].sort((a, b) => a.order_index - b.order_index)
+  const at = dropAt == null ? stored.length : Math.min(Math.max(dropAt, 0), stored.length)
+  const joining: StoredVisit = { order_index: -1 }
+  const startOf = (row: StoredVisit): number | null => {
+    if (row === joining) return minutes
+    const checkIn = row.accommodation_id == null ? null : nights.find(n => n.id === row.accommodation_id)?.check_in
+    return parseTimeToMinutes(row.place?.place_time ?? checkIn)
+  }
+  const drawn = chronoOrder([...stored.slice(0, at), joining, ...stored.slice(at)], startOf)
+  const before = drawn[drawn.indexOf(joining) - 1]
+  return before ? stored.indexOf(before) + 1 : 0
+}
