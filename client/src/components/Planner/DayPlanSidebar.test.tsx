@@ -3934,6 +3934,52 @@ describe('DayPlanSidebar', () => {
     openSpy.mockRestore()
   })
 
+  describe('a moving day with a flight between the two stays (#2476)', () => {
+    // Day 2 checks out of a Munich hotel and into a Hamburg one, and nothing else is
+    // planned on it. The booked night's own stop never reaches the list.
+    const movingDays = [
+      buildDay({ id: 10, date: '2026-11-03', title: 'Day 1' }),
+      buildDay({ id: 11, date: '2026-11-04', title: 'Day 2' }),
+      buildDay({ id: 12, date: '2026-11-05', title: 'Day 3' }),
+    ]
+    const stays: Accommodation[] = [
+      { id: 1, trip_id: 1, start_day_id: 10, end_day_id: 11, place_lat: 48.137, place_lng: 11.575, place_name: 'Hotel A' },
+      { id: 2, trip_id: 1, start_day_id: 11, end_day_id: 12, place_lat: 53.551, place_lng: 9.993, place_name: 'Hotel B' },
+    ]
+    const airport = (role: 'from' | 'to', name: string, lat: number, lng: number) =>
+      ({ role, sequence: role === 'from' ? 0 : 1, name, code: null, lat, lng, timezone: null, local_date: null, local_time: null })
+    const flight = (located: boolean) => buildReservation({
+      id: 77, type: 'flight', title: 'LH 2078', day_id: 11, end_day_id: 11,
+      reservation_time: '2026-11-04T15:15:00', reservation_end_time: '2026-11-04T17:20:00',
+      endpoints: located ? [airport('from', 'MUC', 48.353, 11.786), airport('to', 'HAM', 53.63, 9.988)] : [],
+    })
+
+    it('FE-PLANNER-DAYPLAN-222: offers no Google Maps or CoMaps route from one hotel to the other', () => {
+      for (const located of [true, false]) {
+        const { unmount } = render(<DayPlanSidebar {...makeDefaultProps({
+          days: movingDays, accommodations: stays, reservations: [flight(located)], selectedDayId: 11,
+        })} />)
+        // The route itself can still be shown; only the hand-offs, which could only
+        // ever describe a drive from Munich to Hamburg, are gone.
+        expect(screen.getByRole('button', { name: 'Route' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: 'Open in CoMaps' })).not.toBeInTheDocument()
+        unmount()
+      }
+    })
+
+    it('FE-PLANNER-DAYPLAN-223: the hotel legs run to the departure airport and from the arrival airport', async () => {
+      render(<DayPlanSidebar {...makeDefaultProps({
+        days: movingDays, accommodations: stays, reservations: [flight(true)], selectedDayId: 11, routeShown: true,
+      })} />)
+      await waitFor(() => expect(vi.mocked(calculateRouteWithLegs)).toHaveBeenCalledTimes(2))
+      const pairs = vi.mocked(calculateRouteWithLegs).mock.calls.map(c => c[0])
+      expect(pairs).toContainEqual([{ lat: 48.137, lng: 11.575 }, { lat: 48.353, lng: 11.786 }])
+      expect(pairs).toContainEqual([{ lat: 53.63, lng: 9.988 }, { lat: 53.551, lng: 9.993 }])
+      expect(pairs).not.toContainEqual([{ lat: 48.137, lng: 11.575 }, { lat: 53.551, lng: 9.993 }])
+    })
+  })
+
   it('FE-PLANNER-DAYPLAN-169: picking a whole-day travel mode persists it and redraws the map', async () => {
     const user = userEvent.setup()
     const { daysApi } = await import('../../api/client')

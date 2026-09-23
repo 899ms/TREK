@@ -66,7 +66,10 @@ export function optimizeDayOrder(
  * links that can label a pin with one. `dayHasCarrier` — a carrier transport
  * with a located endpoint on the day — keeps the no-time bookend default from
  * opening a leg out of a hotel only reached tonight or back into one already
- * left (#2157), same as the drawn route.
+ * left (#2157), same as the drawn route. `dayHasCarrierBooking`, any carrier
+ * booked on the day with or without coordinates, leaves a day without stops
+ * with nothing to export: the hotels at either end are joined by that booking,
+ * not by a road (#2476).
  */
 export function dayExportStops(
   day: Day,
@@ -75,8 +78,10 @@ export function dayExportStops(
   accommodations: Accommodation[],
   bookendFromAccommodation: boolean,
   dayHasCarrier?: boolean,
+  dayHasCarrierBooking?: boolean,
 ): NamedWaypoint[] {
   const located = dayAssignments.filter(a => a.place?.lat != null && a.place?.lng != null)
+  if (located.length === 0 && dayHasCarrierBooking) return []
   const stops = located.map(a => ({ lat: a.place!.lat!, lng: a.place!.lng!, name: a.place!.name }))
   const bookends = bookendFromAccommodation ? getDayBookendHotels(day, days, accommodations) : null
   const firstStop = located[0]
@@ -103,9 +108,10 @@ export function dayGoogleMapsUrl(
   accommodations: Accommodation[],
   bookendFromAccommodation: boolean,
   dayHasCarrier?: boolean,
+  dayHasCarrierBooking?: boolean,
 ): string | null {
   return generateGoogleMapsUrl(
-    dayExportStops(day, days, dayAssignments, accommodations, bookendFromAccommodation, dayHasCarrier),
+    dayExportStops(day, days, dayAssignments, accommodations, bookendFromAccommodation, dayHasCarrier, dayHasCarrierBooking),
   ) || null
 }
 
@@ -118,9 +124,10 @@ export function dayCoMapsUrl(
   bookendFromAccommodation: boolean,
   profile: RouteProfileKey,
   dayHasCarrier?: boolean,
+  dayHasCarrierBooking?: boolean,
 ): string | null {
   return generateCoMapsUrl(
-    dayExportStops(day, days, dayAssignments, accommodations, bookendFromAccommodation, dayHasCarrier),
+    dayExportStops(day, days, dayAssignments, accommodations, bookendFromAccommodation, dayHasCarrier, dayHasCarrierBooking),
     profile,
   ) || null
 }

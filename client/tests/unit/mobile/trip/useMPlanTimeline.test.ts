@@ -12,7 +12,7 @@ import { buildPlanner, buildTripActions } from '../../../helpers/mobileTrip'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { act, renderHook, waitFor } from '../../../helpers/render'
 
-// FE-MOB-PLTL-001 to FE-MOB-PLTL-045
+// FE-MOB-PLTL-001 to FE-MOB-PLTL-050
 
 // The connector calculation is its own hook with real OSRM calls — stubbed here so
 // the timeline sees exactly the legs a test wants to match against.
@@ -602,6 +602,29 @@ describe('useMPlanTimeline', () => {
     const { result } = await renderTimeline(makePlanner({ assignments: { '2': [vague] } }))
     act(() => { result.current.exportGoogleMaps() })
     expect(window.open).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-PLTL-050: a moving day that only holds its flight has no route to export (#2476)', async () => {
+    // Day 2 checks out of one hotel and into another, the flight in between saved
+    // without its airports. The exports used to open a drive between the two hotels.
+    const stays = [
+      { ...HOTEL, id: 72, start_day_id: 1, end_day_id: 2, place_name: 'Hotel A' },
+      { ...HOTEL, id: 73, start_day_id: 2, end_day_id: 3, place_name: 'Hotel B', place_lat: 53.55, place_lng: 9.99 },
+    ] as Accommodation[]
+    const flight = buildReservation({ id: 77, type: 'flight', title: 'LH 2078', day_id: 2, end_day_id: 2, reservation_time: '2026-05-02T15:15' })
+    const { result } = await renderTimeline(makePlanner({ assignments: {}, reservations: [flight], tripAccommodations: stays }))
+    expect(result.current.canExportRoute).toBe(false)
+    act(() => { result.current.exportGoogleMaps() })
+    act(() => { result.current.exportCoMaps() })
+    expect(window.open).not.toHaveBeenCalled()
+
+    // The same day without the booking is a drive from one hotel to the other.
+    const byRoad = await renderTimeline(makePlanner({ assignments: {}, reservations: [], tripAccommodations: stays }))
+    expect(byRoad.result.current.canExportRoute).toBe(true)
+    act(() => { byRoad.result.current.exportGoogleMaps() })
+    expect(window.open).toHaveBeenCalledWith(
+      'https://www.google.com/maps/dir/48,16.05/53.55,9.99', '_blank', 'noopener,noreferrer',
+    )
   })
 
   it('FE-MOB-PLTL-039: renames the day with a trimmed title', async () => {

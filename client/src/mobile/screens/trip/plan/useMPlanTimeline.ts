@@ -4,8 +4,8 @@ import { useRouteCalculation } from '../../../../hooks/useRouteCalculation'
 import { assignmentsApi, reservationsApi, weatherApi } from '../../../../api/client'
 import { usePluginStore } from '../../../../store/pluginStore'
 import { getDayBookendHotels } from '../../../../utils/dayOrder'
-import { getDisplayTimeForDay, getMergedItems, getTransportForDay, hasCarrierEndpointOnDay } from '../../../../utils/dayMerge'
-import { dayCoMapsUrl, dayGoogleMapsUrl, optimizeDayOrder } from '../lib/dayRoute'
+import { getDisplayTimeForDay, getMergedItems, getTransportForDay, hasCarrierEndpointOnDay, isCarrierTransport } from '../../../../utils/dayMerge'
+import { dayCoMapsUrl, dayExportStops, dayGoogleMapsUrl, optimizeDayOrder } from '../lib/dayRoute'
 import { buildTransitLeg, buildTransitNameIndex, type TransitLeg } from '../../../../components/Planner/transitLeg'
 import {
   buildPlanRows, breaksChronology, findUpNext, hotelChipsForDay, hotelLegsForDay, itemHasTime,
@@ -59,6 +59,12 @@ export function useMPlanTimeline(planner: TripPlanner) {
   const dayHasCarrier = useMemo(
     () => !!day && merged.some(it => it.type === 'transport' && hasCarrierEndpointOnDay(it.data, day.id)),
     [day, merged],
+  )
+  // Any carrier booked today, located or not. On a day without stops it is the move
+  // itself, so the exports have no road to hand over (#2476).
+  const dayHasCarrierBooking = useMemo(
+    () => merged.some(it => it.type === 'transport' && isCarrierTransport(it.data)),
+    [merged],
   )
 
   // Travel-time connectors (walk · distance · drive between consecutive places)
@@ -318,25 +324,35 @@ export function useMPlanTimeline(planner: TripPlanner) {
     }
   }, [day, dayAssignments, days, tripAccommodations, settings, dayHasCarrier, tripActions, tripId, pushUndo, updateRouteForDay, toast, t])
 
+  // A route needs two ends. With fewer the map hand-offs would open a lone pin or
+  // nothing at all, so the plan does not offer them (#2476).
+  const canExportRoute = useMemo(
+    () => !!day && dayExportStops(
+      day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
+      dayHasCarrier, dayHasCarrierBooking,
+    ).length >= 2,
+    [day, days, dayAssignments, tripAccommodations, settings, dayHasCarrier, dayHasCarrierBooking],
+  )
+
   const exportGoogleMaps = useCallback(() => {
     if (!day) return
     // Bookend the exported route with the day's accommodation the same way the
     // drawn route does — only when the leg is real (#1372, #1465).
     const url = dayGoogleMapsUrl(
       day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
-      dayHasCarrier,
+      dayHasCarrier, dayHasCarrierBooking,
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
-  }, [day, dayAssignments, days, tripAccommodations, settings, dayHasCarrier])
+  }, [day, dayAssignments, days, tripAccommodations, settings, dayHasCarrier, dayHasCarrierBooking])
 
   const exportCoMaps = useCallback(() => {
     if (!day) return
     const url = dayCoMapsUrl(
       day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
-      day.default_transport_mode ?? routeProfile, dayHasCarrier,
+      day.default_transport_mode ?? routeProfile, dayHasCarrier, dayHasCarrierBooking,
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
-  }, [day, dayAssignments, days, tripAccommodations, settings, routeProfile, dayHasCarrier])
+  }, [day, dayAssignments, days, tripAccommodations, settings, routeProfile, dayHasCarrier, dayHasCarrierBooking])
 
   const renameDay = useCallback((title: string) => {
     if (!day) return
@@ -408,7 +424,7 @@ export function useMPlanTimeline(planner: TripPlanner) {
     moveRow, removeAssignment, editAssignment, editTransport, openTransitJourney,
     moveRowTo,
     addPlace, addBooking, addTransport,
-    optimize, exportGoogleMaps, exportCoMaps, renameDay, fullPlaceOf,
+    optimize, canExportRoute, exportGoogleMaps, exportCoMaps, renameDay, fullPlaceOf,
     routeModeOptions, setLegMode, transitLegFor, planTransitLeg,
   }
 }

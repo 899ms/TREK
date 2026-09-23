@@ -170,7 +170,12 @@ export function buildDayRouteRuns(dayId: number, input: DayRouteInputs): DayRout
 
   // Transfer day with no activities: you check out of one accommodation and into
   // another, so there are no waypoints for withHotelBookends to attach a leg to.
-  if (runsWithHotel.length === 0 && drawMorning && drawEvening) {
+  // Not when a flight, train, ferry or coach is booked on the day, located or not:
+  // that booking IS the move, and the road from one hotel to the other is exactly
+  // the stretch nobody drove (#2476). One saved without its stations leaves no
+  // waypoint behind, so the gates above never see it; no line beats a wrong one.
+  const dayHasCarrierBooking = dayTransports.some(r => isCarrierTransport(r))
+  if (runsWithHotel.length === 0 && drawMorning && drawEvening && !dayHasCarrierBooking) {
     const m = hotelPt(bookends?.morning)
     const e = hotelPt(bookends?.evening)
     if (m && e && (m.lat !== e.lat || m.lng !== e.lng)) runsWithHotel.push([m, e])

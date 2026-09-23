@@ -1627,7 +1627,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           // useRouteCalculation) even with zero places. Mirror that exact gate here — two
           // distinct bookend hotels you actually slept in / sleep in tonight — so the route
           // tools appear when you click the day (#1297). A same-hotel rest day or a plain
-          // arrival/departure day has morning === evening and stays excluded.
+          // arrival/departure day has morning === evening and stays excluded. With a flight
+          // or train booked on it the map drops that leg and keeps only the drives to and
+          // from located stations, and the exports below have nothing to hand over (#2476).
           const transferMorning = routeBookends?.morning
           const transferEvening = routeBookends?.evening
           const hasHotelTransfer = !!(
@@ -1647,6 +1649,10 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
            */
           const dayExportStops = (): NamedWaypoint[] => {
             const dayStops = getDayAssignments(day.id).filter(a => a.place?.lat != null && a.place?.lng != null)
+            // A flight, train, ferry or coach on a day without stops is the move itself,
+            // located or not: the hotels at either end are joined by it, not by a road
+            // worth handing to a map app (#2476).
+            if (dayStops.length === 0 && (mergedItemsMap[day.id] || []).some(i => i.type === 'transport' && isCarrierTransport(i.data))) return []
             const stops = dayStops.map(a => ({ lat: a.place!.lat!, lng: a.place!.lng!, name: a.place!.name }))
             const first = dayStops[0] ? { isPlace: true, time: dayStops[0].place?.place_time ?? null, lat: dayStops[0].place!.lat!, lng: dayStops[0].place!.lng! } : undefined
             const lastAssignment = dayStops[dayStops.length - 1]
@@ -1662,6 +1668,10 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
               ? { lat: routeBookends.evening.place_lat, lng: routeBookends.evening.place_lng, name: routeBookends.evening.place_name } : null
             return [...(morning ? [morning] : []), ...stops, ...(evening ? [evening] : [])]
           }
+          const showRouteTools = (isSelected || (showRouteToolsWhenExpanded && isExpanded)) && routeToolsRoutable
+          // Built once, for the day the tools show on. A route needs two ends: with
+          // fewer the hand-offs would open a lone pin or nothing at all (#2476).
+          const exportStops = showRouteTools ? dayExportStops() : []
           // Is this day's inline route currently on? Mobile toggles it per day (its
           // own expandedRouteDayIds entry); desktop uses the global Route toggle on
           // the selected day (#1374).
@@ -2832,7 +2842,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                   </div>
 
                   {/* Routen-Werkzeuge (ausgewählter Tag, 2+ Orte — oder 1 Ort mit Hotel-Bookend #1330 — oder Hotel-zu-Hotel-Transfertag ohne Orte #1297) */}
-                  {(isSelected || (showRouteToolsWhenExpanded && isExpanded)) && routeToolsRoutable && (
+                  {showRouteTools && (
                     <div style={{ padding: '10px 16px 12px', borderTop: '1px solid var(--border-faint)', display: 'flex', flexDirection: 'column', gap: 7 }}>
                       <div style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
                         <button type="button"
@@ -2865,10 +2875,10 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                           {!narrowPanel && t('dayplan.route')}
                         </button>
                         {/* Open the day's stops as a route in Google Maps (planned order). #1255 */}
-                        <Tooltip label={t('planner.openGoogleMaps')} placement="top">
+                        {exportStops.length >= 2 && <Tooltip label={t('planner.openGoogleMaps')} placement="top">
                           <button type="button"
                             onClick={() => {
-                              const url = generateGoogleMapsUrl(dayExportStops())
+                              const url = generateGoogleMapsUrl(exportStops)
                               if (url) window.open(url, '_blank', 'noopener,noreferrer')
                             }}
                             aria-label={t('planner.openGoogleMaps')}
@@ -2881,14 +2891,14 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                           >
                             <GoogleMapsIcon size={14} />
                           </button>
-                        </Tooltip>
+                        </Tooltip>}
                         {/* The same day, handed to CoMaps for offline navigation (#1904). The
                             day's own travel mode rides along, so the route it builds walks
                             when the plan walks. */}
-                        <Tooltip label={t('planner.openCoMaps')} placement="top">
+                        {exportStops.length >= 2 && <Tooltip label={t('planner.openCoMaps')} placement="top">
                           <button type="button"
                             onClick={() => {
-                              const url = generateCoMapsUrl(dayExportStops(), day.default_transport_mode ?? routeProfile)
+                              const url = generateCoMapsUrl(exportStops, day.default_transport_mode ?? routeProfile)
                               if (url) window.open(url, '_blank', 'noopener,noreferrer')
                             }}
                             aria-label={t('planner.openCoMaps')}
@@ -2901,7 +2911,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                           >
                             <Compass size={14} strokeWidth={2} />
                           </button>
-                        </Tooltip>
+                        </Tooltip>}
                         {/* Icon-only, like the two map hand-offs beside it (#1981). It
                             was the one button here carrying a label with no room for
                             it: `flex: 1` alongside `padding: '6px 0'` meant the text

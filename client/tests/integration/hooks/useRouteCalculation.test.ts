@@ -966,4 +966,34 @@ describe('useRouteCalculation', () => {
     // Tonight's hotel is still where the day ends.
     expect(legs).toContainEqual([`${home.lat},${home.lng}`, `${hotel.lat},${hotel.lng}`]);
   });
+
+  it('FE-HOOK-ROUTE-035: #2476 a moving day with a flight saved without airports draws no hotel → hotel drive', async () => {
+    // FE-HOOK-ROUTE-016 with the flight the day was actually travelled on. It carries
+    // no coordinates, so nothing is left to draw, and the fallback drive from one
+    // hotel to the other is exactly the stretch that was flown.
+    const hotelA = { lat: 48.137, lng: 11.575 };
+    const hotelB = { lat: 53.551, lng: 9.993 };
+    const accommodations = [
+      { id: 1, start_day_id: 1, end_day_id: 2, place_lat: hotelA.lat, place_lng: hotelA.lng },
+      { id: 2, start_day_id: 2, end_day_id: 3, place_lat: hotelB.lat, place_lng: hotelB.lng },
+    ];
+    const flight = {
+      id: 80, type: 'flight', title: 'LH 2078', day_id: 2, end_day_id: 2,
+      reservation_time: '2026-11-04T15:15', reservation_end_time: '2026-11-04T17:20', endpoints: [],
+    };
+    const store = { assignments: {} } as unknown as TripStoreState;
+    useTripStore.setState({
+      assignments: {},
+      reservations: [flight],
+      days: [{ id: 1, day_number: 1 }, { id: 2, day_number: 2 }, { id: 3, day_number: 3 }],
+    } as unknown as Partial<TripStoreState>);
+
+    const { result } = renderHook(() =>
+      useRouteCalculation(store, 2, true, 'driving', accommodations as unknown as Parameters<typeof useRouteCalculation>[4])
+    );
+    await act(async () => {});
+
+    expect(result.current.route).toBeNull();
+    expect(calculateRouteWithLegs).not.toHaveBeenCalled();
+  });
 });

@@ -199,7 +199,13 @@ export function hotelLegsForDay(
   const legAt = (a: Accommodation | undefined, end: 'from' | 'to'): HotelLeg | null => {
     if (!a || a.place_lat == null || a.place_lng == null) return null
     const coord: [number, number] = [a.place_lat, a.place_lng]
-    const seg = routeSegments.find(s => sameCoord(end === 'from' ? s.from : s.to, coord))
+    // The morning leg is the first segment leaving the hotel, the evening leg the
+    // LAST one reaching it. Taking the first for both put an earlier drive that
+    // happens to end on the evening hotel's spot under the day's end, instead of
+    // the drive that closes the day (#2476).
+    const seg = end === 'from'
+      ? routeSegments.find(s => sameCoord(s.from, coord))
+      : [...routeSegments].reverse().find(s => sameCoord(s.to, coord))
     return seg ? { seg, name: accommodationName(a) } : null
   }
   return { top: legAt(morning, 'from'), bottom: legAt(evening, 'to') }

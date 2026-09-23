@@ -6,12 +6,13 @@ import {
   type TransportEntry,
 } from '../../../../src/mobile/screens/trip/plan/planTimelineModel'
 import { getDisplayTimeForDay, type MergedItem } from '../../../../src/utils/dayMerge'
+import { buildDayRouteRuns } from '../../../../src/components/Map/dayRoutePlan'
 import { buildAssignment, buildDayNote, buildPlace, buildReservation } from '../../../helpers/factories'
 import type {
   Accommodation, Assignment, Day, DayNote, Reservation, RouteSegment, TranslationFn,
 } from '../../../../src/types'
 
-// FE-MOB-PTLM-001 to FE-MOB-PTLM-044
+// FE-MOB-PTLM-001 to FE-MOB-PTLM-046
 
 const DAYS = [
   { id: 1, trip_id: 1, day_number: 1, date: '2026-05-01', title: null },
@@ -308,6 +309,61 @@ describe('planTimelineModel — hotel chips and legs', () => {
 
   it('FE-MOB-PTLM-027: returns no legs without an accommodation on the day', () => {
     expect(hotelLegsForDay(DAY2, DAYS, [], [seg([48.1, 16.1], [48.2, 16.2])])).toEqual({ top: null, bottom: null })
+  })
+
+  it('FE-MOB-PTLM-045: the evening leg is the last drive into the hotel, not the first (#2476)', () => {
+    // A stop planned on the hotel's own spot early in the day: the drive there reaches
+    // the hotel's coordinates first, but the day ends with the drive back from the park.
+    const hotel = accommodation({ id: 7, start_day_id: 1, end_day_id: 3, place_lat: 48.0, place_lng: 16.0 })
+    const out = seg([48.0, 16.0], [48.1, 16.1])
+    const toHotelSpot = seg([48.1, 16.1], [48.0, 16.0])
+    const onward = seg([48.0, 16.0], [48.2, 16.2])
+    const back = seg([48.2, 16.2], [48.0, 16.0])
+    const legs = hotelLegsForDay(DAY2, DAYS, [hotel], [out, toHotelSpot, onward, back])
+    expect(legs.top?.seg).toBe(out)
+    expect(legs.bottom?.seg).toBe(back)
+  })
+
+  describe('a moving day with a flight between the two stays (#2476)', () => {
+    // Day 2 checks out of Munich and into Hamburg; the flight sits between them.
+    const HOTEL_A = { lat: 48.137, lng: 11.575 }
+    const HOTEL_B = { lat: 53.551, lng: 9.993 }
+    const MUC = { lat: 48.353, lng: 11.786 }
+    const HAM = { lat: 53.63, lng: 9.988 }
+    const stays = [
+      accommodation({ id: 1, start_day_id: 1, end_day_id: 2, place_name: 'Hotel A', place_lat: HOTEL_A.lat, place_lng: HOTEL_A.lng }),
+      accommodation({ id: 2, start_day_id: 2, end_day_id: 3, place_name: 'Hotel B', place_lat: HOTEL_B.lat, place_lng: HOTEL_B.lng }),
+    ]
+    const flight = (located: boolean) => buildReservation({
+      id: 7, type: 'flight', title: 'LH 2078', day_id: 2, end_day_id: 2,
+      reservation_time: '2026-05-02T15:15', reservation_end_time: '2026-05-02T17:20',
+      endpoints: located
+        ? [
+            { role: 'from', sequence: 0, name: 'MUC', code: null, ...MUC, timezone: null, local_date: null, local_time: null },
+            { role: 'to', sequence: 1, name: 'HAM', code: null, ...HAM, timezone: null, local_date: null, local_time: null },
+          ]
+        : [],
+    })
+    // What the connector calculation hands the timeline: one segment per pair of
+    // neighbouring waypoints in each drawn run.
+    const legsOf = (reservations: Reservation[]) => {
+      const runs = buildDayRouteRuns(2, {
+        days: DAYS, assignments: {}, reservations, accommodations: stays, optimizeFromAccommodation: true,
+      })
+      const segments = runs.flatMap(run => run.slice(1).map((p, i) => seg([run[i].lat, run[i].lng], [p.lat, p.lng])))
+      return hotelLegsForDay(DAY2, DAYS, stays, segments)
+    }
+
+    it('FE-MOB-PTLM-046: shows no drive from one hotel to the other, above or below the flight', () => {
+      // Saved without its airports, the flight leaves nothing to connect: the plan
+      // used to show the whole Munich to Hamburg drive twice, around the flight.
+      expect(legsOf([flight(false)])).toEqual({ top: null, bottom: null })
+      // With them, the morning drive goes to the departure airport and the evening
+      // one comes from the arrival airport.
+      const located = legsOf([flight(true)])
+      expect(located.top).toMatchObject({ name: 'Hotel A', seg: { from: [HOTEL_A.lat, HOTEL_A.lng], to: [MUC.lat, MUC.lng] } })
+      expect(located.bottom).toMatchObject({ name: 'Hotel B', seg: { from: [HAM.lat, HAM.lng], to: [HOTEL_B.lat, HOTEL_B.lng] } })
+    })
   })
 })
 

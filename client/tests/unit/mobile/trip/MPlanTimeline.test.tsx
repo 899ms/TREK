@@ -9,7 +9,7 @@ import type { MergedItem } from '../../../../src/utils/dayMerge'
 import type { Assignment, Day, DayNote, Place, RouteSegment } from '../../../../src/types'
 import MPlanTimeline from '../../../../src/mobile/screens/trip/plan/MPlanTimeline'
 
-// FE-MOB-PLTL-001 to FE-MOB-PLTL-047
+// FE-MOB-PLTL-001 to FE-MOB-PLTL-049
 
 const mocks = vi.hoisted(() => ({
   tl: {} as Record<string, unknown>,
@@ -110,7 +110,9 @@ function buildTl(over: Record<string, unknown> = {}): MPlanTimelineController {
     addBooking: vi.fn(),
     addTransport: vi.fn(),
     optimize: vi.fn(async () => undefined),
+    canExportRoute: true,
     exportGoogleMaps: vi.fn(),
+    exportCoMaps: vi.fn(),
     renameDay: vi.fn(),
     fullPlaceOf: vi.fn(() => undefined as Place | undefined),
     routeModeOptions: [
@@ -581,6 +583,16 @@ describe('MPlanTimeline', () => {
       expect(mocks.tl.addTransport).toHaveBeenCalledTimes(1)
       expect(mocks.tl.optimize).toHaveBeenCalledTimes(1)
       expect(mocks.tl.exportGoogleMaps).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-PLTL-049: a day with no route to hand over offers no Google Maps or CoMaps tile (#2476)', () => {
+      // A moving day whose only content is the flight: the export would be a drive
+      // from one hotel to the other, so the two tiles are left out, not left dead.
+      renderTimeline({ canExportRoute: false }, {}, { mode: 'edit' })
+
+      expect(screen.queryByText('mobileTrip.googleMaps')).not.toBeInTheDocument()
+      expect(screen.queryByText('mobileTrip.coMaps')).not.toBeInTheDocument()
+      expect(screen.getByText('dayplan.optimize')).toBeInTheDocument()
     })
 
     it('FE-MOB-PLTL-034: the note tile is inert while no day is selected', () => {
