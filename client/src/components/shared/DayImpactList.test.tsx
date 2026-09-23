@@ -1,4 +1,4 @@
-// FE-COMP-DAYIMPACT-001 to FE-COMP-DAYIMPACT-003
+// FE-COMP-DAYIMPACT-001 to FE-COMP-DAYIMPACT-004
 import { describe, it, expect } from 'vitest'
 import { BedDouble, MapPin } from 'lucide-react'
 import { render, screen } from '../../../tests/helpers/render'
@@ -45,5 +45,22 @@ describe('DayImpactList', () => {
     // Hairlines between rows, not above the first.
     expect(rows[0].className).not.toContain('border-t')
     expect(rows[1].className).toContain('border-t')
+  })
+
+  it('FE-COMP-DAYIMPACT-004: the days themselves lead the list as chips, in both skins', () => {
+    render(<DayImpactList lines={lines} days={['Fri, Oct 9', 'Sat, Oct 10', '+2 more']} label="desk" />)
+    const desk = screen.getByRole('list', { name: 'desk' })
+    const [daysRow, stay] = Array.from(desk.querySelectorAll('li'))
+    expect(daysRow).toHaveAttribute('data-kind', 'days')
+    expect(Array.from(daysRow.querySelectorAll('div > span')).map(s => s.textContent)).toEqual(['Fri, Oct 9', 'Sat, Oct 10', '+2 more'])
+    expect(daysRow.querySelector('span')).toHaveClass('bg-warning-soft')
+    expect(stay).toHaveTextContent('Stay at Harbour Hotel')
+
+    render(<MDayImpactList lines={lines} days={['Fri, Oct 9']} label="phone" />)
+    const phoneRows = screen.getByRole('list', { name: 'phone' }).querySelectorAll('li')
+    expect(phoneRows).toHaveLength(3)
+    expect(phoneRows[0].className).not.toContain('border-t')
+    // The first content row sits under the day chips, so it gets the hairline.
+    expect(phoneRows[1].className).toContain('border-t')
   })
 })

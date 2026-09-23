@@ -239,6 +239,18 @@ describe('Trips e2e (real auth guard + temp SQLite)', () => {
     expect(db.prepare('SELECT end_date FROM trips WHERE id = ?').get(week.body.trip.id)).toEqual({ end_date: '2026-07-07' });
   });
 
+  it('200 update with an earlier end drops the last days, and the answer stays { trip }', async () => {
+    const week = await request(server).post('/api/trips').set('Cookie', sessionCookie(1))
+      .send({ title: 'Week', start_date: '2026-07-01', end_date: '2026-07-07' });
+    const kept = db.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY day_number LIMIT 5').all(week.body.trip.id);
+    const res = await request(server).put(`/api/trips/${week.body.trip.id}`).set('Cookie', sessionCookie(1))
+      .send({ end_date: '2026-07-05' });
+    expect(res.status).toBe(200);
+    expect(Object.keys(res.body)).toEqual(['trip']);
+    expect(res.body.trip).toMatchObject({ start_date: '2026-07-01', end_date: '2026-07-05', day_count: 5 });
+    expect(db.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY day_number').all(week.body.trip.id)).toEqual(kept);
+  });
+
   it('404 on a missing trip', async () => {
     const res = await request(server).get('/api/trips/77').set('Cookie', sessionCookie(1));
     expect(res.status).toBe(404);

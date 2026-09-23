@@ -129,7 +129,7 @@ export class TripsMcp {
 
   @Tool({
     name: 'update_trip',
-    description: 'Update an existing trip\'s details.',
+    description: 'Update an existing trip\'s details. Shortening a dated trip deletes its last days by position, with their planned places, notes and any stay that checks in or out on them; day plans move with the dates, so a later start with the same end also takes the last days. When a change removed days, the result lists them in removed_days (id, day_number and date as they stood before; reason overflow for a day past the new range, spare for an empty one).',
     inputSchema: {
       tripId: z.number().int().positive(),
       title: z.string().min(1).max(200).optional(),
@@ -184,9 +184,10 @@ export class TripsMcp {
     // update() re-anchors the budget before the trip row moves off the old
     // currency (#1543) and then runs the legacy updateTrip core.
     try {
-      const { updatedTrip } = await this.trips.update(tripId, ctx.userId, { title, description, ...dates, currency, is_archived, cover_image, day_count, reminder_days, date_shift_mode }, 'user');
+      const { updatedTrip, removedDays } = await this.trips.update(tripId, ctx.userId, { title, description, ...dates, currency, is_archived, cover_image, day_count, reminder_days, date_shift_mode }, 'user');
       this.guards.safeBroadcast(tripId, 'trip:updated', { trip: updatedTrip });
-      return ok({ trip: updatedTrip });
+      // Only when days went, so the answer to a rename or a longer trip stays as it was.
+      return ok({ trip: updatedTrip, ...(removedDays.length > 0 ? { removed_days: removedDays } : {}) });
     } catch (err) {
       if (err instanceof ValidationError) return errorResult(err.message);
       throw err;

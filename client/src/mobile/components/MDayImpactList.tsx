@@ -7,6 +7,7 @@ const PHONE: ImpactListSkin = {
   row: 'flex items-start gap-[10px] px-[11px] py-[9px]',
   divider: 'border-t border-[color:var(--m-rowbr)]',
   chip: 'mt-[1px] flex h-[26px] w-[26px] flex-none items-center justify-center rounded-full',
+  dayChip: 'rounded-full bg-[color:var(--m-ic)] px-[9px] py-[2px] text-[0.6875rem] font-semibold text-m-ink',
   iconSize: 13,
   text: 'text-[0.78125rem] font-semibold leading-snug',
   hint: 'mt-[2px] text-[0.6875rem] leading-snug text-m-muted',
@@ -25,6 +26,6 @@ const PHONE: ImpactListSkin = {
 }
 
 /** The phone's day impact list: DayImpactList drawn in the mobile tokens. */
-export default function MDayImpactList({ lines, label }: { lines: ImpactLine[]; label?: string }) {
-  return <DayImpactList lines={lines} label={label} skin={PHONE} />
+export default function MDayImpactList({ lines, days, label }: { lines: ImpactLine[]; days?: string[]; label?: string }) {
+  return <DayImpactList lines={lines} days={days} label={label} skin={PHONE} />
 }

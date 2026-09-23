@@ -109,4 +109,17 @@ Each row of the **Reorder days** dialog has a delete button; on a phone it sits 
 
 A trip always keeps at least one day, and deleting needs a connection. There is no undo, which is why the dialog spells out the consequences first.
 
+## Shortening a trip
+
+New dates lay the days of a trip out again. Plans follow their position: the first day of the plan takes the new start date, the second the date after it, and so on. When the new dates hold fewer days than the plan, the last days go, also when it was the start that moved. Empty days without a date go as well.
+
+Before such a save, the trip dialog (on a phone, the trip sheet) asks and lists the days that go, then what is on them:
+
+- **Planned places** stay in the place list of the trip.
+- **Notes**, day titles and day descriptions are deleted.
+- **Bookings** on those days stay under Bookings. With **Keep bookings on their dates**, a booking whose date is still part of the trip goes back onto that day; with **Shift everything** it stays without a day.
+- **A stay that checks in or out on one of those days** is removed as a whole, also for nights that are still part of the trip. Its booking and the expense of that booking stay under Bookings. The list shows the stay in red.
+
+When the start moved as well, the same step also asks how bookings follow the new dates. Nothing is asked when the days that go are empty, and there is no undo.
+
 **See also:** [Places-and-Search](Places-and-Search) · [Map-Features](Map-Features) · [Route-Optimization](Route-Optimization) · [Weather-Forecasts](Weather-Forecasts) · [Reservations-and-Bookings](Reservations-and-Bookings)

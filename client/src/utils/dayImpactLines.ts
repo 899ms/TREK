@@ -1,6 +1,7 @@
 import { BedDouble, CalendarCheck, CalendarClock, CalendarMinus, MapPin, StickyNote, Ticket, Type } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { DayContent, DayDeleteImpact } from './dayDeleteImpact'
+import type { TripRangeImpact } from './tripRangeImpact'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
@@ -21,17 +22,26 @@ export interface ImpactLine {
 }
 
 /**
- * The question the list answers. Deleting a day cancels a stay cleanly and lets
- * go of its bookings; other ways of losing days treat both differently, so the
- * hints are looked up per variant while the rows themselves stay the same.
+ * The question the list answers. Deleting a day cancels a stay cleanly, with
+ * its booking and expense. Shortening a trip removes the stay through the day
+ * rows instead and leaves its booking behind. So the hints are looked up per
+ * variant while the rows themselves stay the same.
  */
-export type ImpactVariant = 'deleteDay'
+export type ImpactVariant = 'deleteDay' | 'shrinkTrip'
+
+/** How bookings follow new dates, as the trip dialog lets the traveller choose. */
+export type ShiftMode = 'keep_bookings' | 'shift_all'
 
 const HINTS: Record<ImpactVariant, { bookings: string; stay: string; stayBooked: string }> = {
   deleteDay: {
     bookings: 'dayplan.deleteDayBookingsHint',
     stay: 'dayplan.deleteDayStayHint',
     stayBooked: 'dayplan.deleteDayStayBookedHint',
+  },
+  shrinkTrip: {
+    bookings: 'dashboard.shrinkBookingsHint',
+    stay: 'dashboard.shrinkStayHint',
+    stayBooked: 'dashboard.shrinkStayBookedHint',
   },
 }
 
@@ -40,8 +50,17 @@ const HINTS: Record<ImpactVariant, { bookings: string; stay: string; stayBooked:
  * money, then places, notes, day texts and bookings. Kinds with nothing in them
  * are left out.
  */
-export function impactLines(content: DayContent, t: Translate, variant: ImpactVariant): ImpactLine[] {
-  const hints = HINTS[variant]
+export function impactLines(
+  content: DayContent,
+  t: Translate,
+  variant: ImpactVariant,
+  options: { shiftMode?: ShiftMode } = {},
+): ImpactLine[] {
+  // With "shift everything" a booking stays glued to its day row, so one on a
+  // removed day keeps no day at all; the default puts it back by its date.
+  const hints = variant === 'shrinkTrip' && options.shiftMode === 'shift_all'
+    ? { ...HINTS.shrinkTrip, bookings: 'dashboard.shrinkBookingsShiftHint' }
+    : HINTS[variant]
   const lines: ImpactLine[] = content.stays.map(stay => ({
     key: `stay-${stay.id}`,
     icon: BedDouble,
@@ -92,6 +111,34 @@ export function deleteDayLines(impact: DayDeleteImpact, t: Translate, formatDate
   }
   if (lines.length === 0) {
     lines.push({ key: 'empty', icon: CalendarCheck, tone: 'muted', text: t('dayplan.deleteDayEmpty') })
+  }
+  return lines
+}
+
+/** Most day chips the list names before it sums up the rest. */
+export const MAX_DAY_CHIPS = 6
+
+/** The removed days as chip labels: the first few by name, the rest as "+n more". */
+export function dayChips(labels: string[], t: Translate, max = MAX_DAY_CHIPS): string[] {
+  if (labels.length <= max) return labels
+  return [...labels.slice(0, max), t('dashboard.shrinkMoreDays', { count: labels.length - max })]
+}
+
+/**
+ * The full list for the warning before a trip is shortened: what sits on the
+ * days that go, with the booking hint following the chosen shift mode, and a
+ * last row when a moved start still takes the last days.
+ */
+export function shrinkTripLines(impact: TripRangeImpact, t: Translate, shiftMode: ShiftMode = 'keep_bookings'): ImpactLine[] {
+  const lines = impactLines(impact.content, t, 'shrinkTrip', { shiftMode })
+  if (impact.startMoved) {
+    lines.push({
+      key: 'lastDays',
+      icon: CalendarClock,
+      tone: 'warning',
+      text: t('dashboard.shrinkLastDays'),
+      hint: t('dashboard.shrinkLastDaysHint'),
+    })
   }
   return lines
 }

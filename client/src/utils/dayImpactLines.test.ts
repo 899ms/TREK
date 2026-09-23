@@ -1,8 +1,9 @@
-// FE-UTIL-DAYLINES-001 to FE-UTIL-DAYLINES-004
+// FE-UTIL-DAYLINES-001 to FE-UTIL-DAYLINES-008
 import { describe, it, expect } from 'vitest'
-import { BedDouble, CalendarCheck } from 'lucide-react'
-import { deleteDayLines, impactLines } from './dayImpactLines'
+import { BedDouble, CalendarCheck, CalendarClock } from 'lucide-react'
+import { dayChips, deleteDayLines, impactLines, shrinkTripLines } from './dayImpactLines'
 import type { DayDeleteImpact } from './dayDeleteImpact'
+import type { TripRangeImpact } from './tripRangeImpact'
 
 const t = (key: string, params?: Record<string, string | number>) =>
   params ? `${key}(${Object.entries(params).map(([k, v]) => `${k}=${v}`).join(',')})` : key
@@ -52,5 +53,50 @@ describe('deleteDayLines', () => {
   it('FE-UTIL-DAYLINES-004: a day with nothing on it and no dates to move gets one quiet row', () => {
     const lines = deleteDayLines(nothing, t, formatDate)
     expect(lines).toEqual([{ key: 'empty', icon: CalendarCheck, tone: 'muted', text: 'dayplan.deleteDayEmpty' }])
+  })
+})
+
+describe('shrinkTripLines', () => {
+  const shrink = (content: Partial<TripRangeImpact['content']>, startMoved = false): TripRangeImpact => ({
+    removedDays: [],
+    startMoved,
+    content: { places: 0, notes: 0, texts: 0, bookings: 0, stays: [], ...content },
+  })
+
+  it('FE-UTIL-DAYLINES-005: the same rows, with the shortening hints: a removed stay leaves its booking behind', () => {
+    const lines = shrinkTripLines(shrink({ places: 2, stays: [{ id: 9, name: 'Harbour Hotel', booking: 'HH' }, { id: 10, name: 'Alma', booking: null }] }), t)
+    expect(lines.map(l => [l.key, l.tone, l.hint])).toEqual([
+      ['stay-9', 'danger', 'dashboard.shrinkStayBookedHint(booking=HH)'],
+      ['stay-10', 'danger', 'dashboard.shrinkStayHint'],
+      ['places', 'neutral', 'dayplan.impactPlacesHint'],
+    ])
+  })
+
+  it('FE-UTIL-DAYLINES-006: the booking hint follows the shift mode', () => {
+    const hint = (mode?: 'keep_bookings' | 'shift_all') => shrinkTripLines(shrink({ bookings: 2 }), t, mode)[0].hint
+    expect(hint()).toBe('dashboard.shrinkBookingsHint')
+    expect(hint('keep_bookings')).toBe('dashboard.shrinkBookingsHint')
+    expect(hint('shift_all')).toBe('dashboard.shrinkBookingsShiftHint')
+    // Deleting a day keeps its own hint whatever mode is passed along.
+    expect(impactLines(shrink({ bookings: 1 }).content, t, 'deleteDay', { shiftMode: 'shift_all' })[0].hint).toBe('dayplan.deleteDayBookingsHint')
+  })
+
+  it('FE-UTIL-DAYLINES-007: a moved start that still takes the last days gets a last row that says so', () => {
+    const lines = shrinkTripLines(shrink({ notes: 1 }, true), t)
+    expect(lines[lines.length - 1]).toEqual({
+      key: 'lastDays',
+      icon: CalendarClock,
+      tone: 'warning',
+      text: 'dashboard.shrinkLastDays',
+      hint: 'dashboard.shrinkLastDaysHint',
+    })
+    expect(shrinkTripLines(shrink({ notes: 1 }), t).map(l => l.key)).toEqual(['notes'])
+  })
+
+  it('FE-UTIL-DAYLINES-008: day chips name six days and sum up the rest', () => {
+    const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun', 'Day 8']
+    expect(dayChips(labels.slice(0, 6), t)).toEqual(labels.slice(0, 6))
+    expect(dayChips(labels, t)).toEqual([...labels.slice(0, 6), 'dashboard.shrinkMoreDays(count=2)'])
+    expect(dayChips(labels, t, 3)).toEqual(['Mon', 'Tue', 'Wed', 'dashboard.shrinkMoreDays(count=5)'])
   })
 })

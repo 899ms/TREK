@@ -1,3 +1,4 @@
+import { CalendarMinus } from 'lucide-react'
 import type { ImpactLine, ImpactTone } from '../../utils/dayImpactLines'
 
 /** The class names one shell draws the list with. */
@@ -7,6 +8,8 @@ export interface ImpactListSkin {
   /** Between two rows; the desktop card divides them itself. */
   divider: string
   chip: string
+  /** One removed day, named in the row above the content rows. */
+  dayChip: string
   iconSize: number
   text: string
   hint: string
@@ -19,6 +22,7 @@ const DESKTOP: ImpactListSkin = {
   row: 'flex items-start gap-3 px-3 py-2.5',
   divider: '',
   chip: 'mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg',
+  dayChip: 'rounded-full border border-edge-faint bg-surface px-2.5 py-0.5 text-caption font-medium text-content-secondary',
   iconSize: 15,
   text: 'text-body font-medium leading-snug',
   hint: 'mt-0.5 text-caption text-content-muted',
@@ -33,6 +37,11 @@ const DESKTOP: ImpactListSkin = {
 
 interface DayImpactListProps {
   lines: ImpactLine[]
+  /**
+   * The days themselves, as chips in a first row: when several days go at
+   * once, the list names them before it says what is on them.
+   */
+  days?: string[]
   /** Names the list for assistive tech; the dialog title usually says it already. */
   label?: string
   /** The phone passes its own; the default is the desktop card. */
@@ -46,12 +55,23 @@ interface DayImpactListProps {
  * skin, so the desktop dialog and the phone sheet share this markup and differ
  * only in their tokens.
  */
-export default function DayImpactList({ lines, label, skin = DESKTOP }: DayImpactListProps) {
+export default function DayImpactList({ lines, days = [], label, skin = DESKTOP }: DayImpactListProps) {
   if (lines.length === 0) return null
+  const offset = days.length > 0 ? 1 : 0
   return (
     <ul aria-label={label} className={skin.list}>
+      {offset > 0 && (
+        <li data-kind="days" className={skin.row}>
+          <span className={`${skin.chip} ${skin.chipTone.warning}`}>
+            <CalendarMinus size={skin.iconSize} strokeWidth={2} aria-hidden="true" />
+          </span>
+          <div className="flex min-w-0 flex-1 flex-wrap gap-1.5 pt-1">
+            {days.map((name, i) => <span key={`${i}-${name}`} className={skin.dayChip}>{name}</span>)}
+          </div>
+        </li>
+      )}
       {lines.map(({ key, icon: Icon, text, hint, tone }, i) => (
-        <li key={key} data-tone={tone} className={`${skin.row} ${i > 0 ? skin.divider : ''}`.trim()}>
+        <li key={key} data-tone={tone} className={`${skin.row} ${i + offset > 0 ? skin.divider : ''}`.trim()}>
           <span className={`${skin.chip} ${skin.chipTone[tone]}`}>
             <Icon size={skin.iconSize} strokeWidth={2} aria-hidden="true" />
           </span>

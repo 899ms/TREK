@@ -1,7 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import path from 'path';
 import { DatabaseService } from '../database/database.service';
-import { MAX_TRIP_DAYS, tripSpanDays, type ActiveTrip, type TrekWsPayload, type TrekWsTripEventName } from '@trek/shared';
+import {
+  MAX_TRIP_DAYS,
+  planDayGrid,
+  resolveDayGridRange,
+  tripSpanDays,
+  type ActiveTrip,
+  type DayGridPlan,
+  type DayGridRemoval,
+  type TrekWsPayload,
+  type TrekWsTripEventName,
+} from '@trek/shared';
 import { RealtimeService } from '../realtime/realtime.service';
 import { PermissionsService } from '../permissions/permissions.service';
 import type { Trip, User } from '../../types';
@@ -14,8 +24,6 @@ import { StorageService } from '../storage/storage.service';
 import { SettingsService } from '../settings/settings.service';
 import { NotFoundError, ValidationError } from '../common/domain-errors';
 import { TRIP_SELECT } from './trip-select';
-
-export const MS_PER_DAY = 86400000;
 
 /**
  * The date range is refused, not cut short: generateDays used to clip the day
@@ -68,6 +76,8 @@ export interface UpdateTripResult {
   newTitle: string;
   newReminder: number;
   oldReminder: number;
+  /** The day rows a changed range took away, as they stood before; empty when none went. */
+  removedDays: DayGridRemoval[];
 }
 
 export interface DeleteTripInfo {
@@ -173,121 +183,53 @@ export class TripsService {
 
   // ── Day generation ────────────────────────────────────────────────────────
 
-  generateDays(tripId: number | bigint | string, startDate: string | null, endDate: string | null, dayCount?: number) {
-    const existing = this.db.prepare('SELECT id, day_number, date FROM days WHERE trip_id = ?').all(tripId) as { id: number; day_number: number; date: string | null }[];
-    const setDayNumber = this.db.prepare('UPDATE days SET day_number = ? WHERE id = ?');
+  /**
+   * Lay the trip's day rows out for a range, by the shared planDayGrid rule the
+   * trip dialog warns by: the plan says which row takes which position and date
+   * and which rows go, and this carries it out. The two-phase numbering keeps
+   * UNIQUE(trip_id, day_number) quiet while rows swap places. A removed day
+   * takes its assignments, notes and every stay checking in or out on it along
+   * through the foreign keys, as it always has (#909). Returns the plan it ran.
+   */
+  generateDays(tripId: number | bigint | string, startDate: string | null, endDate: string | null, dayCount?: number): DayGridPlan {
+    return this.db.transaction(() => {
+      const existing = this.db.prepare(`
+        SELECT d.id, d.day_number, d.date,
+          EXISTS (SELECT 1 FROM day_assignments da WHERE da.day_id = d.id)
+            OR EXISTS (SELECT 1 FROM day_notes dn WHERE dn.day_id = d.id) AS has_plan_items
+        FROM days d WHERE d.trip_id = ?
+      `).all(tripId) as { id: number; day_number: number; date: string | null; has_plan_items: number }[];
+      const stays = this.db.prepare(`
+        SELECT dac.start_day_id, dac.end_day_id FROM day_accommodations dac
+        WHERE dac.start_day_id IN (SELECT id FROM days WHERE trip_id = ?)
+           OR dac.end_day_id IN (SELECT id FROM days WHERE trip_id = ?)
+      `).all(tripId, tripId) as { start_day_id: number; end_day_id: number }[];
 
-    // Helper: two-phase renumber to avoid UNIQUE(trip_id, day_number) collisions
-    function renumber(days: { id: number }[]) {
-      days.forEach((d, i) => setDayNumber.run(-(i + 1), d.id));
-      days.forEach((d, i) => setDayNumber.run(i + 1, d.id));
-    }
+      const plan = planDayGrid({
+        days: existing.map(d => ({ id: d.id, day_number: d.day_number, date: d.date, hasPlanItems: !!d.has_plan_items })),
+        stays,
+        startDate,
+        endDate,
+        dayCount,
+      });
 
-    if (!startDate || !endDate) {
-      // Nullify all dated days instead of deleting them — preserves assignments/notes/accommodations
-      const withDates = existing.filter(d => d.date);
-      if (withDates.length > 0) {
-        const nullify = this.db.prepare('UPDATE days SET date = NULL WHERE id = ?');
-        for (const d of withDates) nullify.run(d.id);
-      }
-      // Now all days are dateless — adjust count toward dayCount target
-      const allDays = this.db.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY day_number').all(tripId) as { id: number }[];
-      const targetCount = Math.min(Math.max(dayCount ?? (allDays.length || 7), 1), MAX_TRIP_DAYS);
-      const needed = targetCount - allDays.length;
-      if (needed > 0) {
-        const insert = this.db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (?, ?, NULL)');
-        for (let i = 0; i < needed; i++) insert.run(tripId, allDays.length + i + 1);
-      } else if (needed < 0) {
-        // Only trim trailing empty days to avoid destroying content
-        const candidates = this.db.prepare(
-          `SELECT d.id FROM days d
-           WHERE d.trip_id = ?
-             AND NOT EXISTS (SELECT 1 FROM day_assignments da WHERE da.day_id = d.id)
-             AND NOT EXISTS (SELECT 1 FROM day_notes dn WHERE dn.day_id = d.id)
-             AND NOT EXISTS (SELECT 1 FROM day_accommodations dac WHERE dac.start_day_id = d.id OR dac.end_day_id = d.id)
-           ORDER BY d.day_number DESC
-           LIMIT ?`
-        ).all(tripId, -needed) as { id: number }[];
-        const del = this.db.prepare('DELETE FROM days WHERE id = ?');
-        for (const d of candidates) del.run(d.id);
-      }
-      const remaining = this.db.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY day_number').all(tripId) as { id: number }[];
-      renumber(remaining);
-      return;
-    }
+      const dateBefore = new Map(existing.map(d => [d.id, d.date]));
+      const setDayNumber = this.db.prepare('UPDATE days SET day_number = ? WHERE id = ?');
+      const assignDay = this.db.prepare('UPDATE days SET date = ?, day_number = ? WHERE id = ?');
+      const insert = this.db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (?, ?, ?)');
+      const del = this.db.prepare('DELETE FROM days WHERE id = ?');
 
-    const [sy, sm, sd] = startDate.split('-').map(Number);
-    const startMs = Date.UTC(sy, sm - 1, sd);
-    const numDays = tripSpanDays(startDate, endDate);
-
-    const targetDates: string[] = [];
-    for (let i = 0; i < numDays; i++) {
-      const d = new Date(startMs + i * MS_PER_DAY);
-      const yyyy = d.getUTCFullYear();
-      const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
-      const dd = String(d.getUTCDate()).padStart(2, '0');
-      targetDates.push(`${yyyy}-${mm}-${dd}`);
-    }
-
-    // Split into dated (sorted by day_number = position) and dateless (spare pool)
-    const dated = existing.filter(d => d.date).sort((a, b) => a.day_number - b.day_number);
-    const dateless = existing.filter(d => !d.date).sort((a, b) => a.day_number - b.day_number);
-
-    // Phase 1: stamp all existing days with negative day_numbers to free up slots
-    const allExisting = [...dated, ...dateless];
-    allExisting.forEach((d, i) => setDayNumber.run(-(i + 1), d.id));
-
-    const assignDay = this.db.prepare('UPDATE days SET date = ?, day_number = ? WHERE id = ?');
-    const insert = this.db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (?, ?, ?)');
-
-    let datelessIdx = 0;
-
-    for (let i = 0; i < targetDates.length; i++) {
-      const date = targetDates[i];
-      if (i < dated.length) {
-        // Positional remap: existing dated day i gets new date — keeps all children
-        assignDay.run(date, i + 1, dated[i].id);
-      } else if (datelessIdx < dateless.length) {
-        // Reuse a dateless day — keeps its assignments, notes, etc.
-        assignDay.run(date, i + 1, dateless[datelessIdx].id);
-        datelessIdx++;
-      } else {
-        insert.run(tripId, i + 1, date);
-      }
-    }
-
-    // Overflow dated days (trip shrunk): delete them (issue #909).
-    // Cascade removes their assignments, notes, and accommodations.
-    const del = this.db.prepare('DELETE FROM days WHERE id = ?');
-    for (let i = targetDates.length; i < dated.length; i++) {
-      del.run(dated[i].id);
-    }
-
-    // Any remaining unused dateless days: drop the empty placeholders so day_count
-    // reflects the dated range, but keep ones that still hold content (assignments,
-    // notes, accommodations) — mirrors the dateless-path trimming above (#1083).
-    // Base must be max(targetDates.length, dated.length) to avoid colliding with
-    // positives already assigned by the main loop or the overflow loop above.
-    const isEmptyDay = this.db.prepare(
-      `SELECT NOT EXISTS (SELECT 1 FROM day_assignments da WHERE da.day_id = @id)
-            AND NOT EXISTS (SELECT 1 FROM day_notes dn WHERE dn.day_id = @id)
-            AND NOT EXISTS (SELECT 1 FROM day_accommodations dac WHERE dac.start_day_id = @id OR dac.end_day_id = @id) AS empty`
-    );
-    const maxAssigned = Math.max(targetDates.length, dated.length);
-    let keptDateless = 0;
-    for (let i = datelessIdx; i < dateless.length; i++) {
-      const empty = (isEmptyDay.get({ id: dateless[i].id }) as { empty: number }).empty;
-      if (empty) {
-        del.run(dateless[i].id);
-      } else {
-        setDayNumber.run(maxAssigned + keptDateless + 1, dateless[i].id);
-        keptDateless++;
-      }
-    }
-
-    // Final renumber to compact and eliminate any gaps/negatives
-    const remaining = this.db.prepare('SELECT id FROM days WHERE trip_id = ? ORDER BY day_number').all(tripId) as { id: number }[];
-    renumber(remaining);
+      existing.forEach((d, i) => setDayNumber.run(-(i + 1), d.id));
+      plan.rows.forEach((row, i) => {
+        if (row.id === null) insert.run(tripId, i + 1, row.date);
+        // A row that had no date and gets none is only renumbered, so an odd
+        // stored value is left as it was, the way the rebuild always treated it.
+        else if (row.date === null && !dateBefore.get(row.id)) setDayNumber.run(i + 1, row.id);
+        else assignDay.run(row.date, i + 1, row.id);
+      });
+      for (const gone of plan.removed) del.run(gone.id);
+      return plan;
+    })();
   }
 
   // ── Trip CRUD ─────────────────────────────────────────────────────────────
@@ -407,6 +349,7 @@ export class TripsService {
     if (trip.start_date && trip.end_date && newStart && newStart !== trip.start_date)
       this.vacay.shiftOwnerEntriesForTripWindow(trip.user_id, trip.start_date, trip.end_date, newStart);
 
+    let removedDays: DayGridRemoval[] = [];
     if (regenerate) {
       this.db.transaction(() => {
         // Accommodations have no absolute date columns, so their pre-change dates must be
@@ -415,7 +358,7 @@ export class TripsService {
           (this.db.prepare('SELECT id, date FROM days WHERE trip_id = ?').all(tripId) as { id: number; date: string | null }[])
             .map(d => [d.id, d.date]),
         );
-        this.generateDays(tripId, newStart || null, newEnd || null, dayCount);
+        removedDays = this.generateDays(tripId, newStart || null, newEnd || null, dayCount).removed;
         if (data.date_shift_mode === 'shift_all') {
           // Explicit "shift everything": bookings stay glued to their (re-dated) day rows,
           // so re-stamp reservation_time to follow — same rules as reorderDays/insertDay.
@@ -449,7 +392,7 @@ export class TripsService {
 
     const updatedTrip = this.db.prepare(`${TRIP_SELECT} WHERE t.id = :tripId`).get({ userId, tripId });
 
-    return { updatedTrip, changes, isAdminEdit, ownerEmail, newTitle, newReminder, oldReminder };
+    return { updatedTrip, changes, isAdminEdit, ownerEmail, newTitle, newReminder, oldReminder, removedDays };
   }
 
   /**
@@ -463,12 +406,9 @@ export class TripsService {
     const { start_date, end_date } = data;
     if (start_date && end_date && new Date(end_date) < new Date(start_date))
       throw new ValidationError('End date must be after start date');
-    const newStart = start_date !== undefined ? start_date : trip.start_date;
-    const newEnd = end_date !== undefined ? end_date : trip.end_date;
-    const dayCount = data.day_count ? Math.min(Math.max(Number(data.day_count) || 7, 1), MAX_TRIP_DAYS) : undefined;
-    const regenerate = newStart !== trip.start_date || newEnd !== trip.end_date || dayCount !== undefined;
-    if (regenerate && newStart && newEnd) assertTripSpan(newStart, newEnd);
-    return { newStart, newEnd, dayCount, regenerate };
+    const range = resolveDayGridRange(trip, data);
+    if (range.regenerate && range.newStart && range.newEnd) assertTripSpan(range.newStart, range.newEnd);
+    return range;
   }
 
   async update(tripId: string | number, userId: number, body: UpdateTripData, role: string) {
