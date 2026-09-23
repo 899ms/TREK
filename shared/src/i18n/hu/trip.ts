@@ -90,7 +90,10 @@ const trip: TranslationStrings = {
   'transit.walkLabel': 'Gyaloglás',
   'transit.searchHint':
     'Keress valós összeköttetéseket, és add hozzá őket közvetlenül a naphoz – adatok a Transitous révén.',
-  'trip.confirm.deletePlaceNight': 'A(z) „{name}” helyre foglalt éjszaka a hellyel együtt törlődik.',
-  'trip.confirm.deletePlaceBooked': 'A(z) „{name}” helyre foglalt éjszaka a hellyel együtt törlődik, a(z) „{booking}” foglalással és a hozzá kapcsolt kiadásokkal.',
+  'trip.confirm.deletePlaceNight': 'Ezzel a(z) „{name}” helyen foglalt szállás is törlődik.',
+  'trip.confirm.deletePlaceBooked':
+    'Ezzel a(z) „{name}” helyen foglalt szállás, a(z) „{booking}” foglalás és a hozzá kapcsolt kiadások is törlődnek.',
+  'trip.confirm.deletePlaceBookedSame':
+    'Ezzel a(z) „{name}” helyen foglalt szállás, a foglalása és a hozzá kapcsolt kiadások is törlődnek.',
 };
 export default trip;

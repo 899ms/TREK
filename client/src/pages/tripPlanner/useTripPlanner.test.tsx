@@ -1314,6 +1314,25 @@ describe('useTripPlanner — place CRUD', () => {
     expect(result.current.deletePlaceNote).toBeNull()
   })
 
+  it('FE-TP-HOOK-140: a booking named after its hotel is not quoted a second time', async () => {
+    const hotel = buildPlace({ id: 1, name: 'Rostock', lat: 54.09, lng: 12.1 })
+    seedTrip({
+      places: [hotel],
+      reservations: [buildReservation({ id: 9, type: 'hotel', title: 'Rostock', accommodation_id: 7 })],
+    })
+    vi.mocked(accommodationRepo.list).mockResolvedValue({
+      accommodations: [{ id: 7, trip_id: 42, place_id: 1, start_day_id: 5, end_day_id: 6 }] as never,
+    })
+
+    const { result } = await renderPlanner()
+    await waitFor(() => expect(result.current.tripAccommodations).toHaveLength(1))
+    const { result: i18n } = renderHook(() => useTranslation(), { wrapper })
+
+    act(() => { result.current.handleDeletePlace(1) })
+    expect(result.current.deletePlaceNote).toBe(i18n.current.t('trip.confirm.deletePlaceBookedSame', { name: 'Rostock' }))
+    expect(result.current.deletePlaceNote).toBe('This also deletes the stay booked at “Rostock”, its booking and any expense linked to it.')
+  })
+
   it('FE-TP-HOOK-119: a bulk delete warns once any of the places carries a night, booking or not', async () => {
     const hotel = buildPlace({ id: 1, name: 'Hotel Fjord', lat: 60.39, lng: 5.32 })
     const cafe = buildPlace({ id: 2, name: 'Cafe', lat: 1, lng: 2 })

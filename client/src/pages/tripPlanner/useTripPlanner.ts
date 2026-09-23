@@ -513,7 +513,8 @@ export function useTripPlanner() {
    * itself only names the place, and those are the rows the traveller least expects
    * to lose, so the dialog says so before the yes. The expense list is loaded with
    * the costs tab, not here, so the sentence speaks of any expense rather than
-   * counting them. Null when nothing beyond the place is at stake.
+   * counting them. A booking named after its hotel, which is how most are named,
+   * is not quoted a second time. Null when nothing beyond the place is at stake.
    */
   const bookedNightsNote = useCallback((placeIds: number[]): string | null => {
     const stays = tripAccommodations.filter(stay => stay.place_id != null && placeIds.includes(stay.place_id))
@@ -525,9 +526,10 @@ export function useTripPlanner() {
         ?? stay.reservation_title ?? null)
       .filter((title): title is string => !!title)
     const name = names.join(', ')
-    return bookings.length > 0
-      ? t('trip.confirm.deletePlaceBooked', { name, booking: bookings.join(', ') })
-      : t('trip.confirm.deletePlaceNight', { name })
+    if (bookings.length === 0) return t('trip.confirm.deletePlaceNight', { name })
+    return bookings.every(title => names.includes(title))
+      ? t('trip.confirm.deletePlaceBookedSame', { name })
+      : t('trip.confirm.deletePlaceBooked', { name, booking: bookings.join(', ') })
   }, [tripAccommodations, allPlaces, reservations, t])
   const deletePlaceNote = useMemo(
     () => (deletePlaceId ? bookedNightsNote([deletePlaceId]) : null),
