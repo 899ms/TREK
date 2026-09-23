@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bike, Bus, Car, CarTaxiFront, Check, ChevronDown, ChevronUp, Plane, Plus, Route, Sailboat, Ship, Train, TrainFront, TramFront, Trash2, X } from 'lucide-react'
 import MSheet from '../../../components/MSheet'
 import { useAddonStore } from '../../../../store/addonStore'
@@ -11,6 +11,7 @@ import CustomTimePicker from '../../../../components/shared/CustomTimePicker'
 import { BookingCodeInput } from '../../../../components/shared/BookingCode'
 import AirportSelect, { type Airport } from '../../../../components/Planner/AirportSelect'
 import LocationSelect, { type LocationPoint } from '../../../../components/Planner/LocationSelect'
+import { toLocationPicks } from '../../../../components/Planner/locationPicks'
 import TransitSearchPanel from '../../../../components/Planner/TransitSearchPanel'
 import { Eyebrow, FIELD_AREA_CLS, FIELD_CLS, FormSheetFooter, FormSheetHeader } from './PlSheetChrome'
 import PlFileAttach from './PlFileAttach'
@@ -158,6 +159,8 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
 
   const isBudgetEnabled = useAddonStore(s => s.isEnabled('budget'))
   const tripHasDates = Boolean(trip?.start_date && trip?.end_date)
+  // The trip's places, offered by every location field of the manual tab (#2468).
+  const locationPicks = useMemo(() => toLocationPicks(places), [places])
 
   const [form, setForm] = useState({ ...EMPTY })
   const [automated, setAutomated] = useState(false)
@@ -850,7 +853,7 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
                           <div className="mb-[8px] flex items-center gap-2">
                             <span className="flex-none font-geist text-[0.625rem] font-bold uppercase tracking-[.09em] text-m-faint">{roleLabel}</span>
                             <div className="min-w-0 flex-1">
-                              <LocationSelect value={wp.location} onChange={l => updateWp({ location: l || null })} />
+                              <LocationSelect value={wp.location} onChange={l => updateWp({ location: l || null })} places={locationPicks} />
                             </div>
                             {!isFirst && !isLast && (
                               <button type="button" onClick={() => setTrainWaypoints(prev => prev.filter((_, j) => j !== i))} aria-label={t('common.delete')} className="flex-none text-m-faint">
@@ -928,9 +931,9 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
               <>
                 {/* From / To endpoints (non-flight / non-train) */}
                 <Eyebrow className="mb-[5px] mt-3 uppercase">{t('reservations.meta.from')}</Eyebrow>
-                <LocationSelect value={fromPick.location || null} onChange={l => setFromPick({ location: l || undefined })} />
+                <LocationSelect value={fromPick.location || null} onChange={l => setFromPick({ location: l || undefined })} places={locationPicks} />
                 <Eyebrow className="mb-[5px] mt-3 uppercase">{t('reservations.meta.to')}</Eyebrow>
-                <LocationSelect value={toPick.location || null} onChange={l => setToPick({ location: l || undefined })} />
+                <LocationSelect value={toPick.location || null} onChange={l => setToPick({ location: l || undefined })} places={locationPicks} />
 
                 {/* Stops along the drive — cars only (#1797). The rental frame above stays the
                     pick-up and return; these are the places in between, in order. */}
@@ -969,6 +972,7 @@ export default function MTransportFormSheet({ planner, onOpenExpense }: MTranspo
                             <LocationSelect
                               value={stop.location}
                               onChange={l => setCarStops(prev => prev.map((s, j) => (j === i ? { ...s, location: l || null } : s)))}
+                              places={locationPicks}
                             />
                           </div>
                           <div className="w-[92px] shrink-0">

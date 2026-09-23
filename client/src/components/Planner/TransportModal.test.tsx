@@ -41,8 +41,13 @@ vi.mock('./AirportSelect', () => ({
 }));
 
 vi.mock('./LocationSelect', () => ({
-  default: ({ onChange }: { onChange: (l: any) => void }) => (
-    <input data-testid="location-select" type="text" onChange={e => onChange({ name: e.target.value, lat: 0, lng: 0, address: null })} />
+  default: ({ onChange, places }: { onChange: (l: any) => void; places?: { name: string }[] }) => (
+    <input
+      data-testid="location-select"
+      data-picks={(places ?? []).map(p => p.name).join('|')}
+      type="text"
+      onChange={e => onChange({ name: e.target.value, lat: 0, lng: 0, address: null })}
+    />
   ),
 }));
 
@@ -1437,5 +1442,30 @@ describe('TransportModal', () => {
       expect(payload.metadata.legs.map((l: { confirmation_number?: string }) => l.confirmation_number)).toEqual(['ABC123', 'XYZ789']);
       expect(payload.confirmation_number).toBe('BOOK1');
     });
+  });
+
+  it('FE-PLANNER-TRANSMODAL-071: the manual From and To fields offer the trip places that have a location, each once (#2468)', async () => {
+    const places = [
+      buildPlace({ id: 1, name: 'Louvre', lat: 48.86, lng: 2.33 }),
+      buildPlace({ id: 2, name: 'No pin yet', lat: null, lng: null }),
+      buildPlace({ id: 3, name: 'Louvre', lat: 48.86, lng: 2.33 }),
+    ];
+    render(<TransportModal {...defaultProps} places={places} />);
+    await userEvent.click(screen.getByRole('button', { name: /^Bus$/i }));
+
+    const fields = screen.getAllByTestId('location-select');
+    expect(fields).toHaveLength(2);
+    for (const field of fields) expect(field).toHaveAttribute('data-picks', 'Louvre');
+  });
+
+  it('FE-PLANNER-TRANSMODAL-072: every train station field offers the trip places too', async () => {
+    const places = [buildPlace({ id: 1, name: 'Berlin Hbf', lat: 52.52, lng: 13.37 })];
+    render(<TransportModal {...defaultProps} places={places} />);
+    await userEvent.click(screen.getByRole('button', { name: /^Train$/i }));
+    await userEvent.click(screen.getByRole('button', { name: /Add stop/i }));
+
+    const stations = screen.getAllByTestId('location-select');
+    expect(stations).toHaveLength(3);
+    for (const station of stations) expect(station).toHaveAttribute('data-picks', 'Berlin Hbf');
   });
 });

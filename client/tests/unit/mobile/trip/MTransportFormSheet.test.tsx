@@ -65,9 +65,10 @@ vi.mock('../../../../src/components/Planner/AirportSelect', () => ({
 }))
 
 vi.mock('../../../../src/components/Planner/LocationSelect', () => ({
-  default: ({ value, onChange }: { value: { name: string } | null; onChange: (l: unknown) => void }) => (
+  default: ({ value, onChange, places }: { value: { name: string } | null; onChange: (l: unknown) => void; places?: { name: string }[] }) => (
     <input
       aria-label="location-select"
+      data-picks={(places ?? []).map(p => p.name).join('|')}
       value={value?.name ?? ''}
       onChange={e => onChange(LOCATIONS[e.target.value] ?? null)}
     />
@@ -1020,5 +1021,20 @@ describe('MTransportFormSheet', () => {
       expect(legs.map(l => l.confirmation_number)).toEqual(['ABC123', 'XYZ789'])
       expect(payload.confirmation_number).toBe('BOOK1')
     })
+  })
+
+  it('FE-MOB-TRFRM-053: the manual From and To fields offer the trip places that have a location, each once (#2468)', () => {
+    renderSheet(makePlanner({
+      places: [
+        { id: 1, name: 'Fushimi Inari', lat: 34.97, lng: 135.77 },
+        { id: 2, name: 'No pin yet', lat: null, lng: null },
+        { id: 3, name: 'Fushimi Inari', lat: 34.97, lng: 135.77 },
+      ],
+    }))
+    fireEvent.click(screen.getByRole('button', { name: 'reservations.type.bus' }))
+
+    const fields = locationInputs()
+    expect(fields).toHaveLength(2)
+    for (const field of fields) expect(field).toHaveAttribute('data-picks', 'Fushimi Inari')
   })
 })
