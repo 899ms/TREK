@@ -214,6 +214,24 @@ export type AssetInfo = {
 }
 
 /**
+ * Why a request to a provider never got an answer, worded for the settings card.
+ *
+ * undici rejects with a bare "fetch failed" and keeps the reason on `cause`
+ * (an unknown host, a refused connection, a self-signed certificate), so the
+ * message alone gave the user nothing to act on (#2475). The first cause that
+ * says something is appended; an error without one reads exactly as before.
+ */
+export function describeFetchFailure(err: unknown): string {
+    if (!(err instanceof Error)) return 'Connection failed';
+    let cause: unknown = err.cause;
+    for (let depth = 0; depth < 3 && cause instanceof Error; depth++) {
+        if (cause.message && cause.message !== err.message) return `${err.message} (${cause.message})`;
+        cause = cause.cause;
+    }
+    return err.message;
+}
+
+/**
  * Proxy an upstream asset straight to the client.
  *
  * It writes status, headers and body onto the Express response itself and is

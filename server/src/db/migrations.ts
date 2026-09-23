@@ -5226,6 +5226,37 @@ function runMigrations(db: Database.Database): void {
       const seated = reseatBookedNights(db);
       if (seated > 0) console.log(`[DB] Seated ${seated} booked night(s) at the head of their day`);
     },
+
+    /*
+     * Immich learns the switch Synology, AirTrail and Dawarich already have: a
+     * server behind a self-signed certificate can be trusted per user (#2475).
+     * Off by default, and only 1 counts as on.
+     *
+     * The two settings rows are the toggle for it and the auto-upload toggle
+     * migration 112 meant to add. That one only ran where the Immich provider
+     * row already existed, which on a fresh install it never did (the seeds run
+     * after the migrations), so fresh installs never showed the upload toggle.
+     * Both rows are in seeds.ts as well for the same reason; here they reach the
+     * installs that already have the provider row. Re-runnable.
+     */
+    () => {
+      const hasColumn = db
+        .prepare("SELECT 1 FROM pragma_table_info('users') WHERE name = 'immich_allow_insecure_tls'")
+        .get();
+      if (!hasColumn) {
+        db.exec('ALTER TABLE users ADD COLUMN immich_allow_insecure_tls INTEGER NOT NULL DEFAULT 0');
+      }
+      const hasImmich = db.prepare("SELECT 1 FROM photo_providers WHERE id = 'immich'").get();
+      if (hasImmich) {
+        db.exec(`
+          INSERT OR IGNORE INTO photo_provider_fields
+            (provider_id, field_key, label, input_type, placeholder, hint, required, secret, settings_key, payload_key, sort_order)
+          VALUES
+            ('immich', 'immich_allow_insecure_tls', 'skipSSLVerification', 'checkbox', NULL, NULL, 0, 0, 'allow_insecure_tls', 'allow_insecure_tls', 2),
+            ('immich', 'immich_auto_upload', 'immichAutoUpload', 'checkbox', NULL, NULL, 0, 0, 'auto_upload', 'auto_upload', 5)
+        `);
+      }
+    },
   ];
 
   if (currentVersion < migrations.length) {

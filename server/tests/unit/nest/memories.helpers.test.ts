@@ -10,6 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   dayStartEpochSeconds,
+  describeFetchFailure,
   isWithinLocalDayRange,
   shiftCalendarDay,
   sortAssetsByTakenAtDesc,
@@ -147,5 +148,31 @@ describe('dayStartEpochSeconds', () => {
     const instant = '2026-03-15T06:00:00Z';
     expect(dayStartEpochSeconds(instant, 600)).toBe(Math.floor(Date.parse(instant) / 1000));
     expect(Number.isNaN(dayStartEpochSeconds('nope'))).toBe(true);
+  });
+});
+
+describe('describeFetchFailure', () => {
+  it('MEM-FETCH-001: appends the reason undici keeps on cause', () => {
+    const err = new TypeError('fetch failed', { cause: new Error('self-signed certificate') });
+    expect(describeFetchFailure(err)).toBe('fetch failed (self-signed certificate)');
+  });
+
+  it('MEM-FETCH-002: an error without a cause reads exactly as before', () => {
+    expect(describeFetchFailure(new Error('ECONNREFUSED'))).toBe('ECONNREFUSED');
+  });
+
+  it('MEM-FETCH-003: looks past a silent or repeated cause to the first one that says something', () => {
+    const deep = new Error('fetch failed', {
+      cause: new Error('', { cause: new Error('fetch failed', { cause: new Error('getaddrinfo ENOTFOUND immich.lan') }) }),
+    });
+    expect(describeFetchFailure(deep)).toBe('fetch failed (getaddrinfo ENOTFOUND immich.lan)');
+  });
+
+  it('MEM-FETCH-004: a cause that is not an Error is ignored', () => {
+    expect(describeFetchFailure(new Error('fetch failed', { cause: 'DEPTH_ZERO_SELF_SIGNED_CERT' }))).toBe('fetch failed');
+  });
+
+  it('MEM-FETCH-005: a rejection that is not an Error falls back to the old wording', () => {
+    expect(describeFetchFailure('boom')).toBe('Connection failed');
   });
 });
