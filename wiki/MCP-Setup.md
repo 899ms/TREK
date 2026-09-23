@@ -78,9 +78,11 @@ TREK answers the discovery documents both at the origin (`/.well-known/oauth-aut
 
 ### Redirect URI
 
-The redirect URI belongs to **your client, not to TREK**: it is the address the client wants the browser sent back to, so it is never your TREK URL and never `/mcp`. Open WebUI, for example, uses `{your Open WebUI URL}/oauth/clients/{connection id}/callback`, the Claude clients use their own callbacks, and the editors use `http://localhost`. When the client supports dynamic registration, let it register itself and the URI is filled in for you. A mismatch shows up at the consent step as `invalid_request: Unregistered redirect_uri`.
+The redirect URI belongs to **your client, not to TREK**: it is the address the client wants the browser sent back to, so it is never your TREK URL and never `/mcp`. Open WebUI, for example, uses `{your Open WebUI URL}/oauth/clients/mcp:{ID}/callback`, where `{ID}` is the ID of the tool server connection with `mcp:` put in front of it (matched exactly, capitals included), the Claude clients use their own callbacks, and the editors use `http://localhost`. When the client supports dynamic registration, let it register itself and the URI is filled in for you. A mismatch shows up at the consent step as `invalid_request: Unregistered redirect_uri`.
 
 TREK accepts `https://` URIs, plain HTTP only on `localhost` or `127.0.0.1`, and private custom schemes such as `myapp://callback`. A client running on a LAN address over plain HTTP is refused for that reason; put it behind HTTPS.
+
+**Open WebUI.** Add TREK as an MCP (Streamable HTTP) tool server with the URL `https://<your-trek-instance>/mcp` and OAuth 2.1 as the auth type, click **Register Client**, save, then open the connection again and authorize. Open WebUI registers the client and trades the code for a token from its own server rather than from your browser, so the Open WebUI container has to reach your public TREK address. Its **WebUI URL** (Admin Panel → Settings → General) has to be the public `https://` address, otherwise the redirect URI goes out as plain HTTP and TREK refuses it.
 
 ### Pre-created OAuth clients
 
