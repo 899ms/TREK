@@ -223,9 +223,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Czas policzony silnikiem omijania, nie głównym.',
   'roadtrip.alt.notHeld': 'Serwer tras podróży nie poprowadzi tą drogą, więc nie została zapisana.',
   'roadtrip.alt.ferryNotHeld':
-    'Ta droga prowadzi promem. Dodaj prom jako rezerwację transportu, a trasa za nim pójdzie.',
+    'Ta droga prowadzi promem. Dodaj prom jako rezerwację transportu, a trasa za nim pójdzie. Jeśli przypływa następnego dnia, przenieś przystanki z drugiego brzegu na ten dzień.',
   'roadtrip.alt.legChanged': 'Ten odcinek zmienił się podczas sprawdzania, więc nic nie zostało zapisane.',
   'roadtrip.alt.offline': 'Inne drogi zapisują się tylko online. Połącz się ponownie, aby wybrać tę.',
+  'roadtrip.alt.otherEngineStandard': 'Czas policzony silnikiem głównym, nie tym, którym planowany jest ten odcinek.',
+  'roadtrip.alt.avoidNotHeld':
+    'Podróż pojedzie tą drogą tylko wtedy, gdy w jej ustawieniach w sekcji „{setting}” zaznaczono „{class}”.',
+  'roadtrip.alt.checking': 'Sprawdzanie tej drogi w serwerze tras podróży…',
+  'roadtrip.alt.standIn':
+    'Silnik omijania nie odpowiedział dla tego odcinka, więc narysował go silnik główny. Silnik omijania jest pytany ponownie.',
   'roadtrip.day': 'Dzień {number}',
   'roadtrip.quietDay.empty': 'Brak przystanków — upuść tutaj',
   'roadtrip.quietDay.one': 'Na razie tylko {name} — upuść tutaj przystanek',
@@ -279,7 +285,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Odbiór {time}',
   'roadtrip.ride.return': 'Zwrot {time}',
   'roadtrip.ride.open': 'Otwórz rezerwację',
-  'roadtrip.ride.undated': 'Rezerwacja {title} nie ma daty, więc trasa jej nie uwzględnia.',
+  'roadtrip.ride.undated': 'Rezerwacja {title} nie przypada na żaden dzień tej podróży, więc trasa jej nie uwzględnia.',
   'roadtrip.bookings.loose': 'Zarezerwowane też tego dnia',
 };
 export default roadtrip;

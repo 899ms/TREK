@@ -1418,7 +1418,7 @@ describe('RoadtripSidebar with the drive in from the day before (#2461)', () => 
       wrap(<RoadtripSidebar routes={routes()} reservations={reservations} onOpenBooking={onOpenBooking} />)
 
       const notice = screen.getByRole('status')
-      expect(within(notice).getByText('IJmuiden to Newcastle has no date, so the drive does not use it.')).toBeInTheDocument()
+      expect(within(notice).getByText('IJmuiden to Newcastle is on none of this trip’s days, so the drive does not use it.')).toBeInTheDocument()
       expect(within(notice).getAllByRole('listitem')).toHaveLength(1)
       fireEvent.click(within(notice).getByRole('button', { name: 'Open booking' }))
       expect(onOpenBooking).toHaveBeenCalledWith(70)
@@ -1426,7 +1426,7 @@ describe('RoadtripSidebar with the drive in from the day before (#2461)', () => 
 
     it('FE-ROADTRIP-SIDEBAR-063: says so without a button where bookings cannot be opened, and says nothing when every ride has a day', () => {
       const reader = wrap(<RoadtripSidebar routes={routes()} reservations={[ferry({})]} />)
-      expect(screen.getByText('IJmuiden to Newcastle has no date, so the drive does not use it.')).toBeInTheDocument()
+      expect(screen.getByText('IJmuiden to Newcastle is on none of this trip’s days, so the drive does not use it.')).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Open booking' })).toBeNull()
       reader.unmount()
 

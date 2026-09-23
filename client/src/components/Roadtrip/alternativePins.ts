@@ -85,6 +85,25 @@ export async function pinAlternative({
 }
 
 /**
+ * The way out of a refusal, where there is one, worded by `t`; null where there is none.
+ *
+ * A crossing by ferry is a booking, and the drive follows a booked ferry from terminal to
+ * terminal. A way offered because it leaves a class of road out is driven once the trip
+ * avoids that class: without it the router holds such a way only as far as a few pins
+ * reach, and on a long leg takes the class back between them, so the choice was refused
+ * after seconds of checking with no word on what would work.
+ */
+export function refusalHint(
+  offer: Pick<OfferedRoute, 'hasFerry' | 'avoids'>,
+  last: Pick<RailLegRoute, 'hasFerry'>,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string | null {
+  if (offer.hasFerry && !last.hasFerry) return t('roadtrip.alt.ferryNotHeld')
+  if (!offer.avoids) return null
+  return t('roadtrip.alt.avoidNotHeld', { class: t(`roadtrip.avoid.${offer.avoids}`), setting: t('roadtrip.avoid.section') })
+}
+
+/**
  * The leg the rail drives from the stop filed at `anchor` now, or null when no stop sits
  * there any more.
  *

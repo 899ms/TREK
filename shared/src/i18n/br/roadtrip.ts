@@ -224,9 +224,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Tempo do roteador de desvios, não do principal.',
   'roadtrip.alt.notHeld': 'O roteador da viagem não segue este caminho, então ele não foi salvo.',
   'roadtrip.alt.ferryNotHeld':
-    'Este caminho atravessa de balsa. Adicione a balsa como reserva de transporte e o trajeto passa a segui-la.',
+    'Este caminho atravessa de balsa. Adicione a balsa como reserva de transporte e o trajeto passa a segui-la. Se ela chega no dia seguinte, coloque as paradas do outro lado da água nesse dia.',
   'roadtrip.alt.legChanged': 'Este trecho mudou enquanto o caminho era verificado, então nada foi salvo.',
   'roadtrip.alt.offline': 'Outros caminhos só são salvos online. Reconecte-se para escolher este.',
+  'roadtrip.alt.otherEngineStandard': 'Tempo do roteador principal, não daquele com que este trecho é planejado.',
+  'roadtrip.alt.avoidNotHeld':
+    'A viagem só faz este caminho com “{class}” marcado em “{setting}” nas configurações dela.',
+  'roadtrip.alt.checking': 'Verificando este caminho com o roteador da viagem…',
+  'roadtrip.alt.standIn':
+    'O roteador de desvios não respondeu para este trecho, então o roteador principal o desenhou. O roteador de desvios está sendo consultado de novo.',
   'roadtrip.day': 'Dia {number}',
   'roadtrip.quietDay.empty': 'Ainda sem paradas — solte uma aqui',
   'roadtrip.quietDay.one': 'Até agora só {name} — solte uma parada aqui',
@@ -280,7 +286,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Retirada {time}',
   'roadtrip.ride.return': 'Devolução {time}',
   'roadtrip.ride.open': 'Abrir reserva',
-  'roadtrip.ride.undated': 'A reserva {title} está sem data, por isso o percurso não a considera.',
+  'roadtrip.ride.undated':
+    'A reserva {title} não está em nenhum dia desta viagem, por isso o percurso não a considera.',
   'roadtrip.bookings.loose': 'Também reservado neste dia',
 };
 export default roadtrip;

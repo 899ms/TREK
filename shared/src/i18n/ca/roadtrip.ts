@@ -226,9 +226,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Temps de l’encaminador d’evitació, no del principal.',
   'roadtrip.alt.notHeld': 'L’encaminador del viatge no segueix aquest camí, així que no s’ha desat.',
   'roadtrip.alt.ferryNotHeld':
-    'Aquest camí creua en transbordador. Afegeix el transbordador com a reserva de transport i el trajecte el seguirà.',
+    'Aquest camí creua en transbordador. Afegeix el transbordador com a reserva de transport i el trajecte el seguirà. Si arriba l’endemà, posa les parades de l’altra banda de l’aigua en aquell dia.',
   'roadtrip.alt.legChanged': 'Aquest tram ha canviat mentre es comprovava el camí, així que no s’ha desat res.',
   'roadtrip.alt.offline': 'Els altres camins només es desen amb connexió. Torna a connectar-te per triar aquest.',
+  'roadtrip.alt.otherEngineStandard': 'Temps de l’encaminador principal, no del que planifica aquest tram.',
+  'roadtrip.alt.avoidNotHeld':
+    'El viatge només fa aquest camí si «{class}» està marcat a «{setting}» a la seva configuració.',
+  'roadtrip.alt.checking': 'S’està comprovant aquest camí amb l’encaminador del viatge…',
+  'roadtrip.alt.standIn':
+    'L’encaminador d’evitació no ha respost per a aquest tram, així que l’ha dibuixat l’encaminador principal. S’està tornant a consultar l’encaminador d’evitació.',
   'roadtrip.day': 'Dia {number}',
   'roadtrip.quietDay.empty': 'Encara sense parades: deixa’n una aquí',
   'roadtrip.quietDay.one': 'De moment només {name}: deixa una parada aquí',
@@ -283,7 +289,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Recollida {time}',
   'roadtrip.ride.return': 'Devolució {time}',
   'roadtrip.ride.open': 'Obre la reserva',
-  'roadtrip.ride.undated': 'La reserva {title} no té data, així que el trajecte no la té en compte.',
+  'roadtrip.ride.undated':
+    'La reserva {title} no és a cap dia d’aquest viatge, així que el trajecte no la té en compte.',
   'roadtrip.bookings.loose': 'També reservat aquest dia',
 };
 export default roadtrip;

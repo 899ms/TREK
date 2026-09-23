@@ -221,9 +221,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': '所要時間は主エンジンではなく回避用エンジンでの計算です。',
   'roadtrip.alt.notHeld': 'ロードトリップのルーティングサーバーがこの道をたどらないため、保存されませんでした。',
   'roadtrip.alt.ferryNotHeld':
-    'この道はフェリーで渡ります。フェリーを交通手段の予約として追加すると、ルートがそれに沿います。',
+    'この道はフェリーで渡ります。フェリーを交通手段の予約として追加すると、ルートがそれに沿います。到着が翌日の場合は、対岸の立ち寄り先をその日に移してください。',
   'roadtrip.alt.legChanged': '確認中にこの区間が変更されたため、何も保存されませんでした。',
   'roadtrip.alt.offline': 'ほかの道はオンラインでのみ保存できます。この道を選ぶには再接続してください。',
+  'roadtrip.alt.otherEngineStandard': '所要時間は、この区間の計画に使うエンジンではなく主エンジンでの計算です。',
+  'roadtrip.alt.avoidNotHeld':
+    'このルートを通るのは、設定の「{setting}」で「{class}」にチェックが入っている場合だけです。',
+  'roadtrip.alt.checking': 'ロードトリップのルーティングサーバーでこの道を確認しています…',
+  'roadtrip.alt.standIn':
+    'この区間では回避用エンジンが応答しなかったため、主エンジンが描画しました。回避用エンジンにもう一度問い合わせています。',
   'roadtrip.day': '{number} 日目',
   'roadtrip.quietDay.empty': 'まだ立ち寄り先がありません。ここにドロップ',
   'roadtrip.quietDay.one': '今のところ {name} だけです。立ち寄り先をここにドロップ',
@@ -277,7 +283,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '受取 {time}',
   'roadtrip.ride.return': '返却 {time}',
   'roadtrip.ride.open': '予約を開く',
-  'roadtrip.ride.undated': '{title} には日付がないため、走行では使われません。',
+  'roadtrip.ride.undated': '{title} はこの旅行のどの日にも入っていないため、走行では使われません。',
   'roadtrip.bookings.loose': 'この日のその他の予約',
 };
 export default roadtrip;

@@ -225,9 +225,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Waktu dihitung mesin penghindaran, bukan mesin utama.',
   'roadtrip.alt.notHeld': 'Server rute perjalanan tidak mengikuti jalan ini, jadi jalan ini tidak disimpan.',
   'roadtrip.alt.ferryNotHeld':
-    'Jalan ini menyeberang dengan feri. Tambahkan feri sebagai pemesanan transportasi dan perjalanan akan mengikutinya.',
+    'Jalan ini menyeberang dengan feri. Tambahkan feri sebagai pemesanan transportasi dan perjalanan akan mengikutinya. Jika feri tiba keesokan harinya, taruh perhentian di seberang pada hari itu.',
   'roadtrip.alt.legChanged': 'Ruas ini berubah saat jalannya diperiksa, jadi tidak ada yang disimpan.',
   'roadtrip.alt.offline': 'Jalan lain hanya disimpan saat online. Sambungkan kembali untuk memilih yang ini.',
+  'roadtrip.alt.otherEngineStandard': 'Waktu dihitung mesin utama, bukan mesin yang merencanakan ruas ini.',
+  'roadtrip.alt.avoidNotHeld':
+    'Perjalanan hanya melewati jalan ini jika “{class}” dicentang di bawah “{setting}” dalam pengaturannya.',
+  'roadtrip.alt.checking': 'Memeriksa jalan ini dengan server rute perjalanan…',
+  'roadtrip.alt.standIn':
+    'Mesin penghindaran tidak menjawab untuk ruas ini, jadi mesin utama yang menggambarnya. Mesin penghindaran sedang ditanya lagi.',
   'roadtrip.day': 'Hari {number}',
   'roadtrip.quietDay.empty': 'Belum ada perhentian — jatuhkan di sini',
   'roadtrip.quietDay.one': 'Sejauh ini hanya {name} — jatuhkan perhentian di sini',
@@ -282,7 +288,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Pengambilan {time}',
   'roadtrip.ride.return': 'Pengembalian {time}',
   'roadtrip.ride.open': 'Buka pemesanan',
-  'roadtrip.ride.undated': 'Pemesanan {title} tidak memiliki tanggal, jadi perjalanan tidak memperhitungkannya.',
+  'roadtrip.ride.undated':
+    'Pemesanan {title} tidak berada di hari mana pun dalam perjalanan ini, jadi perjalanan tidak memperhitungkannya.',
   'roadtrip.bookings.loose': 'Juga dipesan hari ini',
 };
 export default roadtrip;

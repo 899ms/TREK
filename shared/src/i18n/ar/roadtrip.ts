@@ -218,9 +218,16 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.quicker': 'أسرع بـ {time}',
   'roadtrip.alt.otherEngine': 'الزمن محسوب بمحرك التجنب، لا بالمحرك الرئيسي.',
   'roadtrip.alt.notHeld': 'خادم المسارات للرحلة البرية لا يتبع هذا الطريق، لذلك لم يُحفظ.',
-  'roadtrip.alt.ferryNotHeld': 'يعبر هذا الطريق بالعبّارة. أضف العبّارة كحجز نقل وستتبعها الرحلة.',
+  'roadtrip.alt.ferryNotHeld':
+    'يعبر هذا الطريق بالعبّارة. أضف العبّارة كحجز نقل وستتبعها الرحلة. وإن كانت تصل في اليوم التالي، فضع المحطات الواقعة على الضفة الأخرى في ذلك اليوم.',
   'roadtrip.alt.legChanged': 'تغيّرت هذه المرحلة أثناء التحقق، لذلك لم يُحفظ أي شيء.',
   'roadtrip.alt.offline': 'تُحفظ الطرق الأخرى عبر الإنترنت فقط. أعد الاتصال لاختيار هذا الطريق.',
+  'roadtrip.alt.otherEngineStandard': 'الزمن محسوب بالمحرك الرئيسي، لا بالمحرك الذي تُخطَّط به هذه المرحلة.',
+  'roadtrip.alt.avoidNotHeld':
+    'لا تسلك الرحلة البرية هذا الطريق إلا إذا فُعّل خيار «{class}» ضمن «{setting}» في إعداداتها.',
+  'roadtrip.alt.checking': 'يجري التحقق من هذا الطريق عبر خادم مسارات الرحلة البرية…',
+  'roadtrip.alt.standIn':
+    'لم يستجب محرك التجنب لهذه المرحلة، لذلك رسمها المحرك الرئيسي. يجري سؤال محرك التجنب مرة أخرى الآن.',
   'roadtrip.day': 'اليوم {number}',
   'roadtrip.quietDay.empty': 'لا توجد محطات بعد — أفلِت واحدة هنا',
   'roadtrip.quietDay.one': 'حتى الآن {name} فقط — أفلِت محطة هنا',
@@ -274,7 +281,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'الاستلام {time}',
   'roadtrip.ride.return': 'الإرجاع {time}',
   'roadtrip.ride.open': 'فتح الحجز',
-  'roadtrip.ride.undated': 'لا يوجد تاريخ للحجز {title}، لذلك لا يستخدمه المسار.',
+  'roadtrip.ride.undated': 'الحجز {title} لا يقع في أي يوم من أيام هذه الرحلة، لذلك لا يستخدمه المسار.',
   'roadtrip.bookings.loose': 'محجوز أيضًا في هذا اليوم',
 };
 export default roadtrip;

@@ -58,6 +58,11 @@ export interface LegAlternatives {
   ends: { from: number; to: number }
   /** The engine the rail drives this leg with. Offers from another cannot be read against it. */
   engine: RouteEngine
+  /**
+   * True when the line the rail has for this leg came from OSRM standing in for `engine`,
+   * which did not answer. Its own road is then not on the map, whatever the leg's vias say.
+   */
+  standIn: boolean
   /** Routes the leg through pins exactly as the rail does, to check a choice before saving it. */
   route: RailLegRouter['route']
   routes: OfferedRoute[]
@@ -65,6 +70,8 @@ export interface LegAlternatives {
   error: boolean
   /** The offer being checked against the rail's router and saved, or null while none is. */
   proving: number | null
+  /** Why the last check saved nothing, for the bar to say beside the offers. Null otherwise. */
+  notice: string | null
 }
 
 /** Everything a picker needs to know about the leg it is opened on. */
@@ -91,8 +98,11 @@ export interface RouteAlternativesState {
    * closes, moves to another leg, or another check starts.
    */
   prove: (index: number) => AbortSignal
-  /** Ends a check that led to no save, leaving the picker open for another choice. */
-  settle: () => void
+  /**
+   * Ends a check that led to no save, leaving the picker open for another choice. `notice`
+   * says why, for the bar to announce.
+   */
+  settle: (notice?: string) => void
 }
 
 /**
@@ -134,15 +144,18 @@ export function useRouteAlternatives(): RouteAlternativesState {
     const controller = new AbortController()
     abortRef.current = controller
     const { dayId, drive, from, to, driven, anchor, ends, router } = request
-    const leg = { dayId, drive, anchor, ends, engine: router.engine, route: router.route, proving: null }
+    const leg = { dayId, drive, anchor, ends, engine: router.engine, standIn: router.standIn, route: router.route, proving: null, notice: null }
     setOpen({ ...leg, routes: [], loading: true, error: false })
 
+    // Marked with the engine that drew it. A line OSRM drew while the rail's engine did not
+    // answer was marked as that engine's, so the list set it against the offers as if one
+    // speed model had timed them all.
     const current: OfferedRoute = {
       coordinates: driven.coordinates,
       distance: driven.distance,
       duration: driven.duration,
       divergence: null,
-      engine: router.engine,
+      engine: router.standIn ? 'osrm' : router.engine,
       current: true,
     }
     // A plugin's mode means nothing to the routers asked here, so its leg is offered the
@@ -176,13 +189,13 @@ export function useRouteAlternatives(): RouteAlternativesState {
     stopProving()
     const controller = new AbortController()
     provingRef.current = controller
-    setOpen(o => (o ? { ...o, proving: index } : o))
+    setOpen(o => (o ? { ...o, proving: index, notice: null } : o))
     return controller.signal
   }, [stopProving])
 
-  const settle = useCallback(() => {
+  const settle = useCallback((notice?: string) => {
     provingRef.current = null
-    setOpen(o => (o ? { ...o, proving: null } : o))
+    setOpen(o => (o ? { ...o, proving: null, notice: notice ?? null } : o))
   }, [])
 
   // One object for as long as nothing in it changes. The planner keys its close gate and

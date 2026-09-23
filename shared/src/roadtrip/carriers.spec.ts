@@ -1,5 +1,5 @@
 /**
- * ROADTRIP-CARRIERS-001..027: a booking the traveller rides becomes a seam in the drive,
+ * ROADTRIP-CARRIERS-001..029: a booking the traveller rides becomes a seam in the drive,
  * and a hire car puts its desks on it.
  *
  * The road ends at the terminal the ride leaves from and starts again at the one it
@@ -8,7 +8,8 @@
  * nothing about a terminal reads as a stored stop, and that a hire car's pick-up and
  * return are points the road runs through rather than a seam in it. From 022 on: a ride
  * on no day is named rather than dropped, and a ride within one day is seated where it
- * adds the least road, as far as the clock leaves a choice (#2461).
+ * adds the least road, as far as the clock leaves a choice (#2461). From 028 on: a ride
+ * that lands on a later day is not seated there by the slot seeded on the day it left.
  */
 import { assembleRoadtrip } from './assemble';
 import {
@@ -773,5 +774,44 @@ describe('a ride within one day, seated by where it goes (#2461)', () => {
     ];
     const muc = { minutes: 13 * 60 + 20, from: { lat: 48.35, lng: 11.78 }, to: { lat: 53.63, lng: 9.99 } };
     expect(rideSeatAfter(close, muc)).toBeNull();
+  });
+});
+
+describe('a ride that lands on a later day (#2461)', () => {
+  const overnight = (over: Partial<CarrierBooking> = {}): CarrierBooking =>
+    ferry({ end_day_id: 2, reservation_end_time: '2026-10-07T09:00', ...over });
+  const newcastleOnDay2 = [stop({ ownerIndex: 0, ownerDayId: 2, name: 'Newcastle', ...NEWCASTLE })];
+
+  it('ROADTRIP-CARRIERS-028: the booking’s own slot seats its departure only, and the arrival opens the day it lands on', () => {
+    // Seeded on the evening of the crossing behind both of its stops, the slot sat behind
+    // the morning's stop across the water too, and the drive ran from it back to the pier.
+    const seeded = carrierSeam(overnight({ day_plan_position: 1.5 }))!;
+    expect(seeded.departure.position).toBe(1.5);
+    expect(seeded.arrival!.position).toBeNull();
+    expect(order(seatCarrierStops(2, newcastleOnDay2, [0], [seeded]))).toEqual(['arrival', 'Newcastle']);
+    // A slot somebody gave it on the day it lands still wins, and so does a leg's own.
+    const dragged = carrierSeam(overnight({ day_plan_position: 1.5, day_positions: { '2': 0.5 } }))!;
+    expect(dragged.arrival!.position).toBe(0.5);
+    expect(order(seatCarrierStops(2, newcastleOnDay2, [0], [dragged]))).toEqual(['Newcastle', 'arrival']);
+    // On the day it leaves, and for a ride within one day, nothing changes.
+    expect(carrierSeam(ferry({ day_plan_position: 1.5 }))!.arrival!.position).toBe(1.5);
+  });
+
+  it('ROADTRIP-CARRIERS-029: a hire car handed back on a later day keeps reading the booking’s slot', () => {
+    const car = carrierSeam({
+      id: 5,
+      type: 'car',
+      title: 'Hire car',
+      day_id: 1,
+      end_day_id: 2,
+      reservation_time: '10:00',
+      reservation_end_time: '10:00',
+      day_plan_position: 1.5,
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'Desk A', code: null, lat: 50, lng: 10 },
+        { role: 'to', sequence: 1, name: 'Desk B', code: null, lat: 51, lng: 10 },
+      ],
+    })!;
+    expect(car.arrival!.position).toBe(1.5);
   });
 });

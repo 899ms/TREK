@@ -2571,6 +2571,37 @@ describe('DayPlanSidebar', () => {
     expect(vi.mocked(reservationsApi.updatePositions).mock.calls[0][1]).toEqual([{ id: 69, day_plan_position: 0.5 }])
   })
 
+  it('FE-PLANNER-DAYPLAN-221: the slot is worked out over the hotel the list hides, so it does not land behind it (#2461)', async () => {
+    // The hotel a booking put on the day sits across the water and is no row of the list.
+    // Worked out over Amsterdam alone, the clock closed the day at 1.5: behind the hotel
+    // for the road trip, which then drove to Newcastle overland before the crossing.
+    const { reservationsApi } = await import('../../api/client')
+    const day = buildDay({ id: 10, date: '2026-10-06', title: 'Day 2' })
+    const amsterdam = buildPlace({ id: 1, name: 'Amsterdam', lat: 52.3731, lng: 4.8926 })
+    const hotel = buildPlace({ id: 3, name: 'Hotel Newcastle', lat: 54.975, lng: -1.61 })
+    const ferry = buildReservation({
+      id: 69, type: 'ferry', title: 'IJmuiden to Newcastle', day_id: 10,
+      reservation_time: '2026-10-06T17:30', reservation_end_time: '2026-10-06T23:00',
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'IJmuiden', code: null, lat: 52.4581, lng: 4.5879, timezone: null, local_date: null, local_time: null },
+        { role: 'to', sequence: 1, name: 'Port of Tyne', code: null, lat: 54.9925, lng: -1.4522, timezone: null, local_date: null, local_time: null },
+      ],
+    })
+    seedStore(useTripStore, { reservations: [ferry] })
+    render(<DayPlanSidebar {...makeDefaultProps({
+      days: [day], places: [amsterdam, hotel], reservations: [ferry],
+      accommodations: [{ id: 7, place_id: 3, start_day_id: 10, end_day_id: 11, check_in: null } as never],
+      assignments: {
+        '10': [
+          buildAssignment({ id: 11, day_id: 10, order_index: 0, place: amsterdam }),
+          buildAssignment({ id: 13, day_id: 10, order_index: 1, place: hotel, accommodation_id: 7 } as never),
+        ],
+      },
+    })} />)
+    await waitFor(() => expect(vi.mocked(reservationsApi.updatePositions)).toHaveBeenCalled())
+    expect(vi.mocked(reservationsApi.updatePositions).mock.calls[0][1]).toEqual([{ id: 69, day_plan_position: 0.5 }])
+  })
+
   it('FE-PLANNER-DAYPLAN-204: a rejected slot write puts the bookings back where the server has them', async () => {
     const { reservationsApi } = await import('../../api/client')
     vi.mocked(reservationsApi.updatePositions).mockRejectedValueOnce(new Error('offline'))

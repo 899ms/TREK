@@ -225,9 +225,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Tempo dal router delle esclusioni, non dal principale.',
   'roadtrip.alt.notHeld': 'Il router del viaggio non segue questo percorso, quindi non è stato salvato.',
   'roadtrip.alt.ferryNotHeld':
-    'Questo percorso attraversa in traghetto. Aggiungi il traghetto come prenotazione di trasporto e il tragitto lo seguirà.',
+    'Questo percorso attraversa in traghetto. Aggiungi il traghetto come prenotazione di trasporto e il tragitto lo seguirà. Se arriva il giorno dopo, metti le tappe sull’altra sponda in quel giorno.',
   'roadtrip.alt.legChanged': 'La tratta è cambiata durante la verifica, quindi non è stato salvato nulla.',
   'roadtrip.alt.offline': 'Gli altri percorsi si salvano solo online. Riconnettiti per scegliere questo.',
+  'roadtrip.alt.otherEngineStandard': 'Tempo dal router principale, non da quello con cui è pianificata questa tratta.',
+  'roadtrip.alt.avoidNotHeld':
+    'Il viaggio segue questo percorso solo con «{class}» spuntato in «{setting}» nelle sue impostazioni.',
+  'roadtrip.alt.checking': 'Verifica di questo percorso con il router del viaggio…',
+  'roadtrip.alt.standIn':
+    'Il router delle esclusioni non ha risposto per questa tratta, quindi l’ha disegnata il router principale. Il router delle esclusioni viene interrogato di nuovo.',
   'roadtrip.day': 'Giorno {number}',
   'roadtrip.quietDay.empty': 'Ancora nessuna sosta: trascinane una qui',
   'roadtrip.quietDay.one': 'Finora solo {name}: trascina qui una sosta',
@@ -282,7 +288,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Ritiro {time}',
   'roadtrip.ride.return': 'Riconsegna {time}',
   'roadtrip.ride.open': 'Apri prenotazione',
-  'roadtrip.ride.undated': 'La prenotazione {title} non ha una data, quindi il percorso non la considera.',
+  'roadtrip.ride.undated':
+    'La prenotazione {title} non cade in nessun giorno di questo viaggio, quindi il percorso non la considera.',
   'roadtrip.bookings.loose': 'Prenotato anche questo giorno',
 };
 export default roadtrip;

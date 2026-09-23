@@ -222,9 +222,16 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.quicker': 'nhanh hơn {time}',
   'roadtrip.alt.otherEngine': 'Giờ do máy chủ định tuyến tránh đường tính, không phải máy chính.',
   'roadtrip.alt.notHeld': 'Máy chủ định tuyến của chuyến đi không đi theo đường này, nên đường này chưa được lưu.',
-  'roadtrip.alt.ferryNotHeld': 'Đường này đi qua phà. Hãy thêm phà làm đặt chỗ phương tiện và lộ trình sẽ đi theo nó.',
+  'roadtrip.alt.ferryNotHeld':
+    'Đường này đi qua phà. Hãy thêm phà làm đặt chỗ phương tiện và lộ trình sẽ đi theo nó. Nếu phà cập bến vào ngày hôm sau, hãy đặt các điểm dừng ở bờ bên kia vào ngày đó.',
   'roadtrip.alt.legChanged': 'Chặng này đã thay đổi trong lúc kiểm tra, nên chưa có gì được lưu.',
   'roadtrip.alt.offline': 'Các đường khác chỉ được lưu khi trực tuyến. Hãy kết nối lại để chọn đường này.',
+  'roadtrip.alt.otherEngineStandard': 'Giờ do máy chủ định tuyến chính tính, không phải máy dùng để lập chặng này.',
+  'roadtrip.alt.avoidNotHeld':
+    'Chuyến đi chỉ đi đường này khi “{class}” được chọn trong “{setting}” ở phần cài đặt của nó.',
+  'roadtrip.alt.checking': 'Đang kiểm tra đường này với máy chủ định tuyến của chuyến đi…',
+  'roadtrip.alt.standIn':
+    'Máy chủ định tuyến tránh đường không phản hồi cho chặng này, nên máy chính đã vẽ nó. Đang hỏi lại máy chủ định tuyến tránh đường.',
   'roadtrip.day': 'Ngày {number}',
   'roadtrip.quietDay.empty': 'Chưa có điểm dừng — thả vào đây',
   'roadtrip.quietDay.one': 'Hiện chỉ có {name} — thả một điểm dừng vào đây',
@@ -278,7 +285,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Nhận xe {time}',
   'roadtrip.ride.return': 'Trả xe {time}',
   'roadtrip.ride.open': 'Mở đặt chỗ',
-  'roadtrip.ride.undated': 'Đặt chỗ {title} chưa có ngày, nên hành trình không tính đến nó.',
+  'roadtrip.ride.undated': 'Đặt chỗ {title} không thuộc ngày nào của chuyến đi này, nên hành trình không tính đến nó.',
   'roadtrip.bookings.loose': 'Cũng đã đặt trong ngày này',
 };
 export default roadtrip;

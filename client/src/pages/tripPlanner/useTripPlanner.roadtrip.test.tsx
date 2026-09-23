@@ -96,6 +96,7 @@ const rt = vi.hoisted(() => {
   const legRoute = vi.fn()
   const routes = {
     legRouter: vi.fn(),
+    reroute: vi.fn(),
     days: [] as Array<Record<string, unknown>>,
     quietDays: [] as unknown[],
     lines: [] as unknown[],
@@ -1119,7 +1120,8 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
     expect(rt.alt.close).not.toHaveBeenCalled()
-    expect(rt.alt.settle).toHaveBeenCalled()
+    // Said to the bar as well, which keeps it beside the offers and announces it.
+    expect(rt.alt.settle).toHaveBeenCalledWith('The road trip’s router won’t follow this way, so it was not saved.')
     expect(toasts).toContainEqual({ message: 'The road trip’s router won’t follow this way, so it was not saved.', type: 'error' })
     // Nothing about a ferry the offer never took.
     expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('ferry') }))
@@ -1135,10 +1137,72 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
+    const ferryHint = 'This way crosses by ferry. Add the ferry as a transport booking and the drive follows it. If it lands the next day, put the stops across the water on that day.'
+    expect(toasts).toContainEqual({ message: ferryHint, type: 'info' })
+    // The ferry is the way out here, not the motorway the offer also leaves out.
+    expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('ticked') }))
+    expect(rt.alt.settle).toHaveBeenCalledWith(`The road trip’s router won’t follow this way, so it was not saved. ${ferryHint}`)
+  })
+
+  it('FE-TP-ROAD-135: a way that leaves a class out says the trip has to avoid it to be driven', async () => {
+    // The router holds such a way only as far as a few pins reach, so on a long leg the
+    // choice was refused after the wait with no word on what would get it driven.
+    routedDay()
+    openWith([detour({ avoids: 'motorway', engine: 'valhalla' })])
+    rt.legRoute.mockResolvedValue(answer(RAIL_LINE, { hasFerry: false }))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
     expect(toasts).toContainEqual({
-      message: 'This way crosses by ferry. Add the ferry as a transport booking and the drive follows it.',
+      message: 'The road trip only drives this way with “Motorways” ticked under “Avoid where possible” in its settings.',
       type: 'info',
     })
+  })
+
+  it('FE-TP-ROAD-136: the router own road on a leg OSRM drew in its place asks the rail for the leg again, and says so', async () => {
+    // Nothing bends the leg, so nothing is written, and the stand-in line stayed on the map
+    // under a picker that closed as if the road had been taken.
+    routedDay()
+    openWith([detour({ direct: true, engine: 'valhalla' })], { engine: 'valhalla', standIn: true })
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.routes.reroute).toHaveBeenCalledTimes(1)
+    expect(toasts).toContainEqual({
+      message: 'The avoidance router did not answer for this leg, so the main router drew it. It is being asked again.',
+      type: 'info',
+    })
+    expect(rt.alt.close).toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-137: pins written for a leg OSRM drew route it again by themselves, and it still says why the line may wait', async () => {
+    routedDay()
+    openWith([detour({ engine: 'valhalla' })], { engine: 'valhalla', standIn: true })
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 0, lat: 53.3, lng: 12.8 }], [0])
+    expect(rt.routes.reroute).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual(expect.objectContaining({ message: expect.stringContaining('did not answer for this leg'), type: 'info' }))
+  })
+
+  it('FE-TP-ROAD-138: on a leg its own engine drew, the router own road changes nothing and asks nothing again', async () => {
+    routedDay()
+    openWith([detour({ direct: true })], { standIn: false })
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.routes.reroute).not.toHaveBeenCalled()
+    expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('did not answer') }))
   })
 
   it('FE-TP-ROAD-119: the router own road on a leg nothing bends writes nothing and closes', async () => {

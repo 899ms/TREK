@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { alternativeSubline, alternativesBusy, alternativesPhase, buildAlternativeOverlays, type AlternativeOverlay } from './alternativeOverlays'
+import { alternativeSubline, alternativesBusy, alternativesPhase, buildAlternativeOverlays, otherEngineNote, type AlternativeOverlay } from './alternativeOverlays'
 import { formatDurationShort } from './roadtripModel'
 import { ALT_PRIMARY, ALT_SECONDARY, ALT_LABEL_PRIMARY_BG, ALT_LABEL_SECONDARY_BG } from './alternativeColors'
 import type { RouteAlternative } from '../Map/RouteCalculator'
 
 /**
- * FE-ALTOVL-001..021: turning the router's answers into something drawable.
+ * FE-ALTOVL-001..023: turning the router's answers into something drawable.
  *
  * Two decisions live here and neither is cosmetic: which of the offered roads is
  * drawn as the one you are on, and where each label hangs. A label anchored on a
@@ -306,6 +306,47 @@ describe('alternativeSubline', () => {
     // Another engine's road has no difference to print, only its own time.
     expect(alternativeSubline(overlay({ note: '', otherEngine: true, label: '2 h', slowerThanQuickest: 0 }), slower))
       .toBe('2 h')
+  })
+})
+
+describe('otherEngineNote', () => {
+  it('FE-ALTOVL-022: a route another engine timed is named after that engine, one the rail timed not at all', () => {
+    // On a plugin leg the offers are OSRM's. They used to be called the avoidance
+    // router's, an engine that had nothing to do with them.
+    const plugin = buildAlternativeOverlays(
+      [
+        alt({ coordinates: line(20, 0), current: true, engine: 'plugin' }),
+        alt({ coordinates: line(20, 1) }),
+        alt({ coordinates: line(20, 2), engine: 'valhalla', avoids: 'motorway' }),
+      ],
+      LABELS,
+      'plugin',
+    )
+    expect(plugin.map(o => o.engine)).toEqual(['plugin', 'osrm', 'valhalla'])
+    expect(plugin.map(otherEngineNote)).toEqual([null, 'roadtrip.alt.otherEngineStandard', 'roadtrip.alt.otherEngine'])
+    // On a trip that avoids nothing, the avoidance router's offer is the other one.
+    const plain = buildAlternativeOverlays(
+      [alt({ coordinates: line(20, 0), current: true }), alt({ coordinates: line(20, 1), engine: 'valhalla' })],
+      LABELS,
+    )
+    expect(plain.map(otherEngineNote)).toEqual([null, 'roadtrip.alt.otherEngine'])
+  })
+
+  it('FE-ALTOVL-023: a line OSRM drew in the avoidance router’s place heads the list as the other engine’s', () => {
+    const out = buildAlternativeOverlays(
+      [
+        alt({ coordinates: line(20, 0), current: true, engine: 'osrm' }),
+        alt({ coordinates: line(20, 1), engine: 'valhalla' }),
+      ],
+      LABELS,
+      'valhalla',
+    )
+    expect(out.map(otherEngineNote)).toEqual(['roadtrip.alt.otherEngineStandard', null])
+    // Nothing is measured against it: the offer is the quickest the rail's engine timed.
+    expect(out[1].note).toBe('Fastest')
+    expect(out.every(o => o.slowerThanQuickest === 0)).toBe(true)
+    // An engine no offer comes from has nothing to say.
+    expect(otherEngineNote({ otherEngine: true, engine: 'plugin' })).toBeNull()
   })
 })
 

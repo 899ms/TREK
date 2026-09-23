@@ -8,7 +8,7 @@ import type { LegAlternatives, OfferedRoute } from '../../../../src/components/R
 import type { TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTALT-001 to FE-MOB-RTALT-012
+// FE-MOB-RTALT-001 to FE-MOB-RTALT-013
 //
 // Rendered through the real controller hook, so a tap is checked all the way to what the
 // planner is asked to do, and the pending state is the transition's own.
@@ -179,6 +179,23 @@ describe('MRtAlternativesBar', () => {
     renderBar(planner({}, { highlightedAlternative: 1 }))
     expect(screen.queryByText('roadtrip.alt.otherEngine')).toBeNull()
     expect(confirmButton().className).toContain('flex-1')
+  })
+
+  it('FE-MOB-RTALT-013: on a leg a route provider drives, a road OSRM timed is said to be OSRM’s', () => {
+    // It used to be called the avoidance router's, an engine that timed none of these.
+    const routes: OfferedRoute[] = [{ ...ROUTES[0], engine: 'plugin' }, ROUTES[1]]
+    const base = buildPlanner()
+    renderBar(buildPlanner({
+      selectedDayId: 2,
+      routeAlternatives: { ...base.routeAlternatives, open: openLeg({ dayId: 2, drive: { kind: 'leg', index: 0 }, routes, engine: 'plugin' }) },
+      alternativeOverlays: buildAlternativeOverlays(routes, {
+        fastest: 'Fastest', current: 'Current', noMotorway: 'No motorway', noToll: 'No tolls', noFerry: 'No ferry',
+      }, 'plugin'),
+      highlightedAlternative: 1,
+    } as Partial<TripPlanner>))
+
+    expect(screen.getByText('roadtrip.alt.otherEngineStandard')).toBeInTheDocument()
+    expect(screen.queryByText('roadtrip.alt.otherEngine')).toBeNull()
   })
 
   it('FE-MOB-RTALT-010: offline a valid pick still cannot be confirmed', () => {

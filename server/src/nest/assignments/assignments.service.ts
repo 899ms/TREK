@@ -342,8 +342,10 @@ export class AssignmentsService {
 
     // A via behind the day's last stop bends the drive into the next day, on a trip
     // with connected days or a night drive (the planner's `anchorFor` files it there).
-    // It stays with that stop while the sort leaves it last (`carriedSeam`, applied
-    // inside `reanchorByStopOrder`), the same rule the planner's own drags follow.
+    // It stays with that stop while the sort leaves it last, and goes once the sort puts
+    // another stop last (`seamViaIndex`, applied inside `reanchorByStopOrder`): it lies on
+    // the road to tomorrow, not on the leg that stop leaves by now. The same rule the
+    // planner's own drags follow.
     const vias = this.dbs.all<AnchoredVia>('SELECT id, after_order_index, lat, lng FROM roadtrip_vias WHERE day_id = ?', dayId);
     const plan = reanchorByStopOrder(vias, previousIds, nextIds);
     for (const viaId of plan.remove) {

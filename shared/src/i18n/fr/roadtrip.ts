@@ -225,10 +225,16 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Temps du routeur de contournement, pas du principal.',
   'roadtrip.alt.notHeld': 'Le routeur du road trip ne suit pas cet itinéraire, il n’a donc pas été enregistré.',
   'roadtrip.alt.ferryNotHeld':
-    'Cet itinéraire traverse en ferry. Ajoutez le ferry comme réservation de transport et le trajet le suivra.',
+    'Cet itinéraire traverse en ferry. Ajoutez le ferry comme réservation de transport et le trajet le suivra. S’il arrive le lendemain, placez les arrêts de l’autre côté de l’eau ce jour-là.',
   'roadtrip.alt.legChanged': 'Cette étape a changé pendant la vérification, rien n’a donc été enregistré.',
   'roadtrip.alt.offline':
     'Les autres itinéraires ne s’enregistrent qu’en ligne. Reconnectez-vous pour choisir celui-ci.',
+  'roadtrip.alt.otherEngineStandard': 'Temps du routeur principal, pas de celui qui planifie cette étape.',
+  'roadtrip.alt.avoidNotHeld':
+    'Le road trip ne prend cet itinéraire que si « {class} » est coché sous « {setting} » dans ses réglages.',
+  'roadtrip.alt.checking': 'Vérification de cet itinéraire auprès du routeur du road trip…',
+  'roadtrip.alt.standIn':
+    'Le routeur de contournement n’a pas répondu pour cette étape, le routeur principal l’a donc tracée. Le routeur de contournement est interrogé à nouveau.',
   'roadtrip.day': 'Jour {number}',
   'roadtrip.quietDay.empty': 'Aucun arrêt — déposez-en un ici',
   'roadtrip.quietDay.one': 'Seulement {name} pour l’instant — déposez un arrêt ici',
@@ -283,7 +289,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Prise en charge {time}',
   'roadtrip.ride.return': 'Restitution {time}',
   'roadtrip.ride.open': 'Ouvrir la réservation',
-  'roadtrip.ride.undated': 'La réservation {title} n’a pas de date, le trajet n’en tient donc pas compte.',
+  'roadtrip.ride.undated':
+    'La réservation {title} n’est sur aucun jour de ce voyage, le trajet n’en tient donc pas compte.',
   'roadtrip.bookings.loose': 'Également réservé ce jour',
 };
 export default roadtrip;

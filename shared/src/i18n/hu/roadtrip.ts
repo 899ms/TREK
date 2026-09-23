@@ -223,9 +223,16 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Az időt a kerülő útvonaltervező számolta, nem a fő.',
   'roadtrip.alt.notHeld': 'Az autós út útvonaltervezője nem követi ezt az utat, ezért nem mentettük el.',
   'roadtrip.alt.ferryNotHeld':
-    'Ez az út komppal kel át. Add hozzá a kompot közlekedési foglalásként, és az út követni fogja.',
+    'Ez az út komppal kel át. Add hozzá a kompot közlekedési foglalásként, és az út követni fogja. Ha csak másnap köt ki, a víz túloldalán lévő megállókat tedd arra a napra.',
   'roadtrip.alt.legChanged': 'A szakasz az ellenőrzés közben megváltozott, ezért semmi sem lett mentve.',
   'roadtrip.alt.offline': 'A többi utat csak online lehet menteni. Csatlakozz újra, hogy ezt válaszd.',
+  'roadtrip.alt.otherEngineStandard':
+    'Az időt a fő útvonaltervező számolta, nem az, amellyel ezt a szakaszt tervezzük.',
+  'roadtrip.alt.avoidNotHeld':
+    'Az autós út csak akkor megy ezen az úton, ha a beállításaiban a „{setting}” alatt be van jelölve a „{class}”.',
+  'roadtrip.alt.checking': 'Az autós út útvonaltervezője ellenőrzi ezt az utat…',
+  'roadtrip.alt.standIn':
+    'A kerülő útvonaltervező nem válaszolt erre a szakaszra, ezért a fő útvonaltervező rajzolta meg. A kerülő útvonaltervezőt most újra megkérdezzük.',
   'roadtrip.day': '{number}. nap',
   'roadtrip.quietDay.empty': 'Még nincs megálló — húzzon ide egyet',
   'roadtrip.quietDay.one': 'Egyelőre csak {name} — húzzon ide egy megállót',
@@ -279,7 +286,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Felvétel {time}',
   'roadtrip.ride.return': 'Visszaadás {time}',
   'roadtrip.ride.open': 'Foglalás megnyitása',
-  'roadtrip.ride.undated': '{title}: a foglalásnak nincs dátuma, ezért az útvonal nem számol vele.',
+  'roadtrip.ride.undated': '{title}: a foglalás az utazás egyik napjára sem esik, ezért az útvonal nem számol vele.',
   'roadtrip.bookings.loose': 'Erre a napra még lefoglalva',
 };
 export default roadtrip;

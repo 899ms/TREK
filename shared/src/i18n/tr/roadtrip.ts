@@ -223,9 +223,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.quicker': '{time} daha kısa',
   'roadtrip.alt.otherEngine': 'Süre, ana motorla değil kaçınma motoruyla hesaplandı.',
   'roadtrip.alt.notHeld': 'Yolculuğun rota sunucusu bu yolu izlemiyor, bu yüzden kaydedilmedi.',
-  'roadtrip.alt.ferryNotHeld': 'Bu yol feribotla geçiyor. Feribotu ulaşım rezervasyonu olarak ekle, sürüş onu izlesin.',
+  'roadtrip.alt.ferryNotHeld':
+    'Bu yol feribotla geçiyor. Feribotu ulaşım rezervasyonu olarak ekle, sürüş onu izlesin. Ertesi gün varıyorsa, karşı kıyıdaki durakları o güne koy.',
   'roadtrip.alt.legChanged': 'Bu etap kontrol sırasında değişti, bu yüzden hiçbir şey kaydedilmedi.',
   'roadtrip.alt.offline': 'Diğer yollar yalnızca çevrimiçiyken kaydedilir. Bunu seçmek için yeniden bağlan.',
+  'roadtrip.alt.otherEngineStandard': 'Süre, bu etabın planlandığı motorla değil ana motorla hesaplandı.',
+  'roadtrip.alt.avoidNotHeld': 'Yolculuk bu yolu yalnızca ayarlarında “{setting}” altında “{class}” işaretliyse izler.',
+  'roadtrip.alt.checking': 'Bu yol, yolculuğun rota sunucusuyla kontrol ediliyor…',
+  'roadtrip.alt.standIn':
+    'Kaçınma motoru bu etap için yanıt vermedi, bu yüzden ana motor çizdi. Kaçınma motoruna yeniden soruluyor.',
   'roadtrip.day': '{number}. gün',
   'roadtrip.quietDay.empty': 'Henüz mola yok — buraya bırakın',
   'roadtrip.quietDay.one': 'Şimdilik yalnızca {name} — buraya bir mola bırakın',
@@ -280,7 +286,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Alış {time}',
   'roadtrip.ride.return': 'İade {time}',
   'roadtrip.ride.open': 'Rezervasyonu aç',
-  'roadtrip.ride.undated': '{title} rezervasyonunun tarihi yok, bu yüzden sürüş onu hesaba katmıyor.',
+  'roadtrip.ride.undated':
+    '{title} rezervasyonu bu yolculuğun hiçbir gününde değil, bu yüzden sürüş onu hesaba katmıyor.',
   'roadtrip.bookings.loose': 'Bu gün için ayrıca rezerve edildi',
 };
 export default roadtrip;

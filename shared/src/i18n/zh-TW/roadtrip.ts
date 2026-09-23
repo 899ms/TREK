@@ -209,9 +209,14 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.quicker': '快 {time}',
   'roadtrip.alt.otherEngine': '駕駛時間由避開專用的路徑服務計算，無法與其他項比較。',
   'roadtrip.alt.notHeld': '公路旅行的路徑服務不會走這條路，因此未儲存。',
-  'roadtrip.alt.ferryNotHeld': '這條路需要搭渡輪。將渡輪新增為交通預訂，路線就會隨之調整。',
+  'roadtrip.alt.ferryNotHeld':
+    '這條路需要搭渡輪。將渡輪新增為交通預訂，路線就會隨之調整。如果渡輪隔天才抵達，請把對岸的停靠點放到那一天。',
   'roadtrip.alt.legChanged': '檢查期間這一段有所變更，因此沒有儲存任何內容。',
   'roadtrip.alt.offline': '其他走法只能在連線時儲存。重新連線後即可選擇這條。',
+  'roadtrip.alt.otherEngineStandard': '駕駛時間由主要路徑服務計算，而非規劃這一段所用的服務。',
+  'roadtrip.alt.avoidNotHeld': '只有在設定的「{setting}」中勾選「{class}」，公路旅行才會走這條路。',
+  'roadtrip.alt.checking': '正在用公路旅行的路徑服務檢查這條路…',
+  'roadtrip.alt.standIn': '避開專用的路徑服務沒有回應這一段，因此由主要路徑服務繪製。正在重新詢問避開專用的路徑服務。',
   'roadtrip.day': '第 {number} 天',
   'roadtrip.quietDay.empty': '尚無停靠點 — 拖到這裡',
   'roadtrip.quietDay.one': '目前只有 {name} — 把停靠點拖到這裡',
@@ -265,7 +270,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '取車 {time}',
   'roadtrip.ride.return': '還車 {time}',
   'roadtrip.ride.open': '開啟預訂',
-  'roadtrip.ride.undated': '{title} 沒有日期，因此行程不會用到它。',
+  'roadtrip.ride.undated': '{title} 不在本次旅行的任何一天，因此行程不會用到它。',
   'roadtrip.bookings.loose': '當天的其他預訂',
 };
 export default roadtrip;

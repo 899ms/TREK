@@ -222,9 +222,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Tid från undvikandemotorn, inte huvudmotorn.',
   'roadtrip.alt.notHeld': 'Bilresans ruttserver följer inte den här vägen, så den sparades inte.',
   'roadtrip.alt.ferryNotHeld':
-    'Den här vägen går med färja. Lägg till färjan som transportbokning så följer resan den.',
+    'Den här vägen går med färja. Lägg till färjan som transportbokning så följer resan den. Kommer den fram först nästa dag, lägg stoppen på andra sidan vattnet på den dagen.',
   'roadtrip.alt.legChanged': 'Sträckan ändrades medan vägen kontrollerades, så inget sparades.',
   'roadtrip.alt.offline': 'Andra vägar sparas bara online. Anslut igen för att välja den här.',
+  'roadtrip.alt.otherEngineStandard': 'Tid från huvudmotorn, inte från den som den här sträckan planeras med.',
+  'roadtrip.alt.avoidNotHeld':
+    'Bilresan kör bara den här vägen om ”{class}” är ikryssat under ”{setting}” i dess inställningar.',
+  'roadtrip.alt.checking': 'Kontrollerar den här vägen med bilresans ruttserver…',
+  'roadtrip.alt.standIn':
+    'Undvikandemotorn svarade inte för den här sträckan, så huvudmotorn ritade den. Undvikandemotorn tillfrågas igen.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Inga stopp än – släpp ett här',
   'roadtrip.quietDay.one': 'Hittills bara {name} – släpp ett stopp här',
@@ -278,7 +284,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Upphämtning {time}',
   'roadtrip.ride.return': 'Återlämning {time}',
   'roadtrip.ride.open': 'Öppna bokning',
-  'roadtrip.ride.undated': 'Bokningen {title} har inget datum, så körningen tar inte med den.',
+  'roadtrip.ride.undated': 'Bokningen {title} ligger inte på någon av resans dagar, så körningen tar inte med den.',
   'roadtrip.bookings.loose': 'Även bokat denna dag',
 };
 export default roadtrip;

@@ -801,6 +801,41 @@ describe('useRoadtripRoutes', () => {
         clock.mockRestore()
       }
     })
+
+    it('FE-ROADTRIP-ROUTES-051: a join OSRM answered in the engine’s place is drawn, flagged, and asked for again on request', async () => {
+      // Filed like any answer, it stood in for the weighed road until the page was loaded
+      // again, and a picker on it read the stand-in line as the road already taken.
+      let now = 10_000
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        setting({ roadtrip_connect_days: true, roadtrip_avoid: 'toll' })
+        const standIn = { ...routed(1), avoidance: { asked: ['toll'], achieved: [], fellBack: true } }
+        calculateRouteWithLegs.mockImplementation((wp: { lat: number }[]) =>
+          Promise.resolve(wp[0].lat === LUENEBURG[0] ? standIn : routed(1)))
+        const { days: daysList, assignments } = twoDays()
+        const { result } = renderHook(() => useRoadtripRoutes(7, daysList, assignments))
+        await waitFor(() => expect(result.current.lines).toHaveLength(3))
+        await waitFor(() => expect(result.current.loading).toBe(false))
+        const lueneburg = result.current.days[0].stops[1]
+        const berlin = result.current.days[1].stops[0]
+        expect(result.current.legRouter!(lueneburg, berlin, 2).standIn).toBe(true)
+        // The day runs came from the engine asked.
+        expect(result.current.legRouter!(result.current.days[0].stops[0], lueneburg, 1).standIn).toBe(false)
+        // Flagged on the card the join arrives on, the way a day's own run is.
+        expect(result.current.days[1].avoidMissed).toEqual(['toll'])
+        expect(result.current.days[0].avoidMissed ?? []).toEqual([])
+
+        const asked = askedFor(LUENEBURG, BERLIN).length
+        now += 10_000
+        calculateRouteWithLegs.mockImplementation(() => Promise.resolve(routed(1)))
+        act(() => { result.current.reroute!() })
+        await waitFor(() => expect(askedFor(LUENEBURG, BERLIN).length).toBeGreaterThan(asked))
+        await waitFor(() => expect(result.current.legRouter!(lueneburg, berlin, 2).standIn).toBe(false))
+        expect(result.current.days[1].avoidMissed ?? []).toEqual([])
+      } finally {
+        clock.mockRestore()
+      }
+    })
   })
 })
 
@@ -1108,5 +1143,23 @@ describe('a leg asked for again on demand', () => {
     await waitFor(() => expect(result.current.loading).toBe(false))
 
     expect(result.current.days[0].avoidMissed).toEqual(['ferry', 'toll'])
+  })
+
+  it('FE-ROADTRIP-ROUTES-050: a leg the stand-in drew says so to whoever asks, and rerouting asks the engine again', async () => {
+    // The rail keeps a day run until its stops or vias change, so a choice of the leg's
+    // own road, which writes nothing, left the stand-in line on the map.
+    act(() => { useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_avoid: 'toll' } })) })
+    calculateRouteWithLegs.mockResolvedValue({ ...routed(1), avoidance: { asked: ['toll'], achieved: [], fellBack: true } })
+    const { result } = renderHook(() => useRoadtripRoutes(7, [day(1, 1)], map(1, [{ id: 1, at: HAMBURG }, { id: 2, at: BERLIN }])))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const [from, to] = result.current.days[0].stops
+    expect(result.current.legRouter!(from, to, 1)).toMatchObject({ engine: 'valhalla', standIn: true })
+    expect(calculateRouteWithLegs).toHaveBeenCalledTimes(1)
+
+    calculateRouteWithLegs.mockResolvedValue({ ...routed(1), avoidance: { asked: ['toll'], achieved: ['toll'], fellBack: false } })
+    act(() => { result.current.reroute!() })
+    await waitFor(() => expect(calculateRouteWithLegs).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(result.current.legRouter!(from, to, 1).standIn).toBe(false))
+    expect(result.current.days[0].avoidMissed ?? []).toEqual([])
   })
 })

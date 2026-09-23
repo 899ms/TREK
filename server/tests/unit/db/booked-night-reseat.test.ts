@@ -128,14 +128,14 @@ describe('booked night reseat', () => {
     reseatBookedNights(db);
 
     // The rules the service applies when it moves a night: a via follows the stop
-    // it was drawn after, so A's road is on leg one now and the hotel's on leg
-    // zero; B is last now and has no leg to keep a via on, so its road goes.
+    // it was drawn after, so A's road is on leg one now; B is last now and has no leg
+    // to keep a via on, so its road goes. The hotel's road was the drive into the next
+    // day, behind the last stop, and goes too now that the hotel leads the day: on the
+    // leg out of the hotel it would bend the drive to A through a point on that road.
     expect(order(db)).toEqual([hotel, a, b]);
-    expect(vias(db)).toEqual([
-      { id: afterHotel, after_order_index: 0, sequence: 0 },
-      { id: afterA, after_order_index: 1, sequence: 0 },
-    ]);
+    expect(vias(db)).toEqual([{ id: afterA, after_order_index: 1, sequence: 0 }]);
     expect(vias(db).map((v) => v.id)).not.toContain(afterB);
+    expect(vias(db).map((v) => v.id)).not.toContain(afterHotel);
   });
 
   it('RESEAT-006: a road behind the last stop stays with it, and the roads ahead follow their stops', () => {

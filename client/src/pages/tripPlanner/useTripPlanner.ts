@@ -43,7 +43,7 @@ import type { RefuelCandidate } from '../../components/Roadtrip/refuelSuggestion
 import { useFollowTrack } from '../../components/Roadtrip/useFollowTrack'
 import { openOn, useRouteAlternatives, type RailDrive } from '../../components/Roadtrip/useRouteAlternatives'
 import { alternativesBusy, buildAlternativeOverlays } from '../../components/Roadtrip/alternativeOverlays'
-import { pinAlternative, railDriveOn, railLegAt, type PinProof } from '../../components/Roadtrip/alternativePins'
+import { pinAlternative, railDriveOn, railLegAt, refusalHint, type PinProof } from '../../components/Roadtrip/alternativePins'
 import { stopArrival } from '../../components/Roadtrip/stopArrival'
 import type { CorridorPoi } from '../../components/Roadtrip/useCorridorPois'
 import { projectOntoRoute, sliceAtMeters, type LatLng } from '../../components/Roadtrip/corridor'
@@ -1646,6 +1646,12 @@ export function useTripPlanner() {
    * between each of them. A write that fails is reported and leaves the picker open:
    * swallowed, it closed on a leg that still carried its via, and not even the reload ran
    * to contradict the traveller.
+   *
+   * A refusal is said twice: as a toast, and to the bar (`settle`), which keeps it beside
+   * the offers and announces it. A leg the rail drew with OSRM standing in for an engine
+   * that did not answer is asked for again once a choice holds, since the road the router
+   * chose is not the one on the map: taking the router's own road there wrote nothing and
+   * left the stand-in line in place, which read as a click that did nothing.
    */
   const chooseRouteAlternative = useCallback(async (index: number) => {
     const open = routeAlternatives.open
@@ -1664,17 +1670,17 @@ export function useTripPlanner() {
       proof = await pinAlternative({ offer, current: open.routes.find(r => r.current), route: open.route, signal })
     } catch {
       if (signal.aborted) return
-      routeAlternatives.settle()
+      routeAlternatives.settle(t('roadtrip.alt.failed'))
       toast.error(t('roadtrip.alt.failed'))
       return
     }
     if (signal.aborted) return
     if (!proof.held) {
-      routeAlternatives.settle()
-      toast.error(t(proof.fellBack ? 'roadtrip.alt.failed' : 'roadtrip.alt.notHeld'), 6000)
-      // The one refusal with a way out: a crossing by ferry is a booking, and the drive
-      // follows a booked ferry from terminal to terminal.
-      if (!proof.fellBack && offer.hasFerry && !proof.last.hasFerry) toast.info(t('roadtrip.alt.ferryNotHeld'), 8000)
+      const refusal = t(proof.fellBack ? 'roadtrip.alt.failed' : 'roadtrip.alt.notHeld')
+      const hint = proof.fellBack ? null : refusalHint(offer, proof.last, t)
+      routeAlternatives.settle(hint ? `${refusal} ${hint}` : refusal)
+      toast.error(refusal, 6000)
+      if (hint) toast.info(hint, 8000)
       return
     }
 
@@ -1687,7 +1693,10 @@ export function useTripPlanner() {
       routeAlternatives.close()
       return
     }
-    // The router's own road on a leg nothing bends is already what is driven.
+    // The router's own road on a leg nothing bends is already what is driven, unless OSRM
+    // drew the leg in its engine's place. A write routes the leg again by itself; without
+    // one the rail is asked to, and either way the picker says why the map may still hold
+    // the stand-in line for a moment, or for as long as that engine does not answer.
     const bent = viasLeaving(leg.from, roadtripVias.byDay[anchor.dayId] ?? []).length > 0
     if (proof.pins.length || bent) {
       try {
@@ -1698,14 +1707,18 @@ export function useTripPlanner() {
         )
       } catch (err: unknown) {
         // Said even when the picker has moved on in the meantime: the write was asked for.
-        if (!signal.aborted) routeAlternatives.settle()
-        toast.error(err instanceof Error ? err.message : t('common.unknownError'))
+        const message = err instanceof Error ? err.message : t('common.unknownError')
+        if (!signal.aborted) routeAlternatives.settle(message)
+        toast.error(message)
         return
       }
+    } else if (open.standIn) {
+      roadtripRoutes.reroute?.()
     }
+    if (open.standIn) toast.info(t('roadtrip.alt.standIn'), 8000)
     // A picker opened on another leg while this was written belongs to that leg now.
     if (!signal.aborted) routeAlternatives.close()
-  }, [routeAlternatives, roadtripVias, toast, t])
+  }, [routeAlternatives, roadtripVias, roadtripRoutes, toast, t])
 
   /**
    * A click on the drawn route puts a via there, and the drive is redrawn through it.

@@ -35,7 +35,7 @@ import { isDayInAccommodationRange, getAccommodationAnchors, getDayBookendHotels
 import {
   TRANSPORT_TYPES, parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getDisplayTimeForDay, getTransportRouteEndpoints,
   getTransportForDay as _getTransportForDay, getMergedItems as _getMergedItems, isCarrierTransport, hasCarrierEndpointOnDay,
-  getAssignmentReservations, timedSlot, rideSeatKey,
+  getAssignmentReservations, timedSlot, storedRideSlot,
   type MergedItem,
 } from '../../utils/dayMerge'
 import { withinDriveRange } from '../../utils/geo'
@@ -438,14 +438,15 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
       .slice().sort((a, b) => a.order_index - b.order_index)
 
   // Compute initial day_plan_position for a transport based on time
-  const computeTransportPosition = (r, da) => {
+  const computeTransportPosition = (r, da, dayId) => {
     // A ride that lands today goes where it adds the least road between the same clocks,
-    // by the rule the list and the road trip seat it with (`rideSeatKey`). This slot is
-    // stored, so seated by the clock alone a ferry between two untimed stops stayed at
-    // the end of the day, and the drive went overland before the crossing (#2461).
-    const seat = rideSeatKey(r, da.map(a => ({ type: 'place' as const, sortKey: a.order_index, data: a })))
-    if (seat === -Infinity) return Math.min(...da.map(a => a.order_index)) - 0.5
-    if (seat !== null) return seat + 0.5
+    // by the rule the road trip seats it with. This slot is stored, so seated by the
+    // clock alone a ferry between two untimed stops stayed at the end of the day, and the
+    // drive went overland before the crossing (#2461). Worked out over every stored row of
+    // the day rather than `da`: the drive stops at the hotel and the service stops the
+    // list hides, and the slot is read against their order indexes too.
+    const ride = storedRideSlot(r, assignments[String(dayId)] || [], accommodations, dayId)
+    if (ride !== null) return ride
     const minutes = parseTimeToMinutes(r.reservation_time) ?? 0
     // Find the last place with time <= transport time
     let afterIdx = -1
@@ -469,7 +470,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     )
     const positions = sorted.map((r, idx) => ({
       id: r.id,
-      day_plan_position: computeTransportPosition(r, da) + idx * 0.01,
+      day_plan_position: computeTransportPosition(r, da, dayId) + idx * 0.01,
     }))
     // Mark as initialized immediately to prevent re-entry
     for (const p of positions) initedTransportIds.current.add(p.id)

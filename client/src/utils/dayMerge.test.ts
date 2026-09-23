@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems, rideSeatKey, timedSlot } from './dayMerge'
+import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems, rideSeatKey, stayStartingOn, storedRideSlot, timedSlot } from './dayMerge'
 
 describe('parseTimeToMinutes', () => {
   it('parses HH:MM string', () => {
@@ -336,7 +336,9 @@ describe('getMergedItems: a ride within one day, seated by where it goes (#2461)
   })
 
   it('opens the day with a ride that lands next to its first stop, ahead of a note too', () => {
-    expect(read([newcastle()], [ferry()], [{ id: 10, sort_order: 0 }])).toEqual(['transport:69', 'place:2', 'note:10'])
+    // The note keeps its place ahead of the stop; the ride goes ahead of both.
+    expect(read([newcastle()], [ferry()], [{ id: 10, sort_order: 0 }])).toEqual(['transport:69', 'note:10', 'place:2'])
+    expect(read([newcastle()], [ferry()], [{ id: 10, sort_order: 2 }])).toEqual(['transport:69', 'place:2', 'note:10'])
   })
 
   it('leaves a slot somebody stored where it is', () => {
@@ -354,6 +356,59 @@ describe('getMergedItems: a ride within one day, seated by where it goes (#2461)
     const bus = { type: 'transport' as const, sortKey: 0.5, data: { id: 11, type: 'bus', reservation_time: '18:00' } }
     expect(rideSeatKey(ferry(), [rows[0], bus, rows[2]])).toBeNull()
     expect(rideSeatKey({ ...ferry(), type: 'taxi' }, rows)).toBeNull()
+  })
+})
+
+// The slot the desktop stores for a ride nobody placed yet, worked out over the rows the
+// road trip drives rather than the ones the list shows (#2461).
+describe('storedRideSlot', () => {
+  const row = (id: number, order_index: number, lat: number | null, lng: number | null, place_time: string | null = null) =>
+    ({ id, order_index, place_id: id * 10, place: { lat, lng, place_time } })
+  const amsterdam = row(1, 0, 52.3731, 4.8926)
+  // The hotel a booking put on the day: hidden in the list, a stop of the drive.
+  const hotel = row(3, 1, 54.975, -1.61)
+  const ferry = (over: Record<string, unknown> = {}) => ({
+    id: 69, type: 'ferry', title: 'IJmuiden to Newcastle', day_id: 5, end_day_id: 5,
+    reservation_time: '2026-10-06T17:30', reservation_end_time: '2026-10-06T23:00',
+    endpoints: [
+      { role: 'from', sequence: 0, name: 'IJmuiden', lat: 52.4581, lng: 4.5879 },
+      { role: 'to', sequence: 1, name: 'Port of Tyne', lat: 54.9925, lng: -1.4522 },
+    ],
+    ...over,
+  })
+
+  it('puts a ferry ahead of the hotel across the water that the list does not show', () => {
+    // Over the visible Amsterdam alone the clock closed the day at 1.5, behind the hotel,
+    // and the drive went there overland before the crossing.
+    expect(storedRideSlot(ferry(), [amsterdam, hotel], [{ place_id: 30, start_day_id: 5, check_in: null }], 5)).toBe(0.5)
+  })
+
+  it('times a night by the check-in of the stay that starts there, and the clock still binds', () => {
+    // Checked in at three, the hotel is behind the drive by the 17:30 sailing already.
+    const checkIn = [{ place_id: 30, start_day_id: 5, check_in: '15:00' }]
+    expect(storedRideSlot(ferry(), [amsterdam, hotel], checkIn, 5)).toBe(1.5)
+    // A stay that starts on another day says nothing about this one.
+    expect(storedRideSlot(ferry(), [amsterdam, hotel], [{ ...checkIn[0], start_day_id: 4 }], 5)).toBe(0.5)
+  })
+
+  it('opens the day, closes it, or sits behind a timed row, measured on order indexes', () => {
+    expect(storedRideSlot(ferry(), [row(2, 3, 54.9783, -1.6178)], [], 5)).toBe(2.5)
+    expect(storedRideSlot(ferry(), [amsterdam], [], 5)).toBe(0.5)
+    expect(storedRideSlot(ferry(), [amsterdam, row(2, 1, 54.9783, -1.6178, '10:00')], [], 5)).toBe(1.5)
+    // A row without coordinates is no stop of the drive, but the day still closes behind it.
+    expect(storedRideSlot(ferry(), [amsterdam, row(4, 1, null, null)], [], 5)).toBe(1.5)
+  })
+
+  it('leaves anything but a ride within one day to the clock', () => {
+    expect(storedRideSlot(ferry({ type: 'taxi' }), [amsterdam, hotel], [], 5)).toBeNull()
+    expect(storedRideSlot(ferry({ end_day_id: 6 }), [amsterdam, hotel], [], 5)).toBeNull()
+    expect(storedRideSlot(ferry(), [], [], 5)).toBeNull()
+  })
+
+  it('finds the stay by its place and the day it starts', () => {
+    const stays = [{ id: 1, place_id: 30, start_day_id: 4 }, { id: 2, place_id: 30, start_day_id: 5 }]
+    expect(stayStartingOn(stays, 30, 5)?.id).toBe(2)
+    expect(stayStartingOn(stays, 31, 5)).toBeUndefined()
   })
 })
 

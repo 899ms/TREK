@@ -221,9 +221,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Zeit vom Ausweich-Router, nicht vom Haupt-Router.',
   'roadtrip.alt.notHeld': 'Der Router des Roadtrips fährt diesen Weg nicht nach, deshalb wurde er nicht gespeichert.',
   'roadtrip.alt.ferryNotHeld':
-    'Dieser Weg führt über eine Fähre. Trag die Fähre als Transportbuchung ein, dann folgt ihr die Fahrt.',
+    'Dieser Weg führt über eine Fähre. Trag die Fähre als Transportbuchung ein, dann folgt ihr die Fahrt. Legt sie erst am nächsten Tag an, gehören die Stopps auf der anderen Seite des Wassers auf diesen Tag.',
   'roadtrip.alt.legChanged': 'Die Etappe hat sich während der Prüfung geändert, deshalb wurde nichts gespeichert.',
   'roadtrip.alt.offline': 'Andere Wege werden nur online gespeichert. Verbinde dich wieder, um diesen zu nehmen.',
+  'roadtrip.alt.otherEngineStandard': 'Zeit vom Haupt-Router, nicht von dem, mit dem diese Etappe geplant wird.',
+  'roadtrip.alt.avoidNotHeld':
+    'Diesen Weg fährt der Roadtrip nur, wenn in seinen Einstellungen unter „{setting}“ die Option „{class}“ angehakt ist.',
+  'roadtrip.alt.checking': 'Der Router des Roadtrips prüft diesen Weg…',
+  'roadtrip.alt.standIn':
+    'Der Ausweich-Router hat für diese Etappe nicht geantwortet, deshalb hat der Haupt-Router sie gezeichnet. Der Ausweich-Router wird jetzt noch einmal gefragt.',
   'roadtrip.day': 'Tag {number}',
   'roadtrip.quietDay.empty': 'Noch keine Stopps — hier ablegen',
   'roadtrip.quietDay.one': 'Bisher nur {name} — hier einen Stopp ablegen',
@@ -277,7 +283,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Abholung {time}',
   'roadtrip.ride.return': 'Rückgabe {time}',
   'roadtrip.ride.open': 'Buchung öffnen',
-  'roadtrip.ride.undated': 'Die Buchung {title} hat kein Datum, deshalb plant die Fahrt nicht mit ihr.',
+  'roadtrip.ride.undated':
+    'Die Buchung {title} liegt auf keinem Tag dieser Reise, deshalb plant die Fahrt nicht mit ihr.',
   'roadtrip.bookings.loose': 'Außerdem an diesem Tag gebucht',
 };
 export default roadtrip;

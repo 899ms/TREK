@@ -13,7 +13,7 @@ import { ARRIVING_DRIVE, openOn, sameDrive, useRouteAlternatives, type Alternati
 import type { RailLegRouter } from './useRoadtripRoutes'
 
 /**
- * FE-ALTHOOK-001..013: asking for other ways of driving one leg.
+ * FE-ALTHOOK-001..015: asking for other ways of driving one leg.
  *
  * The case that carries the feature: the road the rail drives is always the first entry,
  * taken from the rail, and the offers come from the engine the rail drives the leg with.
@@ -46,7 +46,7 @@ function request(router: Partial<RailLegRouter> = {}, over: Partial<Alternatives
     driven: { coordinates: RAIL, distance: 290_000, duration: 10_800 },
     anchor: { dayId: 3, afterIndex: 2 },
     ends: { from: 11, to: 12 },
-    router: { mode: 'driving', avoid: [], engine: 'osrm', route, ...router },
+    router: { mode: 'driving', avoid: [], engine: 'osrm', standIn: false, route, ...router },
     ...over,
   }
 }
@@ -251,6 +251,40 @@ describe('useRouteAlternatives', () => {
     act(() => { result.current.prove(1) })
     act(() => { result.current.settle() })
     expect(result.current.open).toBeNull()
+  })
+})
+
+describe('a leg OSRM drew while the rail’s engine did not answer', () => {
+  it('FE-ALTHOOK-014: Current is marked as OSRM’s line, and the picker knows the leg was drawn by the stand-in', async () => {
+    // Marked as the rail's engine, the stand-in line was set against the second engine's
+    // offers as if one speed model had timed them all.
+    const { result } = renderHook(() => useRouteAlternatives())
+
+    act(() => { result.current.ask(request({ avoid: ['toll'], engine: 'valhalla', standIn: true })) })
+    await waitFor(() => expect(result.current.open?.loading).toBe(false))
+
+    expect(result.current.open).toMatchObject({ engine: 'valhalla', standIn: true })
+    expect(result.current.open?.routes[0]).toMatchObject({ current: true, engine: 'osrm' })
+  })
+
+  it('FE-ALTHOOK-015: a check that saved nothing leaves its reason on the picker until the next one starts', async () => {
+    const { result } = renderHook(() => useRouteAlternatives())
+    act(() => { result.current.ask(request()) })
+    await waitFor(() => expect(result.current.open?.loading).toBe(false))
+    expect(result.current.open?.notice).toBeNull()
+
+    act(() => { result.current.prove(1) })
+    act(() => { result.current.settle('Not saved.') })
+    expect(result.current.open).toMatchObject({ proving: null, notice: 'Not saved.' })
+
+    act(() => { result.current.prove(2) })
+    expect(result.current.open).toMatchObject({ proving: 2, notice: null })
+    act(() => { result.current.settle() })
+    expect(result.current.open?.notice).toBeNull()
+
+    act(() => { result.current.settle('Not saved.') })
+    act(() => { result.current.ask(request({}, { drive: { kind: 'leg', index: 0 } })) })
+    expect(result.current.open?.notice).toBeNull()
   })
 })
 

@@ -24,6 +24,8 @@ export interface AlternativeOverlay {
    * `slowerThanQuickest` stays zero.
    */
   otherEngine: boolean
+  /** The engine that priced this route, which names the other engine when it is one. */
+  engine: RouteEngine
   labelBg: string
   /** Where to hang the label — a point on this route and on no other. */
   at: { lat: number; lng: number }
@@ -157,6 +159,7 @@ export function buildAlternativeOverlays(
         ? 0
         : Math.max(0, Math.round(route.duration - routes[quickest].duration)),
       otherEngine,
+      engine: engineOf(route),
       labelBg: primary ? ALT_LABEL_PRIMARY_BG : ALT_LABEL_SECONDARY_BG,
       at: at ?? { lat: 0, lng: 0 },
     }
@@ -201,6 +204,22 @@ export function alternativeSubline(alt: AlternativeOverlay, slower: (time: strin
   // slower" under it would read as a tie that nobody measured.
   if (alt.otherEngine) return alt.label
   return slower(formatDurationShort(alt.slowerThanQuickest))
+}
+
+/**
+ * What a route another engine timed says about it, as a translation key: which engine it
+ * was. Null for a route the rail's own engine timed.
+ *
+ * Both bars used to call every such route the avoidance router's. A leg a route provider
+ * plugin drives is offered OSRM's ways, and a leg OSRM drew while the avoidance router did
+ * not answer heads its list with OSRM's line, so the note named an engine that had nothing
+ * to do with either. One reading for the desk and the phone.
+ */
+export function otherEngineNote(alt: Pick<AlternativeOverlay, 'otherEngine' | 'engine'>): string | null {
+  if (!alt.otherEngine) return null
+  if (alt.engine === 'valhalla') return 'roadtrip.alt.otherEngine'
+  // No offer comes from a plugin: only the rail's own line on a plugin leg is one's.
+  return alt.engine === 'osrm' ? 'roadtrip.alt.otherEngineStandard' : null
 }
 
 /**

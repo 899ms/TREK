@@ -222,9 +222,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Čas spočítal server pro objížďky, ne ten hlavní.',
   'roadtrip.alt.notHeld': 'Směrovací server cesty touto trasou nepovede, proto nebyla uložena.',
   'roadtrip.alt.ferryNotHeld':
-    'Tato trasa vede přes trajekt. Přidej trajekt jako rezervaci dopravy a jízda ho bude následovat.',
+    'Tato trasa vede přes trajekt. Přidej trajekt jako rezervaci dopravy a jízda ho bude následovat. Pokud připlouvá až další den, dej zastávky na druhém břehu na ten den.',
   'roadtrip.alt.legChanged': 'Úsek se během kontroly změnil, proto se nic neuložilo.',
   'roadtrip.alt.offline': 'Jiné trasy se ukládají jen online. Pro výběr této trasy se znovu připoj.',
+  'roadtrip.alt.otherEngineStandard': 'Čas spočítal hlavní server, ne ten, kterým se tento úsek plánuje.',
+  'roadtrip.alt.avoidNotHeld':
+    'Touto trasou cesta pojede jen tehdy, když je v jejím nastavení v části „{setting}“ zaškrtnuto „{class}“.',
+  'roadtrip.alt.checking': 'Směrovací server cesty tuto trasu ověřuje…',
+  'roadtrip.alt.standIn':
+    'Server pro objížďky pro tento úsek neodpověděl, takže ho nakreslil hlavní server. Dotaz na server pro objížďky se teď opakuje.',
   'roadtrip.day': 'Den {number}',
   'roadtrip.quietDay.empty': 'Zatím žádné zastávky — přetáhněte sem',
   'roadtrip.quietDay.one': 'Zatím jen {name} — přetáhněte sem zastávku',
@@ -278,7 +284,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Vyzvednutí {time}',
   'roadtrip.ride.return': 'Vrácení {time}',
   'roadtrip.ride.open': 'Otevřít rezervaci',
-  'roadtrip.ride.undated': 'Rezervace {title} nemá datum, proto s ní jízda nepočítá.',
+  'roadtrip.ride.undated': 'Rezervace {title} nepatří k žádnému dni této cesty, proto s ní jízda nepočítá.',
   'roadtrip.bookings.loose': 'Také rezervováno na tento den',
 };
 export default roadtrip;

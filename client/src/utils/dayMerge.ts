@@ -322,6 +322,69 @@ export function rideSeatKey(r: CarrierBooking, rows: readonly MergedItem[]): num
   return ride ? rideSeatAfter(rows.flatMap(seatItemsOf), ride) : null
 }
 
+/** A booked stay, as far as the road trip times a stop by it. */
+interface StayStart {
+  place_id?: number | null
+  start_day_id?: number | null
+  check_in?: string | null
+}
+
+/**
+ * The stay a stop at `placeId` begins on day `dayId`, the one whose check-in the road trip
+ * times that stop by. Only the day the stay starts: a check-out says when the room has to
+ * be handed back, not when the drive sets off.
+ */
+export function stayStartingOn<T extends StayStart>(stays: readonly T[], placeId: number | null | undefined, dayId: number): T | undefined {
+  return stays.find(stay => stay.place_id === placeId && stay.start_day_id === dayId)
+}
+
+/** A stored row of a day, as far as `storedRideSlot` reads it. */
+interface StoredStop {
+  order_index: number
+  place_id?: number | null
+  place?: { lat?: number | null; lng?: number | null; place_time?: string | null } | null
+}
+
+/**
+ * The slot to store for a ride that lands on the day it left (`sameDayRide`) and has none
+ * yet: worked out over the day's rows the way the road trip seats its terminals among
+ * them (`seatCarrierStops`), so the slot the list is drawn by and the drive agree. Null for
+ * any other booking, which keeps the clock's slot.
+ *
+ * Read over every stored row the drive stops at, the ones the list hides included: the
+ * hotel a booking put on the day, a petrol station kept out of the list. The slot is a
+ * number among their order indexes all the same, and worked out over the rows the list
+ * shows it could land behind a hidden stop on the far shore, which the drive then went to
+ * overland before the crossing (#2461). Each row counts with its start, else the check-in
+ * of the stay that begins there that day (`stayStartingOn`), and with its coordinates; a
+ * row without them is no stop of the drive. Where the rule keeps the clock's seat, the
+ * clock is read over the same rows: behind the last one timed at or before the departure,
+ * else at the end of the day.
+ */
+export function storedRideSlot(
+  r: CarrierBooking,
+  day: readonly StoredStop[],
+  stays: readonly StayStart[],
+  dayId: number,
+): number | null {
+  const ride = sameDayRide(r)
+  if (!ride || !day.length) return null
+  const items: SeatItem[] = day.flatMap(row => {
+    const lat = row.place?.lat
+    const lng = row.place?.lng
+    if (typeof lat !== 'number' || typeof lng !== 'number' || !Number.isFinite(lat) || !Number.isFinite(lng)) return []
+    const start = row.place?.place_time ?? stayStartingOn(stays, row.place_id, dayId)?.check_in
+    return [{ key: row.order_index, minutes: parseTimeToMinutes(start), point: { lat, lng } }]
+  })
+  const keys = day.map(row => row.order_index)
+  const seat = rideSeatAfter(items, ride)
+  if (seat === -Infinity) return Math.min(...keys) - 0.5
+  if (seat !== null) return seat + 0.5
+  const departs = ride.minutes ?? 0
+  const before = items.filter(item => item.minutes !== null && item.minutes <= departs).map(item => item.key)
+  return (before.length ? Math.max(...before) : Math.max(...keys)) + 0.5
+}
+
 /** Merge places, notes, and transports into a single ordered day timeline. */
 export function getMergedItems(opts: {
   dayAssignments: any[]

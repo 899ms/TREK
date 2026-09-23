@@ -1284,16 +1284,17 @@ describe('the drawn roads a booking moves', () => {
     const existing = svc.getAccommodation(accommodation.id, trip.id)!;
     const { mirror } = svc.updateAccommodation(accommodation.id, existing, { check_in: '20:00' }) as any;
 
-    // The night is last now. The road out of it has no leg left and goes; the roads
-    // behind B and C follow them one number up, and the one into the next day is
-    // C's no longer.
+    // The night is last now. The road out of it has no leg left and goes; the road
+    // behind B follows it one number up. The one behind C was the drive into the next
+    // day, which leaves from the hotel now, so it goes as well rather than bending the
+    // drive from C to the hotel through a point on the road to tomorrow.
     expect(stopsOn(day.id)).toEqual([a.id, b.id, c.id, hotel.id]);
     expect(viaAnchors(day.id)).toEqual([
       { id: afterA, after_order_index: 0 },
       { id: afterB, after_order_index: 1 },
-      { id: afterC, after_order_index: 2 },
     ]);
     expect(viaAnchors(day.id).map(via => via.id)).not.toContain(afterHotel);
+    expect(viaAnchors(day.id).map(via => via.id)).not.toContain(afterC);
     expect(mirror.moved).not.toBeNull();
     expect(mirror.vias).toEqual([{ dayId: day.id, vias: expect.arrayContaining([expect.objectContaining({ id: afterB, after_order_index: 1 })]) }]);
   });

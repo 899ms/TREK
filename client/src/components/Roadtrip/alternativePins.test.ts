@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MAX_PINS, pinAlternative, railDriveOn, railLegAt } from './alternativePins'
+import { MAX_PINS, pinAlternative, railDriveOn, railLegAt, refusalHint } from './alternativePins'
 import type { RailLegRoute, RailLegRouter, RoadtripDay, RoadtripStop } from './useRoadtripRoutes'
 import type { OfferedRoute } from './useRouteAlternatives'
 
 /**
- * FE-ALTPIN-001..011: proving a choice with the rail's own router before it is saved.
+ * FE-ALTPIN-001..012: proving a choice with the rail's own router before it is saved.
  *
  * A choice used to be one via at the point where the offer strayed furthest, written
  * without asking whether the router then drove the offer. On a ferry it did not (OSRM
@@ -180,5 +180,26 @@ describe('railDriveOn', () => {
     expect(railDriveOn(card({ legs: [] }), { kind: 'leg', index: 0 })).toBeNull()
     // A line the card does not have yet is no reason to refuse the drive.
     expect(railDriveOn(card({ legLines: undefined }), { kind: 'leg', index: 0 })?.line).toBeUndefined()
+  })
+})
+
+describe('refusalHint', () => {
+  /** Echoes the key with its values, so a case reads which sentence was picked and with what. */
+  const t = (key: string, params?: Record<string, string | number>) =>
+    params ? `${key}(${Object.entries(params).map(([k, v]) => `${k}=${v}`).join(',')})` : key
+
+  it('FE-ALTPIN-012: a refused way says what would get it driven: a ferry booking, or the class left out avoided', () => {
+    // The ferry the router would not board wins: the crossing is a booking, whatever else
+    // the way leaves out.
+    expect(refusalHint({ hasFerry: true, avoids: 'motorway' }, { hasFerry: false }, t)).toBe('roadtrip.alt.ferryNotHeld')
+    // A way without the motorway on a trip that does not avoid it is held for a few pins
+    // at most; ticking the class is what drives it.
+    expect(refusalHint({ avoids: 'motorway' }, { hasFerry: false }, t))
+      .toBe('roadtrip.alt.avoidNotHeld(class=roadtrip.avoid.motorway,setting=roadtrip.avoid.section)')
+    expect(refusalHint({ avoids: 'toll' }, {}, t))
+      .toBe('roadtrip.alt.avoidNotHeld(class=roadtrip.avoid.toll,setting=roadtrip.avoid.section)')
+    // A plain way, or a ferry the router did board, has no way out to offer.
+    expect(refusalHint({}, {}, t)).toBeNull()
+    expect(refusalHint({ hasFerry: true }, { hasFerry: true }, t)).toBeNull()
   })
 })

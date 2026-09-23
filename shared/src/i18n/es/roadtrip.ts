@@ -225,9 +225,14 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Tiempo del enrutador de evitación, no del principal.',
   'roadtrip.alt.notHeld': 'El enrutador del viaje no sigue esta ruta, así que no se ha guardado.',
   'roadtrip.alt.ferryNotHeld':
-    'Esta ruta cruza en ferri. Añade el ferri como reserva de transporte y el trayecto lo seguirá.',
+    'Esta ruta cruza en ferri. Añade el ferri como reserva de transporte y el trayecto lo seguirá. Si llega al día siguiente, pon las paradas del otro lado del agua en ese día.',
   'roadtrip.alt.legChanged': 'Este tramo cambió mientras se comprobaba la ruta, así que no se ha guardado nada.',
   'roadtrip.alt.offline': 'Las otras rutas solo se guardan con conexión. Vuelve a conectarte para elegir esta.',
+  'roadtrip.alt.otherEngineStandard': 'Tiempo del enrutador principal, no del que planifica este tramo.',
+  'roadtrip.alt.avoidNotHeld': 'El viaje solo hace esta ruta con «{class}» marcado en «{setting}» en su configuración.',
+  'roadtrip.alt.checking': 'Comprobando esta ruta con el enrutador del viaje…',
+  'roadtrip.alt.standIn':
+    'El enrutador de evitación no respondió para este tramo, así que lo dibujó el enrutador principal. Se está volviendo a consultar el enrutador de evitación.',
   'roadtrip.day': 'Día {number}',
   'roadtrip.quietDay.empty': 'Sin paradas todavía: suelta una aquí',
   'roadtrip.quietDay.one': 'Por ahora solo {name}: suelta una parada aquí',
@@ -282,7 +287,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Recogida {time}',
   'roadtrip.ride.return': 'Devolución {time}',
   'roadtrip.ride.open': 'Abrir reserva',
-  'roadtrip.ride.undated': 'La reserva {title} no tiene fecha, así que el trayecto no la tiene en cuenta.',
+  'roadtrip.ride.undated':
+    'La reserva {title} no está en ningún día de este viaje, así que el trayecto no la tiene en cuenta.',
   'roadtrip.bookings.loose': 'También reservado este día',
 };
 export default roadtrip;

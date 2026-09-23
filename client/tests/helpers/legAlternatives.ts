@@ -18,7 +18,9 @@ export function openLeg(over: Partial<LegAlternatives> = {}): LegAlternatives {
     anchor: { dayId: over.dayId ?? 2, afterIndex: over.drive?.kind === 'leg' ? over.drive.index : 0 },
     ends: { from: 1, to: 2 },
     engine: 'osrm',
+    standIn: false,
     route: vi.fn(),
+    notice: null,
     ...over,
   }
 }

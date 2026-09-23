@@ -574,9 +574,10 @@ describe('updateTime', () => {
   });
 
   it('ASG-SVC-042: a sort that moves the last stop up the day takes the drive behind it along, never leaving it on no stop', () => {
-    // The rule the planner applies too (carriedSeam): a via behind the last stop stays
-    // there only while that stop is last. Once another stop is, the via follows its stop
-    // like any other, and nothing is left on an index behind the day's end.
+    // The rule the planner applies too (seamViaIndex): a via behind the last stop stays
+    // there only while that stop is last. Once another stop is, it goes: it lies on the
+    // road to tomorrow, and read as the leg its stop leaves by now it would bend the
+    // drive from C to A through a point on that road.
     const { day, ids: [a, b, c] } = dayOf([['09:00', 0], ['12:00', 1], ['18:00', 2]]);
     const afterA = addVia(day.id, 0);
     const intoTomorrow = addVia(day.id, 2);
@@ -584,10 +585,8 @@ describe('updateTime', () => {
     const update = svc.updateTime(c, '08:00', null);
 
     expect(dayOrder(day.id)).toEqual([c, a, b]);
-    expect(viaAnchors(day.id)).toEqual([
-      { id: afterA, after_order_index: 1, sequence: 0 },
-      { id: intoTomorrow, after_order_index: 0, sequence: 0 },
-    ]);
+    expect(viaAnchors(day.id)).toEqual([{ id: afterA, after_order_index: 1, sequence: 0 }]);
+    expect(viaAnchors(day.id).map(via => via.id)).not.toContain(intoTomorrow);
     expect(update.vias?.dayId).toBe(day.id);
   });
 

@@ -16,7 +16,9 @@ import {
   scheduleStopOf,
   carriedSeam,
   reanchorAfterRemove,
+  reanchorAfterReorder,
   reanchorByStopOrder,
+  seamViaIndex,
 } from './roadtripModel';
 
 import { describe, it, expect } from 'vitest';
@@ -1196,5 +1198,48 @@ describe('carriedSeam', () => {
     expect(reanchorByStopOrder([via(9, 2)], [10, 20, 30], [20, 10, 30])).toEqual({ vias: [], remove: [] });
     expect(reanchorAfterRemove([via(9, 2)], 2, 3)).toEqual({ vias: [], remove: [9] });
     expect(reanchorAfterRemove([via(9, 2)], 0, 3)).toEqual({ vias: [{ id: 9, after_order_index: 1 }], remove: [] });
+  });
+});
+
+describe('seamViaIndex', () => {
+  const via = (id: number, after: number) => ({ id, after_order_index: after, lat: 53, lng: 10 });
+  /** The day's stops after `from` was taken out and put back at `to`. */
+  const moved = (ids: number[], from: number, to: number): number[] => {
+    const next = ids.filter((_, i) => i !== from);
+    next.splice(to, 0, ids[from]!);
+    return next;
+  };
+
+  it('FE-ROADTRIP-MODEL-109: the via behind the last stop stays while that stop is last and goes once it is not', () => {
+    expect(seamViaIndex(2, [10, 20, 30], [10, 30])).toBe(1);
+    expect(seamViaIndex(2, [10, 20, 30], [30, 10, 20])).toBeNull();
+    expect(seamViaIndex(2, [10, 20, 30], [10, 30, 20])).toBeNull();
+    // A via on a leg of the day is left to the writer.
+    expect(seamViaIndex(1, [10, 20, 30], [30, 10, 20])).toBeUndefined();
+  });
+
+  it('FE-ROADTRIP-MODEL-110: every writer does the same to it for the same move, and never bends a leg of the day with it', () => {
+    // The rail's drag (positional) and the list's reorder or the server's sort (by stop)
+    // used to disagree: one dropped the via, the other put it on the leg its stop leaves by.
+    for (const count of [2, 3, 4, 5]) {
+      const ids = Array.from({ length: count }, (_, i) => 10 * (i + 1));
+      for (let from = 0; from < count; from++) {
+        for (let to = 0; to < count; to++) {
+          if (from === to) continue;
+          const vias = [via(9, count - 1)];
+          const positional = reanchorAfterReorder(vias, from, to, count);
+          expect(reanchorByStopOrder(vias, ids, moved(ids, from, to)), `${count}: ${from}->${to}`).toEqual(positional);
+          const stays = moved(ids, from, to)[count - 1] === ids[count - 1];
+          expect(positional, `${count}: ${from}->${to}`).toEqual(
+            stays ? { vias: [], remove: [] } : { vias: [], remove: [9] },
+          );
+        }
+        // Taken out: the same, by position and by stop.
+        const removed = ids.filter((_, i) => i !== from);
+        expect(reanchorByStopOrder([via(9, count - 1)], ids, removed)).toEqual(
+          reanchorAfterRemove([via(9, count - 1)], from, count),
+        );
+      }
+    }
   });
 });

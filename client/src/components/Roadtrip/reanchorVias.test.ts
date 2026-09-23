@@ -207,14 +207,16 @@ describe('the drive into the next day (#2461)', () => {
     expect(single.remove).toEqual([1])
   })
 
-  it('FE-REANCHOR-026: a last stop dragged up the day takes its drive along; a stop dragged behind it splits that drive', () => {
+  it('FE-REANCHOR-026: a last stop dragged up the day takes its drive along, and so does a stop dragged behind it', () => {
     // Left alone, the via sat at an index past the end of the day.
     const up = reanchorAfterReorder([via(1, 0), via(9, 3)], 3, 1, 4)
     expect(up.remove).toEqual([9])
     expect(anchors(up.vias)).toEqual({})
-    // Behind the old last stop now comes the moved one, and the point stays on the road
-    // leaving the old last stop, the way an insert into any leg keeps its first half.
-    expect(anchors(reanchorAfterReorder([via(9, 3)], 1, 3, 4).vias)).toEqual({ 9: 2 })
+    // Behind the old last stop now comes the moved one. The point lay on the road into the
+    // next day, not on the way to the stop that took its place, so it goes as well.
+    const behind = reanchorAfterReorder([via(9, 3)], 1, 3, 4)
+    expect(behind.remove).toEqual([9])
+    expect(behind.vias).toEqual([])
     // Anything moved in front of the last stop leaves it where it was.
     expect(isEmptyReanchoring(reanchorAfterReorder([via(9, 3)], 0, 2, 4))).toBe(true)
   })
@@ -229,5 +231,17 @@ describe('the drive into the next day (#2461)', () => {
       expect(plan.remove, `${from}->${to}`).toEqual([9])
       expect(plan.vias, `${from}->${to}`).toEqual([])
     }
+  })
+
+  it('FE-REANCHOR-029: under Days and in the server’s sort, a last stop moved up the day takes its drive along too', () => {
+    // It followed its stop instead, and the drive from 40 to 20 inside the day went
+    // through a point on the road to tomorrow, for everybody on the trip.
+    const up = reanchorByStopOrder([via(1, 0), via(9, 3)], [10, 20, 30, 40], [10, 40, 20, 30])
+    expect(up.remove).toEqual([9])
+    expect(anchors(up.vias)).toEqual({})
+    const front = reanchorByStopOrder([via(9, 2)], [10, 20, 30], [30, 10, 20])
+    expect(front).toEqual({ vias: [], remove: [9] })
+    // Two stops swapped: the drive out of the one that is first now goes here as well.
+    expect(reanchorByStopOrder([via(9, 1)], [10, 20], [20, 10])).toEqual({ vias: [], remove: [9] })
   })
 })

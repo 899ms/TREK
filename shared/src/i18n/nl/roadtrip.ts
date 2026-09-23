@@ -225,9 +225,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.otherEngine': 'Tijd van de vermijdingsrouter, niet van de hoofdrouter.',
   'roadtrip.alt.notHeld': 'De routeserver van de roadtrip volgt deze route niet, dus die is niet opgeslagen.',
   'roadtrip.alt.ferryNotHeld':
-    'Deze route gaat met de veerboot. Voeg de veerboot toe als vervoersboeking en de rit volgt hem.',
+    'Deze route gaat met de veerboot. Voeg de veerboot toe als vervoersboeking en de rit volgt hem. Komt hij pas de volgende dag aan, zet de stops aan de overkant dan op die dag.',
   'roadtrip.alt.legChanged': 'Dit traject veranderde tijdens de controle, dus er is niets opgeslagen.',
   'roadtrip.alt.offline': 'Andere routes worden alleen online opgeslagen. Maak opnieuw verbinding om deze te kiezen.',
+  'roadtrip.alt.otherEngineStandard': 'Tijd van de hoofdrouter, niet van de router waarmee dit traject gepland wordt.',
+  'roadtrip.alt.avoidNotHeld':
+    'De roadtrip rijdt deze route alleen als ‘{class}’ is aangevinkt onder ‘{setting}’ in de instellingen.',
+  'roadtrip.alt.checking': 'Deze route wordt gecontroleerd met de router van de roadtrip…',
+  'roadtrip.alt.standIn':
+    'De vermijdingsrouter gaf voor dit traject geen antwoord, dus de hoofdrouter heeft het getekend. De vermijdingsrouter wordt opnieuw gevraagd.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Nog geen stops — laat er hier een vallen',
   'roadtrip.quietDay.one': 'Voorlopig alleen {name} — laat hier een stop vallen',
@@ -281,7 +287,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Ophalen {time}',
   'roadtrip.ride.return': 'Inleveren {time}',
   'roadtrip.ride.open': 'Boeking openen',
-  'roadtrip.ride.undated': 'De boeking {title} heeft geen datum, dus de rit houdt er geen rekening mee.',
+  'roadtrip.ride.undated':
+    'De boeking {title} valt op geen enkele dag van deze reis, dus de rit houdt er geen rekening mee.',
   'roadtrip.bookings.loose': 'Ook geboekt op deze dag',
 };
 export default roadtrip;

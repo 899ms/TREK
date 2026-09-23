@@ -225,6 +225,18 @@ export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
   const bookingPosition = (dayId: number): number | null =>
     positionOn(booking.day_positions, dayId) ??
     (typeof booking.day_plan_position === 'number' ? booking.day_plan_position : null);
+  // The booking's own slot (`day_plan_position`) is one number for every day it spans,
+  // and the day plan seeds it on the day the booking leaves, against that day's stops.
+  // Read on the day a ride lands it named a seat among stops it was never measured
+  // against: an overnight ferry seeded behind both stops of its evening sat behind the
+  // morning's stop across the water, and the drive went from that stop back to the pier
+  // (#2461). So a ride landing on a later day takes only a slot somebody gave it on that
+  // day. Without one the clock seats it there, and with nothing timed ahead of it the
+  // arrival opens the day (`opensTheDay`).
+  const arrivalPosition = (dayId: number): number | null =>
+    kind === 'ride' && dayId !== depDayId
+      ? (positionOn(last?.day_positions, dayId) ?? positionOn(booking.day_positions, dayId))
+      : (positionOn(last?.day_positions, dayId) ?? bookingPosition(dayId));
 
   return {
     reservationId: booking.id,
@@ -245,7 +257,7 @@ export function carrierSeam(booking: CarrierBooking): CarrierSeam | null {
       to && arrDayId != null
         ? {
             dayId: arrDayId,
-            position: positionOn(last?.day_positions, arrDayId) ?? bookingPosition(arrDayId),
+            position: arrivalPosition(arrDayId),
             clock: arrClock,
             name: to.name,
             code: to.code ?? null,

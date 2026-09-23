@@ -218,9 +218,15 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.quicker': '{time} 더 빠름',
   'roadtrip.alt.otherEngine': '기본 엔진이 아니라 회피 엔진이 계산한 시간입니다.',
   'roadtrip.alt.notHeld': '로드트립의 경로 서버가 이 길을 따르지 않아 저장하지 않았습니다.',
-  'roadtrip.alt.ferryNotHeld': '이 길은 페리로 건넙니다. 페리를 교통편 예약으로 추가하면 경로가 그대로 따라갑니다.',
+  'roadtrip.alt.ferryNotHeld':
+    '이 길은 페리로 건넙니다. 페리를 교통편 예약으로 추가하면 경로가 그대로 따라갑니다. 다음 날 도착한다면 건너편의 경유지를 그날로 옮기세요.',
   'roadtrip.alt.legChanged': '확인하는 동안 이 구간이 바뀌어 아무것도 저장하지 않았습니다.',
   'roadtrip.alt.offline': '다른 길은 온라인에서만 저장됩니다. 이 길을 고르려면 다시 연결하세요.',
+  'roadtrip.alt.otherEngineStandard': '이 구간을 계획하는 엔진이 아니라 기본 엔진이 계산한 시간입니다.',
+  'roadtrip.alt.avoidNotHeld': '설정의 “{setting}”에서 “{class}”을(를) 선택해야 로드트립이 이 길로 갑니다.',
+  'roadtrip.alt.checking': '로드트립의 경로 서버로 이 길을 확인하는 중…',
+  'roadtrip.alt.standIn':
+    '이 구간에서 회피 엔진이 응답하지 않아 기본 엔진이 경로를 그렸습니다. 회피 엔진에 다시 묻는 중입니다.',
   'roadtrip.day': '{number}일차',
   'roadtrip.quietDay.empty': '아직 경유지가 없습니다. 여기에 놓으세요',
   'roadtrip.quietDay.one': '지금은 {name}뿐입니다. 경유지를 여기에 놓으세요',
@@ -274,7 +280,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '픽업 {time}',
   'roadtrip.ride.return': '반납 {time}',
   'roadtrip.ride.open': '예약 열기',
-  'roadtrip.ride.undated': '{title}에 날짜가 없어 주행에 반영되지 않습니다.',
+  'roadtrip.ride.undated': '{title}은(는) 이 여행의 어느 날에도 속하지 않아 주행에 반영되지 않습니다.',
   'roadtrip.bookings.loose': '이날의 다른 예약',
 };
 export default roadtrip;
