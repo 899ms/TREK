@@ -17,6 +17,7 @@ import { isPlacesProviderChoice, type PlacesProviderChoice } from './providers/p
 import {
   AMAP_SHORT_HOSTS,
   AmapPlacesProvider,
+  AmapTipStash,
   isAmapHost,
   isAmapPlaceId,
   parseAmapUrl,
@@ -702,6 +703,10 @@ export class MapsService {
    *  oldest entry is the one evicted when it fills up. */
   private readonly brandLogoCache = new Map<string, { at: number; logo: BrandLogo | null }>();
 
+  /** Amap autocomplete tips for the details fallback. Here rather than on the provider:
+   *  a provider is built per request, and a pick is two requests. */
+  private readonly amapTips = new AmapTipStash();
+
   private isSettingDisabled(key: string): boolean {
     const row = this.database.get<{ value: string }>(
       'SELECT value FROM app_settings WHERE key = ?',
@@ -1073,7 +1078,7 @@ export class MapsService {
 
     const amap = this.resolveAmapKey(userId);
     return amap.key
-      ? { id: 'amap', provider: new AmapPlacesProvider({ key: amap.key, source: amap.source, userId }) }
+      ? { id: 'amap', provider: new AmapPlacesProvider({ key: amap.key, source: amap.source, userId }, this.amapTips) }
       : null;
   }
 
@@ -1127,7 +1132,7 @@ export class MapsService {
   private providerForPlaceId(userId: number, placeId: string): AmapPlacesProvider | null {
     if (!isAmapPlaceId(placeId)) return null;
     const amap = this.resolveAmapKey(userId);
-    return amap.key ? new AmapPlacesProvider({ key: amap.key, source: amap.source, userId }) : null;
+    return amap.key ? new AmapPlacesProvider({ key: amap.key, source: amap.source, userId }, this.amapTips) : null;
   }
 
   /**

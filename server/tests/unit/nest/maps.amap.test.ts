@@ -65,6 +65,8 @@ import { DatabaseService } from '../../../src/nest/database/database.service';
 import { MapsService } from '../../../src/nest/maps/maps.service';
 import {
   AmapPlacesProvider,
+  AmapTipStash,
+  amapOpeningToOsm,
   amapPoiId,
   isAmapHost,
   isAmapPlaceId,
@@ -86,8 +88,8 @@ const photoCacheStub = {
 const svc = new MapsService(new DatabaseService(db as never), photoCacheStub);
 
 /** A provider over a fixed key, which is all these cases need. */
-function provider(): AmapPlacesProvider {
-  return new AmapPlacesProvider({ key: 'amap-test-key', source: 'instance', userId: 3 });
+function provider(tips = new AmapTipStash()): AmapPlacesProvider {
+  return new AmapPlacesProvider({ key: 'amap-test-key', source: 'instance', userId: 3 }, tips);
 }
 
 /** Amap's success envelope. */
@@ -290,7 +292,7 @@ describe('AmapPlacesProvider.searchText', () => {
   it('AMAP-017: an empty place/around falls through to place/text, which can read a region out of the keywords', async () => {
     // The client's details-miss fallback searches for "name, region". around
     // matches that literally against POI names and finds nothing; text parses
-    // the region and answers. Invented fixtures — the id and the place do not
+    // the region and answers. Invented fixtures: the id and the place do not
     // exist.
     const villageGcj = wgs84ToGcj02(30.0, 120.0);
     const fetchSpy = vi
@@ -310,47 +312,15 @@ describe('AmapPlacesProvider.searchText', () => {
     expect(calls[1]).toContain('/v3/place/text');
   });
 
-  it('AMAP-018: Chinese opening hours are translated before the OSM-dialect parser sees them', async () => {
-    // "周一至周日 10:00-22:00" fed to the parser as-is produced seven "?" lines
-    // and no periods, so the place never got an open/closed badge.
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        ok({ pois: [{ id: 'B0TESTHRS1', name: 'Test Shop', location: [], business: { opentime_week: '周一至周日 10:00-22:00' } }] }),
-      ),
-    );
+  it('AMAP-017b: a place/around with hits answers alone, place/text is not asked', async () => {
+    const fetchSpy = vi.fn().mockResolvedValue(ok({ pois: [{ id: 'B1', name: '咖啡', location: TIANANMEN_LOCATION }] }));
+    vi.stubGlobal('fetch', fetchSpy);
 
-    const [place] = await provider().searchText('Test Shop');
+    const places = await provider().searchText('咖啡', 'zh', { lat: 39.9, lng: 116.4, radius: 3000 });
 
-    expect(place.opening_hours).toEqual([
-      'Monday: 10:00-22:00', 'Tuesday: 10:00-22:00', 'Wednesday: 10:00-22:00',
-      'Thursday: 10:00-22:00', 'Friday: 10:00-22:00', 'Saturday: 10:00-22:00', 'Sunday: 10:00-22:00',
-    ]);
-    expect(place.opening_periods).toHaveLength(7);
-  });
-
-  it('AMAP-019: a holiday segment carrying a date range is dropped, not fed to the weekly parser', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        ok({
-          pois: [
-            {
-              id: 'B0TESTHRS2',
-              name: 'Test Shop',
-              location: [],
-              business: { opentime_week: '周一至周五 09:00-18:00；2026-10-01至2026-10-07 10:00-22:00' },
-            },
-          ],
-        }),
-      ),
-    );
-
-    const [place] = await provider().searchText('Test Shop');
-
-    // Five weekdays parsed; the dated exception did not leak into the week.
-    expect(place.opening_periods).toHaveLength(5);
-    expect((place.opening_hours as string[])[5]).toBe('Saturday: ?');
+    expect(places).toHaveLength(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(calledUrl()).toContain('/v3/place/around');
   });
 });
 
@@ -480,7 +450,7 @@ describe('AmapPlacesProvider.placeDetails', () => {
   });
 
   it('AMAP-043: answers from the tip autocomplete served when the detail index does not know the id', async () => {
-    // inputtips indexes 地名地址 entries (typecode 19xxxx — villages, lanes)
+    // inputtips indexes 地名地址 entries (typecode 19xxxx: villages, lanes)
     // that place/detail then answers with count=0. Without the stash the pick
     // ends in a failed search. Invented fixtures throughout.
     const villageGcj = wgs84ToGcj02(30.0, 120.0);
@@ -502,10 +472,12 @@ describe('AmapPlacesProvider.placeDetails', () => {
       .mockResolvedValueOnce(ok({ count: '0', pois: [] }));
     vi.stubGlobal('fetch', fetchSpy);
 
-    const [suggestion] = await provider().autocomplete('Test Vil');
+    // Two provider instances, as two requests make them, sharing one stash.
+    const tips = new AmapTipStash();
+    const [suggestion] = await provider(tips).autocomplete('Test Vil');
     expect(suggestion.placeId).toBe('amap:B0TESTVIL2');
 
-    const place = await provider().placeDetails('amap:B0TESTVIL2');
+    const place = await provider(tips).placeDetails('amap:B0TESTVIL2');
     expect(place).not.toBeNull();
     expect(place!.name).toBe('Test Village');
     expect(place!.address).toBe('Test Province Test CityTest Hamlet');
@@ -521,6 +493,76 @@ describe('AmapPlacesProvider.placeDetails', () => {
   it('AMAP-044: without a stashed tip the empty detail answer is still null', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ count: '0', pois: [] })));
     expect(await provider().placeDetails('amap:B0TESTNONE')).toBeNull();
+  });
+
+  it('AMAP-045: Chinese hours from v5 place/detail become weekday lines and periods', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [{
+      id: 'B0TESTHRS1', name: 'Test Shop', location: TIANANMEN_LOCATION,
+      business: { opentime_week: '周一至周五 09:00-18:00；周六、周日 10:00-16:00' },
+    }] })));
+
+    const place = await provider().placeDetails('amap:B0TESTHRS1');
+
+    expect(place!.opening_hours).toEqual([
+      'Monday: 09:00-18:00', 'Tuesday: 09:00-18:00', 'Wednesday: 09:00-18:00', 'Thursday: 09:00-18:00',
+      'Friday: 09:00-18:00', 'Saturday: 10:00-16:00', 'Sunday: 10:00-16:00',
+    ]);
+    expect(place!.opening_periods).toHaveLength(7);
+  });
+
+  it('AMAP-046: a dated holiday segment is dropped, not allowed to void the week', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [{
+      id: 'B0TESTHRS2', name: 'Test Shop', location: TIANANMEN_LOCATION,
+      business: { opentime_week: '周一至周五 09:00-18:00；2026-10-01至2026-10-07 10:00-22:00' },
+    }] })));
+
+    const place = await provider().placeDetails('amap:B0TESTHRS2');
+
+    expect(place!.opening_periods).toHaveLength(5);
+    expect((place!.opening_hours as string[])[5]).toBe('Saturday: ?');
+  });
+
+  it('AMAP-047: hours the translation cannot fully read give no hours, not a verbatim line', async () => {
+    // Amap's own documented example: a service remark with a nested ；, and a
+    // Saturday segment that is prose. Partly parsed, Saturday would read as closed.
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [{
+      id: 'B0TESTHRS3', name: 'Test Bank', location: TIANANMEN_LOCATION,
+      business: { opentime_week: '周一至周五:08:30-17:30(延时服务时间:08:30-09:00；12:00-13:30)；周六延时服务时间:09:00-13:00(法定节假日除外)' },
+    }] })));
+
+    const place = await provider().placeDetails('amap:B0TESTHRS3');
+
+    expect(place!.opening_hours).toBeNull();
+    expect(place!.opening_periods).toBeNull();
+    expect(place!.open_now).toBeNull();
+  });
+
+  it('AMAP-048: amapOpeningToOsm reads the common spellings and refuses a partial read', () => {
+    const rows: [string, string | null][] = [
+      ['周一至周日 10:00-22:00', 'Mo-Su 10:00-22:00'],
+      ['周一至周四,周日 09:30-22:00；周五至周六 09:30-22:30', 'Mo-Th,Su 09:30-22:00; Fr-Sa 09:30-22:30'],
+      ['周一至周五 09:00-18:00；周六、周日 10:00-16:00', 'Mo-Fr 09:00-18:00; Sa,Su 10:00-16:00'],
+      ['周一至周五 10:00-14:00，周六至周日 17:00-22:00', 'Mo-Fr 10:00-14:00; Sa-Su 17:00-22:00'],
+      ['每天 10:00～22:00', 'Mo-Su 10:00-22:00'],
+      ['周一至周日:10：00-22：00', 'Mo-Su 10:00-22:00'],
+      ['星期一到星期五 09:00-12:00 14:00-18:00', 'Mo-Fr 09:00-12:00,14:00-18:00'],
+      ['周一至周日 18:00-次日02:00', 'Mo-Su 18:00-02:00'],
+      ['24小时营业', 'Mo-Su 00:00-24:00'],
+      ['周二至周日 09:00-17:00(周一闭馆)', 'Tu-Su 09:00-17:00'],
+      ['周二至周日 09:00-17:00；周一闭馆', 'Tu-Su 09:00-17:00'],
+      ['周一至周五 09:00-18:00；法定节假日 10:00-16:00', null],
+      ['Open daily 10:00-22:00', null],
+      ['2026-10-01至2026-10-07 10:00-22:00', null],
+    ];
+    for (const [input, expected] of rows) expect(amapOpeningToOsm(input), input).toBe(expected);
+  });
+
+  it('AMAP-049: a stashed tip without a coordinate is still null, so the client falls back to its text search', async () => {
+    const tips = new AmapTipStash();
+    tips.remember([{ id: 'B0TESTVIL3', name: 'Test Village', location: [] }]);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ count: '0', pois: [] })));
+
+    expect(await provider(tips).placeDetails('amap:B0TESTVIL3')).toBeNull();
   });
 });
 
@@ -731,6 +773,26 @@ describe('MapsService with Amap in the keyed slot', () => {
     expect(result.places[0].amap_poi_id).toBe('amap:B1');
   });
 
+  it('AMAP-085: the tip a suggestion came from answers the details request that follows it', async () => {
+    // Two requests, two provider instances: the stash has to live on the service.
+    amapSelected();
+    const villageGcj = wgs84ToGcj02(30.0, 120.0);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: unknown) =>
+        String(url).includes('/v3/assistant/inputtips')
+          ? ok({ tips: [{ id: 'B0TESTVIL4', name: 'Test Village', district: 'Test District', location: `${villageGcj.lng},${villageGcj.lat}` }] })
+          : ok({ count: '0', pois: [] }),
+      ),
+    );
+
+    await svc.autocompletePlaces(1, 'Test Vil');
+    const { place } = await svc.getPlaceDetails(1, 'amap:B0TESTVIL4');
+
+    expect(place!.name).toBe('Test Village');
+    expect(place!.lat as number).toBeCloseTo(30.0, 4);
+  });
+
   it('AMAP-081: autocomplete goes to inputtips instead of Nominatim', async () => {
     amapSelected();
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ tips: [{ id: 'T1', name: '外滩', district: '上海市黄浦区' }] })));
@@ -796,5 +858,27 @@ describe('MapsService with Amap in the keyed slot', () => {
     vi.stubGlobal('fetch', fetchSpy);
     await expect(svc.resolveGoogleMapsUrl('https://www.amap.com/place/B000A83M61')).rejects.toMatchObject({ status: 400 });
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+});
+
+describe('AmapTipStash', () => {
+  it('AMAP-090: a tip is forgotten once its ten minutes are up', () => {
+    const tips = new AmapTipStash();
+    tips.remember([{ id: 'T1', name: 'x' }], 1_000);
+    expect(tips.recall('T1', 1_000 + AmapTipStash.TTL_MS - 1)?.name).toBe('x');
+    expect(tips.recall('T1', 1_000 + AmapTipStash.TTL_MS)).toBeNull();
+    // Dropped on the expired read, not merely hidden.
+    expect(tips.recall('T1', 0)).toBeNull();
+    expect(tips.recall('nope')).toBeNull();
+  });
+
+  it('AMAP-091: holds at most 500 tips, oldest out first, and a tip served again counts as new', () => {
+    const tips = new AmapTipStash();
+    tips.remember(Array.from({ length: AmapTipStash.MAX }, (_, i) => ({ id: `T${i}` })), 0);
+    tips.remember([{ id: 'T0' }], 0);
+    tips.remember([{ id: 'NEW' }], 0);
+    expect(tips.recall('T0', 0)).not.toBeNull();
+    expect(tips.recall('T1', 0)).toBeNull();
+    expect(tips.recall('NEW', 0)).not.toBeNull();
   });
 });
