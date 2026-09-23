@@ -12,7 +12,7 @@ import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-SHOST-001 to FE-MOB-SHOST-030
+// FE-MOB-SHOST-001 to FE-MOB-SHOST-029 and FE-MOB-SHOST-032 (030 and 031 live in MTripSheets.members.test.tsx)
 //
 // Every child sheet is stubbed: this file is about the host — which sheet is
 // mounted for which shell.sheet id, and how the host's own callbacks wire the
@@ -447,7 +447,7 @@ describe('MTripSheets', () => {
     expect(planner.setDeletePlaceId).toHaveBeenCalledWith(null)
   })
 
-  it('FE-MOB-SHOST-030: the delete-day confirm names the day, lists what goes with it and runs the planner confirmation', () => {
+  it('FE-MOB-SHOST-032: the delete-day confirm names the day, lists what goes with it and runs the planner confirmation', () => {
     const lines = [
       { key: 'stay-9', icon: BedDouble, tone: 'danger' as const, text: 'Stay at Harbour Hotel', hint: 'Cancelled with its booking.' },
       { key: 'places', icon: MapPin, tone: 'neutral' as const, text: 'Planned places: 2' },
