@@ -175,4 +175,9 @@ describe('describeFetchFailure', () => {
   it('MEM-FETCH-005: a rejection that is not an Error falls back to the old wording', () => {
     expect(describeFetchFailure('boom')).toBe('Connection failed');
   });
+
+  it('MEM-FETCH-006: leaves out the advice Node adds for whoever runs the server', () => {
+    const cause = new Error('self-signed certificate; if the root CA is installed locally, try running Node.js with --use-system-ca');
+    expect(describeFetchFailure(new TypeError('fetch failed', { cause }))).toBe('fetch failed (self-signed certificate)');
+  });
 });

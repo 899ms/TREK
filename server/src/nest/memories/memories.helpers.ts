@@ -213,6 +213,8 @@ export type AssetInfo = {
     fileName?: string | null;
 }
 
+const NODE_OPERATOR_HINT = /;\s*if the root CA is installed locally.*$/is;
+
 /**
  * Why a request to a provider never got an answer, worded for the settings card.
  *
@@ -220,12 +222,16 @@ export type AssetInfo = {
  * (an unknown host, a refused connection, a self-signed certificate), so the
  * message alone gave the user nothing to act on (#2475). The first cause that
  * says something is appended; an error without one reads exactly as before.
+ * Node's own advice to operators that rides along on a certificate error
+ * ("try running Node.js with --use-system-ca") is cut off: whoever reads the
+ * card cannot act on it.
  */
 export function describeFetchFailure(err: unknown): string {
     if (!(err instanceof Error)) return 'Connection failed';
     let cause: unknown = err.cause;
     for (let depth = 0; depth < 3 && cause instanceof Error; depth++) {
-        if (cause.message && cause.message !== err.message) return `${err.message} (${cause.message})`;
+        const reason = cause.message.replace(NODE_OPERATOR_HINT, '').trim();
+        if (reason && reason !== err.message) return `${err.message} (${reason})`;
         cause = cause.cause;
     }
     return err.message;

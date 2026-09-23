@@ -503,6 +503,7 @@
 .trek-dash .col-detail-btn:hover { background: var(--surface); color: var(--ink); }
 .trek-dash .col-detail-btn svg { flex-shrink: 0; }
 .trek-dash .col-detail-btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+.trek-dash .col-detail-btn:disabled { opacity: .5; cursor: not-allowed; }
 .trek-dash .col-detail-btn.danger { color: oklch(0.6 0.2 25); border-color: transparent; background: transparent; }
 .trek-dash .col-detail-btn.danger:hover { background: oklch(0.6 0.2 25 / .12); }
 
