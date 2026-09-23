@@ -129,6 +129,46 @@ interface AmapTip {
   location?: unknown;
 }
 
+/**
+ * A short-lived memory of the tips autocomplete just served, keyed by bare POI
+ * id. inputtips indexes places place/detail does not — villages, lanes and
+ * other 地名地址 entries (typecode 19xxxx) come back from the completer with an
+ * id and coordinates that the detail endpoint then knows nothing about. The
+ * picker asks for details right after the user picks a suggestion, so the tip
+ * itself is the only place those coordinates survive; stashing it lets
+ * placeDetails answer with a plain name-and-pin place instead of null.
+ */
+const TIP_STASH_TTL = 10 * 60 * 1000;
+const TIP_STASH_MAX = 500;
+const tipStash = new Map<string, { tip: AmapTip; expiresAt: number }>();
+
+function stashTips(tips: AmapTip[]): void {
+  const now = Date.now();
+  for (const [id, entry] of tipStash) {
+    if (entry.expiresAt <= now) tipStash.delete(id);
+  }
+  for (const tip of tips) {
+    const id = amapText(tip.id);
+    if (id) tipStash.set(id, { tip, expiresAt: now + TIP_STASH_TTL });
+  }
+  // FIFO eviction: Map iterates in insertion order, so the front is oldest.
+  while (tipStash.size > TIP_STASH_MAX) {
+    const oldest = tipStash.keys().next();
+    if (oldest.done) break;
+    tipStash.delete(oldest.value);
+  }
+}
+
+function stashedTip(poiId: string): AmapTip | null {
+  const entry = tipStash.get(poiId);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    tipStash.delete(poiId);
+    return null;
+  }
+  return entry.tip;
+}
+
 interface AmapPoi {
   id?: string;
   name?: string;
@@ -163,6 +203,36 @@ function amapNumber(value: unknown): number | null {
   if (!text) return null;
   const n = Number.parseFloat(text);
   return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Amap writes opening hours in Chinese ("周一至周四,周日 09:30-22:00；周五至周六
+ * 09:30-22:30"), which the OSM-dialect parser cannot read. Translated into that
+ * dialect ("Mo-Th,Su 09:30-22:00; Fr-Sa 09:30-22:30") it can, and the place then
+ * gets real weekday lines and an open/closed badge instead of seven "?".
+ *
+ * Segments carrying a specific date range ("2026-05-01至2026-05-05 …") are
+ * dropped: they describe a holiday exception, not the weekly pattern, and the
+ * parser has no concept of them.
+ */
+export function amapOpeningToOsm(text: string): string {
+  return text
+    .split(/[;；]/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment && !/\d{4}-\d{1,2}-\d{1,2}/.test(segment))
+    .map((segment) =>
+      segment
+        .replace(/周一/g, 'Mo')
+        .replace(/周二/g, 'Tu')
+        .replace(/周三/g, 'We')
+        .replace(/周四/g, 'Th')
+        .replace(/周五/g, 'Fr')
+        .replace(/周六/g, 'Sa')
+        .replace(/周[日天]/g, 'Su')
+        .replace(/至/g, '-')
+        .replace(/[，,]\s*/g, ','),
+    )
+    .join('; ');
 }
 
 export class AmapPlacesProvider implements PlacesProvider {
@@ -284,6 +354,11 @@ export class AmapPlacesProvider implements PlacesProvider {
       .filter((part, i, all) => part && all.indexOf(part) === i);
     const address = [...region, street].filter(Boolean).join('');
     const openText = amapText(business.opentime_week) || amapText(bizExt.open_time);
+    // Amap phrases hours in Chinese; translate to the OSM dialect first so the
+    // shared parser can read them. When even the translation does not parse,
+    // the verbatim line is still worth showing — seven "?" lines are not.
+    const openParsed = openText ? parseOpeningHours(amapOpeningToOsm(openText)) : null;
+    const openParsedOk = openParsed && openParsed.periods.length > 0;
 
     return {
       amap_poi_id: poi.id ? `${AMAP_PLACE_ID_PREFIX}${poi.id}` : null,
@@ -301,12 +376,11 @@ export class AmapPlacesProvider implements PlacesProvider {
       // Amap's type is a slash-separated taxonomy ("餐饮服务;中餐厅;川菜"); split so
       // it reads like the string array every other provider returns.
       types: amapText(poi.type).split(/[;|]/).map((t) => t.trim()).filter(Boolean),
-      // Amap gives opening hours as free text in the same dialect OSM uses for
-      // simple cases, so the existing parser gets a chance at it; unparseable
-      // text is still worth showing verbatim.
-      opening_hours: openText ? parseOpeningHours(openText).weekdayDescriptions : null,
-      open_now: openText ? parseOpeningHours(openText).openNow : null,
-      opening_periods: null,
+      // Hours arrive as Chinese free text; amapOpeningToOsm gives the shared
+      // parser a dialect it reads, and unparseable text is shown verbatim.
+      opening_hours: openParsedOk ? openParsed.weekdayDescriptions : openText ? [openText] : null,
+      open_now: openParsedOk ? openParsed.openNow : null,
+      opening_periods: openParsedOk ? openParsed.periods : null,
       opening_special_days: null,
       summary: null,
       reviews: [],
@@ -328,19 +402,28 @@ export class AmapPlacesProvider implements PlacesProvider {
     // `place/around` rather than `place/text` when we know where the user is
     // looking: Amap's text search has no bias parameter at all, so without this
     // a search for "咖啡" from a Shanghai viewport returns Beijing.
-    const data = bias
-      ? await this.call<AmapEnvelope & { pois?: AmapPoi[] }>(
-          '/v3/place/around',
-          {
-            ...common,
-            location: toAmapLocation(bias.lat, bias.lng),
-            // Amap caps the radius at 50 km, which is also the default the
-            // Google path uses for an unspecified bias.
-            radius: String(Math.min(Math.round(bias.radius ?? 50000), 50000)),
-          },
-          'place/around',
-        )
-      : await this.call<AmapEnvelope & { pois?: AmapPoi[] }>('/v3/place/text', common, 'place/text');
+    if (bias) {
+      const around = await this.call<AmapEnvelope & { pois?: AmapPoi[] }>(
+        '/v3/place/around',
+        {
+          ...common,
+          location: toAmapLocation(bias.lat, bias.lng),
+          // Amap caps the radius at 50 km, which is also the default the
+          // Google path uses for an unspecified bias.
+          radius: String(Math.min(Math.round(bias.radius ?? 50000), 50000)),
+        },
+        'place/around',
+      );
+      const pois = asArray(around.pois);
+      // place/around matches the keyword literally against POI names only: a
+      // comma-joined "name, region" query (which the client's details-miss
+      // fallback sends) matches nothing even when the place exists. place/text
+      // reads the region out of the keywords, so an empty around falls through
+      // to it before the caller gives up.
+      if (pois.length) return pois.map((poi) => this.toPlace(poi));
+    }
+
+    const data = await this.call<AmapEnvelope & { pois?: AmapPoi[] }>('/v3/place/text', common, 'place/text');
 
     // The envelope is validated, its arrays are not: `as T` only ever said what
     // the answer was meant to look like. A `pois` object rather than an array
@@ -373,6 +456,10 @@ export class AmapPlacesProvider implements PlacesProvider {
       'inputtips',
     );
 
+    // Kept before the slice: a tip the user never saw is still the details
+    // fallback for one that shares its id, and the stash is cheap.
+    stashTips(data.tips ?? []);
+
     return (data.tips ?? [])
       // A tip without an id cannot be looked up afterwards, and inputtips does
       // return those (a district name, a road).
@@ -404,7 +491,36 @@ export class AmapPlacesProvider implements PlacesProvider {
     );
 
     const poi = asArray(data.pois)[0];
-    return poi ? { ...this.toPlace(poi), cached_at: Date.now() } : null;
+    if (poi) return { ...this.toPlace(poi), cached_at: Date.now() };
+
+    // place/detail indexes fewer places than inputtips: a village (typecode
+    // 190108) can be suggested, clicked, and then answer count=0 here. The tip
+    // autocomplete served still holds the name and coordinates, so answer with
+    // a plain name-and-pin place rather than nothing — the caller treats null
+    // as "this id does not exist" and the user gets a failed search.
+    const tip = stashedTip(poiId);
+    if (!tip) return null;
+    const coords = fromAmapLocation(tip.location);
+    return {
+      amap_poi_id: `${AMAP_PLACE_ID_PREFIX}${poiId}`,
+      name: amapText(tip.name),
+      address: [amapText(tip.district), amapText(tip.address)].filter(Boolean).join(''),
+      lat: coords?.lat ?? null,
+      lng: coords?.lng ?? null,
+      rating: null,
+      rating_count: null,
+      website: null,
+      phone: null,
+      types: [],
+      opening_hours: null,
+      open_now: null,
+      opening_periods: null,
+      opening_special_days: null,
+      summary: null,
+      reviews: [],
+      source: 'amap' as const,
+      cached_at: Date.now(),
+    };
   }
 
   /**

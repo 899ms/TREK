@@ -286,6 +286,72 @@ describe('AmapPlacesProvider.searchText', () => {
     expect(place.lng).toBeNull();
     expect(place.name).toBe('无坐标');
   });
+
+  it('AMAP-017: an empty place/around falls through to place/text, which can read a region out of the keywords', async () => {
+    // The client's details-miss fallback searches for "name, region". around
+    // matches that literally against POI names and finds nothing; text parses
+    // the region and answers. Invented fixtures — the id and the place do not
+    // exist.
+    const villageGcj = wgs84ToGcj02(30.0, 120.0);
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(ok({ pois: [] }))
+      .mockResolvedValueOnce(
+        ok({ pois: [{ id: 'B0TESTVIL1', name: 'Test Village', location: `${villageGcj.lng},${villageGcj.lat}` }] }),
+      );
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const places = await provider().searchText('Test Village, Test Region', 'zh', { lat: 30.0, lng: 120.0, radius: 5000 });
+
+    expect(places).toHaveLength(1);
+    expect(places[0].amap_poi_id).toBe('amap:B0TESTVIL1');
+    const calls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls[0]).toContain('/v3/place/around');
+    expect(calls[1]).toContain('/v3/place/text');
+  });
+
+  it('AMAP-018: Chinese opening hours are translated before the OSM-dialect parser sees them', async () => {
+    // "周一至周日 10:00-22:00" fed to the parser as-is produced seven "?" lines
+    // and no periods, so the place never got an open/closed badge.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        ok({ pois: [{ id: 'B0TESTHRS1', name: 'Test Shop', location: [], business: { opentime_week: '周一至周日 10:00-22:00' } }] }),
+      ),
+    );
+
+    const [place] = await provider().searchText('Test Shop');
+
+    expect(place.opening_hours).toEqual([
+      'Monday: 10:00-22:00', 'Tuesday: 10:00-22:00', 'Wednesday: 10:00-22:00',
+      'Thursday: 10:00-22:00', 'Friday: 10:00-22:00', 'Saturday: 10:00-22:00', 'Sunday: 10:00-22:00',
+    ]);
+    expect(place.opening_periods).toHaveLength(7);
+  });
+
+  it('AMAP-019: a holiday segment carrying a date range is dropped, not fed to the weekly parser', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        ok({
+          pois: [
+            {
+              id: 'B0TESTHRS2',
+              name: 'Test Shop',
+              location: [],
+              business: { opentime_week: '周一至周五 09:00-18:00；2026-10-01至2026-10-07 10:00-22:00' },
+            },
+          ],
+        }),
+      ),
+    );
+
+    const [place] = await provider().searchText('Test Shop');
+
+    // Five weekdays parsed; the dated exception did not leak into the week.
+    expect(place.opening_periods).toHaveLength(5);
+    expect((place.opening_hours as string[])[5]).toBe('Saturday: ?');
+  });
 });
 
 // ── Error translation ────────────────────────────────────────────────────────
@@ -411,6 +477,50 @@ describe('AmapPlacesProvider.placeDetails', () => {
   it('AMAP-042: returns null when Amap knows the id but has no POI for it', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [] })));
     expect(await provider().placeDetails('amap:B000A83M61')).toBeNull();
+  });
+
+  it('AMAP-043: answers from the tip autocomplete served when the detail index does not know the id', async () => {
+    // inputtips indexes 地名地址 entries (typecode 19xxxx — villages, lanes)
+    // that place/detail then answers with count=0. Without the stash the pick
+    // ends in a failed search. Invented fixtures throughout.
+    const villageGcj = wgs84ToGcj02(30.0, 120.0);
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(
+        ok({
+          tips: [
+            {
+              id: 'B0TESTVIL2',
+              name: 'Test Village',
+              district: 'Test Province Test City',
+              address: 'Test Hamlet',
+              location: `${villageGcj.lng},${villageGcj.lat}`,
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(ok({ count: '0', pois: [] }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const [suggestion] = await provider().autocomplete('Test Vil');
+    expect(suggestion.placeId).toBe('amap:B0TESTVIL2');
+
+    const place = await provider().placeDetails('amap:B0TESTVIL2');
+    expect(place).not.toBeNull();
+    expect(place!.name).toBe('Test Village');
+    expect(place!.address).toBe('Test Province Test CityTest Hamlet');
+    // The tip's GCJ-02 coordinate made it back to WGS-84.
+    expect(place!.lat as number).toBeCloseTo(30.0, 4);
+    expect(place!.lng as number).toBeCloseTo(120.0, 4);
+    expect(place!.source).toBe('amap');
+    expect(place!.cached_at).toBeTypeOf('number');
+    const calls = fetchSpy.mock.calls.map((c) => String(c[0]));
+    expect(calls[1]).toContain('/v5/place/detail');
+  });
+
+  it('AMAP-044: without a stashed tip the empty detail answer is still null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ count: '0', pois: [] })));
+    expect(await provider().placeDetails('amap:B0TESTNONE')).toBeNull();
   });
 });
 
