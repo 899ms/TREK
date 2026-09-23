@@ -110,6 +110,10 @@ Driving settings includes **Show hazard areas**, off by default and shared by th
 
 Driving settings also controls **Show in Days too** under **Service stops**. It is on by default and applies to every service stop in the trip, including existing stops. Turn it off to keep service stops exclusively in the Roadtrip view and omit them from the normal Days view and its route. Turning it on restores their visibility without creating duplicates. The setting is shared with fellow travellers and can also be changed through `update_roadtrip_settings` using `roadtrip_service_stops_in_days`.
 
+**Start and end each day at your stay**, under **Route line** in Driving settings, starts each Roadtrip day after a booked night at that hotel and ends each day before one there. It is off by default and shared by the trip. The hotel rows are drawn from the booking, not stored as stops, so the Days view stays as it is and switching it off gives the drive exactly as before. On the phone it is the one switch in **Driving figures**. See [Road-Trip](Road-Trip#starting-and-ending-the-day-at-the-stay).
+
+> **AI / MCP:** Set `roadtrip_hotel_bookends` through `update_roadtrip_settings`; a missing value means off. `calculate_roadtrip` returns the hotel rows as stops carrying `bookend`.
+
 **Looking for** in Roadtrip also searches installed place-search plugins. Plugin results show their source and can be added like other stops. Search remains online-only and runs on request. Results outside the chosen corridor are removed, and failed sources are shown beside the remaining results. It opens on Charging when the trip's vehicle is electric and on Fuel otherwise, and the choice is yours from then on.
 
 Clicking a result brings it into view on the map, which is how you tell which side of the road it is on. **Clear results** above the list empties both the list and its pins, along with the name, section, plug and power filters.

@@ -53,6 +53,10 @@ A few details worth knowing:
 
 - Only the check-in day gets a stop, however many nights the stay runs. That is the day
   you travel there; the later nights keep showing as badges in the day header.
+- The Road Trip view can also start each day after a night at the hotel and end each day
+  before one there, with **Start and end each day at your stay** in its driving
+  settings. The switch is off by default, stores no extra stop and leaves **Days** as it
+  is. See [Road Trip](Road-Trip#starting-and-ending-the-day-at-the-stay).
 - The stop leads its check-in day. It is seated first, behind only a stop whose own time
   is at or before the check-in, and the stops that carry no hour follow it. A night
   without a check-in is seated first too, a new check-in seats the stop afresh, and two
