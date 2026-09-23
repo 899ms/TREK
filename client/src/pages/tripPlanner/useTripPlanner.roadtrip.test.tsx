@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-153
+// FE-TP-ROAD-001 to FE-TP-ROAD-154
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -2291,6 +2291,38 @@ it('preserves exclusive service stops when reordering the visible Days stops', a
   act(() => result.current.toggleRoadtripMode())
   await act(async () => result.current.handleReorder(5, [13, 11]))
   expect(actions.reorderAssignments).toHaveBeenCalledWith(42, 5, [13, 12, 11])
+})
+
+it('FE-TP-ROAD-154: a place a booking points at stays in Days while road trip stops are hidden there', async () => {
+  // Every lodging booking types its place as 'hotel', and 'hotel' is a road trip stop
+  // type. With "Show in Days too" off, Days dropped the booked hotel from the place list,
+  // from the booking's own place picker and from the map the moment it was booked.
+  const town = buildPlace({ id: 101, name: 'Cologne' })
+  const hotel = buildPlace({ id: 102, name: 'Cologne Cathedral', stop_type: 'hotel' })
+  const pump = buildPlace({ id: 103, name: 'Pump', stop_type: 'fuel' })
+  const brauhaus = buildPlace({ id: 104, name: 'Brauhaus', stop_type: 'restaurant' })
+  const campsite = buildPlace({ id: 105, name: 'Camping Rhein', stop_type: 'campsite' })
+  seedTrip({
+    places: [town, hotel, pump, brauhaus, campsite],
+    days: [buildDay({ id: 5 }), buildDay({ id: 6 })],
+    reservations: [
+      buildReservation({ id: 9, type: 'restaurant', place_id: 104, day_id: 5 }),
+      buildReservation({ id: 10, type: 'hotel', accommodation_id: 8, accommodation_place_id: 105 }),
+    ],
+  })
+  vi.mocked(accommodationRepo.list).mockResolvedValue({
+    accommodations: [{ id: 7, trip_id: 42, place_id: 102, start_day_id: 5, end_day_id: 6, reservation_title: null }],
+  } as never)
+  useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_service_stops_in_days: false } }))
+  const { result } = await renderRoadtrip()
+
+  act(() => result.current.toggleRoadtripMode())
+
+  // The pump nobody booked stays a road trip stop, out of Days.
+  await waitFor(() => expect(result.current.places.map(p => p.id)).toEqual([101, 102, 104, 105]))
+  // Road trip mode keeps every place, as before.
+  act(() => result.current.toggleRoadtripMode())
+  expect(result.current.places.map(p => p.id)).toEqual([101, 102, 103, 104, 105])
 })
 
 /**

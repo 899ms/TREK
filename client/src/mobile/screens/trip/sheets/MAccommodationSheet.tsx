@@ -10,6 +10,7 @@ import { applyStayStops } from '../../../../store/stayStops'
 import { useTranslation } from '../../../../i18n'
 import { Eyebrow } from './MTripSheetUi'
 import type { MTripSheetsProps } from '../MTripShell'
+import { stayPlaces } from '../../../../utils/stayPlaces'
 
 interface AccommodationPayload {
   dayId?: number
@@ -97,7 +98,8 @@ export default function MAccommodationSheet({ planner, shell }: MTripSheetsProps
       : (d.title ? t('planner.dayN', { n: i + 1 }) : undefined),
   }))
 
-  const filteredPlaces = categoryFilter != null ? places.filter(p => p.category_id === categoryFilter) : places
+  const offeredPlaces = stayPlaces(places, form.place_id)
+  const filteredPlaces = categoryFilter != null ? offeredPlaces.filter(p => p.category_id === categoryFilter) : offeredPlaces
 
   const save = async () => {
     setSaving(true)

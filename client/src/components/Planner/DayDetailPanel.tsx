@@ -21,6 +21,7 @@ import type { Day, Place, Category, Reservation, AssignmentsMap } from '../../ty
 import { isDayInAccommodationRange } from '../../utils/dayOrder'
 import { formatClockTime, splitReservationDateTime } from '../../utils/formatters'
 import { useDayDetail } from './useDayDetail'
+import { stayPlaces } from '../../utils/stayPlaces'
 
 const WEATHER_ICON_MAP = {
   Clear: Sun, Clouds: Cloud, Rain: CloudRain, Drizzle: CloudDrizzle,
@@ -660,7 +661,8 @@ function HotelPickerModal({ showHotelPicker, setShowHotelPicker, font, t, hotelD
                   {/* Place List */}
                   <div style={{ maxHeight: 250, overflowY: 'auto' }}>
                     {(() => {
-                      const filtered = hotelCategoryFilter ? places.filter(p => p.category_id === hotelCategoryFilter) : places
+                      const offered = stayPlaces<Place>(places, hotelForm.place_id)
+                      const filtered = hotelCategoryFilter ? offered.filter(p => p.category_id === hotelCategoryFilter) : offered
                       return filtered.length === 0 ? (
                         <div style={{ padding: 20, textAlign: 'center', fontSize: 'calc(12px * var(--fs-scale-body, 1))', color: 'var(--text-faint)' }}>{t('day.noPlacesForHotel')}</div>
                       ) : filtered.map(p => (

@@ -1,4 +1,4 @@
-// FE-PLANNER-RESMODAL-001 to FE-PLANNER-RESMODAL-100
+// FE-PLANNER-RESMODAL-001 to FE-PLANNER-RESMODAL-102
 import { render, screen, waitFor, fireEvent, within, act } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
@@ -625,6 +625,29 @@ describe('ReservationModal', () => {
     expect(onSave).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'Grand Hotel', type: 'hotel' })
     );
+  });
+
+  it('FE-PLANNER-RESMODAL-101: an imported track is not offered as the place of a stay', async () => {
+    const hotel = buildPlace({ id: 21, name: 'Hotel Adler' });
+    const track = buildPlace({ id: 22, name: 'Rheinsteig', route_geometry: '[[50.1,7.6],[50.2,7.7]]' });
+    render(<ReservationModal {...defaultProps} places={[hotel, track]} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /Accommodation/i }));
+    const field = screen.getAllByText('Accommodation').find(el => el.tagName === 'LABEL')!.parentElement!;
+    await userEvent.click(within(field).getByRole('button'));
+
+    expect(screen.getByText('Hotel Adler')).toBeInTheDocument();
+    expect(screen.queryByText('Rheinsteig')).not.toBeInTheDocument();
+  });
+
+  it('FE-PLANNER-RESMODAL-102: a stay already booked at a track still shows that track', () => {
+    const track = buildPlace({ id: 22, name: 'Rheinsteig', route_geometry: '[[50.1,7.6],[50.2,7.7]]' });
+    const days = [buildDay({ id: 1 }), buildDay({ id: 2 })];
+    const accommodations = [{ id: 7, trip_id: 1, place_id: 22, start_day_id: 1, end_day_id: 2 }];
+    const res = buildReservation({ id: 9, type: 'hotel', title: 'Hut', accommodation_id: 7 });
+    render(<ReservationModal {...defaultProps} days={days} places={[track]} accommodations={accommodations as never} reservation={res} />);
+
+    expect(screen.getByText('Rheinsteig')).toBeInTheDocument();
   });
 
   it('FE-PLANNER-RESMODAL-043: hover styles applied to file picker items', async () => {

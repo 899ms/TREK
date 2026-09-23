@@ -9,7 +9,7 @@ import { buildPlanner } from '../../../helpers/mobileTrip'
 import { resetAllStores } from '../../../helpers/store'
 import { act, fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-RESSH-001 to FE-MOB-RESSH-061
+// FE-MOB-RESSH-001 to FE-MOB-RESSH-063
 
 // Date/time/select pickers have their own suites — here they only have to be
 // addressable, so they render as plain controls.
@@ -467,6 +467,20 @@ describe('MReservationSheet', () => {
     expect(screen.getByPlaceholderText('15:00')).toHaveValue('15:00')
     expect(screen.getByPlaceholderText('11:00')).toHaveValue('11:00')
     expect(screen.getByPlaceholderText('reservations.locationPlaceholder')).toHaveValue('Philharmonikerstrasse 4')
+  })
+
+  it('FE-MOB-RESSH-062: an imported track is not offered as the place of a stay', () => {
+    const track = { id: 103, name: 'Donauradweg', address: null, route_geometry: '[[48.2,16.3],[48.3,16.4]]' }
+    setup(makePlanner({ places: [...PLACES, track], editingReservation: HOTEL }))
+    const hotelOptions = [...screen.getByLabelText('reservations.meta.pickHotel').querySelectorAll('option')].map(o => o.textContent)
+    expect(hotelOptions).toContain('Hotel Sacher')
+    expect(hotelOptions).not.toContain('Donauradweg')
+  })
+
+  it('FE-MOB-RESSH-063: a stay already at a track keeps that track selected', () => {
+    const track = { id: 103, name: 'Donauradweg', address: null, route_geometry: '[[48.2,16.3],[48.3,16.4]]' }
+    setup(makePlanner({ places: [...PLACES, track], tripAccommodations: [{ ...ACCOMMODATIONS[0], place_id: 103 }], editingReservation: HOTEL }))
+    expect(screen.getByLabelText('reservations.meta.pickHotel')).toHaveAttribute('data-value', '103')
   })
 
   it('FE-MOB-RESSH-023: a hotel without an accommodation falls back to the booking location', () => {

@@ -77,8 +77,10 @@ A few details worth knowing:
   placed, and the booking simply rides along with it.
 - Moving the booking to a different check-in day moves its stop with it. Deleting the
   booking removes the stop it created, and leaves a stop you placed yourself standing.
-- Hotels are service stops, so **Show in Days too** under **Service stops** in the Road
-  Trip settings also decides whether they appear in the places list.
+- Hotels count as service stops on the drive, so **Show in Days too** under **Service
+  stops** in the Road Trip settings decides whether the hotel's stop shows in the day list.
+  The hotel itself always stays in the places list, on the Days map and in the booking
+  forms, whatever the switch says.
 
 Nights booked before this existed are given their stop when the server upgrades, so trips
 you already have show their hotels on the drive without anyone re-saving anything. Trips

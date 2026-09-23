@@ -1,4 +1,4 @@
-// FE-PLANNER-DAYDETAIL-001 to FE-PLANNER-DAYDETAIL-084
+// FE-PLANNER-DAYDETAIL-001 to FE-PLANNER-DAYDETAIL-085
 import React from 'react';
 import { fireEvent, render, screen, waitFor, within, act } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
@@ -518,6 +518,15 @@ describe('DayDetailPanel', () => {
     await screen.findByText('Hotel du Nord');
     await screen.findByText('Hotel du Sud');
     expect(await screen.findByText('102 Quai de Jemmapes')).toBeInTheDocument();
+  });
+
+  it('FE-PLANNER-DAYDETAIL-085: the hotel picker leaves out imported tracks', async () => {
+    const hotel = buildPlace({ id: 10, name: 'Hotel du Nord' });
+    const track = buildPlace({ id: 12, name: 'Canal Saint-Martin walk', route_geometry: '[[48.87,2.36],[48.88,2.37]]' });
+    render(<DayDetailPanel {...defaultProps} places={[hotel, track]} />);
+    await userEvent.click(await screen.findByText(/Add accommodation/i));
+    await screen.findByText('Hotel du Nord');
+    expect(screen.queryByText('Canal Saint-Martin walk')).not.toBeInTheDocument();
   });
 
   it('FE-PLANNER-DAYDETAIL-030: selecting a place in hotel picker enables save button', async () => {

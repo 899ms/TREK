@@ -20,6 +20,7 @@ import { useTripStore } from '../../../../store/tripStore'
 import type { TripMember } from '../../../../types'
 import type { BookingExpenseRequest } from '../../../../components/Planner/BookingCostsSection.types'
 import type { TripPlanner } from '../MTripShell'
+import { stayPlaces } from '../../../../utils/stayPlaces'
 
 export interface MReservationSheetProps {
   planner: TripPlanner
@@ -212,6 +213,7 @@ export default function MReservationSheet({ planner, onOpenExpense }: MReservati
     d ? new Date(`${d.slice(0, 10)}T00:00:00Z`).toLocaleDateString(locale, { day: 'numeric', month: 'short', timeZone: 'UTC' }) : undefined
 
   const placeOptions = [{ value: '', label: '—' }, ...places.map(p => ({ value: p.id, label: p.name }))]
+  const hotelPlaceOptions = [{ value: '', label: '—' }, ...stayPlaces(places, form.hotel_place_id).map(p => ({ value: p.id, label: p.name }))]
   const dayOptions = days.map(d => ({
     value: d.id,
     label: d.title || t('dayplan.dayN', { n: d.day_number }),
@@ -449,7 +451,7 @@ export default function MReservationSheet({ planner, onOpenExpense }: MReservati
                   return next
                 })
               }}
-              options={placeOptions}
+              options={hotelPlaceOptions}
               placeholder={t('reservations.meta.pickHotel')}
               searchable
               size="sm"

@@ -8,7 +8,7 @@ import { useSettingsStore } from '../../../../src/store/settingsStore'
 import { isBlurred } from '../../../helpers/bookingCodeBlur'
 import { act, fireEvent, render, screen, waitFor } from '../../../helpers/render'
 
-// FE-MOB-ACCSH-001 to FE-MOB-ACCSH-029
+// FE-MOB-ACCSH-001 to FE-MOB-ACCSH-031
 
 // The pickers have their own suites; here they only need to be addressable, so
 // they render as plain controls. data-value keeps the requested value readable
@@ -394,5 +394,18 @@ describe('MAccommodationSheet', () => {
       await waitFor(() => expect(update).toHaveBeenCalled())
       expect(update.mock.calls[0][2]).toMatchObject({ confirmation: 'ABC-1' })
     })
+  })
+
+  it('FE-MOB-ACCSH-030: an imported track is not offered as the place of a stay', () => {
+    const track = { id: 103, name: 'Donauradweg', address: null, category_id: null, image_url: null, route_geometry: '[[48.2,16.3],[48.3,16.4]]' }
+    setup(makePlanner({ places: [...PLACES, track] }))
+    expect(screen.getByText('Hotel Sacher')).toBeInTheDocument()
+    expect(screen.queryByText('Donauradweg')).toBeNull()
+  })
+
+  it('FE-MOB-ACCSH-031: a stay already at a track still lists that track', () => {
+    const track = { id: 103, name: 'Donauradweg', address: null, category_id: null, image_url: null, route_geometry: '[[48.2,16.3],[48.3,16.4]]' }
+    setup(makePlanner({ places: [...PLACES, track], tripAccommodations: [{ ...EXISTING, place_id: 103 }] }), makeShell({ dayId: 12, accId: 77 }))
+    expect(placeRow('Donauradweg')).toBeInTheDocument()
   })
 })

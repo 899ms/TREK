@@ -67,7 +67,7 @@ import type { Accommodation, Assignment, TripMember, Day, Place, Reservation } f
 import { OFM_POSITRON, DEFAULT_MAP_LAT, DEFAULT_MAP_LNG, DEFAULT_MAP_ZOOM } from '../../constants/mapDefaults'
 import { useTileUrl } from '../../hooks/useTileUrl'
 import { applyStayStops } from '../../store/stayStops'
-import { resolvePoolAssignmentId } from './tripPlannerModel'
+import { placesForDays, resolvePoolAssignmentId } from './tripPlannerModel'
 import { isDeepLinkableTripTab, TRIP_TAB_LABEL_KEYS } from '../../constants/tripTabs'
 import { isRoutableReservation } from '../../utils/reservationRoutes'
 import {
@@ -175,7 +175,6 @@ export function useTripPlanner() {
       Object.entries(storedAssignments).map(([dayId, visits]) => [dayId, visits.filter(v => !hidden(v))]),
     )
   }, [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, storedAssignments])
-  const places = useMemo(() => roadtripMode || roadtripSettings.roadtrip_service_stops_in_days !== false ? allPlaces : allPlaces.filter(place => !isServiceStopType(place.stop_type)), [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, allPlaces])
   const toggleRoadtripMode = useCallback(() => {
     setRoadtripMode(prev => {
       const next = !prev
@@ -185,6 +184,12 @@ export function useTripPlanner() {
   }, [tripId])
   const [collabFeatures, setCollabFeatures] = useState<{ chat: boolean; notes: boolean; links: boolean; polls: boolean; whatsnext: boolean }>({ chat: true, notes: true, links: true, polls: true, whatsnext: true })
   const [tripAccommodations, setTripAccommodations] = useState<Accommodation[]>([])
+  const places = useMemo(
+    () => (roadtripMode
+      ? allPlaces
+      : placesForDays(allPlaces, roadtripSettings.roadtrip_service_stops_in_days === false, { accommodations: tripAccommodations, reservations })),
+    [roadtripMode, roadtripSettings.roadtrip_service_stops_in_days, allPlaces, tripAccommodations, reservations],
+  )
   const [allowedFileTypes, setAllowedFileTypes] = useState<string | null>(null)
   const [tripMembers, setTripMembers] = useState<TripMember[]>([])
 
