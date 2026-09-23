@@ -6,12 +6,14 @@ import { resolveLegMode } from '../Planner/legMode'
 import { splitIntoRuns, parseAvoid, type DriveLimits } from './roadtripModel'
 import { spillChains } from './nightSpill'
 import { useSettingsStore } from '../../store/settingsStore'
+import { useTripStore } from '../../store/tripStore'
 import { useVehicleRange } from './useVehicleRange'
 import type { Assignment, AssignmentsMap, Accommodation, Day, Reservation, RouteAvoidClass, SnappedWaypoint } from '../../types'
 import type { RoadtripVia, RoadtripDayBoundary } from '@trek/shared'
 import { dayWindow } from './dayWindow'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { stayStartingOn } from '../../utils/dayMerge'
+import { staysAtTheirPlaces } from './nightBookend'
 
 export type { RoadtripStop, RoadtripDay, RoadtripRoutes, QuietDay, AccessSpur, RoutedLeg, SnappedPoint } from '@trek/shared/roadtrip'
 
@@ -333,11 +335,15 @@ export function useRoadtripRoutes(
    * Off until the trip switches it on, so a trip drives exactly as it did before.
    */
   const bookendsOn = useRoadtripSettings(hotelBookendsOn, tripId)
-  // The nights as the rule reads them, with the booking behind each. Read only while the
-  // switch is on, so a new booking on a trip without it touches nothing downstream.
+  // Where each hotel stands now. The stay rows keep the position their place had when they
+  // were fetched, while the visits follow the place at once, and the server joins it afresh.
+  const tripPlaces = useTripStore(s => s.places)
+  // The nights as the rule reads them, with the booking behind each and the hotel where its
+  // place is. Read only while the switch is on, so a new booking or a moved pin on a trip
+  // without it touches nothing downstream.
   const stays = useMemo(
-    () => (bookendsOn ? bookendStaysOf(accommodations, reservations) : []),
-    [bookendsOn, accommodations, reservations],
+    () => (bookendsOn ? bookendStaysOf(staysAtTheirPlaces(accommodations, tripPlaces), reservations) : []),
+    [bookendsOn, accommodations, tripPlaces, reservations],
   )
   // The stored days with the night before and the night after seated at their edges, by
   // the rule the server's calculate_roadtrip runs too. Before a day is asked whether it

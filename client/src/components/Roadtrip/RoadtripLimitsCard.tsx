@@ -1,5 +1,5 @@
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
-import React, { useState } from 'react'
+import React, { useId, useState } from 'react'
 import {
   Clock, Fuel, CalendarClock, SlidersHorizontal, ChevronRight, Coins, Signpost, Ship, Check,
   Car, Zap, BatteryCharging, BatteryFull, BatteryWarning, Gauge, Route, Sparkles, Link2, Palette,
@@ -18,7 +18,6 @@ import { FS } from './typeScale'
 import DayWindowFields from './DayWindowFields'
 import SettingsHint from './SettingsHint'
 import { dayWindow } from './dayWindow'
-import { Tooltip } from '../shared/Tooltip'
 import { BOOKEND_ICON } from './nightBookend'
 import { useHotelBookends } from './useHotelBookends'
 
@@ -166,7 +165,9 @@ function LimitRow({ icon: Icon, label, suffix, value, placeholder, step, derived
  * pointed the instance at their own OSRM has no second engine, and a switch that flips
  * and changes nothing is worse than one that says why it cannot.
  *
- * A `hint` is the sentence a switch needs and its panel has no room for, on the label.
+ * A `hint` is the sentence a switch needs to say what flipping it changes. It stands under
+ * the label, in the caption the panels close on, and the switch is described by it: behind a
+ * hover it was a sentence nobody found, and a screen reader never heard.
  */
 function AvoidRow({ icon: Icon, label, hint, on, disabled, onToggle }: {
   icon: typeof Coins
@@ -176,14 +177,17 @@ function AvoidRow({ icon: Icon, label, hint, on, disabled, onToggle }: {
   disabled: boolean
   onToggle: () => void
 }): React.ReactElement {
-  const text = <span tabIndex={hint ? 0 : undefined} className="min-w-0 flex-1 text-body text-content-secondary">{label}</span>
+  const hintId = useId()
   return (
     <div className={`flex items-center gap-3 ${disabled ? 'opacity-50' : ''}`}>
       <Icon size={16} className="shrink-0 text-content-faint" aria-hidden />
-      {hint ? <Tooltip label={hint} placement="top">{text}</Tooltip> : text}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="text-body text-content-secondary">{label}</span>
+        {hint ? <span id={hintId} className="text-caption leading-snug text-content-faint">{hint}</span> : null}
+      </span>
       {disabled
         ? <span className="text-caption text-content-faint">{'—'}</span>
-        : <ToggleSwitch on={on} onToggle={onToggle} label={label} />}
+        : <ToggleSwitch on={on} onToggle={onToggle} label={label} describedBy={hint ? hintId : undefined} />}
     </div>
   )
 }

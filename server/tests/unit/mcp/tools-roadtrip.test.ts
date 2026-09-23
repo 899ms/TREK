@@ -356,6 +356,20 @@ describe('road-trip MCP tools', () => {
     expect(testDb.prepare('SELECT COUNT(*) c FROM roadtrip_preferences WHERE trip_id = ?').get(trip.id)).toEqual({ c: 0 });
   });
 
+  it('MCP-ROADTRIP-014: both via tools say that a via on the drive into a booked night is kept and not used', async () => {
+    // The planner refuses that click with a sentence; a tool stores the via as asked, so
+    // the note on the tool is the only place the assistant can learn it changes nothing.
+    const { user } = createUser(testDb);
+    await withHarness(user.id, async (h) => {
+      const tools = (await h.client.listTools()).tools;
+      for (const name of ['add_route_via', 'add_route_vias']) {
+        const description = tools.find(t => t.name === name)?.description ?? '';
+        expect(description, name).toContain('roadtrip_hotel_bookends');
+        expect(description, name).toContain('kept but not used');
+      }
+    });
+  });
+
   it('MCP-ROADTRIP-009: removing one that is not on the day is refused, not silently ignored', async () => {
     const { user, trip, day } = scenario();
 

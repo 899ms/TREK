@@ -10,7 +10,7 @@ import type { CarrierTerminal, RoadtripDay, RoadtripRoutes, RoadtripStop, RouteS
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-064
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-065
 //
 // The stage bar pictures the place its day ends at. It reads that place out of the trip
 // store rather than the planner, the unfiltered list, so the picture tests seed the store.
@@ -1006,6 +1006,19 @@ describe('MRoadtripTab', () => {
         fireEvent.click(screen.getByText('roadtrip.bookend.checkOut:Hotel Alpenblick'))
         expect(reader.handlePlaceClick).toHaveBeenCalledWith(900)
         expect(shell.openSheet).not.toHaveBeenCalled()
+      })
+
+      it('FE-MOB-RTTAB-065: a stage that only drives from one stay to the next says its drive and no count of stops', () => {
+        const transfer = stage({
+          stops: [bookend('morning', 0), { ...bookend('evening', 0), name: 'Wallinga', lat: 48, lng: 12 }],
+          legs: [seg('172 km', '2 h')],
+          schedule: { entries: [entry('08:00'), entry('10:00')], warnings: [] },
+          legVias: [[]], driveWarnings: [], spills: [], dryPoints: [],
+        })
+        renderTab(planner({ roadtripRoutes: routes({ days: [transfer] }) }))
+
+        expect(screen.getByText('roadtrip.bookend.back:Wallinga')).toBeInTheDocument()
+        expect(screen.queryByText(/roadtrip\.day\.stopCount/)).toBeNull()
       })
     })
   })

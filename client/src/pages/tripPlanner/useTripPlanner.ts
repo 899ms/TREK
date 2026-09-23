@@ -1093,6 +1093,12 @@ export function useTripPlanner() {
    */
   const roadtripMapPlaces = useMemo(() => {
     const plannedIds = new Set(Object.values(assignments).flat().map(a => a.place_id))
+    // The hotel a day sets out from or ends at is drawn with its drive whether or not a day
+    // still holds its stop: with that stop removed, the line and the walk to the door ended
+    // at a spot with no pin, where the phone's stage map has one (`stagePlaceIds`).
+    for (const day of roadtripRoutes.days) {
+      for (const stop of day.stops) if (stop.bookend) plannedIds.add(stop.placeId)
+    }
     const plannedPlaces = mapPlaces.filter(p => plannedIds.has(p.id))
     if (!collapsedRoadtripDays.size) return plannedPlaces
     const hidden = new Set<number>()

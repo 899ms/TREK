@@ -278,7 +278,7 @@ describe('RoadtripLimitsCard', () => {
       expect(onSave).toHaveBeenCalledWith('roadtrip_connect_days', false)
     })
 
-    it('FE-ROADTRIP-LIMITS-018: starting and ending each day at the stay is off until it is asked for', async () => {
+    it('FE-ROADTRIP-LIMITS-018: starting and ending each day at the stay is off until it is asked for', () => {
       const onSave = vi.fn()
       open(onSave)
 
@@ -288,11 +288,16 @@ describe('RoadtripLimitsCard', () => {
       fireEvent.click(toggle)
       expect(onSave).toHaveBeenCalledWith('roadtrip_hotel_bookends', true)
       expect(onSave).toHaveBeenCalledTimes(1)
-      // What it does is said on the label, where the panel has no room for it.
-      fireEvent.mouseEnter(screen.getByText('Start and end each day at your stay'))
-      expect(await screen.findByRole('tooltip')).toHaveTextContent(
-        'After a booked night the day starts where you slept, and before one it ends there.',
+      // What it does is said under it for everybody to read, and the switch is described by
+      // that sentence, so a screen reader hears it with the switch rather than never.
+      const hint = screen.getByText(
+        'After a booked night the day starts at that stay, and before one it ends at the stay booked for that night.',
       )
+      expect(toggle).toHaveAttribute('aria-describedby', hint.id)
+      expect(hint.id).not.toBe('')
+      expect(screen.queryByRole('tooltip')).toBeNull()
+      // A switch that needs no sentence is described by none.
+      expect(screen.getByRole('button', { name: 'Connect the days' })).not.toHaveAttribute('aria-describedby')
     })
 
     it('FE-ROADTRIP-LIMITS-019: switched on, it reads on and reports the way back off', () => {

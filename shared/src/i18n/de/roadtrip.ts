@@ -116,7 +116,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Verbindungsfahrten zählen zum Ankunftstag.',
   'roadtrip.line.hotelBookends': 'Jeden Tag an der Unterkunft beginnen und beenden',
   'roadtrip.line.hotelBookendsHint':
-    'Nach einer gebuchten Nacht beginnt der Tag dort, wo du geschlafen hast, und vor einer endet er dort.',
+    'Nach einer gebuchten Nacht beginnt der Tag an dieser Unterkunft, vor einer endet er an der Unterkunft dieser Nacht.',
   'roadtrip.avoid.section': 'Möglichst meiden',
   'roadtrip.avoid.toll': 'Mautstraßen',
   'roadtrip.avoid.motorway': 'Autobahnen',
@@ -293,6 +293,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Ab {name}',
   'roadtrip.bookend.back': 'Zurück zu {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
-  'roadtrip.bookend.noVia': 'Die Fahrt von und zu deiner Unterkunft behält ihre Strecke.',
+  'roadtrip.bookend.noVia':
+    'Auf der Fahrt zur oder von der Unterkunft geht kein Zwischenpunkt. Füge dort stattdessen einen Stopp hinzu.',
 };
 export default roadtrip;

@@ -10,7 +10,7 @@ import type { BookendReading } from './roadtripRowModel'
  * One module for both shells, the way `carrierRide` is for a ride: the two would otherwise
  * carry the same sentence and the same decision each, and the duplication budget does not
  * stretch to that. What the row IS comes from the row model (`bookendReading`); this only
- * says it.
+ * says it, and reads the hotel it stands for off the trip's places (`staysAtTheirPlaces`).
  */
 
 /** The bed the day plan's stay chips wear, so the hotel looks like itself here too. */
@@ -27,6 +27,49 @@ export function bookendTitle(reading: BookendReading, t: TranslationFn): string 
  */
 export function bookendMeta(reading: BookendReading, t: TranslationFn, is12h: boolean): string | null {
   return reading.until ? t('roadtrip.stay.until', { time: formatClockTime(reading.until, is12h) }) : null
+}
+
+/** The fields of a trip place the hotel of a stay is read from. */
+export interface HotelPlace {
+  id: number
+  name: string
+  lat?: number | null
+  lng?: number | null
+}
+
+/** The fields of a stay row that name its hotel and where it stands. */
+export interface StayAtPlace {
+  place_id?: number | null
+  place_name?: string | null
+  place_lat?: number | null
+  place_lng?: number | null
+}
+
+/**
+ * The stays with their hotel where the trip's places have it now.
+ *
+ * A stay row carries its place's name and position as they were when the stays were last
+ * fetched, and the planner fetches them again on a stay's own edit only. A pin moved on the
+ * hotel reaches its visits at once (`mergeAssignmentPlace`) and the stay row not at all, so a
+ * bookend seated from the row stood at the old spot beside its own stop at the new one: the
+ * day drove from the one to the other, and the server, which joins the place afresh, planned
+ * another drive. The place wins; the row stands in only for a place the list does not hold.
+ * Rows that need nothing come back as they were, and so does the list when none does.
+ */
+export function staysAtTheirPlaces<S extends StayAtPlace>(stays: readonly S[], places: readonly HotelPlace[]): readonly S[] {
+  if (!stays.length || !places.length) return stays
+  const byId = new Map(places.map(place => [place.id, place]))
+  let changed = false
+  const out = stays.map(stay => {
+    const place = stay.place_id == null ? undefined : byId.get(stay.place_id)
+    if (!place) return stay
+    const lat = place.lat ?? null
+    const lng = place.lng ?? null
+    if (stay.place_lat === lat && stay.place_lng === lng && stay.place_name === place.name) return stay
+    changed = true
+    return { ...stay, place_lat: lat, place_lng: lng, place_name: place.name }
+  })
+  return changed ? out : stays
 }
 
 /**

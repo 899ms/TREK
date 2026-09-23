@@ -296,10 +296,10 @@ With it on:
 - The hotel stands at the edge of the day card as a row of its own, with a bed icon and no number. In the morning it reads *Check-out · Hotel Adler* with *until 10:00* on the day you leave, and *From Hotel Adler* on a day you come back to. In the evening it reads *Back to Hotel Adler*, or *Check-in · Hotel Adler* on the day the stay begins when the hotel's own stop is not on the card before it, for example because you removed it.
 - The drive to and from the hotel counts towards the day's distance, driving time, driving limits and range. The hotel does not count as a stop and does not refill the tank.
 - These rows are not stops you planned, and nothing is stored for them: they cannot be dragged, removed or given a stay. Clicking one opens the night's booking, or the hotel's place when there is no booking to open. On the phone, a night without a booking opens the stay for somebody who may edit days.
-- Only real nights count: a stay that checks in and out on the same day adds no row, and neither does a hotel without coordinates. Where two stays overlap, the one entered first counts.
+- Only real nights count: a stay that checks in and out on the same day adds no row, and neither does a hotel without coordinates. Where two stays overlap, the choice is the one **Days** makes: the day ends at a stay checked in that day, otherwise at the one it started from, and it starts at a stay checked in on an earlier day, the one entered first where there are two. A drive between two different hotels is then a real drive.
 - A side of the day that already starts or ends at the hotel gets no row. Neither does a day that starts where a flight, train or ferry lands or at a hire car's pick-up desk, or ends at a departure terminal or where the hire car goes back.
 - A day with one place becomes a drive from the hotel to it and back. A day between two nights in the same hotel with no place planned has no drive, and a check-out day with no places is the drive from one hotel to the next.
-- The drive from and to the hotel keeps its road. Clicking it on the map places no via point and says *The drive from or to your stay keeps its road.*, and its drive band offers no **Other ways**. A place added from the search along that drive goes to the start or the end of the day.
+- The drive from and to the hotel keeps its road. Clicking it on the map places no via point and says *No via point on the drive to or from your stay. Add a stop there instead.*, and its drive band offers no **Other ways**. A place added from the search along that drive goes to the start or the end of the day.
 - With **Connect the days** on or daily travel times set, a night at one hotel is no drive between the two days. A via point on the drive from one day into the next is kept, but not used while that day ends at a hotel.
 
 Switch it off and every day drives from its first stop to its last, as before. The **Days** view does not change either way.
@@ -409,7 +409,7 @@ What TREK contacts, and from where:
 | *Use a Google Maps directions link.* | The link is not a Google Maps directions link, for example a single place. |
 | *The link must contain between 2 and 30 readable stops.* | Too few or too many stops in the link. Split a longer route into days. |
 | Via handles do not appear or do not move | Zoom in further. Otherwise you are offline, or you may not edit days on this trip. |
-| *The drive from or to your stay keeps its road.* | You clicked the drive to or from a hotel row, which takes no via point. Add a stop there instead, or switch off **Start and end each day at your stay**. |
+| *No via point on the drive to or from your stay. Add a stop there instead.* | You clicked the drive to or from a hotel row, which takes no via point. Add a stop there instead, or switch off **Start and end each day at your stay**. |
 
 ## See also
 

@@ -110,7 +110,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.dayColors': '每天一种颜色',
   'roadtrip.line.hint': '也会规划两天之间的路段，并计入抵达的那一天。',
   'roadtrip.line.hotelBookends': '每天从住处出发，并在住处结束',
-  'roadtrip.line.hotelBookendsHint': '预订的一晚之后，当天从你住的地方出发；预订的一晚之前，当天在那里结束。',
+  'roadtrip.line.hotelBookendsHint': '预订的一晚之后，当天从那处住宿出发；预订的一晚之前，当天在那晚预订的住宿结束。',
   'roadtrip.avoid.section': '尽量避开',
   'roadtrip.avoid.toll': '收费公路',
   'roadtrip.avoid.motorway': '高速公路',
@@ -279,6 +279,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '从 {name} 出发',
   'roadtrip.bookend.back': '返回 {name}',
   'roadtrip.bookend.checkIn': '入住 · {name}',
-  'roadtrip.bookend.noVia': '往返住处的路段保持原有路线。',
+  'roadtrip.bookend.noVia': '往返住处的路段不能添加途经点。请改为在那里添加一个停靠点。',
 };
 export default roadtrip;

@@ -104,7 +104,19 @@ export function bookendStaysOf<S extends Omit<BookendStay, 'reservation_id'>>(
   return out;
 }
 
-function bookendStop(day: PlanDay, phase: BookendPhase, stay: BookendStay, ownerIndex: number): RoadtripStop {
+/**
+ * A bookend as a stop. `legMode` is the mode of the drive that leaves it: the morning's
+ * drive to the first stop goes the way that stop is reached from the hotel
+ * (`incoming_leg_transport_mode`, the mode the day plan draws that leg in), and the
+ * evening's leaves nowhere.
+ */
+function bookendStop(
+  day: PlanDay,
+  phase: BookendPhase,
+  stay: BookendStay,
+  ownerIndex: number,
+  legMode: string | null,
+): RoadtripStop {
   const checkingOut = phase === 'morning' && stay.end_day_id === day.dayId;
   return {
     bookend: {
@@ -131,7 +143,7 @@ function bookendStop(day: PlanDay, phase: BookendPhase, stay: BookendStay, owner
     dwellMinutes: 0,
     night: false,
     endDay: false,
-    legMode: null,
+    legMode,
     incomingLegMode: null,
     stopType: 'hotel',
     fillPercent: null,
@@ -193,9 +205,9 @@ export function seatNightBookends(plan: PlanDay[], days: readonly DayRef[], stay
     return {
       ...day,
       stops: [
-        ...(head ? [bookendStop(day, 'morning', hotels.morning!, 0)] : []),
+        ...(head ? [bookendStop(day, 'morning', hotels.morning!, 0, first?.incomingLegMode ?? null)] : []),
         ...stops,
-        ...(tail ? [bookendStop(day, 'evening', hotels.evening!, stored)] : []),
+        ...(tail ? [bookendStop(day, 'evening', hotels.evening!, stored, null)] : []),
       ],
     };
   });

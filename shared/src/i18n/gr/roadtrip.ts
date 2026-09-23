@@ -120,7 +120,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Υπολογίζει και το τμήμα ανάμεσα σε δύο ημέρες, στην ημέρα άφιξης.',
   'roadtrip.line.hotelBookends': 'Έναρξη και λήξη κάθε ημέρας στο κατάλυμα',
   'roadtrip.line.hotelBookendsHint':
-    'Μετά από μια κρατημένη νύχτα η ημέρα ξεκινά εκεί όπου κοιμηθήκατε, και πριν από μία τελειώνει εκεί.',
+    'Μετά από μια κρατημένη νύχτα η ημέρα ξεκινά από εκείνο το κατάλυμα, και πριν από μία τελειώνει στο κατάλυμα που έχει κρατηθεί για εκείνη τη νύχτα.',
   'roadtrip.avoid.section': 'Αποφυγή όπου γίνεται',
   'roadtrip.avoid.toll': 'Δρόμοι με διόδια',
   'roadtrip.avoid.motorway': 'Αυτοκινητόδρομοι',
@@ -301,6 +301,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Από {name}',
   'roadtrip.bookend.back': 'Επιστροφή: {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
-  'roadtrip.bookend.noVia': 'Η διαδρομή προς και από το κατάλυμα διατηρεί τον δρόμο της.',
+  'roadtrip.bookend.noVia':
+    'Δεν μπαίνει ενδιάμεσο σημείο στη διαδρομή προς ή από το κατάλυμα. Προσθέστε εκεί μια στάση.',
 };
 export default roadtrip;

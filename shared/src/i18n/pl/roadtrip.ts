@@ -117,7 +117,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Wyznacza też odcinek między dniami i liczy go do dnia przyjazdu.',
   'roadtrip.line.hotelBookends': 'Zaczynaj i kończ każdy dzień w noclegu',
   'roadtrip.line.hotelBookendsHint':
-    'Po zarezerwowanej nocy dzień zaczyna się w miejscu noclegu, a przed taką nocą tam się kończy.',
+    'Po zarezerwowanej nocy dzień zaczyna się w tym noclegu, a przed taką nocą kończy się w noclegu zarezerwowanym na tę noc.',
   'roadtrip.avoid.section': 'Omijaj, jeśli się da',
   'roadtrip.avoid.toll': 'Drogi płatne',
   'roadtrip.avoid.motorway': 'Autostrady',
@@ -294,6 +294,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Wyjazd: {name}',
   'roadtrip.bookend.back': 'Powrót: {name}',
   'roadtrip.bookend.checkIn': 'Zameldowanie · {name}',
-  'roadtrip.bookend.noVia': 'Trasa do noclegu i z niego pozostaje bez zmian.',
+  'roadtrip.bookend.noVia':
+    'Na trasie do noclegu ani z niego nie można dodać punktu pośredniego. Dodaj tam zamiast tego postój.',
 };
 export default roadtrip;

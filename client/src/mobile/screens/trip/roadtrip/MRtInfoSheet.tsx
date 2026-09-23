@@ -28,8 +28,8 @@ import type { DistanceUnit } from '../../../../types'
  * The figures cannot be changed here. That is the point rather than a gap: driving limits
  * are set once, at a table, before anybody is in the car, and a form in the passenger seat is
  * a way to break a trip while it is happening. So there is no field, no slider and no
- * greyed-out button that looks like one, and the last line says plainly where the settings
- * are and what else that screen can do that this one cannot.
+ * greyed-out button that looks like one, and the line under the figures says plainly where
+ * they are set and what else that screen can do that this one cannot.
  *
  * One switch is the exception: whether a day starts and ends at the stay. It is no figure and
  * breaks nothing. It moves where a drawn day begins and ends, never a stored stop, and
@@ -37,7 +37,8 @@ import type { DistanceUnit } from '../../../../types'
  * on the road reaches for, when the day on the phone sets off from its first place instead
  * of the hotel they woke up in. It writes through the desktop dialog's own save
  * (`useHotelBookends` over the planner's `saveRoadtripLimit`), and stays disabled for a
- * reader who may not edit days.
+ * reader who may not edit days. It sits below that line rather than above it, so the
+ * sentence about figures set at the desktop never reads as being about the switch too.
  */
 
 /**
@@ -240,8 +241,13 @@ export default function MRtInfoSheet({ planner, shell }: MTripSheetsProps) {
           </InfoCard>
         </div>
 
+        {/* Under the figures it speaks of, and above the switch it does not. */}
+        <p className="mt-2.5 font-geist text-[0.6875rem] leading-snug text-m-faint">
+          {t('mobileTrip.rtDesktopNote')}
+        </p>
+
         {/* ── The one switch: whether a day starts and ends at the stay ── */}
-        <div className="mt-2.5">
+        <div className="mt-3">
           <InfoCard label={t('roadtrip.line.section')}>
             <div className="mt-1 flex items-center justify-between gap-3 py-2">
               <span className="min-w-0 flex-1 text-[0.8125rem] text-m-muted">{t('roadtrip.line.hotelBookends')}</span>
@@ -257,10 +263,6 @@ export default function MRtInfoSheet({ planner, shell }: MTripSheetsProps) {
             </div>
           </InfoCard>
         </div>
-
-        <p className="mt-3 font-geist text-[0.6875rem] leading-snug text-m-faint">
-          {t('mobileTrip.rtDesktopNote')}
-        </p>
       </div>
     </MSheet>
   )

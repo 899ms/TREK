@@ -119,7 +119,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Calcule aussi le trajet entre deux jours et le compte au jour d’arrivée.',
   'roadtrip.line.hotelBookends': 'Commencer et finir chaque jour à votre hébergement',
   'roadtrip.line.hotelBookendsHint':
-    'Après une nuit réservée, la journée commence là où vous avez dormi, et avant une nuit réservée, elle s’y termine.',
+    'Après une nuit réservée, la journée commence à cet hébergement, et avant une nuit réservée, elle se termine à l’hébergement réservé pour cette nuit.',
   'roadtrip.avoid.section': 'Éviter si possible',
   'roadtrip.avoid.toll': 'Routes à péage',
   'roadtrip.avoid.motorway': 'Autoroutes',
@@ -299,6 +299,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Depuis {name}',
   'roadtrip.bookend.back': 'Retour à {name}',
   'roadtrip.bookend.checkIn': 'Arrivée · {name}',
-  'roadtrip.bookend.noVia': 'Le trajet depuis ou vers votre hébergement garde son itinéraire.',
+  'roadtrip.bookend.noVia':
+    'Pas de point de passage sur le trajet vers ou depuis votre hébergement. Ajoutez plutôt un arrêt à cet endroit.',
 };
 export default roadtrip;

@@ -117,7 +117,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Cũng tính đoạn giữa hai ngày và cộng vào ngày tới nơi.',
   'roadtrip.line.hotelBookends': 'Bắt đầu và kết thúc mỗi ngày tại nơi lưu trú',
   'roadtrip.line.hotelBookendsHint':
-    'Sau một đêm đã đặt, ngày bắt đầu ở nơi bạn ngủ, và trước một đêm đã đặt, ngày kết thúc ở đó.',
+    'Sau một đêm đã đặt, ngày bắt đầu tại nơi lưu trú đó, và trước một đêm đã đặt, ngày kết thúc tại nơi lưu trú đã đặt cho đêm ấy.',
   'roadtrip.avoid.section': 'Tránh nếu có thể',
   'roadtrip.avoid.toll': 'Đường thu phí',
   'roadtrip.avoid.motorway': 'Đường cao tốc',
@@ -294,6 +294,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Từ {name}',
   'roadtrip.bookend.back': 'Về lại {name}',
   'roadtrip.bookend.checkIn': 'Nhận phòng · {name}',
-  'roadtrip.bookend.noVia': 'Chặng đi và về nơi lưu trú giữ nguyên tuyến đường.',
+  'roadtrip.bookend.noVia':
+    'Không thể đặt điểm trung gian trên chặng đi hoặc về nơi lưu trú. Hãy thêm một điểm dừng ở đó.',
 };
 export default roadtrip;

@@ -118,7 +118,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'També calcula el tram entre dos dies i el compta al dia d’arribada.',
   'roadtrip.line.hotelBookends': 'Comença i acaba cada dia a l’allotjament',
   'roadtrip.line.hotelBookendsHint':
-    'Després d’una nit reservada, el dia comença on has dormit, i abans d’una acaba allà.',
+    'Després d’una nit reservada, el dia comença en aquest allotjament, i abans d’una acaba a l’allotjament reservat per a aquella nit.',
   'roadtrip.avoid.section': 'Evita quan sigui possible',
   'roadtrip.avoid.toll': 'Peatges',
   'roadtrip.avoid.motorway': 'Autopistes',
@@ -299,6 +299,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Des de {name}',
   'roadtrip.bookend.back': 'Tornada a {name}',
   'roadtrip.bookend.checkIn': 'Entrada · {name}',
-  'roadtrip.bookend.noVia': 'El trajecte des del teu allotjament o fins a ell manté la seva ruta.',
+  'roadtrip.bookend.noVia':
+    'No es pot posar cap punt de pas al trajecte fins al teu allotjament o des d’ell. Afegeix-hi una parada.',
 };
 export default roadtrip;

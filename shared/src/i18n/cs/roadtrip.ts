@@ -116,7 +116,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.dayColors': 'Barva na den',
   'roadtrip.line.hint': 'Spočítá i úsek mezi dvěma dny a připočte ho ke dni příjezdu.',
   'roadtrip.line.hotelBookends': 'Začínat a končit každý den v ubytování',
-  'roadtrip.line.hotelBookendsHint': 'Po zarezervované noci začíná den tam, kde jste spali, a před ní tam končí.',
+  'roadtrip.line.hotelBookendsHint':
+    'Po zarezervované noci začíná den v tomto ubytování a před ní končí v ubytování zarezervovaném na tu noc.',
   'roadtrip.avoid.section': 'Vyhnout se, pokud to jde',
   'roadtrip.avoid.toll': 'Mýtné silnice',
   'roadtrip.avoid.motorway': 'Dálnice',
@@ -292,6 +293,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Z ubytování {name}',
   'roadtrip.bookend.back': 'Zpět do ubytování {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
-  'roadtrip.bookend.noVia': 'Trasa z vašeho ubytování a do něj zůstává beze změny.',
+  'roadtrip.bookend.noVia':
+    'Na trasu do ubytování ani z něj nelze přidat průjezdní bod. Přidejte tam místo toho zastávku.',
 };
 export default roadtrip;

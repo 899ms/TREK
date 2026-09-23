@@ -118,7 +118,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Juga menghitung ruas antara dua hari dan memasukkannya ke hari kedatangan.',
   'roadtrip.line.hotelBookends': 'Mulai dan akhiri setiap hari di penginapan Anda',
   'roadtrip.line.hotelBookendsHint':
-    'Setelah malam yang dipesan, hari dimulai di tempat Anda menginap, dan sebelum malam yang dipesan, hari berakhir di sana.',
+    'Setelah malam yang dipesan, hari dimulai di penginapan itu, dan sebelum malam yang dipesan, hari berakhir di penginapan yang dipesan untuk malam itu.',
   'roadtrip.avoid.section': 'Hindari bila bisa',
   'roadtrip.avoid.toll': 'Jalan tol',
   'roadtrip.avoid.motorway': 'Jalan bebas hambatan',
@@ -298,6 +298,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Dari {name}',
   'roadtrip.bookend.back': 'Kembali ke {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
-  'roadtrip.bookend.noVia': 'Perjalanan dari dan ke penginapan Anda tetap pada jalurnya.',
+  'roadtrip.bookend.noVia':
+    'Titik lintas tidak bisa ditaruh di perjalanan ke atau dari penginapan Anda. Tambahkan perhentian di sana.',
 };
 export default roadtrip;

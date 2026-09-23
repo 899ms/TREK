@@ -118,7 +118,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'İki gün arasındaki yolu da hesaplar ve varış gününe sayar.',
   'roadtrip.line.hotelBookends': 'Her güne konaklama yerinde başla ve orada bitir',
   'roadtrip.line.hotelBookendsHint':
-    'Rezerve edilmiş bir geceden sonra gün uyuduğunuz yerde başlar, böyle bir geceden önce de orada biter.',
+    'Rezerve edilmiş bir geceden sonra gün o konaklama yerinde başlar, böyle bir geceden önce de o gece için ayrılan konaklama yerinde biter.',
   'roadtrip.avoid.section': 'Mümkünse kaçın',
   'roadtrip.avoid.toll': 'Paralı yollar',
   'roadtrip.avoid.motorway': 'Otoyollar',
@@ -296,6 +296,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Başlangıç: {name}',
   'roadtrip.bookend.back': 'Dönüş: {name}',
   'roadtrip.bookend.checkIn': 'Giriş · {name}',
-  'roadtrip.bookend.noVia': 'Konaklama yerinize gidiş ve dönüş yolu değişmez.',
+  'roadtrip.bookend.noVia':
+    'Konaklama yerinize giden ya da oradan çıkan yola ara nokta konamaz. Bunun yerine oraya bir mola ekleyin.',
 };
 export default roadtrip;

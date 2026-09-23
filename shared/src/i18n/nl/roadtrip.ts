@@ -119,7 +119,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Berekent ook het stuk tussen twee dagen en telt het bij de aankomstdag.',
   'roadtrip.line.hotelBookends': 'Elke dag bij je verblijf beginnen en eindigen',
   'roadtrip.line.hotelBookendsHint':
-    'Na een geboekte nacht begint de dag waar je sliep, en vóór een geboekte nacht eindigt hij daar.',
+    'Na een geboekte nacht begint de dag bij dat verblijf, en vóór een geboekte nacht eindigt hij bij het verblijf dat voor die nacht is geboekt.',
   'roadtrip.avoid.section': 'Vermijden waar het kan',
   'roadtrip.avoid.toll': 'Tolwegen',
   'roadtrip.avoid.motorway': 'Snelwegen',
@@ -297,6 +297,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Vanaf {name}',
   'roadtrip.bookend.back': 'Terug naar {name}',
   'roadtrip.bookend.checkIn': 'Inchecken · {name}',
-  'roadtrip.bookend.noVia': 'De rit van en naar je verblijf houdt zijn route.',
+  'roadtrip.bookend.noVia':
+    'Geen tussenpunt op de rit naar of van je verblijf. Voeg daar in plaats daarvan een stop toe.',
 };
 export default roadtrip;

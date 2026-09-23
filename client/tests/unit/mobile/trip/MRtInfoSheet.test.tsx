@@ -9,7 +9,7 @@ import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { fireEvent, render, screen } from '../../../helpers/render'
 
-// FE-MOB-RTINFO-001 to FE-MOB-RTINFO-018
+// FE-MOB-RTINFO-001 to FE-MOB-RTINFO-019
 //
 // The sheet renders inside the real TranslationProvider, so the copy is asserted
 // in English. Everything it shows comes out of the roadtrip preferences store,
@@ -154,7 +154,7 @@ describe('MRtInfoSheet', () => {
     }
   })
 
-  it('FE-MOB-RTINFO-013: closes with the footnote that names the desktop as the place to change them', () => {
+  it('FE-MOB-RTINFO-013: carries the footnote that names the desktop as the place to change them', () => {
     renderSheet()
     expect(screen.getByText(/These figures are set on the desktop/)).toBeInTheDocument()
   })
@@ -179,7 +179,9 @@ describe('MRtInfoSheet', () => {
     const toggle = screen.getByRole('switch', { name: 'Start and end each day at your stay' })
     expect(toggle).toHaveAttribute('aria-checked', 'false')
     expect(toggle).toBeEnabled()
-    expect(screen.getByText('After a booked night the day starts where you slept, and before one it ends there.')).toBeInTheDocument()
+    expect(
+      screen.getByText('After a booked night the day starts at that stay, and before one it ends at the stay booked for that night.'),
+    ).toBeInTheDocument()
     fireEvent.click(toggle)
     expect(saveRoadtripLimit).toHaveBeenCalledWith('roadtrip_hotel_bookends', true)
     expect(saveRoadtripLimit).toHaveBeenCalledTimes(1)
@@ -192,6 +194,15 @@ describe('MRtInfoSheet', () => {
     expect(toggle).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(toggle)
     expect(saveRoadtripLimit).toHaveBeenCalledWith('roadtrip_hotel_bookends', false)
+  })
+
+  it('FE-MOB-RTINFO-019: the footnote about figures set on the desktop stands under the figures, above the switch that is set here', () => {
+    renderSheet()
+    const note = screen.getByText(/These figures are set on the desktop/)
+    const limits = screen.getByText('Longest drive at once')
+    const toggle = screen.getByRole('switch', { name: 'Start and end each day at your stay' })
+    expect(limits.compareDocumentPosition(note) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(note.compareDocumentPosition(toggle) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('FE-MOB-RTINFO-018: a reader who may not edit days sees the switch, disabled', () => {

@@ -116,7 +116,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Connecting drives count toward the arrival day.',
   'roadtrip.line.hotelBookends': 'Start and end each day at your stay',
   'roadtrip.line.hotelBookendsHint':
-    'After a booked night the day starts where you slept, and before one it ends there.',
+    'After a booked night the day starts at that stay, and before one it ends at the stay booked for that night.',
   'roadtrip.avoid.section': 'Avoid where possible',
   'roadtrip.avoid.toll': 'Toll roads',
   'roadtrip.avoid.motorway': 'Motorways',
@@ -290,6 +290,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'From {name}',
   'roadtrip.bookend.back': 'Back to {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
-  'roadtrip.bookend.noVia': 'The drive from or to your stay keeps its road.',
+  'roadtrip.bookend.noVia': 'No via point on the drive to or from your stay. Add a stop there instead.',
 };
 export default roadtrip;

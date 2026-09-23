@@ -115,7 +115,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.dayColors': 'لون لكل يوم',
   'roadtrip.line.hint': 'يحسب أيضًا المسافة بين يومين ويحتسبها على يوم الوصول.',
   'roadtrip.line.hotelBookends': 'ابدأ كل يوم وأنهِه في مكان إقامتك',
-  'roadtrip.line.hotelBookendsHint': 'بعد ليلة محجوزة يبدأ اليوم حيث نمت، وقبل ليلة محجوزة ينتهي هناك.',
+  'roadtrip.line.hotelBookendsHint':
+    'بعد ليلة محجوزة يبدأ اليوم من مكان الإقامة ذاك، وقبل ليلة محجوزة ينتهي في مكان الإقامة المحجوز لتلك الليلة.',
   'roadtrip.avoid.section': 'التجنب قدر الإمكان',
   'roadtrip.avoid.toll': 'الطرق ذات الرسوم',
   'roadtrip.avoid.motorway': 'الطرق السريعة',
@@ -289,6 +290,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'من {name}',
   'roadtrip.bookend.back': 'العودة إلى {name}',
   'roadtrip.bookend.checkIn': 'تسجيل الوصول · {name}',
-  'roadtrip.bookend.noVia': 'يبقى الطريق من مكان إقامتك وإليه كما هو.',
+  'roadtrip.bookend.noVia': 'لا يمكن وضع نقطة عبور على الطريق من مكان إقامتك أو إليه. أضف توقفاً هناك بدلاً من ذلك.',
 };
 export default roadtrip;

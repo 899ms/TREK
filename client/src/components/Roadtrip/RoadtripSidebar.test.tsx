@@ -1545,4 +1545,61 @@ describe('RoadtripSidebar with a booked night at the edge of the day', () => {
     const hotelRow = screen.getByText('Back to Hotel Alpenblick').closest('li')!
     expect(within(hotelRow).getByText('+30 min')).toBeInTheDocument()
   })
+
+  /** Whether a row's disc has the rail running into it from above. */
+  const lineAbove = (text: string): boolean => {
+    const rail = screen.getByText(text).closest('button')!.firstElementChild!
+    return rail.firstElementChild!.className.includes('w-[1.5px]')
+  }
+
+  it('FE-ROADTRIP-SIDEBAR-071: the hotel row the morning marker went into starts the rail, with no line running in from nowhere', () => {
+    const resume = stop({
+      assignmentId: -2_000_000_003,
+      name: 'Continue journey',
+      lat: 47.2,
+      lng: 11.4,
+      automaticNight: { phase: 'start', fromDayNumber: 1 },
+    })
+    const stops = [resume, bookend('morning', { checkingOut: true }, { ownerIndex: 0 }), stop({ assignmentId: 1, name: 'Lookout', ownerIndex: 0 })]
+    wrap(<RoadtripSidebar routes={routes({ days: [day({ stops, legs: [leg({ distance: 0 }), leg()] })] })} />)
+    expect(lineAbove('Check-out · Hotel Alpenblick')).toBe(false)
+    // Below it the rail runs on as always.
+    expect(lineAbove('Lookout')).toBe(true)
+  })
+
+  /** A transfer day: out of one stay and into the next, with nothing stored in between. */
+  const transfer = () => day({
+    dayId: 2,
+    dayNumber: 2,
+    stops: [
+      bookend('morning', { checkingOut: true }, { ownerIndex: 0 }),
+      bookend('evening', { accommodationId: 6, checkingIn: true }, { ownerIndex: 0, name: 'Wallinga', lat: 48, lng: 12 }),
+    ],
+    legs: [leg()],
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-072: a day that only drives from one stay to the next says its drive and no count of stops', () => {
+    wrap(<RoadtripSidebar routes={routes({ days: [transfer()] })} />)
+    expect(screen.getByText('Check-in · Wallinga')).toBeInTheDocument()
+    const header = screen.getByText('Day 2').closest('header')!
+    expect(within(header).getByText(/100 km/)).toBeInTheDocument()
+    expect(within(header).queryByText(/stops?$/)).toBeNull()
+    expect(screen.queryByText('0 stops')).toBeNull()
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-073: a stop dragged onto such a day lands as its first stop, dropped on either hotel', () => {
+    const onMoveStopToDay = vi.fn()
+    const { container } = wrap(
+      <RoadtripSidebar routes={routes({ days: [day(), transfer()] })} onReorderStop={vi.fn()} onMoveStopToDay={onMoveStopToDay} />,
+    )
+    const hotelRow = screen.getByText('Check-in · Wallinga').closest('li')!
+    const rows = container.querySelectorAll('li[draggable="true"]')
+    fireEvent.dragStart(rows[1], { dataTransfer: { effectAllowed: '', setData: vi.fn() } })
+    fireEvent.dragOver(hotelRow)
+    expect(hotelRow.className).toContain('ring-accent')
+    fireEvent.drop(hotelRow)
+
+    // From day 1, its second stop (assignment 2), onto day 2 as its first.
+    expect(onMoveStopToDay).toHaveBeenCalledWith(1, 2, 2, 0)
+  })
 })

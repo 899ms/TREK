@@ -368,16 +368,6 @@ export function computeSchedule(
 }
 
 /**
- * Whether the rail lists this day among the days, rather than as a quiet placeholder
- * asking for stops.
- *
- * Two stops make a drive. A booked night makes a day on its own: the day you arrive
- * somewhere and go no further, or the one you check in at ten and set out from. It
- * used to need company, and a hotel entered under Days for the arrival day was filed
- * at the bottom of the rail under "only X so far", which reads as the hotel missing
- * from the road trip altogether.
- */
-/**
  * Whether a stop is one somebody stored on the day: an assignment, filed at its own
  * index. Not an automatic night, a terminal or a booked night at a day's edge, which the
  * plan seats between the stored stops and which borrow a stored stop's index to be seated
@@ -391,6 +381,16 @@ export function isStoredStop(stop: Pick<RoadtripStop, 'automaticNight' | 'carrie
   return !stop.automaticNight && !stop.carrier && !stop.bookend;
 }
 
+/**
+ * Whether the rail lists this day among the days, rather than as a quiet placeholder
+ * asking for stops.
+ *
+ * Two stops make a drive. A booked night makes a day on its own: the day you arrive
+ * somewhere and go no further, or the one you check in at ten and set out from. It
+ * used to need company, and a hotel entered under Days for the arrival day was filed
+ * at the bottom of the rail under "only X so far", which reads as the hotel missing
+ * from the road trip altogether.
+ */
 export function standsAsDay(stops: readonly { night?: boolean }[]): boolean {
   return stops.length > 1 || stops.some((stop) => stop.night === true);
 }

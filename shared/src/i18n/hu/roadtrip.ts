@@ -118,7 +118,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'A két nap közti szakaszt is kiszámolja, és az érkezés napjához adja.',
   'roadtrip.line.hotelBookends': 'Minden nap a szálláson kezdődjön és érjen véget',
   'roadtrip.line.hotelBookendsHint':
-    'Egy lefoglalt éjszaka után a nap ott kezdődik, ahol aludtál, egy lefoglalt éjszaka előtt pedig ott ér véget.',
+    'Egy lefoglalt éjszaka után a nap annál a szállásnál kezdődik, egy lefoglalt éjszaka előtt pedig az arra az éjszakára foglalt szállásnál ér véget.',
   'roadtrip.avoid.section': 'Kerülés, ha lehet',
   'roadtrip.avoid.toll': 'Fizetős utak',
   'roadtrip.avoid.motorway': 'Autópályák',
@@ -295,6 +295,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Indulás: {name}',
   'roadtrip.bookend.back': 'Vissza: {name}',
   'roadtrip.bookend.checkIn': 'Bejelentkezés · {name}',
-  'roadtrip.bookend.noVia': 'A szálláshoz vezető és onnan induló út útvonala nem változik.',
+  'roadtrip.bookend.noVia':
+    'A szálláshoz vezető vagy onnan induló útra nem kerülhet köztes pont. Adj hozzá inkább egy megállót ott.',
 };
 export default roadtrip;

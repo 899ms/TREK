@@ -25,6 +25,7 @@ vi.mock('../Map/RouteCalculator', async importOriginal => ({
 
 import { useRoadtripRoutes } from './useRoadtripRoutes'
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../store/settingsStore'
+import { useTripStore } from '../../store/tripStore'
 import { lineMetres } from './corridor'
 
 const HAMBURG: [number, number] = [53.5511, 9.9937]
@@ -1165,7 +1166,7 @@ describe('a leg asked for again on demand', () => {
 })
 
 /**
- * FE-ROADTRIP-ROUTES-052..059: a booked night at both ends of the days around it.
+ * FE-ROADTRIP-ROUTES-052..061: a booked night at both ends of the days around it.
  *
  * The first cases here that hand the hook the trip's stays. What is pinned is what goes to
  * the router: the drive from the hotel slept in and to tonight's is part of the day's own
@@ -1209,7 +1210,10 @@ describe('a booked night at both ends of its days', () => {
     calculateRouteWithLegs.mockImplementation(async (points: { lat: number; lng: number }[]) => hourly(points))
     switchTo(true)
   })
-  afterEach(() => act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })))
+  afterEach(() => act(() => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })
+    useTripStore.setState({ places: [] })
+  }))
 
   /** A check-in with two places, then a transfer day that is only the next check-in. */
   const cam = () => ({
@@ -1355,5 +1359,49 @@ describe('a booked night at both ends of its days', () => {
     // The earliest booking of the stay, and the router is not asked again.
     await waitFor(() => expect(result.current.days[1].stops[0].bookend?.reservationId).toBe(90))
     expect(calculateRouteWithLegs).toHaveBeenCalledTimes(calls)
+  })
+
+  it('FE-ROADTRIP-ROUTES-060: a hotel whose pin was moved stands where its place is now, not where the stay row last saw it', async () => {
+    // The stay rows are fetched on a stay's own edit only, so after the pin moved they still
+    // carry the old spot while the visit is already at the new one. Seated from the row,
+    // the check-in day drove from the hotel's stop to its old spot and every morning set
+    // off from there, while the server, which joins the place afresh, planned neither.
+    const MOVED: [number, number] = [-33.8, 150.2]
+    const days = [day(1, 1), day(2, 2), day(3, 3)]
+    const assignments = {
+      ...map(1, [{ id: 1, at: MOVED }]),
+      ...map(2, [{ id: 2, at: LOOKOUT }]),
+    } as AssignmentsMap
+    const stays = [stayOf(1, 1, 1, 3, GETAWAY)]
+    act(() => {
+      useTripStore.setState({ places: [{ id: 10, trip_id: 7, name: 'Getaway Motel', lat: MOVED[0], lng: MOVED[1] }] as never })
+    })
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // The check-in day is its hotel alone, with no drive to a second copy of it.
+    expect(result.current.days.map(d => shape(d.stops))).toEqual([
+      ['Stop 1'],
+      ['morning:1', 'Stop 2', 'evening:1'],
+    ])
+    expect(result.current.days[1].stops[0]).toMatchObject({ lat: MOVED[0], lng: MOVED[1], name: 'Getaway Motel' })
+    expect(asked()).toEqual([[MOVED[0], LOOKOUT[0], MOVED[0]]])
+  })
+
+  it('FE-ROADTRIP-ROUTES-061: the drive out of the morning hotel goes the way the first place is reached from it', async () => {
+    // The mode the day plan draws that leg in, and the one the server routes it in.
+    const { days, stays } = simeon()
+    const assignments = {
+      ...map(1, [{ id: 10, at: HOTEL }, { id: 11, at: P[0] }, { id: 12, at: P[1] }]),
+      ...map(2, [{ id: 13, at: P[2], incoming: 'walking' }, { id: 14, at: P[3] }]),
+      ...map(3, [{ id: 15, at: P[4] }, { id: 16, at: P[5] }]),
+    } as AssignmentsMap
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const runs = calculateRouteWithLegs.mock.calls.map(c => [c[1].profile, c[0].map((p: { lat: number }) => p.lat)])
+    expect(runs).toContainEqual(['walking', [HOTEL[0], P[2][0]]])
+    expect(runs).toContainEqual(['driving', [P[2][0], P[3][0], HOTEL[0]]])
+    expect(runs).toContainEqual(['driving', [HOTEL[0], P[4][0], P[5][0], HOTEL[0]]])
   })
 })

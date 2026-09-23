@@ -118,7 +118,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': 'Также считает участок между двумя днями и относит его ко дню прибытия.',
   'roadtrip.line.hotelBookends': 'Начинать и заканчивать каждый день в месте проживания',
   'roadtrip.line.hotelBookendsHint':
-    'После забронированной ночи день начинается там, где вы ночевали, а перед ней заканчивается там.',
+    'После забронированной ночи день начинается в этом жилье, а перед ней заканчивается в жилье, забронированном на эту ночь.',
   'roadtrip.avoid.section': 'Избегать по возможности',
   'roadtrip.avoid.toll': 'Платные дороги',
   'roadtrip.avoid.motorway': 'Автомагистрали',
@@ -298,6 +298,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Отправление: {name}',
   'roadtrip.bookend.back': 'Возвращение: {name}',
   'roadtrip.bookend.checkIn': 'Заезд · {name}',
-  'roadtrip.bookend.noVia': 'Маршрут от места проживания и обратно к нему остаётся прежним.',
+  'roadtrip.bookend.noVia':
+    'На маршрут до места проживания или от него нельзя поставить промежуточную точку. Добавьте там остановку.',
 };
 export default roadtrip;

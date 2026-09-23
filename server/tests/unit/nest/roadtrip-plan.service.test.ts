@@ -21,7 +21,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 function hourlyRouter() {
   return {
     profiles: () => ['driving'],
-    route: vi.fn(async (_user: number, _trip: number, _day: number, points: { lat: number; lng: number }[]) => ({
+    route: vi.fn(async (_user: number, _trip: number, _day: number, points: { lat: number; lng: number }[], _profile?: string) => ({
       parts: points.slice(1).map(() => ({ distance: 60000, duration: 3600 })),
       avoidMissed: [],
       leg: {
@@ -510,6 +510,23 @@ describe('a booked night at both ends of its days', () => {
     expect(calculated.days.map((d) => d.dayId)).not.toContain(days[3].id);
     expect(router.route).toHaveBeenCalledTimes(3);
     expect(lats(router)[1]).toEqual([HOTEL.lat, 45.3, 45.4, HOTEL.lat]);
+  });
+
+  it('drives out of the morning hotel the way the first place is reached from it, as the browser and the day plan do', async () => {
+    const { user, trip: created, router, plans } = simeon();
+    db.prepare(
+      "UPDATE day_assignments SET incoming_leg_transport_mode = 'walking' WHERE place_id = (SELECT id FROM places WHERE trip_id = ? AND name = 'P3')",
+    ).run(created.id);
+
+    const { calculated } = await plans.calculate(created.id, user.id);
+
+    expect(calculated.days[1].stops[0]).toMatchObject({ legMode: 'walking', bookend: { phase: 'morning' } });
+    const runs = router.route.mock.calls.map((call) => [call[4], call[3].map((p: { lat: number }) => p.lat)]);
+    // The hotel's leg on foot on its own, the rest of the day in the day's own mode.
+    expect(runs).toContainEqual(['walking', [HOTEL.lat, 45.3]]);
+    expect(runs).toContainEqual(['driving', [45.3, 45.4, HOTEL.lat]]);
+    // The other mornings are reached no particular way and stay in one run.
+    expect(runs).toContainEqual(['driving', [HOTEL.lat, 45.5, 45.6, HOTEL.lat]]);
   });
 
   it('drives the stored days while the trip has it off, and a preview can switch it either way', async () => {

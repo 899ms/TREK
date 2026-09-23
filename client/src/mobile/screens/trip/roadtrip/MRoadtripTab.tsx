@@ -229,7 +229,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                       })
                       : t('roadtrip.summary.partial')}
                   </MBadge>
-                  <MBadge>{t('roadtrip.day.stopCount', { count: rt.stops })}</MBadge>
+                  {/* Not on a stage that only drives from one stay to the next, where "0 stops"
+                      beside the drive reads as the stops having gone missing. */}
+                  {rt.stops > 0 && <MBadge>{t('roadtrip.day.stopCount', { count: rt.stops })}</MBadge>}
                 </span>
               </div>
               <div className="mt-2 flex items-end justify-between gap-3">

@@ -117,7 +117,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.hint': '두 날 사이 구간도 계산해 도착한 날에 더합니다.',
   'roadtrip.line.hotelBookends': '매일 숙소에서 시작하고 숙소에서 끝내기',
   'roadtrip.line.hotelBookendsHint':
-    '예약한 밤 다음 날은 묵은 곳에서 시작하고, 예약한 밤이 있는 날은 그곳에서 끝납니다.',
+    '예약한 밤 다음 날은 그 숙소에서 시작하고, 예약한 밤이 있는 날은 그날 밤 예약한 숙소에서 끝납니다.',
   'roadtrip.avoid.section': '가능하면 피하기',
   'roadtrip.avoid.toll': '유료 도로',
   'roadtrip.avoid.motorway': '고속도로',
@@ -289,6 +289,6 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '{name}에서 출발',
   'roadtrip.bookend.back': '{name}(으)로 돌아가기',
   'roadtrip.bookend.checkIn': '체크인 · {name}',
-  'roadtrip.bookend.noVia': '숙소를 오가는 구간은 지금 경로를 그대로 유지합니다.',
+  'roadtrip.bookend.noVia': '숙소를 오가는 구간에는 경유지를 둘 수 없습니다. 대신 그곳에 정차 지점을 추가하세요.',
 };
 export default roadtrip;

@@ -24,7 +24,7 @@ import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
 import { useVehicleRange } from './useVehicleRange'
 import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
-import { isCarrierMode, undatedRides, type CarrierTerminal } from '@trek/shared/roadtrip'
+import { isCarrierMode, isStoredStop, undatedRides, type CarrierTerminal } from '@trek/shared/roadtrip'
 import type { QuietDay, RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
 import type { SpillMark } from './nightSpill'
 import { ARRIVING_DRIVE, openOn, type LegAlternatives, type RailDrive } from './useRouteAlternatives'
@@ -1611,6 +1611,24 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
   // The running number a stop wears, with the service stops passed over — so a day with a
   // charger halfway through still counts one, two, three the way its map pins do.
   let counted = 0
+  // A day of nothing but its hotels, the drive from one stay to the next. The hotels make it
+  // a day, so it is no quiet row a stop can be dropped on, and it has no stored stop to drop
+  // onto either: its hotel rows take the drop instead, as the day's first stop.
+  const dropOnHotels: React.LiHTMLAttributes<HTMLLIElement> = onMoveStopToDay && from && !day.stops.some(isStoredStop)
+    ? {
+        onDragOver: e => {
+          e.preventDefault()
+          if (dropAt?.dayId !== day.dayId || dropAt.index !== -1) setDropAt({ dayId: day.dayId, index: -1 })
+        },
+        onDrop: e => {
+          e.preventDefault()
+          setFrom(null)
+          setDropAt(null)
+          if (from.dayId !== day.dayId) onMoveStopToDay(from.dayId, from.assignmentId, day.dayId, 0)
+        },
+        className: `rounded-lg ${dropAt?.dayId === day.dayId && dropAt.index === -1 ? 'ring-2 ring-inset ring-accent' : ''}`,
+      }
+    : {}
 
   /**
    * One row of the chain: the stop, the drive leaving it, whatever hangs off that drive.
@@ -1672,14 +1690,15 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
       if (booking !== null && onOpenBooking) open = () => onOpenBooking(booking)
       else if (onSelectStop) open = () => onSelectStop(stop.placeId)
       return (
-        <li key={stop.assignmentId}>
+        <li key={stop.assignmentId} {...dropOnHotels}>
           <BookendStop
             reading={reading}
             entry={day.schedule.entries[i]}
             late={lateness}
             driveFindings={findingsFor(i)}
             continues={i < last}
-            starts={i === 0}
+            // The first row drawn, also when the morning marker before it went into it.
+            starts={i === 0 || (i === 1 && resumeFoldsIntoBookend(day, 0))}
             onOpen={open}
           />
           {i < last && (!day.stops[i + 1].automaticNight || day.legs[i]?.distance !== 0) ? <DriveBand leg={day.legs[i]} /> : null}
@@ -1935,7 +1954,9 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
               </span>
             </Tooltip>
           ) : null}
-          {day.legs.length > 0 ? (
+          {/* Nor does a day whose drive runs from one hotel to the next with no stop of its
+              own: "0 stops" beside the drive reads as the stops having gone missing. */}
+          {day.legs.length > 0 && destinationCount(day) > 0 ? (
             <span className={`${DAY_BADGE} bg-surface-card`} style={{ fontSize: FS.label }}>
               {t('roadtrip.day.stopCount', { count: destinationCount(day) })}
             </span>

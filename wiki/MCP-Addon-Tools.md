@@ -243,7 +243,7 @@ These tools work without an open browser. The external assistant chooses places 
 | `search_roadtrip_corridor` | Fuel, charging, rest areas, campsites, food, sights or hotels along a day | `trips:read` |
 | `update_route_via` | Move an existing routing handle and optionally change its outgoing leg | `trips:write` |
 | `list_route_vias` | A day's via points, or the whole trip's together with its followed tracks | `trips:read` |
-| `add_route_via`, `add_route_vias` | Add one via point, or a whole chain on one day | `trips:write` |
+| `add_route_via`, `add_route_vias` | Add one via point, or a whole chain on one day. With `roadtrip_hotel_bookends` on, a via after the last stop of a day that ends at a booked night is kept but not used, because the drive to the hotel keeps its own road | `trips:write` |
 | `reanchor_route_vias` | Re-pin a day's via points after its stops changed | `trips:write` |
 | `remove_route_via` | Remove a via point so the leg drives direct again | `trips:write` |
 | `list_day_boundaries`, `set_day_boundary` | Read or set dragged day endings; null restores the automatic ending | `trips:read` / `trips:write` |

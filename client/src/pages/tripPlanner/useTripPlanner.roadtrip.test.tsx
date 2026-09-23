@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-147
+// FE-TP-ROAD-001 to FE-TP-ROAD-150
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -3093,7 +3093,7 @@ describe('useTripPlanner road trip: the drive between two days (#2461)', () => {
 })
 
 describe('useTripPlanner road trip: a booked night at the edge of a day', () => {
-  const NO_VIA = 'The drive from or to your stay keeps its road.'
+  const NO_VIA = 'No via point on the drive to or from your stay. Add a stop there instead.'
   const bookend = (phase: 'morning' | 'evening', over: Record<string, unknown>) => ({
     assignmentId: phase === 'morning' ? -6_000_000_010 : -6_000_000_011,
     placeId: 900,
@@ -3260,5 +3260,90 @@ describe('useTripPlanner road trip: a booked night at the edge of a day', () => 
 
     expect(toasts.filter(t => t.message.includes('changed'))).toEqual([])
     expect(rt.vias.addMany).toHaveBeenCalledWith(5, [], [0])
+  })
+
+  const HAMBURG = { lat: 53.55, lng: 9.99 }
+  const HOTEL = { lat: 53.0, lng: 11.5 }
+
+  it('FE-TP-ROAD-148: the drive into the hotel handed to the next card through the night takes no via, and a place there goes first on that card', async () => {
+    // The hotel was reached after midnight: tonight's hotel row of day 5 heads card 6,
+    // behind the stretch driven from Hamburg, and the morning's hotel row follows it. The
+    // stretch is Hamburg's leg as far as a via is stored, and bending it would bend the
+    // drive to the hotel, which keeps its road.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    rt.routes.days = [{
+      dayId: 6,
+      dayNumber: 2,
+      stops: [
+        bookend('evening', { ownerDayId: 5, ownerIndex: 2, ...HOTEL }),
+        bookend('morning', { assignmentId: -6_000_000_012, ownerDayId: 6, ownerIndex: 0, ...HOTEL }),
+        { assignmentId: 21, placeId: 1201, ownerDayId: 6, ownerIndex: 0, lat: 51.05, lng: 13.74, name: 'Dresden' },
+      ],
+      spills: [{ at: 0, count: 1, fromDayNumber: 1, fromStop: drawn(1101, HAMBURG.lat, HAMBURG.lng, 5, 1) }],
+      geometry: [[HAMBURG.lat, HAMBURG.lng], [53.3, 10.7], [HOTEL.lat, HOTEL.lng], [52.0, 12.6], [51.05, 13.74]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53.3, 10.7) })
+    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: NO_VIA, type: 'info' })
+
+    expect(result.current.manualStopTargetFor(53.3, 10.7)).toMatchObject({ dayId: 6, position: 0 })
+  })
+
+  it('FE-TP-ROAD-149: nor does the drive in from yesterday that leaves from its hotel', async () => {
+    // Connected days after a quiet check-out: the drive into card 6 starts at the hotel
+    // day 5 ended at, drawn at the head of card 6. It files nothing, whatever the first
+    // stop behind it is.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    rt.routes.days = [{
+      dayId: 6,
+      dayNumber: 2,
+      stops: [
+        { assignmentId: 21, placeId: 1201, ownerDayId: 6, ownerIndex: 0, lat: 51.05, lng: 13.74, name: 'Dresden' },
+        { assignmentId: 22, placeId: 1202, ownerDayId: 6, ownerIndex: 1, lat: 50.08, lng: 14.43, name: 'Prague' },
+      ],
+      spills: [],
+      arrivingFrom: bookend('evening', { ownerDayId: 5, ownerIndex: 2, ...HOTEL }),
+      geometry: [[HOTEL.lat, HOTEL.lng], [52.0, 12.6], [51.05, 13.74], [50.6, 14.1], [50.08, 14.43]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(52.0, 12.6) })
+    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(toasts.filter(t => t.message === NO_VIA)).toHaveLength(1)
+    expect(result.current.manualStopTargetFor(52.0, 12.6)).toMatchObject({ dayId: 6, position: 0 })
+
+    // Past the first stop the card's own leg takes one as always.
+    await act(async () => { await result.current.addRoadtripVia(50.6, 14.1) })
+    expect(rt.vias.add).toHaveBeenCalledWith(6, 0, 50.6, 14.1)
+  })
+
+  it('FE-TP-ROAD-150: the hotel a day starts or ends at has its pin on the map, also when no day holds its stop', async () => {
+    seedTrip({
+      days: [buildDay({ id: 5, day_number: 1 })],
+      places: [buildPlace({ id: 900, ...HOTEL }), buildPlace({ id: 901, lat: 53, lng: 10 })],
+    })
+    const place = useTripStore.getState().places.find(p => p.id === 901)!
+    useTripStore.setState({ assignments: { '5': [buildAssignment({ id: 11, day_id: 5, place_id: 901, place })] } })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        { assignmentId: 11, placeId: 901, ownerIndex: 0, lat: 53, lng: 10, name: 'Lookout' },
+        bookend('evening', { ownerIndex: 1, ...HOTEL }),
+      ],
+      geometry: [[53, 10], [HOTEL.lat, HOTEL.lng]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    expect(result.current.roadtripMapPlaces.map(p => p.id).sort((a, b) => a - b)).toEqual([900, 901])
+
+    // Folded, the card takes its hotel off the map with its stops.
+    act(() => { result.current.toggleRoadtripDay(5) })
+    expect(result.current.roadtripMapPlaces.map(p => p.id)).toEqual([])
   })
 })

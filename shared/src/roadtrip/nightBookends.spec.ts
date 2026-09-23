@@ -1,5 +1,5 @@
 /**
- * ROADTRIP-BOOKENDS-001..027: a booked night stands at both ends of the days around it.
+ * ROADTRIP-BOOKENDS-001..028: a booked night stands at both ends of the days around it.
  *
  * Pinned here: which hotel a day wakes up in and which it sleeps in, where the two are
  * seated and where they are not (the hotel already there, a landing, a departure, a hire
@@ -18,7 +18,7 @@ import {
   type BookendStay,
 } from './nightBookends';
 import type { CarrierTerminal, PlanDay, RoadtripStop, RoutedLeg } from './planning-types';
-import { standsAsDay } from './roadtripModel';
+import { splitIntoRuns, standsAsDay } from './roadtripModel';
 
 import { describe, expect, it } from 'vitest';
 
@@ -325,7 +325,7 @@ describe('what a bookend is', () => {
     for (const id of ids) expect(id).toBeLessThan(terminalAssignmentId(1_000_000, 'arrival'));
   });
 
-  it('ROADTRIP-BOOKENDS-021: never a clock, a stay, a mode or a night of its own, whatever the stay says', () => {
+  it('ROADTRIP-BOOKENDS-021: never a clock, a stay, a mode of its own or a night, whatever the stay says', () => {
     const [day] = seatNightBookends([planDay(D4, [visit(D4, 0), visit(D4, 1)])], days, [
       stay(5, D1, D4, HOTEL, { check_out: '11:00' }),
     ]);
@@ -504,5 +504,36 @@ describe('with the switch off', () => {
       ['morning:5', 'P2', 'evening:5'],
       [],
     ]);
+  });
+});
+
+describe('the drive out of the morning hotel', () => {
+  it('ROADTRIP-BOOKENDS-028: goes the way the first stop is reached from the hotel, the leg the day plan draws; the evening sets no mode', () => {
+    const hotel = stay(5, D1, D4, HOTEL);
+    const [day] = seatNightBookends(
+      [
+        planDay(D2, [
+          visit(D2, 0, { name: 'P3', incomingLegMode: 'walking', legMode: 'cycling' }),
+          visit(D2, 1, { name: 'P4' }),
+        ]),
+      ],
+      days,
+      [hotel],
+    );
+    expect(shape(day)).toEqual(['morning:5', 'P3', 'P4', 'evening:5']);
+    expect(day!.stops[0]).toMatchObject({ legMode: 'walking', incomingLegMode: null });
+    expect(day!.stops[3]).toMatchObject({ legMode: null, incomingLegMode: null });
+    // Read the way the browser and the server both split a day: the hotel's leg on foot,
+    // the first stop's own mode after it, and the day's default into tonight's hotel.
+    const runs = splitIntoRuns(day!.stops, (from) => from.legMode ?? 'driving');
+    expect(runs.map((run) => [run.mode, shape({ ...day!, stops: run.stops })])).toEqual([
+      ['walking', ['morning:5', 'P3']],
+      ['cycling', ['P3', 'P4']],
+      ['driving', ['P4', 'evening:5']],
+    ]);
+
+    // A first stop reached no particular way leaves the drive to the day's own mode.
+    const [plain] = seatNightBookends([planDay(D3, [visit(D3, 0), visit(D3, 1)])], days, [hotel]);
+    expect(plain!.stops[0]!.legMode).toBeNull();
   });
 });

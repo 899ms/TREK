@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { BedDouble } from 'lucide-react'
-import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle } from './nightBookend'
+import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, staysAtTheirPlaces } from './nightBookend'
 import type { BookendReading } from './roadtripRowModel'
 
-// FE-BOOKEND-001 to FE-BOOKEND-005
+// FE-BOOKEND-001 to FE-BOOKEND-006
 
 const reading = (over: Partial<BookendReading> = {}): BookendReading => ({
   phase: 'morning',
@@ -48,5 +48,31 @@ describe('a booked night as the rail and the phone say it', () => {
 
   it('FE-BOOKEND-005: the hotel wears the bed the stay chips wear', () => {
     expect(BOOKEND_ICON).toBe(BedDouble)
+  })
+})
+
+describe('the hotel a booked night stands for', () => {
+  it('FE-BOOKEND-006: is read off the trip place as it is now, and the stay row stands in only where there is none', () => {
+    const moved = { id: 1, place_id: 10, place_name: 'Old name', place_lat: 47.2, place_lng: 11.4 }
+    const unknown = { id: 2, place_id: 20, place_name: 'Elsewhere', place_lat: 48.1, place_lng: 11.6 }
+    const placeless = { id: 3, place_id: null, place_name: null, place_lat: null, place_lng: null }
+    const places = [
+      { id: 10, name: 'Hotel Alpenblick', lat: 47.3, lng: 11.5 },
+      { id: 30, name: 'Unrelated', lat: 1, lng: 2 },
+    ]
+
+    const read = staysAtTheirPlaces([moved, unknown, placeless], places)
+    expect(read[0]).toEqual({ id: 1, place_id: 10, place_name: 'Hotel Alpenblick', place_lat: 47.3, place_lng: 11.5 })
+    expect(read[1]).toBe(unknown)
+    expect(read[2]).toBe(placeless)
+
+    // A place that lost its pin takes the bookend with it, as the server's join does.
+    expect(staysAtTheirPlaces([moved], [{ id: 10, name: 'Hotel Alpenblick', lat: null, lng: null }])[0])
+      .toMatchObject({ place_lat: null, place_lng: null })
+
+    // Nothing to change hands the list back as it came, so nothing downstream recomputes.
+    const current = [{ ...moved, place_name: 'Hotel Alpenblick', place_lat: 47.3, place_lng: 11.5 }]
+    expect(staysAtTheirPlaces(current, places)).toBe(current)
+    expect(staysAtTheirPlaces(current, [])).toBe(current)
   })
 })
