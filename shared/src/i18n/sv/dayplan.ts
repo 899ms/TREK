@@ -114,5 +114,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Att ändra dagar kräver en anslutning',
   'dayplan.deleteDaySuccess': 'Dagen togs bort',
   'dayplan.deleteDayError': 'Kunde inte ta bort dagen',
+  'dayplan.addUndatedDay': 'Lägg till dag utan datum',
+  'dayplan.addUndatedDayHint': 'Lägger till en dag utan datum i slutet. Resans datum förblir desamma.',
+  'dayplan.addDatedDay': 'Lägg till {date}',
+  'dayplan.addDatedDayHint': 'Förlänger resan med en dag, till {date}.',
+  'dayplan.tripExtended': 'Dag tillagd. Resan slutar nu {date}.',
 };
 export default dayplan;

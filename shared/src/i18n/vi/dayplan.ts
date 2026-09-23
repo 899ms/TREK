@@ -113,5 +113,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Cần có kết nối để thay đổi ngày',
   'dayplan.deleteDaySuccess': 'Đã xóa ngày',
   'dayplan.deleteDayError': 'Không thể xóa ngày',
+  'dayplan.addUndatedDay': 'Thêm ngày không có ngày tháng',
+  'dayplan.addUndatedDayHint': 'Thêm một ngày không có ngày tháng vào cuối. Ngày của chuyến đi giữ nguyên.',
+  'dayplan.addDatedDay': 'Thêm {date}',
+  'dayplan.addDatedDayHint': 'Kéo dài chuyến đi thêm một ngày, đến {date}.',
+  'dayplan.tripExtended': 'Đã thêm ngày. Chuyến đi giờ kết thúc vào {date}.',
 };
 export default dayplan;

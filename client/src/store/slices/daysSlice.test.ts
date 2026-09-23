@@ -1,4 +1,4 @@
-// FE-TSLICE-DAYS-001 to FE-TSLICE-DAYS-011 (whole-day reorder + insert, #589; delete)
+// FE-TSLICE-DAYS-001 to FE-TSLICE-DAYS-013 (whole-day reorder + insert, #589; delete; dated append)
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../tests/helpers/msw/server';
 import { resetAllStores, seedStore } from '../../../tests/helpers/store';
@@ -246,6 +246,54 @@ describe('daysSlice', () => {
       expect(useTripStore.getState().selectedDayId).toBe(2);
       // Answered without a trip, the store keeps the one it has.
       expect(useTripStore.getState().trip?.end_date).toBe('2025-06-03');
+    });
+  });
+
+  describe('appendDatedDay', () => {
+    it('FE-TSLICE-DAYS-012: asks for the next date, takes the grown trip and pulls the days, but not the bookings', async () => {
+      seedStore(useTripStore, {
+        trip: buildTrip({ id: 1, start_date: '2025-06-01', end_date: '2025-06-03' }),
+        days: datedDays(),
+      });
+      const created = buildDay({ id: 4, trip_id: 1, day_number: 4, date: '2025-06-04' });
+      const grown = buildTrip({ id: 1, start_date: '2025-06-01', end_date: '2025-06-04', day_count: 4 });
+
+      let body: Record<string, unknown> = {};
+      let reservationsLoaded = false;
+      server.use(
+        http.post('/api/trips/1/days', async ({ request }) => {
+          body = await request.json() as Record<string, unknown>;
+          return HttpResponse.json({ day: created, trip: grown }, { status: 201 });
+        }),
+        http.get('/api/trips/1/days', () => HttpResponse.json({ days: [...datedDays(), created] })),
+        http.get('/api/trips/1/reservations', () => {
+          reservationsLoaded = true;
+          return HttpResponse.json({ reservations: [] });
+        }),
+      );
+
+      const day = await useTripStore.getState().appendDatedDay(1);
+
+      expect(body).toEqual({ dated: true });
+      expect(day).toMatchObject({ id: 4, date: '2025-06-04' });
+      expect(useTripStore.getState().trip).toMatchObject({ end_date: '2025-06-04', day_count: 4 });
+      expect(useTripStore.getState().days.map(d => d.id)).toEqual([1, 2, 3, 4]);
+      expect(reservationsLoaded).toBe(false);
+    });
+
+    it('FE-TSLICE-DAYS-013: a refusal leaves the trip and the days as they were and throws the server sentence', async () => {
+      seedStore(useTripStore, {
+        trip: buildTrip({ id: 1, start_date: '2025-06-01', end_date: '2025-06-03' }),
+        days: datedDays(),
+      });
+      server.use(
+        http.post('/api/trips/1/days', () => HttpResponse.json({ error: 'A trip can span at most 999 days' }, { status: 400 })),
+      );
+
+      await expect(useTripStore.getState().appendDatedDay(1)).rejects.toThrow('A trip can span at most 999 days');
+
+      expect(useTripStore.getState().trip?.end_date).toBe('2025-06-03');
+      expect(useTripStore.getState().days.map(d => d.id)).toEqual([1, 2, 3]);
     });
   });
 });

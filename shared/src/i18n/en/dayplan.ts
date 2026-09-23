@@ -113,5 +113,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Changing days needs a connection',
   'dayplan.deleteDaySuccess': 'Day deleted',
   'dayplan.deleteDayError': 'Failed to delete day',
+  'dayplan.addUndatedDay': 'Add day without date',
+  'dayplan.addUndatedDayHint': 'Adds a day without a date at the end. The trip dates stay as they are.',
+  'dayplan.addDatedDay': 'Add {date}',
+  'dayplan.addDatedDayHint': 'Extends the trip by one day, until {date}.',
+  'dayplan.tripExtended': 'Day added. The trip now ends on {date}.',
 };
 export default dayplan;

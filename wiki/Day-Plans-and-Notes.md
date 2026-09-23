@@ -77,7 +77,7 @@ At the top of the Day Plan sidebar:
 - **Export** — opens the export dialog, which holds every format in three groups: **Document** (a PDF of the full trip plan, see [PDF-Export](PDF-Export)), **Calendar** (a `.ics` file for import into calendar apps, plus a subscribable calendar feed for members who can manage share links) and **Maps & GPS** (GPX — whole trip, places only, or days as routes).
 - **Expand / Collapse all** — toggles all day sections open or closed at once.
 - **Undo** — reverses the last drag, reorder, or assign action.
-- **Reorder days**: reorder the days of the trip, add a day, or delete one. A day's places, notes and bookings move with it. Shown to members who can edit days. See [Deleting a day](#deleting-a-day).
+- **Reorder days**: reorder the days of the trip, add a day, or delete one. A day's places, notes and bookings move with it. Shown to members who can edit days. See [Adding a day](#adding-a-day) and [Deleting a day](#deleting-a-day).
 - **Show all booking routes** — draws the connection of every routable booking on the map at once. Shown once the trip has at least one routable booking.
 
 Route controls appear at the bottom of a day section, after the place list, and only for the day you have selected — click a day header to select it. The row only appears on a day that can actually be routed: two or more places on the day, a single located place that accommodation optimization can bookend with a hotel, or a transfer day where you check out of one hotel and into another. On a phone the same controls sit in the **Daily Overview** sheet instead, opened from the pill above the plan timeline, and appear there when the day has two located places, or one located place plus a hotel to start from.
@@ -87,6 +87,15 @@ Route controls appear at the bottom of a day section, after the place list, and 
 - **Open in CoMaps** — the same day handed to CoMaps for offline navigation, carrying the day's travel mode.
 - **Optimize** — reorders the day's places into the shortest route. See [Route-Optimization](Route-Optimization).
 - **Travel mode** — Driving or Walking for that day, plus any travel mode a plugin adds.
+
+## Adding a day
+
+The **Reorder days** dialog adds a day at its foot; on a phone the day sheet does the same below its list. On a trip with dates there are two ways, each with a line that says what it does:
+
+- **Add day without date** puts a day without a date at the end. The trip dates stay as they are, which suits a buffer day you have not placed yet.
+- **Add** followed by the next date (for example **Add Tue, Oct 13**) adds the calendar day after the last date of the trip and extends the trip to it. The new day goes right behind the last dated day, so days without a date move one place back and keep their plans. No existing day or booking changes its date.
+
+A trip without dates has a single **Add day** button. Adding a day needs a connection, and a trip that already spans the most days a trip can have cannot grow by another date.
 
 ## Deleting a day
 

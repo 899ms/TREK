@@ -8,10 +8,10 @@ import { z } from 'zod';
 import { AuthService } from '../auth/auth.service';
 import { noAccess, permissionDenied } from '../../mcp/tools/_shared';
 import {
-  dayCreateRequestSchema, dayReorderRequestSchema, dayUpdateRequestSchema,
+  DAY_CREATE_DATED_CONFLICT, dayCreateRequestSchema, dayReorderRequestSchema, dayUpdateRequestSchema,
 } from '@trek/shared';
 import type { DayCreateRequest, DayReorderRequest, DayUpdateRequest } from '@trek/shared';
-import { DaysService, DayReorderError } from './days.service';
+import { DaysService, DayReorderError, DayAppendError, type DatedDayAppend, type DaySender } from './days.service';
 import { DayRemovalService, DayDeleteError, type DayRemoval } from './day-removal.service';
 import type { MirrorSender } from '../accommodations/accommodations.service';
 
@@ -80,23 +80,25 @@ export class DaysMcp {
 
   @Tool({
     name: 'create_day',
-    description: 'Add a day to a trip. Without `position` the day is appended at the end, optionally with a date and notes. With `position` an empty day is slotted in at that place instead, which is the way to add a day in the middle of an itinerary that already has days.',
+    description: 'Add a day to a trip. Without `position` the day is appended at the end, optionally with a date and notes. With `position` an empty day is slotted in at that place instead, which is the way to add a day in the middle of an itinerary that already has days. With `dated` the trip grows by the calendar day after its last date: the new day gets that date and goes right behind the last dated day, and the end date of the trip moves to it, while `position` re-dates the days after the slot it fills.',
     inputSchema: {
       tripId: z.number().int().positive(),
       date: dayCreateRequestSchema.shape.date.describe('ISO date string YYYY-MM-DD, optional for dateless trips'),
       notes: dayCreateRequestSchema.shape.notes,
       position: dayCreateRequestSchema.shape.position.describe('1-based slot to insert an empty day at; omit to append at the end. On a dated trip the days keep their calendar slots, so the trip gains one day at its end and bookings move with the day they sit on. date and notes are ignored when this is set, as on the REST route.'),
+      dated: dayCreateRequestSchema.shape.dated.describe('Append the calendar day after the last date of the trip and extend the trip by one day. Days without a date stay undated and move one place back. Cannot be combined with position or date. Only for trips with dates.'),
     },
     annotations: TOOL_ANNOTATIONS_NON_IDEMPOTENT,
     access: { group: 'trips', mode: 'write' },
   })
   async createDay(
-    { tripId, date, notes, position }: { tripId: number } & DayCreateRequest,
+    { tripId, date, notes, position, dated }: { tripId: number } & DayCreateRequest,
     ctx: McpContext,
   ) {
     if (this.auth.isDemoUser(ctx.userId)) return demoDenied();
     if (!this.days.verifyTripAccess(tripId, ctx.userId)) return noAccess();
     if (!this.guards.hasTripPermission('day_edit', tripId, ctx.userId)) return permissionDenied();
+    if (dated) return this.appendDated(tripId, notes, date, position, ctx);
     if (position === undefined) {
       const day = this.days.create(tripId, date, notes);
       this.guards.safeBroadcast(tripId, 'day:created', { day });
@@ -107,12 +109,37 @@ export class DaysMcp {
       // An insert renumbers and re-dates every later day, so collaborators get
       // the list-wide event and refetch, the same one the REST create route sends.
       this.guards.safeBroadcast(tripId, 'day:reordered', { day });
+      // The trip grew by a day, and on a dated trip its end date moved.
+      const trip = this.days.getTripForViewer(tripId, ctx.userId);
+      if (trip) this.guards.safeBroadcast(tripId, 'trip:updated', { trip });
       return ok({ day });
     } catch (err) {
       // REST lets this bubble into a 500; a tool caller can act on the sentence.
       if (err instanceof DayReorderError) return errorResult(err.message);
       throw err;
     }
+  }
+
+  /**
+   * create_day with `dated`, the same as the REST route. The tool builds its input
+   * from the contract's fields alone, so the refusal the contract's refine gives
+   * for `dated` next to `date` or `position` is repeated here, word for word.
+   */
+  private appendDated(
+    tripId: number, notes: string | undefined, date: string | undefined, position: number | undefined, ctx: McpContext,
+  ) {
+    if (date !== undefined || position !== undefined) return errorResult(`${DAY_CREATE_DATED_CONFLICT}.`);
+    let append: DatedDayAppend;
+    try {
+      append = this.days.appendDated(tripId, ctx.userId, notes);
+    } catch (err) {
+      if (err instanceof DayAppendError) return errorResult(err.message);
+      throw err;
+    }
+    // A tool has no socket of its own, so every screen hears all of it.
+    const send: DaySender = (event, payload) => this.guards.safeBroadcast(tripId, event, payload as Record<string, unknown>);
+    this.days.announceDatedAppend(append, { all: send, others: send });
+    return ok({ day: append.day, trip: append.trip });
   }
 
   @Tool({

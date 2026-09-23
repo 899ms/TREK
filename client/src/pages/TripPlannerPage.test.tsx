@@ -1793,6 +1793,34 @@ describe('TripPlannerPage', () => {
     });
   });
 
+  describe('FE-PAGE-PLANNER-054: Adding the next date from the reorder dialog', () => {
+    it('hands the sidebar the planner add controls, whose dated add goes through the store', async () => {
+      vi.useFakeTimers();
+      seedTripStore({ id: 42 });
+      const appendDatedDay = vi.fn().mockResolvedValue({ id: 903, date: '2025-06-06' });
+      useTripStore.setState({
+        trip: buildTrip({ id: 42, start_date: '2025-06-01', end_date: '2025-06-05' }),
+        days: [buildDay({ id: 901, trip_id: 42, day_number: 1, date: '2025-06-01' })],
+        appendDatedDay,
+      });
+
+      renderPlannerPage(42);
+      act(() => { vi.runAllTimers(); });
+      vi.useRealTimers();
+      await waitFor(() => {
+        expect(screen.getByTestId('day-plan-sidebar')).toBeInTheDocument();
+      });
+
+      const { dayAdd } = capturedDayPlanSidebarProps.current;
+      expect(dayAdd).toMatchObject({ nextDate: '2025-06-06', blocked: null, datedBlocked: null, busy: false });
+      await act(async () => { dayAdd.onAddDated(); });
+      expect(appendDatedDay).toHaveBeenCalledWith(42);
+      await waitFor(() => {
+        expect(capturedDayPlanSidebarProps.current.dayAdd.busy).toBe(false);
+      });
+    });
+  });
+
   describe('FE-PAGE-PLANNER-052: Road trip mode opens a booking the way the day plan does (#2428)', () => {
     // The rail is mounted only with the addon on and the mode on for this trip; the
     // road-trip hooks then read their own endpoints, answered empty here.

@@ -3,7 +3,8 @@ import { HttpException } from '@nestjs/common';
 import { DaysController } from '../../../src/nest/days/days.controller';
 import { DayNotesController } from '../../../src/nest/day-notes/day-notes.controller';
 import { DayNoteCreateDto, DayNoteUpdateDto } from '../../../src/nest/day-notes/day-notes.dto';
-import { DayReorderError } from '../../../src/nest/days/days.service';
+import { DayReorderError, DayAppendError, NO_DATES_MESSAGE, type DatedDayAppend } from '../../../src/nest/days/days.service';
+import { DayCreateDto } from '../../../src/nest/days/days.dto';
 import { DayDeleteError, type DayRemoval, type DayRemovalService } from '../../../src/nest/days/day-removal.service';
 import type { DayReorderDto } from '../../../src/nest/days/days.dto';
 import type { DaysService } from '../../../src/nest/days/days.service';
@@ -59,13 +60,76 @@ describe('DaysController (parity with the legacy /api/trips/:tripId/days route)'
   });
 
 
-  it('POST / with a position inserts + broadcasts day:reordered', () => {
+  it('POST / with a position inserts, broadcasts day:reordered, then the grown trip', () => {
     const insert = vi.fn().mockReturnValue({ id: 12 }); const create = vi.fn(); const broadcast = vi.fn();
-    const svc = daysSvc({ insert, create, broadcast } as Partial<DaysService>);
-    expect(new DaysController(svc, removalSvc()).create(user, '5', { position: 0 }, 'sock')).toEqual({ day: { id: 12 } });
+    const getTripForViewer = vi.fn().mockReturnValue({ id: 5, end_date: '2026-07-04' });
+    const svc = daysSvc({ insert, create, broadcast, getTripForViewer } as Partial<DaysService>);
+    expect(new DaysController(svc, removalSvc()).create(user, '5', { position: 0 }, 'sock'))
+      .toEqual({ day: { id: 12 }, trip: { id: 5, end_date: '2026-07-04' } });
     expect(insert).toHaveBeenCalledWith('5', 0);
     expect(create).not.toHaveBeenCalled();
-    expect(broadcast).toHaveBeenCalledWith('5', 'day:reordered', { day: { id: 12 } }, 'sock');
+    expect(getTripForViewer).toHaveBeenCalledWith('5', 1);
+    expect(broadcast.mock.calls).toEqual([
+      ['5', 'day:reordered', { day: { id: 12 } }, 'sock'],
+      ['5', 'trip:updated', { trip: { id: 5, end_date: '2026-07-04' } }, 'sock'],
+    ]);
+
+    // A trip that is gone by the time it is re-read is not announced.
+    broadcast.mockClear();
+    getTripForViewer.mockReturnValue(undefined);
+    new DaysController(svc, removalSvc()).create(user, '5', { position: 1 }, 'sock');
+    expect(broadcast.mock.calls.map(call => call[1])).toEqual(['day:reordered']);
+  });
+
+  describe('POST / dated', () => {
+    const appended: DatedDayAppend = {
+      day: { id: 14, trip_id: 5, day_number: 4, date: '2026-07-04', assignments: [], notes_items: [] } as DatedDayAppend['day'],
+      endDate: '2026-07-04', boundaries: null, trip: { id: 5, end_date: '2026-07-04' },
+    };
+
+    it('appends as the caller, announces with and without the socket, and answers with the day and the trip', () => {
+      const appendDated = vi.fn().mockReturnValue(appended);
+      const announceDatedAppend = vi.fn();
+      const broadcast = vi.fn(); const insert = vi.fn(); const create = vi.fn();
+      const svc = daysSvc({ appendDated, announceDatedAppend, broadcast, insert, create } as Partial<DaysService>);
+
+      expect(new DaysController(svc, removalSvc()).create(user, '5', { dated: true, notes: 'Late checkout' }, 'sock'))
+        .toEqual({ day: appended.day, trip: appended.trip });
+      expect(appendDated).toHaveBeenCalledWith('5', 1, 'Late checkout');
+      expect(insert).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+
+      const [sent, senders] = announceDatedAppend.mock.calls[0];
+      expect(sent).toBe(appended);
+      senders.all('roadtripBoundary:changed', { boundaries: [] });
+      senders.others('day:reordered', { day: appended.day });
+      expect(broadcast.mock.calls).toEqual([
+        ['5', 'roadtripBoundary:changed', { boundaries: [] }, undefined],
+        ['5', 'day:reordered', { day: appended.day }, 'sock'],
+      ]);
+    });
+
+    it('400 with the service sentence for a trip without dates, and nothing is announced', () => {
+      const announceDatedAppend = vi.fn();
+      const svc = daysSvc({
+        appendDated: vi.fn(() => { throw new DayAppendError(NO_DATES_MESSAGE); }), announceDatedAppend,
+      } as Partial<DaysService>);
+      expect(thrown(() => new DaysController(svc, removalSvc()).create(user, '5', { dated: true }, 'sock')))
+        .toEqual({ status: 400, body: { error: NO_DATES_MESSAGE } });
+      expect(announceDatedAppend).not.toHaveBeenCalled();
+    });
+
+    it('rethrows anything else unchanged', () => {
+      const boom = new Error('db is down');
+      const svc = daysSvc({ appendDated: vi.fn(() => { throw boom; }) } as Partial<DaysService>);
+      expect(() => new DaysController(svc, removalSvc()).create(user, '5', { dated: true })).toThrow(boom);
+    });
+
+    it('the DTO refuses dated next to a position or a date before the handler runs', () => {
+      expect(DayCreateDto.schema.safeParse({ dated: true, position: 2 }).success).toBe(false);
+      expect(DayCreateDto.schema.safeParse({ dated: true, date: '2026-07-04' }).success).toBe(false);
+      expect(DayCreateDto.schema.safeParse({ dated: true }).success).toBe(true);
+    });
   });
 
   describe('PUT /reorder', () => {

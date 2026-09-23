@@ -1,4 +1,4 @@
-// FE-REPO-DAY-001 to FE-REPO-DAY-006
+// FE-REPO-DAY-001 to FE-REPO-DAY-008
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { http, HttpResponse } from 'msw'
@@ -86,5 +86,32 @@ describe('dayRepo.remove', () => {
     await expect(dayRepo.remove(5, 51)).rejects.toThrow('Deleting a day needs a connection')
     expect(hit).not.toHaveBeenCalled()
     expect(await offlineDb.days.get(51)).toBeDefined()
+  })
+})
+
+describe('dayRepo.appendDated', () => {
+  it('FE-REPO-DAY-007: online, asks for a dated day and caches the trip it answers with', async () => {
+    const trip = buildTrip({ id: 5, end_date: '2026-06-04' })
+    const day = buildDay({ id: 61, trip_id: 5, day_number: 4, date: '2026-06-04' })
+    let body: unknown = null
+    server.use(http.post('/api/trips/5/days', async ({ request }) => {
+      body = await request.json()
+      return HttpResponse.json({ day, trip }, { status: 201 })
+    }))
+
+    const result = await dayRepo.appendDated(5)
+
+    expect(body).toEqual({ dated: true })
+    expect(result).toMatchObject({ day: { id: 61, date: '2026-06-04' }, trip: { end_date: '2026-06-04' } })
+    expect(await offlineDb.trips.get(5)).toMatchObject({ end_date: '2026-06-04' })
+  })
+
+  it('FE-REPO-DAY-008: offline, refuses without a request', async () => {
+    const hit = vi.fn()
+    server.use(http.post('/api/trips/5/days', () => { hit(); return HttpResponse.json({}) }))
+    setOnline(false)
+
+    await expect(dayRepo.appendDated(5)).rejects.toThrow('Adding a day needs a connection')
+    expect(hit).not.toHaveBeenCalled()
   })
 })

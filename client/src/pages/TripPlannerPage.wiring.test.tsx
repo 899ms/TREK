@@ -1298,7 +1298,9 @@ describe('TripPlannerPage — modals', () => {
   it('FE-PAGE-TPW-062: the question before a booked night becomes a pause answers through the hook', () => {
     renderPage({ stayRelease: { stop: { stopType: null, dwellMinutes: 30 }, name: 'Hotel Fjord', booking: 'Booking 4711' } })
 
-    const [, , release] = confirmDialogs as unknown as Array<Record<string, () => unknown> & { isOpen: boolean }>
+    // Found by its handler rather than its place: the delete-day question sits in front of it now.
+    const release = (confirmDialogs as unknown as Array<Record<string, () => unknown> & { isOpen: boolean }>)
+      .find(dialog => dialog.onConfirm === hookState.confirmStayRelease)!
     expect(release.isOpen).toBe(true)
 
     act(() => { release.onClose() })

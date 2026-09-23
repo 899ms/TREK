@@ -77,6 +77,7 @@ import {
 } from '../../utils/connectionsVisibility'
 import { plannedPlaceIds, plannedPlaceIdsForDay } from '../../utils/plannedPlaces'
 import { useDayDelete } from './useDayDelete'
+import { useDayAdd } from './useDayAdd'
 
 /** Stable empty list so the road trip hook stays inert while its mode is off. */
 const EMPTY_DAYS: Day[] = []
@@ -2521,10 +2522,9 @@ export function useTripPlanner() {
       .catch(err => toast.error(err instanceof Error ? err.message : t('dayplan.reorderError')))
   }, [tripId, toast, pushUndo])
 
-  const handleAddDay = useCallback((position?: number) => {
-    tripActions.insertDay(tripId, position)
-      .catch(err => toast.error(err instanceof Error ? err.message : t('dayplan.addDayError')))
-  }, [tripId, toast])
+  const { handleAddDay, dayAdd } = useDayAdd({
+    tripId, trip, days, canEditDays: can('day_edit', trip), t, locale, toast,
+  })
 
   // A deleted day can take a stay along, and the selected day's route may have
   // lost its day or its stops.
@@ -2861,7 +2861,7 @@ export function useTripPlanner() {
     route, routeSegments, routeInfo, setRoute, setRouteInfo, updateRouteForDay,
     handleSelectDay, handlePlaceClick, handleMarkerClick, handleMapClick, handleMapContextMenu, openAddPlaceFromPoi, handlePoiClick,
     handleSavePlace, openPlaceEditor, handleDeletePlace, confirmDeletePlace, confirmDeletePlaces, confirmChangeCategory,
-    handleAssignToDay, handleMoveToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, handleUpdateDayTitle,
+    handleAssignToDay, handleMoveToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, dayAdd, handleUpdateDayTitle,
     ...dayDelete,
     handleSaveReservation, handleSaveTransport, handleDeleteReservation,
     selectedPlace, dayOrderMap, dayPlaces,

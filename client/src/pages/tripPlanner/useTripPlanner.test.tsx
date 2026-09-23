@@ -1,4 +1,4 @@
-// FE-TP-HOOK-001 to FE-TP-HOOK-125
+// FE-TP-HOOK-001 to FE-TP-HOOK-129
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -102,6 +102,7 @@ interface PlannerActions {
   reorderAssignments: ReturnType<typeof vi.fn>
   reorderDays: ReturnType<typeof vi.fn>
   insertDay: ReturnType<typeof vi.fn>
+  appendDatedDay: ReturnType<typeof vi.fn>
   deleteDay: ReturnType<typeof vi.fn>
   updateDayTitle: ReturnType<typeof vi.fn>
   addReservation: ReturnType<typeof vi.fn>
@@ -130,6 +131,7 @@ function makeActions(): PlannerActions {
     reorderAssignments: vi.fn(async () => undefined),
     reorderDays: vi.fn(async () => undefined),
     insertDay: vi.fn(async () => undefined),
+    appendDatedDay: vi.fn(async () => ({ id: 99, date: '2026-06-04' })),
     deleteDay: vi.fn(async () => undefined),
     updateDayTitle: vi.fn(async () => undefined),
     addReservation: vi.fn(async () => ({ id: 77 })),
@@ -2374,5 +2376,100 @@ describe('useTripPlanner: deleting a day', () => {
     actions.reorderDays.mockClear()
     await act(async () => { await result.current.undo() })
     expect(actions.reorderDays).not.toHaveBeenCalled()
+  })
+})
+
+describe('useTripPlanner: adding a day', () => {
+  // A trip running 1 to 3 June with one day per date and a spare day without one.
+  function seedDated(extra: Partial<TripStoreState> = {}) {
+    return seedTrip({
+      trip: buildTrip({ id: 42, title: 'Kyoto', start_date: '2026-06-01', end_date: '2026-06-03' }),
+      days: [
+        buildDay({ id: 1, day_number: 1, date: '2026-06-01' }),
+        buildDay({ id: 2, day_number: 2, date: '2026-06-02' }),
+        buildDay({ id: 3, day_number: 3, date: '2026-06-03' }),
+        buildDay({ id: 4, day_number: 4, date: null }),
+      ],
+      ...extra,
+    } as Partial<TripStoreState>)
+  }
+
+  it('FE-TP-HOOK-126: a trip with dates offers the day after its end date; one without dates offers none', async () => {
+    seedDated()
+    const dated = await renderPlanner()
+    expect(dated.result.current.dayAdd).toMatchObject({ nextDate: '2026-06-04', blocked: null, datedBlocked: null, busy: false })
+    dated.unmount()
+
+    seedTrip({ trip: buildTrip({ id: 42, start_date: null, end_date: null }), days: [buildDay({ id: 1, day_number: 1, date: null })] } as Partial<TripStoreState>)
+    const { result } = await renderPlanner()
+    expect(result.current.dayAdd.nextDate).toBeNull()
+    act(() => { result.current.dayAdd.onAddDated() })
+    expect(actions.appendDatedDay).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-HOOK-127: without day_edit neither kind of day is added', async () => {
+    seedStore(useAuthStore, { user: buildUser({ id: 2, role: 'user' }) })
+    usePermissionsStore.setState({ permissions: { day_edit: 'admin' } })
+    seedDated()
+    const { result } = await renderPlanner()
+
+    act(() => { result.current.dayAdd.onAddDated() })
+    act(() => { result.current.handleAddDay() })
+
+    expect(actions.appendDatedDay).not.toHaveBeenCalled()
+    expect(actions.insertDay).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-HOOK-128: one day at a time, and the toast names the new end date', async () => {
+    seedDated()
+    let finish: (day: { id: number; date: string }) => void = () => {}
+    actions.appendDatedDay.mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const { result } = await renderPlanner()
+
+    act(() => { result.current.dayAdd.onAddDated() })
+    expect(result.current.dayAdd.busy).toBe(true)
+    // A double click, and a click on the other button while the first is on its way.
+    act(() => { result.current.dayAdd.onAddDated() })
+    act(() => { result.current.handleAddDay() })
+    expect(actions.appendDatedDay).toHaveBeenCalledTimes(1)
+    expect(actions.appendDatedDay).toHaveBeenCalledWith(42)
+    expect(actions.insertDay).not.toHaveBeenCalled()
+
+    await act(async () => { finish({ id: 99, date: '2026-06-04' }) })
+    await waitFor(() => expect(result.current.dayAdd.busy).toBe(false))
+    expect(toasts).toContainEqual(expect.objectContaining({ type: 'success', message: expect.stringMatching(/^Day added\. The trip now ends on .*Jun 4/) }))
+
+    // Free again: the next click goes through.
+    await act(async () => { result.current.handleAddDay() })
+    expect(actions.insertDay).toHaveBeenCalledWith(42, undefined)
+    await waitFor(() => expect(result.current.dayAdd.busy).toBe(false))
+  })
+
+  it('FE-TP-HOOK-129: a failure is said in the traveller language; offline and at the day limit nothing is asked', async () => {
+    seedDated()
+    actions.appendDatedDay.mockRejectedValueOnce(new Error('A trip can span at most 999 days'))
+    const failing = await renderPlanner()
+    await act(async () => { failing.result.current.dayAdd.onAddDated() })
+    await waitFor(() => expect(toasts).toContainEqual(expect.objectContaining({ type: 'error', message: 'Failed to add day' })))
+    await waitFor(() => expect(failing.result.current.dayAdd.busy).toBe(false))
+    failing.unmount()
+
+    actions.appendDatedDay.mockClear()
+    env.forcedOffline = true
+    seedDated()
+    const offline = await renderPlanner()
+    expect(offline.result.current.dayAdd.blocked).toBe('Changing days needs a connection')
+    act(() => { offline.result.current.dayAdd.onAddDated() })
+    act(() => { offline.result.current.handleAddDay() })
+    expect(actions.appendDatedDay).not.toHaveBeenCalled()
+    expect(actions.insertDay).not.toHaveBeenCalled()
+    offline.unmount()
+
+    env.forcedOffline = false
+    seedDated({ trip: buildTrip({ id: 42, start_date: '2026-01-01', end_date: '2028-09-25' }) } as Partial<TripStoreState>)
+    const { result } = await renderPlanner()
+    expect(result.current.dayAdd.datedBlocked).toBe('A trip can span at most 999 days')
+    act(() => { result.current.dayAdd.onAddDated() })
+    expect(actions.appendDatedDay).not.toHaveBeenCalled()
   })
 })

@@ -1,9 +1,10 @@
-// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-016
+// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-021
 import { render, screen, fireEvent } from '../../../tests/helpers/render'
 import userEvent from '@testing-library/user-event'
 import { buildDay } from '../../../tests/helpers/factories'
 import { DayReorderPopup } from './DayReorderPopup'
 import { setForcedOffline } from '../../sync/networkMode'
+import type { DayAddControls } from '../../utils/dayAdd'
 import type { Day } from '../../types'
 
 // The component takes `t` as a prop, so returning the key keeps assertions exact.
@@ -179,6 +180,84 @@ describe('DayReorderPopup', () => {
       expect(buttons.every(b => (b as HTMLButtonElement).disabled)).toBe(true)
       await user.hover(buttons[0].parentElement as HTMLElement)
       expect(await screen.findByText('dayplan.daysOffline')).toBeInTheDocument()
+    })
+  })
+
+  describe('adding a day', () => {
+    const tWithDate = (key: string, params?: Record<string, unknown>) => (params?.date ? `${key}|${params.date}` : key)
+    const controls = (overrides: Partial<DayAddControls> = {}): DayAddControls => ({
+      nextDate: '2026-10-13', blocked: null, datedBlocked: null, busy: false, onAddDated: vi.fn(), ...overrides,
+    })
+
+    it('FE-PLANNER-DAYREORDER-017: a trip with dates offers a day without a date and the next date, by name', () => {
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), t: tWithDate, dayAdd: controls() })} />)
+      expect(screen.getByRole('button', { name: 'dayplan.addUndatedDay' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: /^dayplan\.addDatedDay\|.*Oct 13/ })).toBeEnabled()
+      expect(screen.queryByRole('button', { name: 'dayplan.addDay' })).not.toBeInTheDocument()
+      expect(screen.getByText(/^dayplan\.addDatedDayHint\|.*Oct 13/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'common.close' })).toBeInTheDocument()
+    })
+
+    it('FE-PLANNER-DAYREORDER-018: each button adds its own kind of day', async () => {
+      const user = userEvent.setup()
+      const onAddDay = vi.fn()
+      const dayAdd = controls()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onAddDay, dayAdd })} />)
+      await user.click(screen.getByRole('button', { name: 'dayplan.addUndatedDay' }))
+      expect(onAddDay).toHaveBeenCalledTimes(1)
+      expect(dayAdd.onAddDated).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'dayplan.addDatedDay' }))
+      expect(dayAdd.onAddDated).toHaveBeenCalledTimes(1)
+      expect(onAddDay).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-PLANNER-DAYREORDER-019: a trip without dates keeps the single button, which waits for the connection', async () => {
+      const user = userEvent.setup()
+      const onAddDay = vi.fn()
+      const { rerender } = render(<DayReorderPopup {...makeProps({ days: threeDays(), onAddDay, dayAdd: controls({ nextDate: null }) })} />)
+      expect(screen.queryByRole('button', { name: 'dayplan.addDatedDay' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'dayplan.addDay' }))
+      expect(onAddDay).toHaveBeenCalledTimes(1)
+
+      rerender(<DayReorderPopup {...makeProps({ days: threeDays(), onAddDay, dayAdd: controls({ nextDate: null, blocked: 'dayplan.daysOffline' }) })} />)
+      expect(screen.getByRole('button', { name: 'dayplan.addDay' })).toBeDisabled()
+      expect(screen.getByText('dayplan.daysOffline')).toBeInTheDocument()
+    })
+
+    it('FE-PLANNER-DAYREORDER-020: busy or offline turns both off, a trip at the day limit only the dated one, and the line says why', () => {
+      const { rerender } = render(<DayReorderPopup {...makeProps({ days: threeDays(), dayAdd: controls({ busy: true }) })} />)
+      expect(screen.getByRole('button', { name: 'dayplan.addUndatedDay' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'dayplan.addDatedDay' })).toBeDisabled()
+
+      rerender(<DayReorderPopup {...makeProps({ days: threeDays(), dayAdd: controls({ blocked: 'dayplan.daysOffline' }) })} />)
+      expect(screen.getByRole('button', { name: 'dayplan.addUndatedDay' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'dayplan.addDatedDay' })).toBeDisabled()
+      expect(screen.getByText('dayplan.daysOffline')).toBeInTheDocument()
+
+      rerender(<DayReorderPopup {...makeProps({ days: threeDays(), dayAdd: controls({ datedBlocked: 'dashboard.tripTooLong' }) })} />)
+      expect(screen.getByRole('button', { name: 'dayplan.addUndatedDay' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'dayplan.addDatedDay' })).toBeDisabled()
+      expect(screen.getByText('dashboard.tripTooLong')).toBeInTheDocument()
+    })
+
+    it('FE-PLANNER-DAYREORDER-021: the line under the buttons follows the pointer and the focus onto the undated one', async () => {
+      const user = userEvent.setup()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), dayAdd: controls() })} />)
+      const undated = screen.getByRole('button', { name: 'dayplan.addUndatedDay' })
+      expect(screen.getByText('dayplan.addDatedDayHint')).toBeInTheDocument()
+
+      await user.hover(undated)
+      expect(screen.getByText('dayplan.addUndatedDayHint')).toBeInTheDocument()
+      await user.unhover(undated)
+      expect(screen.getByText('dayplan.addDatedDayHint')).toBeInTheDocument()
+
+      fireEvent.focus(undated)
+      expect(screen.getByText('dayplan.addUndatedDayHint')).toBeInTheDocument()
+      fireEvent.blur(undated)
+      expect(screen.getByText('dayplan.addDatedDayHint')).toBeInTheDocument()
+      // Both buttons are described by that line.
+      const hintId = screen.getByText('dayplan.addDatedDayHint').id
+      expect(undated).toHaveAttribute('aria-describedby', hintId)
     })
   })
 })

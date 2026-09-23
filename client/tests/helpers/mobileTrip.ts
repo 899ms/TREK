@@ -16,7 +16,7 @@ import { buildTrip } from './factories';
 export function buildTripActions(): Record<string, ReturnType<typeof vi.fn>> {
   const names = [
     'addCategory', 'addDayNote', 'addFile', 'addPackingContributor', 'addPackingItem',
-    'addPlace', 'addReservation', 'addTodoItem', 'assignPlaceToDay', 'clonePackingItem',
+    'addPlace', 'addReservation', 'addTodoItem', 'appendDatedDay', 'assignPlaceToDay', 'clonePackingItem',
     'deleteBudgetItem', 'deleteDayNote', 'deleteFile', 'deletePackingItem', 'deletePlace',
     'deleteDay', 'deletePlacesMany', 'deleteReservation', 'deleteTodoItem', 'insertDay', 'loadBudgetItems',
     'loadFiles', 'loadReservations', 'loadTrip', 'moveAssignment', 'moveDayNote', 'ratePlace',
@@ -184,6 +184,9 @@ export function buildPlanner(overrides: Partial<TripPlanner> = {}): TripPlanner 
     setDeletePlaceId: vi.fn(),
     deletePlaceIds: null,
     setDeletePlaceIds: vi.fn(),
+
+    // Adding a day from the days sheet: a trip without dates, so the single button.
+    dayAdd: { nextDate: null, blocked: null, datedBlocked: null, busy: false, onAddDated: vi.fn() },
 
     // Deleting a day from the days sheet: no question open, nothing blocking.
     deleteDayId: null,

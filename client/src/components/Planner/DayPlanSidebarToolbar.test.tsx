@@ -1,4 +1,4 @@
-// FE-PLANNER-DPTOOLBAR-001 to FE-PLANNER-DPTOOLBAR-024
+// FE-PLANNER-DPTOOLBAR-001 to FE-PLANNER-DPTOOLBAR-025
 import { render, screen, waitFor, fireEvent } from '../../../tests/helpers/render'
 import userEvent from '@testing-library/user-event'
 import { downloadTripPDF } from '../PDF/TripPDF'
@@ -241,6 +241,23 @@ describe('DayPlanSidebarToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'dayplan.reorderDays' }))
     await user.click(screen.getAllByRole('button', { name: 'dayplan.deleteDay' })[1])
     expect(onDeleteDay).toHaveBeenCalledWith(11)
+  })
+
+  it('FE-PLANNER-DPTOOLBAR-025: the popup gets the planner add controls, and its dated button adds the next date', async () => {
+    const user = userEvent.setup()
+    const days = [buildDay({ id: 10, title: 'Day 1', day_number: 1 })]
+    const onAddDated = vi.fn()
+    const onAddDay = vi.fn()
+    render(<DayPlanSidebarToolbar {...makeProps({
+      days, canEditDays: true, onReorderDays: vi.fn(), onAddDay,
+      dayAdd: { nextDate: '2026-10-13', blocked: null, datedBlocked: null, busy: false, onAddDated },
+    })} />)
+    await user.click(screen.getByRole('button', { name: 'dayplan.reorderDays' }))
+    await user.click(screen.getByRole('button', { name: /^dayplan\.addDatedDay/ }))
+    expect(onAddDated).toHaveBeenCalledTimes(1)
+    await user.click(screen.getByRole('button', { name: 'dayplan.addUndatedDay' }))
+    // The popup asks for an append, never a position.
+    expect(onAddDay).toHaveBeenCalledWith()
   })
 
   it('FE-PLANNER-DPTOOLBAR-021: the reorder button is hidden without edit rights or without days', () => {

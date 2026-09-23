@@ -1,4 +1,4 @@
-// FE-APISURF-001 to FE-APISURF-057
+// FE-APISURF-001 to FE-APISURF-058
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import type { AxiosResponse } from 'axios'
 import { http, HttpResponse } from 'msw'
@@ -570,6 +570,11 @@ describe('client > request payloads', () => {
     expect((await traceOne(() => budgetApi.reorderCategories(1, ['Food', 'Fun']))).body)
       .toEqual({ orderedCategories: ['Food', 'Fun'] })
     expect((await traceOne(() => journeyApi.reorderEntries(2, [8, 7]))).body).toEqual({ orderedIds: [8, 7] })
+  })
+
+  it('FE-APISURF-058: a dated day is asked for with the dated flag alone', async () => {
+    const rec = await traceOne(() => daysApi.create(1, { dated: true }))
+    expect(rec).toMatchObject({ method: 'POST', url: '/api/trips/1/days', body: { dated: true } })
   })
 
   it('FE-APISURF-023: user-id collections are sent as user_ids', async () => {

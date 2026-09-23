@@ -56,6 +56,7 @@ import { DayPlanSidebarTimeConfirmModal } from './DayPlanSidebarTimeConfirmModal
 import { DayPlanSidebarTransportDetailModal } from './DayPlanSidebarTransportDetailModal'
 import { TransitTitle, TransitLegChips, TransitItineraryInline } from './transitDisplay'
 import { DayPlanSidebarFooter } from './DayPlanSidebarFooter'
+import type { DayAddControls } from '../../utils/dayAdd'
 import type { Trip, Day, Place, Category, Assignment, Accommodation, Reservation, AssignmentsMap, RouteResult, RouteSegment, DayNote } from '../../types'
 import { getNavigationTargets, openNavigationTarget } from './placeNavigation'
 
@@ -76,6 +77,8 @@ interface DayPlanSidebarProps {
   onReorder: (dayId: number, orderedIds: number[]) => void
   onReorderDays?: (orderedIds: number[]) => void
   onAddDay?: (position?: number) => void
+  /** The planner's add controls, for the second "Add with date" button on a trip with dates. */
+  dayAdd?: DayAddControls
   /** Asks to delete a day from the reorder dialog; the planner owns the question. */
   onDeleteDay?: (dayId: number) => void
   /** Renaming lives in the day-detail panel (#1065); the sidebar only forwards the prop. */
@@ -148,7 +151,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   trip, days, places, categories, assignments,
   selectedDayId, selectedPlaceId, selectedAssignmentId,
   onSelectDay, onPlaceClick, onDayDetail, accommodations = [],
-  onReorder, onReorderDays, onAddDay, onDeleteDay,
+  onReorder, onReorderDays, onAddDay, dayAdd, onDeleteDay,
   onAssignToDay, onMoveToDay, onRemoveAssignment, onEditPlace, onDeletePlace,
   reservations = [],
   visibleConnectionIds = [],
@@ -1131,6 +1134,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     onReorder,
     onReorderDays,
     onAddDay,
+    dayAdd,
     onDeleteDay,
     onAssignToDay,
     onRemoveAssignment,
@@ -1334,6 +1338,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     onReorder,
     onReorderDays,
     onAddDay,
+    dayAdd,
     onDeleteDay,
     onAssignToDay,
     onRemoveAssignment,
@@ -1594,6 +1599,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         canManageShare={canManageShare}
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
+        dayAdd={dayAdd}
         onDeleteDay={onDeleteDay}
       />
 

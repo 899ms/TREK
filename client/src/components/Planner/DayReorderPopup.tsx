@@ -1,10 +1,12 @@
 import { useState } from 'react'
-import { GripVertical, ArrowUp, ArrowDown, Plus, Trash2 } from 'lucide-react'
+import { GripVertical, ArrowUp, ArrowDown, Trash2 } from 'lucide-react'
 import Modal from '../shared/Modal'
 import Tooltip from '../shared/Tooltip'
+import { DayAddFooter } from './DayAddFooter'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { dayLabel } from '../../utils/dayLabel'
 import { deleteDayBlockedReason } from '../../utils/dayDeleteImpact'
+import type { DayAddControls } from '../../utils/dayAdd'
 import type { Day } from '../../types'
 
 interface DayReorderPopupProps {
@@ -14,6 +16,11 @@ interface DayReorderPopupProps {
   locale: string
   onReorder: (orderedIds: number[]) => void
   onAddDay: () => void
+  /**
+   * The planner's add controls. On a trip with dates they add a second button for
+   * the next calendar day; without them the footer keeps its single "Add day".
+   */
+  dayAdd?: DayAddControls
   /** Asks to delete a day; the planner opens the question. Without it rows have no delete button. */
   onDeleteDay?: (dayId: number) => void
   onClose: () => void
@@ -21,12 +28,13 @@ interface DayReorderPopupProps {
 
 /**
  * Modal for moving whole days around: drag a row by its grip or use the up/down
- * arrows, add a day at the end, or delete one. Day headers stay untouched, so
- * this is the single surface for ordering. Reorders are applied optimistically
- * by the store, so the list reflects each move immediately. A delete only asks:
- * the planner shows what goes with the day before anything happens.
+ * arrows, add a day, or delete one. Day headers stay untouched, so this is the
+ * single surface for ordering. Reorders are applied optimistically by the store,
+ * so the list reflects each move immediately. A delete only asks: the planner
+ * shows what goes with the day before anything happens. Adding a day on a trip
+ * with dates offers both kinds, a day without a date or the next date.
  */
-export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, onDeleteDay, onClose }: DayReorderPopupProps) {
+export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, dayAdd, onDeleteDay, onClose }: DayReorderPopupProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
   const { offline } = useNetworkMode()
@@ -54,32 +62,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
       onClose={onClose}
       title={t('dayplan.reorderTitle')}
       size="md"
-      footer={
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <button type="button"
-            onClick={onClose}
-            style={{
-              padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 500,
-              border: '1px solid var(--border-primary)', background: 'none',
-              color: 'var(--text-muted)', cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            {t('common.close')}
-          </button>
-          <button type="button"
-            onClick={onAddDay}
-            className="bg-accent text-accent-text"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px',
-              borderRadius: 8, border: 'none', fontSize: 13, fontWeight: 500,
-              cursor: 'pointer', fontFamily: 'inherit',
-            }}
-          >
-            <Plus size={15} strokeWidth={2} />
-            {t('dayplan.addDay')}
-          </button>
-        </div>
-      }
+      footer={<DayAddFooter dayAdd={dayAdd} onAddDay={onAddDay} onClose={onClose} t={t} locale={locale} />}
     >
       <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--text-faint)', lineHeight: 1.4 }}>
         {t('dayplan.reorderHint')}

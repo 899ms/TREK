@@ -11,6 +11,7 @@ type GetState = StoreApi<TripStoreState>['getState']
 export interface DaysSlice {
   reorderDays: (tripId: number | string, orderedIds: number[]) => Promise<void>
   insertDay: (tripId: number | string, position?: number) => Promise<Day | undefined>
+  appendDatedDay: (tripId: number | string) => Promise<Day>
   deleteDay: (tripId: number | string, dayId: number) => Promise<void>
 }
 
@@ -78,6 +79,21 @@ export const createDaysSlice = (set: SetState, get: GetState): DaysSlice => ({
     } catch (err: unknown) {
       throw new Error(getApiErrorMessage(err, 'Error adding day'))
     }
+  },
+
+  // Add the calendar day after the trip's last date. The trip grows by that day,
+  // so the store takes the trip the server answered with (the socket echo skips
+  // this tab) and pulls the days, where the ones without a date moved back one
+  // place. No booking changes date, so reservations stay as they are.
+  appendDatedDay: async (tripId) => {
+    const outcome = await dayRepo.appendDated(tripId).then(
+      answer => answer,
+      (failure: unknown) => ({ failure }),
+    )
+    if ('failure' in outcome) throw new Error(getApiErrorMessage(outcome.failure, 'Error adding day'))
+    if (outcome.trip) set({ trip: outcome.trip })
+    await get().refreshDays(tripId)
+    return outcome.day
   },
 
   // Delete a day. The list closes up at once; a refusal (the last day, no

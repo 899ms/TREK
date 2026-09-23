@@ -150,6 +150,31 @@ describe('Days + day-notes e2e (real auth guard + temp SQLite, real day SQL)', (
     expect(miss.body).toEqual({ error: 'Trip not found' });
   });
 
+  it('201 create dated day extends the trip, and the days without a date move back', async () => {
+    db.prepare('INSERT INTO trips (id, user_id, title, start_date, end_date) VALUES (10, 1, ?, ?, ?)').run('Grow', '2026-09-01', '2026-09-02');
+    db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (10, 1, ?)').run('2026-09-01');
+    db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (10, 2, ?)').run('2026-09-02');
+    const spare = Number(db.prepare('INSERT INTO days (trip_id, day_number) VALUES (10, 3)').run().lastInsertRowid);
+    const res = await request(server).post('/api/trips/10/days').set('Cookie', sessionCookie(1)).send({ dated: true });
+    expect(res.status).toBe(201);
+    expect(res.body.day).toMatchObject({ trip_id: 10, day_number: 3, date: '2026-09-03', assignments: [], notes_items: [] });
+    expect(res.body.trip).toMatchObject({ id: 10, end_date: '2026-09-03', day_count: 4, is_owner: 1 });
+    expect(db.prepare('SELECT end_date FROM trips WHERE id = 10').get()).toEqual({ end_date: '2026-09-03' });
+    expect(db.prepare('SELECT day_number, date FROM days WHERE id = ?').get(spare)).toEqual({ day_number: 4, date: null });
+  });
+
+  it('400 dated with position, 400 dated on a trip without dates', async () => {
+    db.prepare('INSERT INTO trips (id, user_id, title, start_date, end_date) VALUES (11, 1, ?, ?, ?)').run('Mixed', '2026-09-01', '2026-09-01');
+    db.prepare('INSERT INTO days (trip_id, day_number, date) VALUES (11, 1, ?)').run('2026-09-01');
+    const mixed = await request(server).post('/api/trips/11/days').set('Cookie', sessionCookie(1)).send({ dated: true, position: 1 });
+    expect(mixed.status).toBe(400);
+    expect(db.prepare('SELECT COUNT(*) AS n FROM days WHERE trip_id = 11').get()).toEqual({ n: 1 });
+    const undated = await request(server).post('/api/trips/5/days').set('Cookie', sessionCookie(1)).send({ dated: true });
+    expect(undated.status).toBe(400);
+    expect(undated.body).toEqual({ error: 'This trip has no dates. Add a day without a date instead.' });
+    expect(db.prepare('SELECT COUNT(*) AS n FROM days WHERE trip_id = 5').get()).toEqual({ n: 1 });
+  });
+
   it('200 update day notes/title, 404 Day not found, 403 without permission', async () => {
     const res = await request(server).put('/api/trips/5/days/3').set('Cookie', sessionCookie(1))
       .send({ notes: 'Walking day', title: 'Arrival' });

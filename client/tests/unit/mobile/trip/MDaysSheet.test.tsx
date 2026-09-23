@@ -4,9 +4,9 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { Day } from '../../../../src/types'
 import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { resetAllStores } from '../../../helpers/store'
-import { fireEvent, render, screen } from '../../../helpers/render'
+import { cleanup, fireEvent, render, screen } from '../../../helpers/render'
 
-// FE-MOB-DAYSS-001 to FE-MOB-DAYSS-015
+// FE-MOB-DAYSS-001 to FE-MOB-DAYSS-019
 //
 // The sheet reads its copy from the real TranslationProvider (useTranslation),
 // not from planner.t — assertions therefore go against the English strings.
@@ -142,5 +142,51 @@ describe('MDaysSheet', () => {
     fireEvent.click(buttons[0])
     expect(planner.handleDeleteDay).not.toHaveBeenCalled()
     expect(screen.getByText('A trip needs at least one day')).toBeInTheDocument()
+  })
+
+  describe('adding a day on a trip with dates', () => {
+    const dayAdd = (overrides: Partial<TripPlanner['dayAdd']> = {}): TripPlanner['dayAdd'] => ({
+      nextDate: '2026-10-13', blocked: null, datedBlocked: null, busy: false, onAddDated: vi.fn(), ...overrides,
+    })
+    const datedTile = () => screen.getByRole('button', { name: /^Add .*Oct 13/ })
+    const undatedTile = () => screen.getByRole('button', { name: /^Add day without date/ })
+
+    it('FE-MOB-DAYSS-016: two tiles, the next date and a day without one, each with what it does', () => {
+      const { planner } = renderSheet({ dayAdd: dayAdd() })
+      expect(datedTile()).toHaveTextContent(/Extends the trip by one day, until .*Oct 13\./)
+      expect(undatedTile()).toHaveTextContent('The trip dates stay as they are.')
+      expect(screen.queryByRole('button', { name: 'Add day' })).not.toBeInTheDocument()
+
+      fireEvent.click(datedTile())
+      expect(planner.dayAdd.onAddDated).toHaveBeenCalledTimes(1)
+      expect(planner.handleAddDay).not.toHaveBeenCalled()
+      fireEvent.click(undatedTile())
+      expect(planner.handleAddDay).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-DAYSS-017: a read-only member gets neither tile', () => {
+      renderSheet({ can: vi.fn(() => false), dayAdd: dayAdd() })
+      expect(screen.queryByRole('button', { name: /^Add/ })).not.toBeInTheDocument()
+    })
+
+    it('FE-MOB-DAYSS-018: busy or offline turns both off, and the offline sentence is said once', () => {
+      renderSheet({ dayAdd: dayAdd({ busy: true }) })
+      expect(datedTile()).toBeDisabled()
+      expect(undatedTile()).toBeDisabled()
+      cleanup()
+
+      const offline = 'Changing days needs a connection'
+      renderSheet({ deleteDayBlocked: offline, dayAdd: dayAdd({ blocked: offline }) })
+      expect(datedTile()).toBeDisabled()
+      expect(undatedTile()).toBeDisabled()
+      expect(screen.getAllByText(offline)).toHaveLength(1)
+    })
+
+    it('FE-MOB-DAYSS-019: a trip at the day limit keeps the undated tile and says why the dated one is off', () => {
+      renderSheet({ dayAdd: dayAdd({ datedBlocked: 'A trip can span at most 999 days' }) })
+      expect(datedTile()).toBeDisabled()
+      expect(datedTile()).toHaveTextContent('A trip can span at most 999 days')
+      expect(undatedTile()).toBeEnabled()
+    })
   })
 })

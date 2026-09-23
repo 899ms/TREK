@@ -113,5 +113,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Mengubah hari memerlukan koneksi',
   'dayplan.deleteDaySuccess': 'Hari dihapus',
   'dayplan.deleteDayError': 'Gagal menghapus hari',
+  'dayplan.addUndatedDay': 'Tambah hari tanpa tanggal',
+  'dayplan.addUndatedDayHint': 'Menambahkan hari tanpa tanggal di akhir. Tanggal perjalanan tetap sama.',
+  'dayplan.addDatedDay': 'Tambah {date}',
+  'dayplan.addDatedDayHint': 'Memperpanjang perjalanan satu hari, hingga {date}.',
+  'dayplan.tripExtended': 'Hari ditambahkan. Perjalanan kini berakhir pada {date}.',
 };
 export default dayplan;

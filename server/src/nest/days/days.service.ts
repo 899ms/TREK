@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { TrekWsPayload, TrekWsTripEventName } from '@trek/shared';
+import { addIsoDays, MAX_TRIP_DAYS, planDatedAppend } from '@trek/shared';
+import type { RoadtripDayBoundary, TrekWsPayload, TrekWsTripEventName } from '@trek/shared';
 import { RealtimeService } from '../realtime/realtime.service';
 import { DatabaseService, type TripAccess } from '../database/database.service';
 import { PermissionsService } from '../permissions/permissions.service';
@@ -14,21 +15,10 @@ type Trip = TripAccess;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Add `n` days to a YYYY-MM-DD date string, staying entirely in UTC.
- *
- * Deliberately never builds a local-time Date: `new Date('2026-06-07T00:00:00')`
- * parses as *server-local* midnight, so a later .toISOString() round-trips through
- * UTC and lands on the previous day whenever the server sits east of Greenwich.
+ * Add `n` days to a YYYY-MM-DD date string, staying entirely in UTC. The shared
+ * day-grid rule, so the planner counts the date it promises the way this writes it.
  */
-export function addDays(date: string, n: number): string {
-  const [y, m, d] = date.split('-').map(Number);
-  const t = Date.UTC(y, m - 1, d) + n * MS_PER_DAY;
-  const dt = new Date(t);
-  const yyyy = dt.getUTCFullYear();
-  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0');
-  const dd = String(dt.getUTCDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-}
+export const addDays = addIsoDays;
 
 function dayDelta(from: string, to: string): number {
   const [fy, fm, fd] = from.split('-').map(Number);
@@ -43,6 +33,31 @@ function withDatePart(timestamp: string, date: string): string {
 
 /** Thrown for invalid reorder/insert requests; mapped to HTTP 400 by the controller. */
 export class DayReorderError extends Error {}
+
+/**
+ * A dated day the trip cannot take: it has no dates, or it would grow past the
+ * day limit. REST answers 400, MCP a tool error, a plugin BadParams.
+ */
+export class DayAppendError extends Error {}
+
+export const NO_DATES_MESSAGE = 'This trip has no dates. Add a day without a date instead.';
+
+/** How a surface sends what a day write changed; the MCP tools and the plugin RPC hand the same sender twice. */
+export type DaySender = <E extends TrekWsTripEventName>(event: E, payload: TrekWsPayload<E>) => void;
+
+/** What adding the next dated day did to the trip, for the surface that announces it. */
+export interface DatedDayAppend {
+  /** The new day, in the shape the create route answers with. */
+  day: Day & { assignments: unknown[]; notes_items: unknown[] };
+  /** The trip's end date now, which is the new day's date. */
+  endDate: string;
+  /** The road trip day boundaries after they moved back with their days, or null when none moved. */
+  boundaries: RoadtripDayBoundary[] | null;
+  /** The trip re-read in list shape for the viewer: its end date and its day count changed. */
+  trip: unknown;
+}
+
+type DayRow = { id: number; day_number: number; date: string | null };
 
 /**
  * Day domain service — owns the day + accommodation SQL (moved 1:1 from the
@@ -522,4 +537,81 @@ export class DaysService {
     return { ...day, assignments: [], notes_items: [] };
   }
 
+  /**
+   * Add the calendar day after the trip's last date and extend the trip to it.
+   *
+   * Unlike insert(), no day that is already there changes its date. The new day
+   * goes right behind the last dated day, so the days without a date stay
+   * undated and move one place back, the road trip boundaries drawn on them with
+   * them. No booking moves either. One transaction, reads included, so two clicks
+   * in a row add two days one after the other instead of the same date twice.
+   *
+   * Throws a DayAppendError for a trip without dates and for one that would grow
+   * past the day limit; nothing is written then.
+   */
+  appendDated(tripId: string | number, viewerId: number, notes?: string): DatedDayAppend {
+    const trip = Number(tripId);
+    const appended = this.db.transaction(() => {
+      const range = this.db.get<{ start_date: string | null; end_date: string | null }>(
+        'SELECT start_date, end_date FROM trips WHERE id = ?', trip,
+      );
+      const rows = this.db.all<DayRow>('SELECT id, day_number, date FROM days WHERE trip_id = ? ORDER BY day_number', trip);
+      const plan = planDatedAppend(range ?? {}, rows.map(r => r.date));
+      if (!plan) throw new DayAppendError(NO_DATES_MESSAGE);
+      if (!plan.fits) throw new DayAppendError(`A trip can span at most ${MAX_TRIP_DAYS} days`);
+
+      // The dates are a prefix of the day order on any trip the planner wrote;
+      // the highest dated number keeps that true even on one that drifted.
+      const position = rows.reduce((last, r) => (r.date ? Math.max(last, r.day_number) : last), 0) + 1;
+      const later = rows.filter(r => r.day_number >= position);
+      const setDayNumber = this.db.prepare('UPDATE days SET day_number = ? WHERE id = ?');
+      // Two phases, to get past UNIQUE(trip_id, day_number) on the way.
+      later.forEach(r => setDayNumber.run(-r.day_number, r.id));
+      const inserted = this.db.run(
+        'INSERT INTO days (trip_id, day_number, date, notes) VALUES (?, ?, ?, ?)', trip, position, plan.date, notes || null,
+      );
+      later.forEach(r => setDayNumber.run(r.day_number + 1, r.id));
+
+      const boundaries = this.shiftBoundariesBack(trip, position);
+      this.db.run('UPDATE trips SET end_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?', plan.date, trip);
+      const day = this.db.get<Day>('SELECT * FROM days WHERE id = ?', inserted.lastInsertRowid)!;
+      return { day: { ...day, assignments: [], notes_items: [] }, endDate: plan.date, boundaries };
+    });
+    return { ...appended, trip: this.getTripForViewer(trip, viewerId) };
+  }
+
+  /**
+   * Boundaries are keyed by day number, so the ones on the days that moved back
+   * move back with them. One at a time and from the last one down: the key is
+   * the primary key, and a CHECK keeps it at 1 or above, so the negative two-step
+   * the days use is not available here. Returns the list after the move, or null
+   * when no boundary had to move.
+   */
+  private shiftBoundariesBack(tripId: number, fromNumber: number): RoadtripDayBoundary[] | null {
+    const later = this.db.all<{ day_number: number }>(
+      'SELECT day_number FROM roadtrip_day_boundaries WHERE trip_id = ? AND day_number >= ? ORDER BY day_number DESC',
+      tripId, fromNumber,
+    );
+    if (later.length === 0) return null;
+    const move = this.db.prepare('UPDATE roadtrip_day_boundaries SET day_number = ? WHERE trip_id = ? AND day_number = ?');
+    for (const row of later) move.run(row.day_number + 1, tripId, row.day_number);
+    return this.db.all<RoadtripDayBoundary>(
+      'SELECT day_number, from_assignment_id, to_assignment_id, fraction FROM roadtrip_day_boundaries WHERE trip_id = ? ORDER BY day_number',
+      tripId,
+    );
+  }
+
+  /**
+   * The one place a dated append is fanned out. The collaborators take the new
+   * day through day:reordered, the insert shape, because it can land in front of
+   * the days without a date and day:created only appends; that event makes them
+   * pull the whole list. The trip follows for its end date and day count. Moved
+   * boundaries go to every screen, the adding one included, which holds them
+   * outside the day list.
+   */
+  announceDatedAppend(append: DatedDayAppend, send: { all: DaySender; others: DaySender }): void {
+    send.others('day:reordered', { day: append.day });
+    if (append.boundaries) send.all('roadtripBoundary:changed', { boundaries: append.boundaries });
+    if (append.trip) send.others('trip:updated', { trip: append.trip });
+  }
 }

@@ -113,5 +113,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Günleri değiştirmek için bağlantı gerekir',
   'dayplan.deleteDaySuccess': 'Gün silindi',
   'dayplan.deleteDayError': 'Gün silinemedi',
+  'dayplan.addUndatedDay': 'Tarihsiz gün ekle',
+  'dayplan.addUndatedDayHint': 'Sona tarihsiz bir gün ekler. Seyahat tarihleri aynı kalır.',
+  'dayplan.addDatedDay': '{date} ekle',
+  'dayplan.addDatedDayHint': 'Seyahati bir gün uzatır. Yeni son gün: {date}.',
+  'dayplan.tripExtended': 'Gün eklendi. Seyahatin yeni son günü: {date}.',
 };
 export default dayplan;

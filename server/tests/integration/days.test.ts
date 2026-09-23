@@ -1,6 +1,6 @@
 /**
  * Days & Accommodations API integration tests.
- * Covers DAY-001 through DAY-010 and ACCOM-001 through ACCOM-006.
+ * Covers DAY-001 through DAY-013 and ACCOM-001 through ACCOM-006.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
 import request from 'supertest';
@@ -122,7 +122,7 @@ describe('List days', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Create day (DAY-006)
+// Create day (DAY-006, DAY-011 to DAY-013)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('Create day', () => {
@@ -166,6 +166,61 @@ describe('Create day', () => {
       .send({ notes: 'Infiltration' });
 
     expect(res.status).toBe(404);
+  });
+
+  it('DAY-011: a dated create adds the next date behind the dated days, and the trip ends on it', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { title: 'Trip', start_date: '2026-08-01', end_date: '2026-08-02' });
+    const spare = createDay(testDb, trip.id);
+
+    const res = await request(app)
+      .post(`/api/trips/${trip.id}/days`)
+      .set('Cookie', authCookie(user.id))
+      .send({ dated: true });
+
+    expect(res.status).toBe(201);
+    expect(res.body.day).toMatchObject({ trip_id: trip.id, day_number: 3, date: '2026-08-03' });
+    expect(res.body.trip).toMatchObject({ id: trip.id, end_date: '2026-08-03', day_count: 4 });
+    expect(res.body.trip).not.toHaveProperty('feed_token', expect.anything());
+    const reread = await request(app).get(`/api/trips/${trip.id}`).set('Cookie', authCookie(user.id));
+    expect(reread.body.trip).toMatchObject({ start_date: '2026-08-01', end_date: '2026-08-03' });
+    const list = await request(app).get(`/api/trips/${trip.id}/days`).set('Cookie', authCookie(user.id));
+    expect(list.body.days.map((d: { id: number; date: string | null }) => [d.id, d.date])).toEqual([
+      [expect.any(Number), '2026-08-01'],
+      [expect.any(Number), '2026-08-02'],
+      [res.body.day.id, '2026-08-03'],
+      [spare.id, null],
+    ]);
+  });
+
+  it('DAY-012: a dated create on a trip without dates is refused with 400 and adds nothing', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { title: 'Open Trip' });
+    createDay(testDb, trip.id);
+
+    const res = await request(app)
+      .post(`/api/trips/${trip.id}/days`)
+      .set('Cookie', authCookie(user.id))
+      .send({ dated: true });
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'This trip has no dates. Add a day without a date instead.' });
+    expect(testDb.prepare('SELECT COUNT(*) AS n FROM days WHERE trip_id = ?').get(trip.id)).toEqual({ n: 1 });
+  });
+
+  it('DAY-013: dated next to a position is refused by the contract with 400 and adds nothing', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { title: 'Trip', start_date: '2026-08-01', end_date: '2026-08-02' });
+
+    const res = await request(app)
+      .post(`/api/trips/${trip.id}/days`)
+      .set('Cookie', authCookie(user.id))
+      .send({ dated: true, position: 1 });
+
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('dated cannot be combined with date or position');
+    expect(testDb.prepare('SELECT COUNT(*) AS n FROM days WHERE trip_id = ?').get(trip.id)).toEqual({ n: 2 });
+    expect(testDb.prepare('SELECT end_date FROM trips WHERE id = ?').get(trip.id)).toEqual({ end_date: '2026-08-02' });
   });
 });
 

@@ -8,6 +8,7 @@
  * stayed behind when the accommodation CRUD moved to accommodations/ — mostly
  * the SKIP paths (booking without a day, snapshot without a date, stay that
  * must not be re-anchored), which the happy-path integration test never walks.
+ * DAY-SVC-091 through DAY-SVC-097 and DAY-SVC-099 cover the dated append.
  * Uses a real in-memory SQLite DB so SQL logic is exercised faithfully.
  */
 import { describe, it, expect, vi, beforeAll, beforeEach, afterAll } from 'vitest';
@@ -52,10 +53,10 @@ vi.mock('../../../src/websocket', () => ({ broadcast: vi.fn() }));
 import { createTables } from '../../../src/db/schema';
 import { runMigrations } from '../../../src/db/migrations';
 import { resetTestDb } from '../../helpers/test-db';
-import { createUser, createTrip, createDay, createPlace, createDayAssignment, createDayAccommodation, createDayNote, createTag } from '../../helpers/factories';
+import { createUser, createTrip, createDay, createPlace, createDayAssignment, createDayAccommodation, createDayNote, createTag, createReservation } from '../../helpers/factories';
 import { DatabaseService } from '../../../src/nest/database/database.service';
 import { PermissionsService } from '../../../src/nest/permissions/permissions.service';
-import { DaysService, DayReorderError, addDays } from '../../../src/nest/days/days.service';
+import { DaysService, DayReorderError, DayAppendError, NO_DATES_MESSAGE, addDays } from '../../../src/nest/days/days.service';
 // Was days.bridge, deleted with the other three that had no consumer outside the
 // container. The assertions stayed; they point at the service now.
 const bridgeGetDay = (id: string | number, tripId: string | number) => svc.getDay(id, tripId);
@@ -898,5 +899,161 @@ describe('DaysService.canEdit', () => {
 
     checkPermission.mockReturnValue(false);
     expect(withStub.canEdit(trip, { id: 2, role: 'user' } as never)).toBe(false);
+  });
+});
+
+/**
+ * appendDated: "Add day with date" in the reorder dialog, create_day with `dated`
+ * and the plugin RPC. The new day takes the calendar day after the last date of
+ * the trip and goes right behind the last dated day; nothing already there moves date.
+ */
+describe('DaysService.appendDated', () => {
+  type Row = { id: number; day_number: number; date: string | null };
+  const rows = (tripId: number): Row[] =>
+    testDb.prepare('SELECT id, day_number, date FROM days WHERE trip_id = ? ORDER BY day_number').all(tripId) as Row[];
+  const endDate = (tripId: number) =>
+    (testDb.prepare('SELECT end_date FROM trips WHERE id = ?').get(tripId) as { end_date: string | null }).end_date;
+  const boundaries = (tripId: number) =>
+    testDb.prepare('SELECT day_number, from_assignment_id FROM roadtrip_day_boundaries WHERE trip_id = ? ORDER BY day_number').all(tripId);
+
+  it('DAY-SVC-091 appends the day after the end date, with its notes, and moves the end date to it', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-10-10', end_date: '2026-10-12' });
+    const before = rows(trip.id);
+
+    const result = svc.appendDated(trip.id, user.id, 'Late checkout');
+
+    expect(result.day).toMatchObject({ trip_id: trip.id, day_number: 4, date: '2026-10-13', notes: 'Late checkout', assignments: [], notes_items: [] });
+    expect(result.endDate).toBe('2026-10-13');
+    expect(result.boundaries).toBeNull();
+    expect(result.trip).toMatchObject({ id: trip.id, end_date: '2026-10-13', day_count: 4, is_owner: 1, feed_token: null });
+    expect(rows(trip.id)).toEqual([...before, { id: result.day.id, day_number: 4, date: '2026-10-13' }]);
+    expect(endDate(trip.id)).toBe('2026-10-13');
+  });
+
+  it('DAY-SVC-092 puts the new day in front of the days without a date, which keep their content and stay undated', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-10-10', end_date: '2026-10-11' });
+    const [d1, d2] = rows(trip.id);
+    const spare = createDay(testDb, trip.id, { title: 'Buffer day' });
+    const other = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id);
+    const stop = createDayAssignment(testDb, spare.id, place.id);
+
+    const { day } = svc.appendDated(trip.id, user.id);
+
+    expect(rows(trip.id)).toEqual([
+      d1, d2,
+      { id: day.id, day_number: 3, date: '2026-10-12' },
+      { id: spare.id, day_number: 4, date: null },
+      { id: other.id, day_number: 5, date: null },
+    ]);
+    expect(testDb.prepare('SELECT day_id FROM day_assignments WHERE id = ?').get(stop.id)).toEqual({ day_id: spare.id });
+    expect(svc.getDay(spare.id, trip.id)).toMatchObject({ title: 'Buffer day' });
+  });
+
+  it('DAY-SVC-093 anchors on a day dated past the end date, so no date is given twice', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-10-10', end_date: '2026-10-11' });
+    const [, d2] = rows(trip.id);
+    testDb.prepare('UPDATE days SET date = ? WHERE id = ?').run('2026-10-14', d2.id);
+
+    const result = svc.appendDated(trip.id, user.id);
+
+    expect(result.day.date).toBe('2026-10-15');
+    expect(endDate(trip.id)).toBe('2026-10-15');
+  });
+
+  it('DAY-SVC-094 refuses a trip without dates and writes nothing', () => {
+    const { user } = createUser(testDb);
+    const dateless = createTrip(testDb, user.id);
+    createDay(testDb, dateless.id);
+    const halfDated = createTrip(testDb, user.id);
+    testDb.prepare('UPDATE trips SET start_date = ? WHERE id = ?').run('2026-10-10', halfDated.id);
+
+    for (const trip of [dateless, halfDated]) {
+      const before = rows(trip.id);
+      expect(() => svc.appendDated(trip.id, user.id)).toThrow(new DayAppendError(NO_DATES_MESSAGE));
+      expect(rows(trip.id)).toEqual(before);
+      expect(endDate(trip.id)).toBeNull();
+    }
+  });
+
+  it('DAY-SVC-095 refuses a day past the day limit and writes nothing', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    // A full-length range without its 999 rows: the limit reads the range, not the rows.
+    testDb.prepare('UPDATE trips SET start_date = ?, end_date = ? WHERE id = ?').run('2026-01-01', addDays('2026-01-01', 998), trip.id);
+    createDay(testDb, trip.id, { date: '2026-01-01' });
+    const before = rows(trip.id);
+
+    expect(() => svc.appendDated(trip.id, user.id)).toThrow(new DayAppendError('A trip can span at most 999 days'));
+    expect(rows(trip.id)).toEqual(before);
+    expect(endDate(trip.id)).toBe(addDays('2026-01-01', 998));
+  });
+
+  it('DAY-SVC-096 moves the road trip boundaries of the days behind it back by one, the last one first', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-10-10', end_date: '2026-10-11' });
+    const [d1] = rows(trip.id);
+    const spareA = createDay(testDb, trip.id);
+    const spareB = createDay(testDb, trip.id);
+    const place = createPlace(testDb, trip.id);
+    const stops = [d1, spareA, spareB].map(d => createDayAssignment(testDb, d.id, place.id));
+    const boundary = testDb.prepare(
+      'INSERT INTO roadtrip_day_boundaries (trip_id, day_number, from_assignment_id, to_assignment_id, fraction) VALUES (?, ?, ?, NULL, 1)',
+    );
+    boundary.run(trip.id, 1, stops[0].id);
+    boundary.run(trip.id, 3, stops[1].id);
+    boundary.run(trip.id, 4, stops[2].id);
+
+    const result = svc.appendDated(trip.id, user.id);
+
+    const moved = [
+      { day_number: 1, from_assignment_id: stops[0].id },
+      { day_number: 4, from_assignment_id: stops[1].id },
+      { day_number: 5, from_assignment_id: stops[2].id },
+    ];
+    expect(boundaries(trip.id)).toEqual(moved);
+    expect(result.boundaries?.map(b => ({ day_number: b.day_number, from_assignment_id: b.from_assignment_id }))).toEqual(moved);
+  });
+
+  it('DAY-SVC-097 moves no booking, while insert() still dates the days without one', () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-10-10', end_date: '2026-10-11' });
+    const [, d2] = rows(trip.id);
+    const reservation = createReservation(testDb, trip.id, { day_id: d2.id });
+    testDb.prepare('UPDATE reservations SET reservation_time = ? WHERE id = ?').run('2026-10-11T19:30', reservation.id);
+    const spare = createDay(testDb, trip.id);
+
+    svc.appendDated(trip.id, user.id);
+    expect(testDb.prepare('SELECT day_id, reservation_time FROM reservations WHERE id = ?').get(reservation.id))
+      .toEqual({ day_id: d2.id, reservation_time: '2026-10-11T19:30' });
+    expect(rows(trip.id).find(r => r.id === spare.id)).toMatchObject({ day_number: 4, date: null });
+
+    // The older path is untouched: an insert re-dates every row, the spare day included.
+    const inserted = svc.insert(trip.id);
+    expect(rows(trip.id).find(r => r.id === spare.id)).toMatchObject({ date: '2026-10-13' });
+    expect(inserted).toMatchObject({ day_number: 5, date: '2026-10-14' });
+  });
+
+  it('DAY-SVC-099 announces the day to the others, moved boundaries to everyone and the trip to the others', () => {
+    const all = vi.fn();
+    const others = vi.fn();
+    const day = { id: 7, trip_id: 1, day_number: 3, date: '2026-10-12', assignments: [], notes_items: [] } as never;
+    const moved = [{ day_number: 4, from_assignment_id: 2, to_assignment_id: null, fraction: 1 }];
+
+    svc.announceDatedAppend({ day, endDate: '2026-10-12', boundaries: moved, trip: { id: 1 } }, { all, others });
+    expect(others.mock.calls).toEqual([
+      ['day:reordered', { day }],
+      ['trip:updated', { trip: { id: 1 } }],
+    ]);
+    expect(all.mock.calls).toEqual([['roadtripBoundary:changed', { boundaries: moved }]]);
+
+    all.mockClear();
+    others.mockClear();
+    svc.announceDatedAppend({ day, endDate: '2026-10-12', boundaries: null, trip: undefined }, { all, others });
+    expect(others.mock.calls).toEqual([['day:reordered', { day }]]);
+    expect(all).not.toHaveBeenCalled();
   });
 });

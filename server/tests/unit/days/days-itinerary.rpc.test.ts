@@ -14,7 +14,7 @@ import { DaysRpc } from '../../../src/nest/days/days.rpc';
 import { DaysModule } from '../../../src/nest/days/days.module';
 import { ItineraryRpc } from '../../../src/nest/assignments/itinerary.rpc';
 import { AssignmentsModule } from '../../../src/nest/assignments/assignments.module';
-import type { DaysService } from '../../../src/nest/days/days.service';
+import { DayAppendError, NO_DATES_MESSAGE, type DatedDayAppend, type DaysService } from '../../../src/nest/days/days.service';
 import { DayDeleteError, type DayRemoval, type DayRemovalService } from '../../../src/nest/days/day-removal.service';
 import type { AssignmentsService } from '../../../src/nest/assignments/assignments.service';
 import type { RealtimeService } from '../../../src/nest/realtime/realtime.service';
@@ -32,6 +32,15 @@ function build(opts: { canEdit?: boolean } = {}) {
     create: vi.fn((tripId: number, date?: string) => ({ id: 20, trip_id: tripId, date })),
     getDay: vi.fn((dayId: number, tripId: number) => (dayId === 3 && tripId === 1 ? { id: 3 } : undefined)),
     update: vi.fn((id: number) => ({ id })),
+    appendDated: vi.fn((tripId: number): DatedDayAppend => ({
+      day: { id: 21, trip_id: tripId, day_number: 3, date: '2027-01-03', assignments: [], notes_items: [] } as DatedDayAppend['day'],
+      endDate: '2027-01-03', boundaries: null, trip: { id: tripId, end_date: '2027-01-03' },
+    })),
+    // The service's own fan-out is DAY-SVC-099; the stub sends one event through each sender.
+    announceDatedAppend: vi.fn((append: DatedDayAppend, send: Parameters<DaysService['announceDatedAppend']>[1]) => {
+      send.others('day:reordered', { day: append.day });
+      send.all('trip:updated', { trip: append.trip });
+    }),
   } as unknown as DaysService & Record<string, ReturnType<typeof vi.fn>>;
   const removed: DayRemoval = {
     dayId: 3, orderedIds: [4], stayIds: [], reservationIds: [], budgetItemIds: [], mirrors: [],
@@ -129,6 +138,36 @@ describe('DaysRpc', () => {
     vi.mocked(f.removal.remove).mockImplementation(() => { throw new Error('db is down'); });
     const res = (await f.host('db:write:days').dispatch(req('days.delete', { tripId: 1, dayId: 3 }), 42)) as RpcError;
     expect(res.error.code).not.toBe('BAD_PARAMS');
+  });
+
+  it('DAYS-RPC-007 a dated create appends as the bound user, answers with the day and fans out to every socket', async () => {
+    const f = build();
+    const res = await f.host('db:write:days').dispatch(req('days.create', { tripId: 1, input: { dated: true, notes: 'Late checkout' } }), 42);
+    expect(res).toMatchObject({ ok: true, result: { id: 21, date: '2027-01-03' } });
+    expect(f.days.appendDated).toHaveBeenCalledWith(1, 42, 'Late checkout');
+    expect(f.days.create).not.toHaveBeenCalled();
+    const send = vi.mocked(f.days.announceDatedAppend).mock.calls[0][1];
+    expect(send.all).toBe(send.others);
+    expect(f.realtime.broadcast.mock.calls.map((c) => c[1])).toEqual(['day:reordered', 'trip:updated']);
+  });
+
+  it('DAYS-RPC-008 a dated create on a trip without dates, or next to a position, is BAD_PARAMS and announces nothing', async () => {
+    const f = build();
+    vi.mocked(f.days.appendDated).mockImplementation(() => { throw new DayAppendError(NO_DATES_MESSAGE); });
+    const host = f.host('db:write:days');
+    const noDates = (await host.dispatch(req('days.create', { tripId: 1, input: { dated: true } }), 42)) as RpcError;
+    expect(noDates.error).toMatchObject({ code: 'BAD_PARAMS', message: NO_DATES_MESSAGE });
+
+    const mixed = (await host.dispatch(req('days.create', { tripId: 1, input: { dated: true, position: 2 } }), 42)) as RpcError;
+    expect(mixed.error.code).toBe('BAD_PARAMS');
+    expect(mixed.error.message).toContain('dated cannot be combined with date or position');
+    expect(f.days.appendDated).toHaveBeenCalledTimes(1);
+
+    // Anything else is not dressed up as bad params.
+    vi.mocked(f.days.appendDated).mockImplementation(() => { throw new Error('db is down'); });
+    const broken = (await host.dispatch(req('days.create', { tripId: 1, input: { dated: true } }), 42)) as RpcError;
+    expect(broken.error.code).not.toBe('BAD_PARAMS');
+    expect(f.realtime.broadcast).not.toHaveBeenCalled();
   });
 });
 

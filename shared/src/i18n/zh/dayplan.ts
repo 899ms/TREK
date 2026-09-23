@@ -111,5 +111,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': '更改日期需要网络连接',
   'dayplan.deleteDaySuccess': '已删除这一天',
   'dayplan.deleteDayError': '删除这一天失败',
+  'dayplan.addUndatedDay': '添加无日期的一天',
+  'dayplan.addUndatedDayHint': '在末尾添加一天没有日期的行程。旅行日期不变。',
+  'dayplan.addDatedDay': '添加 {date}',
+  'dayplan.addDatedDayHint': '旅行延长一天，到 {date} 为止。',
+  'dayplan.tripExtended': '已添加一天。旅行现在于 {date} 结束。',
 };
 export default dayplan;

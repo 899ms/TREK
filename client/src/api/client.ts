@@ -1,7 +1,7 @@
 import { isEffectivelyOffline } from '../sync/networkMode'
 import axios, { AxiosInstance } from 'axios'
 import type { z } from 'zod'
-import type { Place, Trip } from '../types'
+import type { Day, Place, Trip } from '../types'
 import type { TransitProvider } from '@trek/shared'
 import { randomId } from '../utils/randomId'
 import {
@@ -434,7 +434,10 @@ export const tripsApi = {
 
 export const daysApi = {
   list: (tripId: number | string) => apiClient.get(`/trips/${tripId}/days`).then(r => r.data),
-  create: (tripId: number | string, data: DayCreateRequest) => apiClient.post(`/trips/${tripId}/days`, data).then(r => r.data),
+  // `trip` comes along when the new day changed the trip itself: a dated day
+  // (`dated: true`) moved its end date, an insert at a position grew it by a day.
+  create: (tripId: number | string, data: DayCreateRequest): Promise<{ day: Day; trip?: Trip }> =>
+    apiClient.post(`/trips/${tripId}/days`, data).then(r => r.data),
   update: (tripId: number | string, dayId: number | string, data: DayUpdateRequest) => apiClient.put(`/trips/${tripId}/days/${dayId}`, data).then(r => r.data),
   // Whole-day default route mode (#1281); per-segment leg modes override it.
   updateTransport: (tripId: number | string, dayId: number | string, mode: string | null) => apiClient.put(`/trips/${tripId}/days/${dayId}/transport`, { transport_mode: mode }).then(r => r.data),

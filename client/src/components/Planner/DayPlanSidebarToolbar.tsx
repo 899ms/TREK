@@ -5,6 +5,7 @@ import Tooltip from '../shared/Tooltip'
 import { useToast } from '../shared/Toast'
 import { TripExportModal } from './TripExportModal'
 import { isRoutableReservation } from '../../utils/reservationRoutes'
+import type { DayAddControls } from '../../utils/dayAdd'
 import type { Trip, Day, Place, Category, AssignmentsMap, Reservation, DayNote } from '../../types'
 
 interface DayPlanSidebarToolbarProps {
@@ -37,6 +38,8 @@ interface DayPlanSidebarToolbarProps {
   canManageShare?: boolean
   onReorderDays?: (orderedIds: number[]) => void
   onAddDay?: (position?: number) => void
+  /** The planner's add controls: on a trip with dates the dialog offers the next date as well. */
+  dayAdd?: DayAddControls
   /** Asks to delete a day from the reorder dialog; without it the dialog has no delete buttons. */
   onDeleteDay?: (dayId: number) => void
 }
@@ -46,7 +49,7 @@ export function DayPlanSidebarToolbar({
   allConnectionsShown = false, onToggleAllConnections,
   t, locale, toast,
   expandedDays, setExpandedDays, onUndo, canUndo, undoHover, setUndoHover, lastActionLabel,
-  canEditDays, canManageShare = true, onReorderDays, onAddDay, onDeleteDay,
+  canEditDays, canManageShare = true, onReorderDays, onAddDay, dayAdd, onDeleteDay,
 }: DayPlanSidebarToolbarProps) {
   const [reorderOpen, setReorderOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -199,6 +202,7 @@ export function DayPlanSidebarToolbar({
               locale={locale}
               onReorder={onReorderDays}
               onAddDay={() => onAddDay()}
+              dayAdd={dayAdd}
               onDeleteDay={onDeleteDay}
               onClose={() => setReorderOpen(false)}
             />

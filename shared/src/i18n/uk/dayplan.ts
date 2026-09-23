@@ -114,5 +114,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Для зміни днів потрібне з’єднання',
   'dayplan.deleteDaySuccess': 'День видалено',
   'dayplan.deleteDayError': 'Не вдалося видалити день',
+  'dayplan.addUndatedDay': 'Додати день без дати',
+  'dayplan.addUndatedDayHint': 'Додає в кінець день без дати. Дати подорожі не змінюються.',
+  'dayplan.addDatedDay': 'Додати {date}',
+  'dayplan.addDatedDayHint': 'Подовжує подорож на один день, до {date}.',
+  'dayplan.tripExtended': 'День додано. Тепер подорож закінчується {date}.',
 };
 export default dayplan;

@@ -113,5 +113,10 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': '日の変更には接続が必要です',
   'dayplan.deleteDaySuccess': '日を削除しました',
   'dayplan.deleteDayError': '日の削除に失敗しました',
+  'dayplan.addUndatedDay': '日付なしの日を追加',
+  'dayplan.addUndatedDayHint': '日付のない日を最後に追加します。旅行の日程は変わりません。',
+  'dayplan.addDatedDay': '{date}を追加',
+  'dayplan.addDatedDayHint': '旅行を1日延長し、{date}までにします。',
+  'dayplan.tripExtended': '日を追加しました。旅行の最終日は{date}になりました。',
 };
 export default dayplan;
