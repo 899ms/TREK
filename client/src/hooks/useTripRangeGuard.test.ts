@@ -1,5 +1,5 @@
 /**
- * FE-HOOK-RANGEGUARD-001 to FE-HOOK-RANGEGUARD-005: the question before a trip
+ * FE-HOOK-RANGEGUARD-001 to FE-HOOK-RANGEGUARD-006: the question before a trip
  * dialog saves new dates. The desktop dialog and the phone sheet both render
  * what this answers, so what it reads, when it reads nothing, and what it says
  * when it cannot read are pinned here once. The repos are mocked; the layout
@@ -9,18 +9,20 @@ import { createElement, type ReactNode } from 'react'
 import { act, renderHook } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { TranslationProvider } from '../i18n/TranslationContext'
-import { buildAssignment, buildDay, buildPlace } from '../../tests/helpers/factories'
-import type { Accommodation, Day, Reservation } from '../types'
+import { buildAssignment, buildBudgetItem, buildDay, buildPlace, buildReservation } from '../../tests/helpers/factories'
+import type { Accommodation, BudgetItem, Day, Reservation } from '../types'
 import { useTripRangeGuard, type RangeCheck, type RangeRemoval } from './useTripRangeGuard'
 
 const repos = {
   days: vi.fn<() => Promise<{ days: Day[] }>>(),
   reservations: vi.fn<() => Promise<{ reservations: Reservation[] }>>(),
   accommodations: vi.fn<() => Promise<{ accommodations: Accommodation[] }>>(),
+  budget: vi.fn<() => Promise<{ items: BudgetItem[] }>>(),
 }
 vi.mock('../repo/dayRepo', () => ({ dayRepo: { list: () => repos.days() } }))
 vi.mock('../repo/reservationRepo', () => ({ reservationRepo: { list: () => repos.reservations() } }))
 vi.mock('../repo/accommodationRepo', () => ({ accommodationRepo: { list: () => repos.accommodations() } }))
+vi.mock('../repo/budgetRepo', () => ({ budgetRepo: { list: () => repos.budget() } }))
 
 const wrapper = ({ children }: { children: ReactNode }) => createElement(TranslationProvider, null, children)
 
@@ -48,6 +50,7 @@ beforeEach(() => {
   repos.days.mockReset().mockResolvedValue({ days: fiveDays([4, 5]) })
   repos.reservations.mockReset().mockResolvedValue({ reservations: [] })
   repos.accommodations.mockReset().mockResolvedValue({ accommodations: [] })
+  repos.budget.mockReset().mockResolvedValue({ items: [] })
 })
 
 describe('useTripRangeGuard', () => {
@@ -83,6 +86,25 @@ describe('useTripRangeGuard', () => {
     expect(await ask({ start_date: '2026-10-01', end_date: '2026-10-03' })).toBe('unknown')
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
+  })
+
+  it('FE-HOOK-RANGEGUARD-006: the expenses say whether the booking of a removed stay has one; unreadable ones cost no answer', async () => {
+    repos.accommodations.mockResolvedValue({ accommodations: [{ id: 9, trip_id: 7, start_day_id: 4, end_day_id: 5, place_name: 'Harbour Hotel' } as Accommodation] })
+    repos.reservations.mockResolvedValue({ reservations: [buildReservation({ id: 40, day_id: 4, type: 'hotel', title: 'Harbour, 1 night', accommodation_id: 9 })] })
+    const shrink = { start_date: '2026-10-01', end_date: '2026-10-03' }
+
+    // Read, and none written against the booking.
+    expect((await ask(shrink) as RangeRemoval).content.stays[0].expense).toBeNull()
+    // Read, with one: said, though not by its sum, since shortening keeps it.
+    repos.budget.mockResolvedValue({ items: [buildBudgetItem({ reservation_id: 40, total_price: 120 })] })
+    expect((await ask(shrink) as RangeRemoval).content.stays[0].expense).toEqual({ amount: null })
+    // Not readable: the warning still comes, and says the booking may have one.
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    repos.budget.mockRejectedValue(new Error('500'))
+    const answer = await ask(shrink) as RangeRemoval
+    expect(answer.content.stays[0]).toMatchObject({ booking: 'Harbour, 1 night', expense: { amount: null } })
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('FE-HOOK-RANGEGUARD-005: a later start with the same end takes the last days and says the start moved', async () => {

@@ -99,7 +99,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Sposta tutto',
   'dashboard.dateShiftAllDesc': "L'intero itinerario si sposta con le nuove date, incluse prenotazioni e alloggi.",
   'dashboard.dateShiftHint':
-    "Suggerimento: per spostare solo una parte dell'itinerario, aggiungi un giorno in «Riordina i giorni» nel planner e spostalo dove deve crearsi lo spazio.",
+    "Suggerimento: per spostare solo una parte dell'itinerario, apri «Riordina i giorni» nel planner, aggiungi il giorno dopo la fine del viaggio con il pulsante che ne mostra la data e sposta quel giorno dove deve crearsi lo spazio.",
   'dashboard.shrinkTitle': 'Rimuovere dei giorni?',
   'dashboard.shrinkIntro': 'Salvando le nuove date vengono rimossi questi giorni:',
   'dashboard.shrinkMoreDays': '+{count} altri',
@@ -113,6 +113,8 @@ const dashboard: TranslationStrings = {
     "Il check-in o il check-out cade in un giorno rimosso, quindi viene rimosso l'intero soggiorno.",
   'dashboard.shrinkStayBookedHint':
     "Il check-in o il check-out cade in un giorno rimosso, quindi viene rimosso l'intero soggiorno. La sua prenotazione «{booking}» e la relativa spesa restano in Prenotazioni.",
+  'dashboard.shrinkStayBookingHint':
+    "Il check-in o il check-out cade in un giorno rimosso, quindi viene rimosso l'intero soggiorno. La sua prenotazione «{booking}» resta in Prenotazioni.",
   'dashboard.shrinkConfirm': 'Rimuovi i giorni e salva',
   'dashboard.shrinkUnknown':
     'Non è stato possibile controllare i giorni di questo viaggio. Se le nuove date hanno meno giorni, salvando vengono rimossi gli ultimi giorni e tutto ciò che vi è pianificato.',

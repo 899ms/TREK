@@ -105,12 +105,21 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Zameldowanie lub wymeldowanie przypada na ten dzień, więc nocleg zostanie anulowany.',
   'dayplan.deleteDayStayBookedHint':
     'Zameldowanie lub wymeldowanie przypada na ten dzień, więc nocleg zostanie anulowany razem z rezerwacją „{booking}” i jej wydatkiem.',
+  'dayplan.deleteDayStayBookingHint':
+    'Zameldowanie lub wymeldowanie przypada na ten dzień, więc nocleg zostanie anulowany razem z rezerwacją „{booking}”.',
+  'dayplan.deleteDayStayPaidHint':
+    'Zameldowanie lub wymeldowanie przypada na ten dzień, więc nocleg zostanie anulowany razem z rezerwacją „{booking}” i jej wydatkiem w kwocie {amount}.',
   'dayplan.deleteDayShift': 'Późniejsze dni: {count}',
   'dayplan.deleteDayShiftHint': 'Każdy przesuwa się o jedną datę wcześniej.',
   'dayplan.deleteDayShiftBookingsHint':
     'Każdy przesuwa się o jedną datę wcześniej. Rezerwacje przesuwane razem z nimi: {count}',
   'dayplan.deleteDayShrink': 'Podróż kończy się teraz {date}',
   'dayplan.deleteDayShrinkHint': 'Nie ma dnia bez daty, który mógłby przejąć ostatnią datę.',
+  'dayplan.impactStayShorter': 'Nocleg w {name}: o jedną noc krócej',
+  'dayplan.deleteDayStayShorterHint': 'Obejmuje ten dzień, więc wymeldowanie przypada teraz na {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Obejmuje ten dzień, więc kończy się teraz dzień wcześniej.',
+  'dayplan.deleteDaySpareDated': '{day} otrzymuje datę {date}',
+  'dayplan.deleteDaySpareDatedHint': 'To pierwszy dzień bez daty i przejmuje ostatnią datę podróży.',
   'dayplan.deleteDayLast': 'Podróż musi mieć co najmniej jeden dzień',
   'dayplan.daysOffline': 'Zmiana dni wymaga połączenia',
   'dayplan.deleteDaySuccess': 'Dzień usunięty',

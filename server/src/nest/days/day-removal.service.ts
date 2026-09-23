@@ -94,9 +94,9 @@ export class DayRemovalService {
       // assignments, notes, stops, roads and booking positions along by cascade.
       this.db.run('DELETE FROM roadtrip_day_boundaries WHERE trip_id = ? AND day_number = ?', trip, target.day_number);
       this.db.run('DELETE FROM days WHERE id = ?', id);
-      this.shiftBoundaries(trip, target.day_number);
 
       const remaining = rows.filter(r => r.id !== id);
+      this.shiftBoundaries(trip, rows, remaining);
       const endDate = this.renumber(trip, rows, remaining);
 
       const boundariesAfter = this.boundaries(trip);
@@ -170,18 +170,34 @@ export class DayRemovalService {
   }
 
   /**
-   * Boundaries are keyed by day number, not by day, so the ones after the deleted
-   * day move up with their days. One at a time and in ascending order: the key is
-   * the primary key, and a CHECK keeps it at 1 or above, so the negative two-step
-   * the days use is not available here.
+   * Boundaries are keyed by day number, not by day, so each one follows its day
+   * to the position that day takes in the closed-up numbering. Not simply one
+   * less: a trip can still carry a hole in its numbering from the old delete,
+   * which the renumbering closes too, and a flat step of one would leave every
+   * boundary behind the hole a day off. A boundary on a number no day holds
+   * applies to no day: inside the list it has no slot left and goes, past the
+   * last day it keeps its distance to the end, the way the flat step kept it.
+   *
+   * One at a time and in ascending order: the key is the primary key, and a
+   * CHECK keeps it at 1 or above, so the negative two-step the days use is not
+   * available here. Ascending is safe, since no number moves up and the order
+   * between them stays.
    */
-  private shiftBoundaries(tripId: number, deletedNumber: number): void {
-    const later = this.db.all<{ day_number: number }>(
-      'SELECT day_number FROM roadtrip_day_boundaries WHERE trip_id = ? AND day_number > ? ORDER BY day_number',
-      tripId, deletedNumber,
+  private shiftBoundaries(tripId: number, rows: DayRow[], remaining: DayRow[]): void {
+    const position = new Map(remaining.map((r, i) => [r.day_number, i + 1]));
+    const lastNumber = rows[rows.length - 1].day_number;
+    const pastEnd = lastNumber - remaining.length;
+    const boundaries = this.db.all<{ day_number: number }>(
+      'SELECT day_number FROM roadtrip_day_boundaries WHERE trip_id = ? ORDER BY day_number',
+      tripId,
     );
+    const drop = this.db.prepare('DELETE FROM roadtrip_day_boundaries WHERE trip_id = ? AND day_number = ?');
     const move = this.db.prepare('UPDATE roadtrip_day_boundaries SET day_number = ? WHERE trip_id = ? AND day_number = ?');
-    for (const row of later) move.run(row.day_number - 1, tripId, row.day_number);
+    for (const { day_number: from } of boundaries) {
+      const to = position.get(from) ?? (from > lastNumber ? from - pastEnd : null);
+      if (to === null) drop.run(tripId, from);
+      else if (to !== from) move.run(to, tripId, from);
+    }
   }
 
   /**

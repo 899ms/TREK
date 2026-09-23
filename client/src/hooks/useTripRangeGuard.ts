@@ -4,6 +4,7 @@ import { useTranslation } from '../i18n'
 import { dayRepo } from '../repo/dayRepo'
 import { reservationRepo } from '../repo/reservationRepo'
 import { accommodationRepo } from '../repo/accommodationRepo'
+import { budgetRepo } from '../repo/budgetRepo'
 import { dayLabel } from '../utils/dayLabel'
 import { hasVisibleContent, tripRangeImpact, type TripRangeImpact } from '../utils/tripRangeImpact'
 import type { AssignmentsMap, DayNotesMap, Trip } from '../types'
@@ -32,7 +33,9 @@ export interface RangePayload {
  * and what is on them. It reads the trip's days, bookings and stays through the
  * repos and lays the days out with planDayGrid, the rule the server rebuilds
  * them by, so the warning names exactly the days the save takes. A save that
- * does not rebuild the days is answered without reading anything.
+ * does not rebuild the days is answered without reading anything. The expenses
+ * only tell whether a removed stay's booking has one; when they cannot be read,
+ * the warning says it may.
  *
  * Used by the desktop trip dialog and the phone's trip sheet alike; both only
  * render what comes back.
@@ -46,10 +49,14 @@ export function useTripRangeGuard(): { checking: boolean; check: (trip: Pick<Tri
     if (!range.regenerate) return null
     setChecking(true)
     try {
-      const [{ days }, { reservations }, { accommodations }] = await Promise.all([
+      const [{ days }, { reservations }, { accommodations }, expenses] = await Promise.all([
         dayRepo.list(trip.id),
         reservationRepo.list(trip.id),
         accommodationRepo.list(trip.id),
+        budgetRepo.list(trip.id).catch((err: unknown) => {
+          console.warn('Expenses not read for the warning before new dates:', err)
+          return null
+        }),
       ])
       const plan = planDayGrid({
         days: days.map(d => ({
@@ -72,7 +79,8 @@ export function useTripRangeGuard(): { checking: boolean; check: (trip: Pick<Tri
         dayNotes[String(day.id)] = day.notes_items ?? []
       }
       const startMoved = !!trip.start_date && !!range.newStart && !!range.newEnd && range.newStart !== trip.start_date
-      const impact = tripRangeImpact(plan, days, { assignments, dayNotes, reservations, accommodations }, { startMoved })
+      const budget = expenses ? { items: expenses.items } : undefined
+      const impact = tripRangeImpact(plan, days, { assignments, dayNotes, reservations, accommodations, budget }, { startMoved })
       if (!hasVisibleContent(impact)) return null
       return { ...impact, dayLabels: impact.removedDays.map(({ day, index }) => dayLabel(day, index, t, locale)) }
     } catch (err: unknown) {

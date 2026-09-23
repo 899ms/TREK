@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Inchecken of uitchecken valt op deze dag, dus het verblijf wordt geannuleerd.',
   'dayplan.deleteDayStayBookedHint':
     'Inchecken of uitchecken valt op deze dag, dus het verblijf wordt geannuleerd, samen met de boeking ‘{booking}’ en de bijbehorende uitgave.',
+  'dayplan.deleteDayStayBookingHint':
+    'Inchecken of uitchecken valt op deze dag, dus het verblijf wordt geannuleerd, samen met de boeking ‘{booking}’.',
+  'dayplan.deleteDayStayPaidHint':
+    'Inchecken of uitchecken valt op deze dag, dus het verblijf wordt geannuleerd, samen met de boeking ‘{booking}’ en de bijbehorende uitgave van {amount}.',
   'dayplan.deleteDayShift': 'Latere dagen: {count}',
   'dayplan.deleteDayShiftHint': 'Elke dag schuift één datum naar voren.',
   'dayplan.deleteDayShiftBookingsHint': 'Elke dag schuift één datum naar voren. Boekingen die meeschuiven: {count}',
   'dayplan.deleteDayShrink': 'De reis eindigt nu op {date}',
   'dayplan.deleteDayShrinkHint': 'Er is geen dag zonder datum die de laatste datum kan overnemen.',
+  'dayplan.impactStayShorter': 'Verblijf in {name}: een nacht minder',
+  'dayplan.deleteDayStayShorterHint': 'Het loopt over deze dag heen en je checkt nu uit op {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Het loopt over deze dag heen en eindigt nu een dag eerder.',
+  'dayplan.deleteDaySpareDated': '{day} krijgt de datum {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Het is de eerste dag zonder datum en neemt de laatste datum van de reis over.',
   'dayplan.deleteDayLast': 'Een reis heeft minstens één dag nodig',
   'dayplan.daysOffline': 'Dagen wijzigen vraagt een verbinding',
   'dayplan.deleteDaySuccess': 'Dag verwijderd',

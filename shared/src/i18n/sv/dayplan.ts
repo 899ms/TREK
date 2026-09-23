@@ -105,11 +105,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Incheckning eller utcheckning sker den här dagen, så boendet avbokas.',
   'dayplan.deleteDayStayBookedHint':
     'Incheckning eller utcheckning sker den här dagen, så boendet avbokas tillsammans med bokningen ”{booking}” och dess utgift.',
+  'dayplan.deleteDayStayBookingHint':
+    'Incheckning eller utcheckning sker den här dagen, så boendet avbokas tillsammans med bokningen ”{booking}”.',
+  'dayplan.deleteDayStayPaidHint':
+    'Incheckning eller utcheckning sker den här dagen, så boendet avbokas tillsammans med bokningen ”{booking}” och dess utgift på {amount}.',
   'dayplan.deleteDayShift': 'Senare dagar: {count}',
   'dayplan.deleteDayShiftHint': 'Var och en flyttas ett datum tidigare.',
   'dayplan.deleteDayShiftBookingsHint': 'Var och en flyttas ett datum tidigare. Bokningar som följer med: {count}',
   'dayplan.deleteDayShrink': 'Resan slutar nu {date}',
   'dayplan.deleteDayShrinkHint': 'Det finns ingen dag utan datum som kan ta över det sista datumet.',
+  'dayplan.impactStayShorter': 'Boende på {name}: en natt kortare',
+  'dayplan.deleteDayStayShorterHint': 'Det sträcker sig över den här dagen och utcheckningen är nu {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Det sträcker sig över den här dagen och slutar nu en dag tidigare.',
+  'dayplan.deleteDaySpareDated': '{day} får datumet {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Det är den första dagen utan datum, och den tar över resans sista datum.',
   'dayplan.deleteDayLast': 'En resa behöver minst en dag',
   'dayplan.daysOffline': 'Att ändra dagar kräver en anslutning',
   'dayplan.deleteDaySuccess': 'Dagen togs bort',

@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Nhận phòng hoặc trả phòng rơi vào ngày này, nên chỗ lưu trú bị hủy.',
   'dayplan.deleteDayStayBookedHint':
     'Nhận phòng hoặc trả phòng rơi vào ngày này, nên chỗ lưu trú bị hủy cùng với đặt chỗ “{booking}” và chi phí của nó.',
+  'dayplan.deleteDayStayBookingHint':
+    'Nhận phòng hoặc trả phòng rơi vào ngày này, nên chỗ lưu trú bị hủy cùng với đặt chỗ “{booking}”.',
+  'dayplan.deleteDayStayPaidHint':
+    'Nhận phòng hoặc trả phòng rơi vào ngày này, nên chỗ lưu trú bị hủy cùng với đặt chỗ “{booking}” và khoản chi {amount} của nó.',
   'dayplan.deleteDayShift': 'Các ngày sau: {count}',
   'dayplan.deleteDayShiftHint': 'Mỗi ngày được chuyển sớm hơn một ngày.',
   'dayplan.deleteDayShiftBookingsHint': 'Mỗi ngày được chuyển sớm hơn một ngày. Đặt chỗ di chuyển theo: {count}',
   'dayplan.deleteDayShrink': 'Chuyến đi giờ kết thúc vào {date}',
   'dayplan.deleteDayShrinkHint': 'Không còn ngày nào chưa có ngày tháng để nhận ngày cuối cùng.',
+  'dayplan.impactStayShorter': 'Lưu trú tại {name}: bớt một đêm',
+  'dayplan.deleteDayStayShorterHint': 'Chỗ lưu trú kéo dài qua ngày này và giờ trả phòng vào {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Chỗ lưu trú kéo dài qua ngày này và giờ kết thúc sớm hơn một ngày.',
+  'dayplan.deleteDaySpareDated': '{day} nhận ngày {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Đây là ngày đầu tiên chưa có ngày, và nó nhận ngày cuối cùng của chuyến đi.',
   'dayplan.deleteDayLast': 'Một chuyến đi cần ít nhất một ngày',
   'dayplan.daysOffline': 'Cần có kết nối để thay đổi ngày',
   'dayplan.deleteDaySuccess': 'Đã xóa ngày',

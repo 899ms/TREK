@@ -12,7 +12,7 @@ vi.mock('../../api/websocket', () => ({
 
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { fireEvent, render, screen, waitFor } from '../../../tests/helpers/render';
+import { fireEvent, render, screen, waitFor, within } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
 import { http, HttpResponse } from 'msw';
 import { server } from '../../../tests/helpers/msw/server';
@@ -177,7 +177,9 @@ describe('CollabLinks', () => {
     expect(deleted).toBe(false);
     expect(screen.getByText('Ferry timetable')).toBeInTheDocument();
 
-    await user.click(document.querySelector('button.bg-red-600') as HTMLElement);
+    // The confirm button of the question itself, found by its role rather than a colour class.
+    const question = screen.getByText(/delete link\?|collab\.links\.confirmDeleteTitle/i).closest('.trek-modal-enter') as HTMLElement;
+    await user.click(within(question).getByRole('button', { name: /^(delete|common\.delete)$/i }));
     await waitFor(() => expect(deleted).toBe(true));
     await waitFor(() => expect(screen.queryByText('Ferry timetable')).not.toBeInTheDocument());
   });

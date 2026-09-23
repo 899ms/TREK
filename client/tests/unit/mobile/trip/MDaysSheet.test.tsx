@@ -153,7 +153,8 @@ describe('MDaysSheet', () => {
 
     it('FE-MOB-DAYSS-016: two tiles, the next date and a day without one, each with what it does', () => {
       const { planner } = renderSheet({ dayAdd: dayAdd() })
-      expect(datedTile()).toHaveTextContent(/Extends the trip by one day, until .*Oct 13\./)
+      // formatDate adds the year once the date lies outside the current year.
+      expect(datedTile()).toHaveTextContent(/Extends the trip by one day, until .*Oct 13(, \d{4})?\./)
       expect(undatedTile()).toHaveTextContent('The trip dates stay as they are.')
       expect(screen.queryByRole('button', { name: 'Add day' })).not.toBeInTheDocument()
 

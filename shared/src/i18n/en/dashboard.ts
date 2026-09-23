@@ -111,7 +111,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     'The entire itinerary moves with the new dates, including reservations and accommodations.',
   'dashboard.dateShiftHint':
-    'Tip: to shift only part of your itinerary, add a day under "Reorder days" in the planner and move it to where the gap belongs.',
+    'Tip: to shift only part of your itinerary, open "Reorder days" in the planner, add the day after the trip with the button that shows its date, and move that day to where the gap belongs.',
   'dashboard.shrinkTitle': 'Remove days?',
   'dashboard.shrinkIntro': 'Saving the new dates removes these days:',
   'dashboard.shrinkMoreDays': '+{count} more',
@@ -124,6 +124,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Checks in or out on a removed day, so the whole stay is removed.',
   'dashboard.shrinkStayBookedHint':
     'Checks in or out on a removed day, so the whole stay is removed. Its booking "{booking}" and its expense stay under Bookings.',
+  'dashboard.shrinkStayBookingHint':
+    'Checks in or out on a removed day, so the whole stay is removed. Its booking "{booking}" stays under Bookings.',
   'dashboard.shrinkConfirm': 'Remove days and save',
   'dashboard.shrinkUnknown':
     'The days of this trip could not be checked. If the new dates hold fewer days, saving removes the last days and everything planned on them.',

@@ -104,12 +104,21 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Заїзд або виїзд припадає на цей день, тому проживання скасовується.',
   'dayplan.deleteDayStayBookedHint':
     'Заїзд або виїзд припадає на цей день, тому проживання скасовується разом із бронюванням «{booking}» і його витратою.',
+  'dayplan.deleteDayStayBookingHint':
+    'Заїзд або виїзд припадає на цей день, тому проживання скасовується разом із бронюванням «{booking}».',
+  'dayplan.deleteDayStayPaidHint':
+    'Заїзд або виїзд припадає на цей день, тому проживання скасовується разом із бронюванням «{booking}» і його витратою на {amount}.',
   'dayplan.deleteDayShift': 'Наступні дні: {count}',
   'dayplan.deleteDayShiftHint': 'Кожен зсувається на одну дату раніше.',
   'dayplan.deleteDayShiftBookingsHint':
     'Кожен зсувається на одну дату раніше. Бронювання, що зсуваються разом із ними: {count}',
   'dayplan.deleteDayShrink': 'Тепер подорож закінчується {date}',
   'dayplan.deleteDayShrinkHint': 'Немає дня без дати, який міг би зайняти останню дату.',
+  'dayplan.impactStayShorter': 'Проживання в {name}: на одну ніч менше',
+  'dayplan.deleteDayStayShorterHint': 'Воно проходить через цей день, і виїзд тепер {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Воно проходить через цей день і тепер закінчується на день раніше.',
+  'dayplan.deleteDaySpareDated': '{day} отримує дату {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Це перший день без дати, і він отримує останню дату подорожі.',
   'dayplan.deleteDayLast': 'Подорож має містити щонайменше один день',
   'dayplan.daysOffline': 'Для зміни днів потрібне з’єднання',
   'dayplan.deleteDaySuccess': 'День видалено',

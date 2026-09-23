@@ -98,7 +98,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     'Todo el itinerario se mueve con las nuevas fechas, incluidas las reservas y los alojamientos.',
   'dashboard.dateShiftHint':
-    'Consejo: para mover solo una parte del itinerario, añade un día en «Reordenar días» del planificador y muévelo al lugar donde debe quedar el hueco.',
+    'Consejo: para mover solo una parte del itinerario, abre «Reordenar días» en el planificador, añade el día siguiente al final del viaje con el botón que muestra su fecha y mueve ese día al lugar donde debe quedar el hueco.',
   'dashboard.shrinkTitle': '¿Quitar días?',
   'dashboard.shrinkIntro': 'Al guardar las nuevas fechas se quitan estos días:',
   'dashboard.shrinkMoreDays': '+{count} más',
@@ -111,6 +111,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'La entrada o la salida es un día que se quita, así que se quita la estancia entera.',
   'dashboard.shrinkStayBookedHint':
     'La entrada o la salida es un día que se quita, así que se quita la estancia entera. Su reserva «{booking}» y su gasto se quedan en Reservas.',
+  'dashboard.shrinkStayBookingHint':
+    'La entrada o la salida es un día que se quita, así que se quita la estancia entera. Su reserva «{booking}» se queda en Reservas.',
   'dashboard.shrinkConfirm': 'Quitar días y guardar',
   'dashboard.shrinkUnknown':
     'No se pudieron comprobar los días de este viaje. Si las nuevas fechas tienen menos días, al guardar se quitan los últimos días y todo lo planificado en ellos.',

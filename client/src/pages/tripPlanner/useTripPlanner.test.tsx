@@ -1,4 +1,4 @@
-// FE-TP-HOOK-001 to FE-TP-HOOK-129
+// FE-TP-HOOK-001 to FE-TP-HOOK-134
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -11,7 +11,7 @@ import { usePermissionsStore } from '../../store/permissionsStore'
 import { usePluginStore } from '../../store/pluginStore'
 import { useBackgroundTasksStore } from '../../store/backgroundTasksStore'
 import { resetAllStores, seedStore } from '../../../tests/helpers/store'
-import { buildUser, buildTrip, buildDay, buildPlace, buildAssignment, buildReservation } from '../../../tests/helpers/factories'
+import { buildUser, buildTrip, buildDay, buildPlace, buildAssignment, buildReservation, buildBudgetItem } from '../../../tests/helpers/factories'
 import {
   addonsApi, accommodationsApi, authApi, tripsApi, assignmentsApi,
   healthApi, airtrailApi, mapsApi,
@@ -19,7 +19,7 @@ import {
 import { accommodationRepo } from '../../repo/accommodationRepo'
 import { offlineDb } from '../../db/offlineDb'
 import { getCached, fetchPhoto } from '../../services/photoService'
-import type { Place, Reservation, Settings } from '../../types'
+import type { Accommodation, Place, Reservation, Settings } from '../../types'
 
 // ── Router ────────────────────────────────────────────────────────────────────
 // Only useParams/useNavigate/useSearchParams are consumed by the hook, so the
@@ -1207,6 +1207,7 @@ describe('useTripPlanner — place CRUD', () => {
     const place = buildPlace({ id: 1, lat: 1, lng: 2, route_geometry: '[[1,2]]', route_color: '#ff0000' })
     seedTrip({
       places: [place],
+      days: [buildDay({ id: 7, day_number: 1 })],
       assignments: { '7': [buildAssignment({ id: 10, day_id: 7, place, order_index: 2 })] },
     })
 
@@ -1248,6 +1249,7 @@ describe('useTripPlanner — place CRUD', () => {
     const b = buildPlace({ id: 2, lat: 3, lng: 4 })
     seedTrip({
       places: [a, b],
+      days: [buildDay({ id: 7, day_number: 1 })],
       assignments: { '7': [buildAssignment({ id: 10, day_id: 7, place: a, order_index: 0 })] },
     })
 
@@ -1263,6 +1265,30 @@ describe('useTripPlanner — place CRUD', () => {
     await act(async () => { await result.current.undo() })
     expect(actions.addPlace).toHaveBeenCalledTimes(2)
     expect(actions.assignPlaceToDay).toHaveBeenCalledWith(42, 7, 900, 0)
+  })
+
+  it('FE-TP-HOOK-134: bringing a deleted place back skips a day deleted since, and still restores the rest', async () => {
+    const place = buildPlace({ id: 1, lat: 1, lng: 2 })
+    seedTrip({
+      places: [place],
+      days: [buildDay({ id: 7, day_number: 1 }), buildDay({ id: 8, day_number: 2 })],
+      assignments: {
+        '7': [buildAssignment({ id: 10, day_id: 7, place, order_index: 0 })],
+        '8': [buildAssignment({ id: 11, day_id: 8, place, order_index: 3 })],
+      },
+    })
+    const { result } = await renderPlanner()
+    act(() => { result.current.handleDeletePlace(1) })
+    await act(async () => { await result.current.confirmDeletePlace() })
+
+    // Day 7 went in the meantime.
+    act(() => { useTripStore.setState({ days: [buildDay({ id: 8, day_number: 1 })] }) })
+    await act(async () => { await result.current.handleUndo() })
+
+    expect(actions.addPlace).toHaveBeenCalledTimes(1)
+    expect(actions.assignPlaceToDay).toHaveBeenCalledTimes(1)
+    expect(actions.assignPlaceToDay).toHaveBeenCalledWith(42, 8, 900, 3)
+    expect(toasts).toContainEqual(expect.objectContaining({ type: 'info', message: 'Undone: Place deleted' }))
   })
 
   it('FE-TP-HOOK-059: an explicit id list leaves the queued bulk selection untouched', async () => {
@@ -2376,6 +2402,94 @@ describe('useTripPlanner: deleting a day', () => {
     actions.reorderDays.mockClear()
     await act(async () => { await result.current.undo() })
     expect(actions.reorderDays).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-HOOK-130: the open panel of the deleted day closes, here and when a fellow traveller deletes it', async () => {
+    seedDays()
+    const { result } = await renderPlanner()
+    const [first, second, third] = useTripStore.getState().days
+
+    act(() => { result.current.setShowDayDetail(second) })
+    expect(result.current.showDayDetail?.id).toBe(2)
+    act(() => { result.current.handleDeleteDay(2) })
+    await act(async () => { await result.current.confirmDeleteDay() })
+    expect(result.current.showDayDetail).toBeNull()
+
+    // A panel on another day stays open through the delete.
+    act(() => { result.current.setShowDayDetail(first) })
+    act(() => { result.current.handleDeleteDay(3) })
+    await act(async () => { await result.current.confirmDeleteDay() })
+    expect(result.current.showDayDetail?.id).toBe(1)
+
+    // Removed by someone else: the day leaves the store, and its panel goes with it.
+    act(() => { result.current.setShowDayDetail(third) })
+    act(() => { useTripStore.setState({ days: [first, second] }) })
+    expect(result.current.showDayDetail).toBeNull()
+  })
+
+  it('FE-TP-HOOK-131: undo steps on the deleted day are dropped, the others stay', async () => {
+    seedDays({ selectedDayId: 1, places: [buildPlace({ id: 70 })] } as Partial<TripStoreState>)
+    const { result } = await renderPlanner()
+
+    await act(async () => { await result.current.handleAssignToDay(70, 1) })
+    await act(async () => { await result.current.handleAssignToDay(70, 2) })
+    expect(result.current.canUndo).toBe(true)
+
+    act(() => { result.current.handleDeleteDay(2) })
+    await act(async () => { await result.current.confirmDeleteDay() })
+
+    // The step on day 2 is gone; the one on day 1 is still the next to undo.
+    actions.removeAssignment.mockClear()
+    await act(async () => { await result.current.handleUndo() })
+    expect(actions.removeAssignment).toHaveBeenCalledTimes(1)
+    expect(actions.removeAssignment).toHaveBeenCalledWith(42, 1, 555)
+    expect(result.current.canUndo).toBe(false)
+  })
+
+  it('FE-TP-HOOK-132: an undo that fails says so instead of claiming it was undone', async () => {
+    seedDays({ selectedDayId: 1, places: [buildPlace({ id: 70 })] } as Partial<TripStoreState>)
+    const { result } = await renderPlanner()
+    await act(async () => { await result.current.handleAssignToDay(70, 1) })
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    actions.removeAssignment.mockRejectedValueOnce(new Error('Not found'))
+
+    await act(async () => { await result.current.handleUndo() })
+
+    expect(toasts).toContainEqual(expect.objectContaining({ type: 'error', message: 'Could not undo: Place assigned to day' }))
+    expect(toasts.some(t => t.type === 'info' && t.message.startsWith('Undone'))).toBe(false)
+    spy.mockRestore()
+  })
+
+  it('FE-TP-HOOK-133: the question names the paid stay by its sum, the stay a night shorter and the day that takes the last date', async () => {
+    vi.mocked(accommodationRepo.list).mockResolvedValue({
+      accommodations: [
+        { id: 9, trip_id: 42, start_day_id: 1, end_day_id: 3, place_name: 'Harbour Hotel' },
+        { id: 10, trip_id: 42, start_day_id: 2, end_day_id: 3, place_name: 'Pension Alma' },
+      ] as Accommodation[],
+    })
+    seedDays({
+      days: [
+        buildDay({ id: 1, day_number: 1, date: '2026-06-01', title: null }),
+        buildDay({ id: 2, day_number: 2, date: '2026-06-02', title: null }),
+        buildDay({ id: 3, day_number: 3, date: '2026-06-03', title: null }),
+        buildDay({ id: 4, day_number: 4, date: null, title: null }),
+      ],
+      trip: buildTrip({ id: 42, start_date: '2026-06-01', end_date: '2026-06-03', currency: 'EUR' }),
+      reservations: [buildReservation({ id: 80, day_id: 2, type: 'hotel', title: 'Alma, 1 night', accommodation_id: 10 })],
+      budgetItems: [buildBudgetItem({ reservation_id: 80, total_price: 95, currency: null })],
+    } as Partial<TripStoreState>)
+    const { result } = await renderPlanner()
+    await waitFor(() => expect(result.current.tripAccommodations).toHaveLength(2))
+
+    act(() => { result.current.handleDeleteDay(2) })
+
+    const lines = result.current.deleteDayLines
+    expect(lines.map(l => l.key)).toEqual(['stay-10', 'stay-short-9', 'places', 'shift', 'spare'])
+    expect(lines[0].hint).toContain('together with the booking “Alma, 1 night” and its expense of')
+    expect(lines[0].hint).toContain('95')
+    expect(lines[1].text).toBe('Stay at Harbour Hotel: one night less')
+    expect(lines[1].hint).toMatch(/^It runs across this day and now checks out on .*Jun 2/)
+    expect(lines[4].text).toMatch(/^Day 4 takes the date .*Jun 3/)
   })
 })
 

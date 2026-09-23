@@ -99,7 +99,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     'A teljes útiterv az új dátumokkal együtt mozog, beleértve a foglalásokat és a szállásokat is.',
   'dashboard.dateShiftHint':
-    'Tipp: ha csak az útiterv egy részét szeretnéd eltolni, a tervezőben a „Napok átrendezése” alatt adj hozzá egy napot, és vidd oda, ahol a résnek lennie kell.',
+    'Tipp: ha csak az útiterv egy részét szeretnéd eltolni, nyisd meg a tervezőben a „Napok átrendezése” ablakot, add hozzá az utazás utáni napot a dátumát mutató gombbal, és vidd oda, ahol a résnek lennie kell.',
   'dashboard.shrinkTitle': 'Eltávolítod a napokat?',
   'dashboard.shrinkIntro': 'Az új dátumok mentésekor ezek a napok eltávolításra kerülnek:',
   'dashboard.shrinkMoreDays': '+{count} további',
@@ -113,6 +113,8 @@ const dashboard: TranslationStrings = {
     'A bejelentkezés vagy a kijelentkezés egy eltávolított napra esik, ezért az egész szállás eltávolításra kerül.',
   'dashboard.shrinkStayBookedHint':
     'A bejelentkezés vagy a kijelentkezés egy eltávolított napra esik, ezért az egész szállás eltávolításra kerül. A(z) „{booking}” foglalás és annak kiadása a Foglalások között marad.',
+  'dashboard.shrinkStayBookingHint':
+    'A bejelentkezés vagy a kijelentkezés egy eltávolított napra esik, ezért az egész szállás eltávolításra kerül. A(z) „{booking}” foglalás a Foglalások között marad.',
   'dashboard.shrinkConfirm': 'Napok eltávolítása és mentés',
   'dashboard.shrinkUnknown':
     'Az utazás napjait nem sikerült ellenőrizni. Ha az új dátumok kevesebb napot fognak át, a mentés eltávolítja az utolsó napokat és mindent, ami rájuk van tervezve.',

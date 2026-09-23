@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'La entrada o la salida es este día, así que la estancia se cancela.',
   'dayplan.deleteDayStayBookedHint':
     'La entrada o la salida es este día, así que la estancia se cancela, junto con la reserva «{booking}» y su gasto.',
+  'dayplan.deleteDayStayBookingHint':
+    'La entrada o la salida es este día, así que la estancia se cancela, junto con la reserva «{booking}».',
+  'dayplan.deleteDayStayPaidHint':
+    'La entrada o la salida es este día, así que la estancia se cancela, junto con la reserva «{booking}» y su gasto de {amount}.',
   'dayplan.deleteDayShift': 'Días posteriores: {count}',
   'dayplan.deleteDayShiftHint': 'Cada uno pasa a la fecha anterior.',
   'dayplan.deleteDayShiftBookingsHint': 'Cada uno pasa a la fecha anterior. Reservas que se mueven con ellos: {count}',
   'dayplan.deleteDayShrink': 'El viaje termina ahora el {date}',
   'dayplan.deleteDayShrinkHint': 'No queda ningún día sin fecha que tome la última fecha.',
+  'dayplan.impactStayShorter': 'Estancia en {name}: una noche menos',
+  'dayplan.deleteDayStayShorterHint': 'Abarca este día y ahora la salida es el {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Abarca este día y ahora termina un día antes.',
+  'dayplan.deleteDaySpareDated': '{day} toma la fecha {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Es el primer día sin fecha y pasa a tener la última fecha del viaje.',
   'dayplan.deleteDayLast': 'Un viaje necesita al menos un día',
   'dayplan.daysOffline': 'Cambiar los días requiere conexión',
   'dayplan.deleteDaySuccess': 'Día eliminado',

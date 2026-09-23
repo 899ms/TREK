@@ -104,21 +104,22 @@ Members who can edit days find a delete button at the end of every row of the **
 - **Planned places** stay in the place list of the trip. Only their spot on this day goes.
 - **Notes**, the day title and the day description are deleted.
 - **Bookings** on the day stay under Bookings, without a day, and keep their date.
-- **A stay that checks in or out on the day** is cancelled, together with its booking and the expense of that booking. The list shows it in red, since this is the line that costs money. A stay that only runs across the day is kept.
-- **The days after it** move up one place. On a trip with dates the dates stay where they are, so every later day, and the bookings on it, takes the date one slot earlier; the list says how many days and bookings move. A day without a date at the end takes over the last date. When there is none, the trip ends one day earlier, and the list names the new end date.
+- **A stay that checks in or out on the day** is cancelled, together with its booking and the expense of that booking. The list shows it in red, since this is the line that costs money, and names the booking and the amount of its expense. A booking without an expense is named alone.
+- **A stay that only runs across the day**, with its check-in before and its check-out after it, is kept, but one night shorter: its check-out day moves up with the other days. The list names the stay and its new check-out date. The booking behind it is not changed.
+- **The days after it** move up one place. On a trip with dates the dates stay where they are, so every later day, and the bookings on it, takes the date one slot earlier; the list says how many days and bookings move. The first day without a date takes over the last date, and the list names that day and the date it gets. From then on it counts as a dated day, also when the trip is shortened later. When there is no day without a date, the trip ends one day earlier, and the list names the new end date.
 
-A day with nothing on it gets a single line that says so. Deleting needs a connection, and the last day of a trip cannot be deleted; in both cases the button is greyed out and TREK says why. There is no undo, which is why the question spells out the consequences first. Fellow travellers see the day go, and a new end date, straight away.
+A day with nothing on it gets a single line that says so. Deleting needs a connection, and the last day of a trip cannot be deleted; in both cases the button is greyed out and TREK says why. There is no undo, which is why the question spells out the consequences first. An open panel of the deleted day closes, and earlier undo steps that acted on that day are dropped, since they could no longer be taken back. Fellow travellers see the day go, and a new end date, straight away.
 
 ## Shortening a trip
 
 New dates lay the days of a trip out again. Plans follow their position: the first day of the plan takes the new start date, the second the date after it, and so on. When the new dates hold fewer days than the plan, the last days go, also when it was the start that moved. Empty days without a date that are left over go as well, with any change of dates.
 
-Before such a save, TREK asks first: in the trip dialog as a step before the save, on a phone in a sheet over the trip sheet. It names the days that go, the first six by name and the rest as a count, and lists what is on them:
+Before such a save, TREK asks first: in the trip dialog as a step before the save. Editing the trip from the phone's dashboard asks in a sheet over the trip sheet instead; editing it from inside the planner shows the same step as on desktop, also on a phone. Escape in that step goes back to the form and keeps what you typed. It names the days that go, the first six by name and the rest as a count, and lists what is on them:
 
 - **Planned places** stay in the place list of the trip.
 - **Notes**, day titles and day descriptions are deleted.
-- **Bookings** on those days stay under Bookings. With **Keep bookings on their dates**, a booking whose date is still part of the trip goes back onto that day; with **Shift everything** it stays without a day. The phone does not offer the choice and keeps bookings on their dates.
-- **A stay that checks in or out on one of those days** is removed as a whole, also for nights that are still part of the trip. Unlike when you delete a single day, its booking stays under Bookings and its expense under Costs. The list shows the stay in red.
+- **Bookings** on those days stay under Bookings. With **Keep bookings on their dates**, a booking whose date is still part of the trip goes back onto that day; with **Shift everything** it stays without a day. The sheet on the phone's dashboard does not offer the choice and keeps bookings on their dates.
+- **A stay that checks in or out on one of those days** is removed as a whole, also for nights that are still part of the trip. Unlike when you delete a single day, its booking stays under Bookings and its expense, if it has one, under Costs. The list shows the stay in red.
 - **The last days go, not the first** closes the list when the start moved, as a reminder that plans follow their position.
 
 The save button then reads **Remove days and save**. When the start moved, the same step also asks how bookings follow the new dates, as before. When the days that go hold nothing, nothing extra is asked. Should TREK fail to read the days of the trip, it warns in general terms instead of listing them. There is no undo.

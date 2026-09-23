@@ -105,11 +105,20 @@ const dayplan: TranslationStrings = {
     'A bejelentkezés vagy a kijelentkezés erre a napra esik, ezért a szállás lemondásra kerül.',
   'dayplan.deleteDayStayBookedHint':
     'A bejelentkezés vagy a kijelentkezés erre a napra esik, ezért a szállás lemondásra kerül a(z) „{booking}” foglalással és annak kiadásával együtt.',
+  'dayplan.deleteDayStayBookingHint':
+    'A bejelentkezés vagy a kijelentkezés erre a napra esik, ezért a szállás lemondásra kerül a(z) „{booking}” foglalással együtt.',
+  'dayplan.deleteDayStayPaidHint':
+    'A bejelentkezés vagy a kijelentkezés erre a napra esik, ezért a szállás lemondásra kerül a(z) „{booking}” foglalással és annak {amount} összegű kiadásával együtt.',
   'dayplan.deleteDayShift': 'Későbbi napok: {count}',
   'dayplan.deleteDayShiftHint': 'Mindegyik egy dátummal előrébb kerül.',
   'dayplan.deleteDayShiftBookingsHint': 'Mindegyik egy dátummal előrébb kerül. Velük együtt mozgó foglalások: {count}',
   'dayplan.deleteDayShrink': 'Az utazás mostantól ekkor ér véget: {date}',
   'dayplan.deleteDayShrinkHint': 'Nincs dátum nélküli nap, amely átvehetné az utolsó dátumot.',
+  'dayplan.impactStayShorter': 'Szállás: {name}, eggyel kevesebb éjszaka',
+  'dayplan.deleteDayStayShorterHint': 'Átnyúlik ezen a napon, a kijelentkezés most {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Átnyúlik ezen a napon, és most egy nappal korábban ér véget.',
+  'dayplan.deleteDaySpareDated': 'A(z) {day} új dátuma: {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Ez az első dátum nélküli nap, és megkapja az utazás utolsó dátumát.',
   'dayplan.deleteDayLast': 'Egy utazáshoz legalább egy nap kell',
   'dayplan.daysOffline': 'A napok módosításához kapcsolat szükséges',
   'dayplan.deleteDaySuccess': 'Nap törölve',

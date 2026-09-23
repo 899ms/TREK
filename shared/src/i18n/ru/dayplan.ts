@@ -104,12 +104,21 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Заезд или выезд приходится на этот день, поэтому проживание отменяется.',
   'dayplan.deleteDayStayBookedHint':
     'Заезд или выезд приходится на этот день, поэтому проживание отменяется вместе с бронированием «{booking}» и его расходом.',
+  'dayplan.deleteDayStayBookingHint':
+    'Заезд или выезд приходится на этот день, поэтому проживание отменяется вместе с бронированием «{booking}».',
+  'dayplan.deleteDayStayPaidHint':
+    'Заезд или выезд приходится на этот день, поэтому проживание отменяется вместе с бронированием «{booking}» и его расходом на {amount}.',
   'dayplan.deleteDayShift': 'Последующие дни: {count}',
   'dayplan.deleteDayShiftHint': 'Каждый сдвигается на одну дату раньше.',
   'dayplan.deleteDayShiftBookingsHint':
     'Каждый сдвигается на одну дату раньше. Бронирования, которые сдвигаются вместе с ними: {count}',
   'dayplan.deleteDayShrink': 'Теперь поездка заканчивается {date}',
   'dayplan.deleteDayShrinkHint': 'Нет дня без даты, который мог бы занять последнюю дату.',
+  'dayplan.impactStayShorter': 'Проживание в {name}: на одну ночь меньше',
+  'dayplan.deleteDayStayShorterHint': 'Оно проходит через этот день, и выезд теперь {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Оно проходит через этот день и теперь заканчивается на день раньше.',
+  'dayplan.deleteDaySpareDated': '{day} получает дату {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Это первый день без даты, и он получает последнюю дату поездки.',
   'dayplan.deleteDayLast': 'В поездке должен быть хотя бы один день',
   'dayplan.daysOffline': 'Для изменения дней нужно подключение',
   'dayplan.deleteDaySuccess': 'День удалён',

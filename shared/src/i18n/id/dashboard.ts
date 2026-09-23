@@ -98,7 +98,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     'Seluruh rencana perjalanan berpindah ke tanggal baru, termasuk reservasi dan akomodasi.',
   'dashboard.dateShiftHint':
-    'Tip: untuk menggeser sebagian rencana perjalanan saja, tambahkan satu hari di “Atur ulang hari” pada perencana lalu pindahkan ke tempat jeda seharusnya berada.',
+    'Tip: untuk menggeser sebagian rencana perjalanan saja, buka “Atur ulang hari” di perencana, tambahkan hari setelah akhir perjalanan dengan tombol yang menampilkan tanggalnya, lalu pindahkan hari itu ke tempat jeda seharusnya berada.',
   'dashboard.shrinkTitle': 'Hapus hari?',
   'dashboard.shrinkIntro': 'Menyimpan tanggal baru akan menghapus hari-hari ini:',
   'dashboard.shrinkMoreDays': '+{count} lainnya',
@@ -111,6 +111,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Check-in atau check-out jatuh pada hari yang dihapus, jadi seluruh penginapan dihapus.',
   'dashboard.shrinkStayBookedHint':
     'Check-in atau check-out jatuh pada hari yang dihapus, jadi seluruh penginapan dihapus. Pemesanan “{booking}” dan pengeluarannya tetap ada di Pemesanan.',
+  'dashboard.shrinkStayBookingHint':
+    'Check-in atau check-out jatuh pada hari yang dihapus, jadi seluruh penginapan dihapus. Pemesanan “{booking}” tetap ada di Pemesanan.',
   'dashboard.shrinkConfirm': 'Hapus hari dan simpan',
   'dashboard.shrinkUnknown':
     'Hari-hari perjalanan ini tidak dapat diperiksa. Jika tanggal baru mencakup lebih sedikit hari, menyimpan akan menghapus hari-hari terakhir beserta semua yang direncanakan di dalamnya.',

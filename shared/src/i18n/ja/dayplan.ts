@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'この日にチェックインまたはチェックアウトするため、宿泊はキャンセルされます。',
   'dayplan.deleteDayStayBookedHint':
     'この日にチェックインまたはチェックアウトするため、宿泊は予約「{booking}」とその支出と一緒にキャンセルされます。',
+  'dayplan.deleteDayStayBookingHint':
+    'この日にチェックインまたはチェックアウトするため、宿泊は予約「{booking}」と一緒にキャンセルされます。',
+  'dayplan.deleteDayStayPaidHint':
+    'この日にチェックインまたはチェックアウトするため、宿泊は予約「{booking}」とその支出（{amount}）と一緒にキャンセルされます。',
   'dayplan.deleteDayShift': '以降の日: {count}',
   'dayplan.deleteDayShiftHint': 'それぞれ1日前の日付になります。',
   'dayplan.deleteDayShiftBookingsHint': 'それぞれ1日前の日付になります。一緒に移動する予約: {count}',
   'dayplan.deleteDayShrink': '旅行の終了日は{date}になります',
   'dayplan.deleteDayShrinkHint': '最後の日付を引き継ぐ日付なしの日がありません。',
+  'dayplan.impactStayShorter': '{name}での宿泊: 1泊短くなります',
+  'dayplan.deleteDayStayShorterHint': 'この日をまたぐ宿泊のため、チェックアウトは{date}になります。',
+  'dayplan.deleteDayStayShorterUndatedHint': 'この日をまたぐ宿泊のため、1日早く終わります。',
+  'dayplan.deleteDaySpareDated': '{day}の日付が{date}になります',
+  'dayplan.deleteDaySpareDatedHint': '日付のない最初の日で、旅行の最後の日付を引き継ぎます。',
   'dayplan.deleteDayLast': '旅行には少なくとも1日が必要です',
   'dayplan.daysOffline': '日の変更には接続が必要です',
   'dayplan.deleteDaySuccess': '日を削除しました',

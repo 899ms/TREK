@@ -103,11 +103,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'يقع تسجيل الوصول أو المغادرة في هذا اليوم، لذا تُلغى الإقامة.',
   'dayplan.deleteDayStayBookedHint':
     'يقع تسجيل الوصول أو المغادرة في هذا اليوم، لذا تُلغى الإقامة مع الحجز "{booking}" ومصروفه.',
+  'dayplan.deleteDayStayBookingHint':
+    'يقع تسجيل الوصول أو المغادرة في هذا اليوم، لذا تُلغى الإقامة مع الحجز "{booking}".',
+  'dayplan.deleteDayStayPaidHint':
+    'يقع تسجيل الوصول أو المغادرة في هذا اليوم، لذا تُلغى الإقامة مع الحجز "{booking}" ومصروفه البالغ {amount}.',
   'dayplan.deleteDayShift': 'الأيام اللاحقة: {count}',
   'dayplan.deleteDayShiftHint': 'ينتقل كل منها إلى التاريخ السابق.',
   'dayplan.deleteDayShiftBookingsHint': 'ينتقل كل منها إلى التاريخ السابق. الحجوزات التي تنتقل معها: {count}',
   'dayplan.deleteDayShrink': 'تنتهي الرحلة الآن في {date}',
   'dayplan.deleteDayShrinkHint': 'لا يوجد يوم بلا تاريخ ليأخذ التاريخ الأخير.',
+  'dayplan.impactStayShorter': 'الإقامة في {name}: ليلة أقل',
+  'dayplan.deleteDayStayShorterHint': 'تمتد عبر هذا اليوم، وأصبحت المغادرة الآن في {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'تمتد عبر هذا اليوم، وأصبحت تنتهي الآن قبل يوم واحد.',
+  'dayplan.deleteDaySpareDated': 'يأخذ {day} التاريخ {date}',
+  'dayplan.deleteDaySpareDatedHint': 'إنه أول يوم بلا تاريخ، ويأخذ آخر تاريخ في الرحلة.',
   'dayplan.deleteDayLast': 'تحتاج الرحلة إلى يوم واحد على الأقل',
   'dayplan.daysOffline': 'تغيير الأيام يتطلب اتصالًا',
   'dayplan.deleteDaySuccess': 'تم حذف اليوم',

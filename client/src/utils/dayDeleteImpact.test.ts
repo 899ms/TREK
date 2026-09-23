@@ -1,7 +1,8 @@
-// FE-UTIL-DAYDEL-001 to FE-UTIL-DAYDEL-012
+// FE-UTIL-DAYDEL-001 to FE-UTIL-DAYDEL-016
 import { describe, it, expect } from 'vitest'
-import { buildAssignment, buildDay, buildDayNote, buildPlace, buildReservation } from '../../tests/helpers/factories'
+import { buildAssignment, buildBudgetItem, buildDay, buildDayNote, buildPlace, buildReservation } from '../../tests/helpers/factories'
 import { contentOnDays, dayDeleteImpact, deleteDayBlockedReason, type DayContentData } from './dayDeleteImpact'
+import { formatMoney } from './formatters'
 import type { Accommodation, Day } from '../types'
 
 const stay = (overrides: Partial<Accommodation>): Accommodation =>
@@ -79,9 +80,10 @@ describe('contentOnDays', () => {
       reservations: [buildReservation({ id: 30, title: 'Harbour Hotel, 1 night', accommodation_id: 1 })],
     }
     expect(contentOnDays([buildDay({ id: 7 })], data).stays).toEqual([
-      { id: 1, name: 'Harbour Hotel', booking: 'Harbour Hotel, 1 night' },
-      { id: 2, name: 'Pension Alma', booking: 'Alma, two nights' },
-      { id: 3, name: '', booking: null },
+      // Expenses not read: a linked booking may carry one, so the warning says it may.
+      { id: 1, name: 'Harbour Hotel', booking: 'Harbour Hotel, 1 night', moreBookings: 0, expense: { amount: null } },
+      { id: 2, name: 'Pension Alma', booking: 'Alma, two nights', moreBookings: 0, expense: null },
+      { id: 3, name: '', booking: null, moreBookings: 0, expense: null },
     ])
   })
 })
@@ -99,6 +101,47 @@ describe('dayDeleteImpact', () => {
       ],
     }
     expect(dayDeleteImpact(days[1], days, data, range)).toMatchObject({ shiftedDays: 1, shiftedBookings: 2, newEndDate: null, isLastDay: false })
+  })
+
+  it('FE-UTIL-DAYDEL-013: the first day without a date takes over the last date, and the question names it', () => {
+    const days = datedDays(true)
+    // A middle day goes: day 3 moves up to 2 June, the spare day takes 3 June.
+    expect(dayDeleteImpact(days[1], days, empty(), range)).toMatchObject({
+      shiftedDays: 1,
+      datedSpare: { day: expect.objectContaining({ id: 4 }), index: 3, date: '2026-06-03' },
+      newEndDate: null,
+    })
+    // The last dated day goes: nothing dated moves, the spare day still takes its date.
+    expect(dayDeleteImpact(days[2], days, empty(), range)).toMatchObject({ shiftedDays: 0, datedSpare: { index: 3, date: '2026-06-03' } })
+    // The spare day itself goes, or there is none: no day gets a date.
+    expect(dayDeleteImpact(days[3], days, empty(), range).datedSpare).toBeNull()
+    expect(dayDeleteImpact(datedDays()[1], datedDays(), empty(), range).datedSpare).toBeNull()
+    // Only the first of two spare days is dated.
+    const two = [...days, buildDay({ id: 5, day_number: 5, date: null })]
+    expect(dayDeleteImpact(two[0], two, empty(), range).datedSpare).toMatchObject({ day: { id: 4 }, date: '2026-06-03' })
+  })
+
+  it('FE-UTIL-DAYDEL-014: a stay that only runs across the day keeps standing, one night shorter', () => {
+    const days = datedDays(true)
+    const data: DayContentData = {
+      ...empty(),
+      accommodations: [
+        stay({ id: 9, start_day_id: 1, end_day_id: 3, place_name: 'Harbour Hotel' }),
+        stay({ id: 10, start_day_id: 2, end_day_id: 3, place_name: 'Pension Alma' }),
+        stay({ id: 11, start_day_id: 1, end_day_id: 2, place_name: 'Dune Lodge' }),
+      ],
+    }
+    const impact = dayDeleteImpact(days[1], days, data, range)
+    // Its check-out day moves up to the deleted day's slot, and takes 2 June.
+    expect(impact.shortenedStays).toEqual([{ id: 9, name: 'Harbour Hotel', checkOut: '2026-06-02' }])
+    // The stays checking in or out on the day are cancelled instead.
+    expect(impact.stays.map(s => s.id)).toEqual([10, 11])
+
+    // On a trip without dates the stay still ends a day earlier, without a date to name.
+    const undated = [1, 2, 3].map(n => buildDay({ id: n, day_number: n, date: null }))
+    expect(dayDeleteImpact(undated[1], undated, data, null).shortenedStays).toEqual([{ id: 9, name: 'Harbour Hotel', checkOut: null }])
+    // A day outside the stay leaves it alone.
+    expect(dayDeleteImpact(days[3], days, data, range).shortenedStays).toEqual([])
   })
 
   it('FE-UTIL-DAYDEL-007: with no spare day the last date goes, and a dated trip ends on the one before', () => {
@@ -123,6 +166,44 @@ describe('dayDeleteImpact', () => {
   })
 })
 
+describe('contentOnDays: what a cancelled stay costs', () => {
+  const hotelStay = (): DayContentData => ({
+    ...empty(),
+    accommodations: [stay({ id: 9, start_day_id: 7, end_day_id: 8, place_name: 'Harbour Hotel' })],
+    reservations: [buildReservation({ id: 40, day_id: 7, type: 'hotel', title: 'Harbour, 1 night', accommodation_id: 9 })],
+  })
+
+  it('FE-UTIL-DAYDEL-015: the expense on the stay booking is named with its sum, in the trip currency when it has none', () => {
+    const budget = {
+      items: [
+        buildBudgetItem({ id: 1, reservation_id: 40, total_price: 180, currency: null }),
+        buildBudgetItem({ id: 2, reservation_id: 40, total_price: 20, currency: 'EUR' }),
+        buildBudgetItem({ id: 3, reservation_id: 41, total_price: 999 }),
+      ],
+      currency: 'EUR',
+      locale: 'en',
+    }
+    const [paid] = contentOnDays([buildDay({ id: 7 })], { ...hotelStay(), budget }).stays
+    // 180 without a currency of its own is in the trip currency, so it adds up with the 20 EUR.
+    expect(paid.expense?.amount).toBe(formatMoney(200, 'EUR', 'en'))
+
+    // Read, and none on the booking: there is no expense to lose.
+    expect(contentOnDays([buildDay({ id: 7 })], { ...hotelStay(), budget: { ...budget, items: [budget.items[2]] } }).stays[0].expense).toBeNull()
+    // Read without a currency to name the sum in: there is one, sum unknown.
+    expect(contentOnDays([buildDay({ id: 7 })], { ...hotelStay(), budget: { items: budget.items } }).stays[0].expense).toEqual({ amount: null })
+    // An expense of nothing names no sum either.
+    const free = { ...budget, items: [buildBudgetItem({ reservation_id: 40, total_price: 0 })] }
+    expect(contentOnDays([buildDay({ id: 7 })], { ...hotelStay(), budget: free }).stays[0].expense).toEqual({ amount: null })
+  })
+
+  it('FE-UTIL-DAYDEL-016: every booking linked to the stay goes, the first by name and the rest counted', () => {
+    const data = hotelStay()
+    data.reservations.push(buildReservation({ id: 41, day_id: 7, type: 'hotel', title: 'Harbour, breakfast', accommodation_id: '9' }))
+    const [cancelled] = contentOnDays([buildDay({ id: 7 })], { ...data, budget: { items: [], currency: 'EUR', locale: 'en' } }).stays
+    expect(cancelled).toEqual({ id: 9, name: 'Harbour Hotel', booking: 'Harbour, 1 night', moreBookings: 1, expense: null })
+  })
+})
+
 describe('contentOnDays over several days (the shrink warning)', () => {
   it('FE-UTIL-DAYDEL-009: counts across all the days at once', () => {
     const data = {
@@ -141,7 +222,7 @@ describe('contentOnDays over several days (the shrink warning)', () => {
   it('FE-UTIL-DAYDEL-010: a stay from one of the days to another counts once', () => {
     const data = { ...empty(), accommodations: [stay({ id: 9, start_day_id: 7, end_day_id: 8, place_name: 'Harbour Hotel' })] }
     expect(contentOnDays([buildDay({ id: 7 }), buildDay({ id: 8 })], data).stays).toEqual([
-      { id: 9, name: 'Harbour Hotel', booking: null },
+      { id: 9, name: 'Harbour Hotel', booking: null, moreBookings: 0, expense: null },
     ])
   })
 

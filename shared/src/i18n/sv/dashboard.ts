@@ -110,7 +110,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Flytta allt',
   'dashboard.dateShiftAllDesc': 'Hela resplanen flyttas med de nya datumen, inklusive bokningar och boenden.',
   'dashboard.dateShiftHint':
-    'Tips: om du bara vill flytta en del av resplanen kan du lägga till en dag under ”Sortera om dagar” i planeraren och flytta den dit luckan ska vara.',
+    'Tips: om du bara vill flytta en del av resplanen öppnar du ”Sortera om dagar” i planeraren, lägger till dagen efter resans slut med knappen som visar dess datum och flyttar den dagen dit luckan ska vara.',
   'dashboard.shrinkTitle': 'Ta bort dagar?',
   'dashboard.shrinkIntro': 'När de nya datumen sparas tas de här dagarna bort:',
   'dashboard.shrinkMoreDays': '+{count} till',
@@ -123,6 +123,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Incheckning eller utcheckning sker en dag som tas bort, så hela boendet tas bort.',
   'dashboard.shrinkStayBookedHint':
     'Incheckning eller utcheckning sker en dag som tas bort, så hela boendet tas bort. Bokningen ”{booking}” och dess utgift ligger kvar under Bokningar.',
+  'dashboard.shrinkStayBookingHint':
+    'Incheckning eller utcheckning sker en dag som tas bort, så hela boendet tas bort. Bokningen ”{booking}” ligger kvar under Bokningar.',
   'dashboard.shrinkConfirm': 'Ta bort dagar och spara',
   'dashboard.shrinkUnknown':
     'Resans dagar kunde inte kontrolleras. Om de nya datumen rymmer färre dagar tar sparandet bort de sista dagarna och allt som är planerat på dem.',

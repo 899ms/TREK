@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': "L'entrada o la sortida és aquest dia, així que l'estada es cancel·la.",
   'dayplan.deleteDayStayBookedHint':
     "L'entrada o la sortida és aquest dia, així que l'estada es cancel·la, juntament amb la reserva «{booking}» i la seva despesa.",
+  'dayplan.deleteDayStayBookingHint':
+    "L'entrada o la sortida és aquest dia, així que l'estada es cancel·la, juntament amb la reserva «{booking}».",
+  'dayplan.deleteDayStayPaidHint':
+    "L'entrada o la sortida és aquest dia, així que l'estada es cancel·la, juntament amb la reserva «{booking}» i la seva despesa de {amount}.",
   'dayplan.deleteDayShift': 'Dies posteriors: {count}',
   'dayplan.deleteDayShiftHint': 'Cadascun passa a la data anterior.',
   'dayplan.deleteDayShiftBookingsHint': 'Cadascun passa a la data anterior. Reserves que es mouen amb ells: {count}',
   'dayplan.deleteDayShrink': 'Ara el viatge acaba el {date}',
   'dayplan.deleteDayShrinkHint': "No queda cap dia sense data que pugui agafar l'última data.",
+  'dayplan.impactStayShorter': 'Estada a {name}: una nit menys',
+  'dayplan.deleteDayStayShorterHint': 'Travessa aquest dia i ara la sortida és el {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Travessa aquest dia i ara acaba un dia abans.',
+  'dayplan.deleteDaySpareDated': '{day} pren la data {date}',
+  'dayplan.deleteDaySpareDatedHint': "És el primer dia sense data i passa a tenir l'última data del viatge.",
   'dayplan.deleteDayLast': 'Un viatge necessita com a mínim un dia',
   'dayplan.daysOffline': 'Per canviar els dies cal connexió',
   'dayplan.deleteDaySuccess': 'Dia eliminat',

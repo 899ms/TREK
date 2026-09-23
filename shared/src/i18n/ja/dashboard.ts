@@ -111,7 +111,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'すべてを移動する',
   'dashboard.dateShiftAllDesc': '予約や宿泊先を含む旅程全体が新しい日程に合わせて移動します。',
   'dashboard.dateShiftHint':
-    'ヒント：旅程の一部だけをずらしたい場合は、プランナーの「日付を並べ替え」で日を追加し、空けたい位置へ移動してください。',
+    'ヒント：旅程の一部だけをずらしたい場合は、プランナーの「日付を並べ替え」を開き、日付が表示されたボタンで旅行終了の翌日を追加して、その日を空けたい位置へ移動してください。',
   'dashboard.shrinkTitle': '日を削除しますか？',
   'dashboard.shrinkIntro': '新しい日付を保存すると、次の日が削除されます：',
   'dashboard.shrinkMoreDays': 'ほか{count}日',
@@ -123,6 +123,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': '削除される日にチェックインまたはチェックアウトするため、宿泊全体が削除されます。',
   'dashboard.shrinkStayBookedHint':
     '削除される日にチェックインまたはチェックアウトするため、宿泊全体が削除されます。予約「{booking}」とその支出は予約に残ります。',
+  'dashboard.shrinkStayBookingHint':
+    '削除される日にチェックインまたはチェックアウトするため、宿泊全体が削除されます。予約「{booking}」は予約に残ります。',
   'dashboard.shrinkConfirm': '日を削除して保存',
   'dashboard.shrinkUnknown':
     'この旅行の日を確認できませんでした。新しい日付の日数が少ない場合、保存すると最後の日とそこに予定されているものがすべて削除されます。',

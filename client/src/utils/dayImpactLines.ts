@@ -1,6 +1,7 @@
-import { BedDouble, CalendarCheck, CalendarClock, CalendarMinus, MapPin, StickyNote, Ticket, Type } from 'lucide-react'
+import { BedDouble, BedSingle, CalendarCheck, CalendarClock, CalendarMinus, CalendarPlus, MapPin, StickyNote, Ticket, Type } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import type { DayContent, DayDeleteImpact } from './dayDeleteImpact'
+import type { Day } from '../types'
+import type { DayContent, DayDeleteImpact, StayImpact } from './dayDeleteImpact'
 import type { TripRangeImpact } from './tripRangeImpact'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
@@ -32,17 +33,48 @@ export type ImpactVariant = 'deleteDay' | 'shrinkTrip'
 /** How bookings follow new dates, as the trip dialog lets the traveller choose. */
 export type ShiftMode = 'keep_bookings' | 'shift_all'
 
-const HINTS: Record<ImpactVariant, { bookings: string; stay: string; stayBooked: string }> = {
+interface StayHints {
+  bookings: string
+  /** A stay without a booking. */
+  stay: string
+  /** A stay with a booking and no expense on it. */
+  stayBooking: string
+  /** A stay with a booking and an expense whose sum is not known. */
+  stayBooked: string
+  /** A stay with a booking and an expense, sum named. Only where the expense is lost. */
+  stayPaid?: string
+}
+
+const HINTS: Record<ImpactVariant, StayHints> = {
   deleteDay: {
     bookings: 'dayplan.deleteDayBookingsHint',
     stay: 'dayplan.deleteDayStayHint',
+    stayBooking: 'dayplan.deleteDayStayBookingHint',
     stayBooked: 'dayplan.deleteDayStayBookedHint',
+    stayPaid: 'dayplan.deleteDayStayPaidHint',
   },
+  // A shortened trip leaves the booking and its expense where they are, so the
+  // sum is no loss worth naming.
   shrinkTrip: {
     bookings: 'dashboard.shrinkBookingsHint',
     stay: 'dashboard.shrinkStayHint',
+    stayBooking: 'dashboard.shrinkStayBookingHint',
     stayBooked: 'dashboard.shrinkStayBookedHint',
   },
+}
+
+/**
+ * What goes with a stay: its booking by name, with the count of any further
+ * ones, and the expense, by its sum where the variant loses it.
+ */
+function stayHint(stay: StayImpact, hints: StayHints, t: Translate): string {
+  if (!stay.booking) return t(hints.stay)
+  const booking = stay.moreBookings > 0
+    ? `${stay.booking} ${t('dashboard.shrinkMoreDays', { count: stay.moreBookings })}`
+    : stay.booking
+  if (!stay.expense) return t(hints.stayBooking, { booking })
+  if (stay.expense.amount && hints.stayPaid) return t(hints.stayPaid, { booking, amount: stay.expense.amount })
+  return t(hints.stayBooked, { booking })
 }
 
 /**
@@ -66,7 +98,7 @@ export function impactLines(
     icon: BedDouble,
     tone: 'danger',
     text: t('dayplan.impactStay', { name: stay.name }),
-    hint: stay.booking ? t(hints.stayBooked, { booking: stay.booking }) : t(hints.stay),
+    hint: stayHint(stay, hints, t),
   }))
   if (content.places > 0) {
     lines.push({ key: 'places', icon: MapPin, tone: 'neutral', text: t('dayplan.impactPlaces', { count: content.places }), hint: t('dayplan.impactPlacesHint') })
@@ -84,11 +116,28 @@ export function impactLines(
 }
 
 /**
- * The full list for the delete question: the content rows, then what happens to
- * the dates, and a single quiet row for a day with nothing on it.
+ * The full list for the delete question: the cancelled stays, then the ones that
+ * lose a night, the rest of the content, then what happens to the dates, and a
+ * single quiet row for a day with nothing on it. `dayName` names a day the way
+ * the day list beside the question does; without it a day is "Day n".
  */
-export function deleteDayLines(impact: DayDeleteImpact, t: Translate, formatDate: (iso: string) => string): ImpactLine[] {
+export function deleteDayLines(
+  impact: DayDeleteImpact,
+  t: Translate,
+  formatDate: (iso: string) => string,
+  dayName: (day: Day, index: number) => string = (_, index) => t('dayplan.dayN', { n: index + 1 }),
+): ImpactLine[] {
   const lines = impactLines(impact, t, 'deleteDay')
+  // Right behind the cancelled stays: a stay is kept, but a night of it is gone.
+  lines.splice(impact.stays.length, 0, ...impact.shortenedStays.map((stay): ImpactLine => ({
+    key: `stay-short-${stay.id}`,
+    icon: BedSingle,
+    tone: 'warning',
+    text: t('dayplan.impactStayShorter', { name: stay.name }),
+    hint: stay.checkOut
+      ? t('dayplan.deleteDayStayShorterHint', { date: formatDate(stay.checkOut) })
+      : t('dayplan.deleteDayStayShorterUndatedHint'),
+  })))
   if (impact.shiftedDays > 0) {
     lines.push({
       key: 'shift',
@@ -98,6 +147,16 @@ export function deleteDayLines(impact: DayDeleteImpact, t: Translate, formatDate
       hint: impact.shiftedBookings > 0
         ? t('dayplan.deleteDayShiftBookingsHint', { count: impact.shiftedBookings })
         : t('dayplan.deleteDayShiftHint'),
+    })
+  }
+  if (impact.datedSpare) {
+    const { day, index, date } = impact.datedSpare
+    lines.push({
+      key: 'spare',
+      icon: CalendarPlus,
+      tone: 'warning',
+      text: t('dayplan.deleteDaySpareDated', { day: dayName(day, index), date: formatDate(date) }),
+      hint: t('dayplan.deleteDaySpareDatedHint'),
     })
   }
   if (impact.newEndDate) {

@@ -20,8 +20,11 @@ interface DayDeleteOptions {
   t: Translate
   locale: string
   toast: { success: (message: string) => unknown; error: (message: string) => unknown }
-  /** After a delete went through: the stays and the route of the selected day are the planner's to reload. */
-  onDeleted: () => void
+  /**
+   * After a delete went through, with the day that went: the stays, the route
+   * of the selected day, an open day panel and the undo steps are the planner's.
+   */
+  onDeleted: (dayId: number) => void
 }
 
 export interface DayDelete {
@@ -54,6 +57,7 @@ export function useDayDelete(options: DayDeleteOptions): DayDelete {
   const { offline } = useNetworkMode()
   const assignments = useTripStore(s => s.assignments)
   const dayNotes = useTripStore(s => s.dayNotes)
+  const budgetItems = useTripStore(s => s.budgetItems)
   const [deleteDayId, setDeleteDayId] = useState<number | null>(null)
 
   const deleteDayBlocked = deleteDayBlockedReason(days.length, offline, t)
@@ -69,9 +73,10 @@ export function useDayDelete(options: DayDeleteOptions): DayDelete {
 
   const deleteDayLines = useMemo(() => {
     if (!target) return []
-    const impact = dayDeleteImpact(target, days, { assignments, dayNotes, reservations, accommodations, places }, trip)
-    return buildDeleteDayLines(impact, t, iso => formatDate(iso, locale) ?? iso)
-  }, [target, days, assignments, dayNotes, reservations, accommodations, places, trip, t, locale])
+    const budget = { items: budgetItems, currency: trip?.currency, locale }
+    const impact = dayDeleteImpact(target, days, { assignments, dayNotes, reservations, accommodations, places, budget }, trip)
+    return buildDeleteDayLines(impact, t, iso => formatDate(iso, locale) ?? iso, (day, i) => dayLabel(day, i, t, locale))
+  }, [target, days, assignments, dayNotes, reservations, accommodations, places, budgetItems, trip, t, locale])
 
   const handleDeleteDay = useCallback((dayId: number) => {
     if (!canEditDays || deleteDayBlocked) return
@@ -91,7 +96,7 @@ export function useDayDelete(options: DayDeleteOptions): DayDelete {
       toast.error(t('dayplan.deleteDayError'))
       return
     }
-    onDeleted()
+    onDeleted(dayId)
     toast.success(t('dayplan.deleteDaySuccess'))
   }, [deleteDayId, tripId, toast, t, onDeleted])
 

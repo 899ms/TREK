@@ -100,7 +100,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     "L'itinéraire entier suit les nouvelles dates, y compris les réservations et hébergements.",
   'dashboard.dateShiftHint':
-    "Astuce : pour ne décaler qu'une partie de votre itinéraire, ajoutez un jour dans « Réorganiser les jours » du planificateur et placez-le là où l'écart doit se créer.",
+    "Astuce : pour ne décaler qu'une partie de votre itinéraire, ouvrez « Réorganiser les jours » dans le planificateur, ajoutez le jour qui suit la fin du voyage avec le bouton qui affiche sa date, puis placez ce jour là où l'écart doit se créer.",
   'dashboard.shrinkTitle': 'Retirer des jours ?',
   'dashboard.shrinkIntro': 'En enregistrant les nouvelles dates, ces jours sont retirés :',
   'dashboard.shrinkMoreDays': '+{count} de plus',
@@ -113,6 +113,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': "L'arrivée ou le départ tombe un jour retiré, le séjour entier est donc retiré.",
   'dashboard.shrinkStayBookedHint':
     "L'arrivée ou le départ tombe un jour retiré, le séjour entier est donc retiré. Sa réservation « {booking} » et sa dépense restent dans Réservations.",
+  'dashboard.shrinkStayBookingHint':
+    "L'arrivée ou le départ tombe un jour retiré, le séjour entier est donc retiré. Sa réservation « {booking} » reste dans Réservations.",
   'dashboard.shrinkConfirm': 'Retirer les jours et enregistrer',
   'dashboard.shrinkUnknown':
     "Les jours de ce voyage n'ont pas pu être vérifiés. Si les nouvelles dates comptent moins de jours, l'enregistrement retire les derniers jours et tout ce qui y est prévu.",

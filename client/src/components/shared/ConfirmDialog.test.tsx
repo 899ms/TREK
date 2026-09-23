@@ -130,6 +130,21 @@ describe('ConfirmDialog', () => {
     expect(document.querySelector('.bg-danger-soft')).toBeNull();
   });
 
+  it('FE-COMP-CONFIRM-013: a long list scrolls inside the card, and the buttons stay outside it, always in reach', () => {
+    render(
+      <ConfirmDialog isOpen={true} onClose={onClose} onConfirm={onConfirm} message="Delete it?">
+        <ul aria-label="consequences">{Array.from({ length: 40 }, (_, i) => <li key={i}>Row {i}</li>)}</ul>
+      </ConfirmDialog>
+    );
+    const scroller = screen.getByRole('list', { name: 'consequences' }).closest('.overflow-y-auto') as HTMLElement;
+    expect(scroller).not.toBeNull();
+    expect(scroller.parentElement).toHaveClass('flex-col');
+    expect(scroller.parentElement!.className).toMatch(/max-h-\[/);
+    const confirm = screen.getByRole('button', { name: /delete/i });
+    expect(scroller.contains(confirm)).toBe(false);
+    expect(confirm.parentElement).toHaveClass('flex-none');
+  });
+
   it('FE-COMP-CONFIRM-008: clicking backdrop calls onClose', async () => {
     const user = userEvent.setup();
     render(<ConfirmDialog isOpen={true} onClose={onClose} onConfirm={onConfirm} message="msg" />);

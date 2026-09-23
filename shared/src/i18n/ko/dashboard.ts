@@ -111,7 +111,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': '모두 이동',
   'dashboard.dateShiftAllDesc': '예약과 숙박을 포함한 전체 일정이 새 날짜로 이동합니다.',
   'dashboard.dateShiftHint':
-    '팁: 일정의 일부만 옮기려면 플래너의 "날짜 순서 변경"에서 날짜를 추가한 뒤 빈칸이 생겨야 할 위치로 옮기세요.',
+    '팁: 일정의 일부만 옮기려면 플래너에서 "날짜 순서 변경"을 열고, 날짜가 표시된 버튼으로 여행 종료 다음 날을 추가한 뒤 그 날을 빈칸이 생겨야 할 위치로 옮기세요.',
   'dashboard.shrinkTitle': '날짜를 삭제할까요?',
   'dashboard.shrinkIntro': '새 날짜를 저장하면 다음 날짜가 삭제됩니다:',
   'dashboard.shrinkMoreDays': '외 {count}일',
@@ -123,6 +123,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': '삭제되는 날짜에 체크인 또는 체크아웃하므로 숙박 전체가 삭제됩니다.',
   'dashboard.shrinkStayBookedHint':
     '삭제되는 날짜에 체크인 또는 체크아웃하므로 숙박 전체가 삭제됩니다. 예약 “{booking}”과 해당 지출은 예약에 남습니다.',
+  'dashboard.shrinkStayBookingHint':
+    '삭제되는 날짜에 체크인 또는 체크아웃하므로 숙박 전체가 삭제됩니다. 예약 “{booking}”은 예약에 남습니다.',
   'dashboard.shrinkConfirm': '날짜 삭제 후 저장',
   'dashboard.shrinkUnknown':
     '이 여행의 날짜를 확인할 수 없습니다. 새 날짜의 일수가 더 적으면 저장 시 마지막 날짜와 그날 계획된 모든 항목이 삭제됩니다.',

@@ -104,12 +104,23 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Η άφιξη ή η αναχώρηση είναι αυτή την ημέρα, οπότε η διαμονή ακυρώνεται.',
   'dayplan.deleteDayStayBookedHint':
     'Η άφιξη ή η αναχώρηση είναι αυτή την ημέρα, οπότε η διαμονή ακυρώνεται μαζί με την κράτηση «{booking}» και το έξοδό της.',
+  'dayplan.deleteDayStayBookingHint':
+    'Η άφιξη ή η αναχώρηση είναι αυτή την ημέρα, οπότε η διαμονή ακυρώνεται μαζί με την κράτηση «{booking}».',
+  'dayplan.deleteDayStayPaidHint':
+    'Η άφιξη ή η αναχώρηση είναι αυτή την ημέρα, οπότε η διαμονή ακυρώνεται μαζί με την κράτηση «{booking}» και το έξοδό της, ύψους {amount}.',
   'dayplan.deleteDayShift': 'Επόμενες ημέρες: {count}',
   'dayplan.deleteDayShiftHint': 'Καθεμία μετακινείται μία ημερομηνία νωρίτερα.',
   'dayplan.deleteDayShiftBookingsHint':
     'Καθεμία μετακινείται μία ημερομηνία νωρίτερα. Κρατήσεις που μετακινούνται μαζί: {count}',
   'dayplan.deleteDayShrink': 'Το ταξίδι τελειώνει τώρα στις {date}',
   'dayplan.deleteDayShrinkHint': 'Δεν υπάρχει ημέρα χωρίς ημερομηνία για να πάρει την τελευταία ημερομηνία.',
+  'dayplan.impactStayShorter': 'Διαμονή στο {name}: μία νύχτα λιγότερη',
+  'dayplan.deleteDayStayShorterHint': 'Εκτείνεται πάνω από αυτή την ημέρα και η αναχώρηση είναι πλέον στις {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint':
+    'Εκτείνεται πάνω από αυτή την ημέρα και πλέον τελειώνει μία ημέρα νωρίτερα.',
+  'dayplan.deleteDaySpareDated': 'Νέα ημερομηνία για {day}: {date}',
+  'dayplan.deleteDaySpareDatedHint':
+    'Είναι η πρώτη ημέρα χωρίς ημερομηνία και παίρνει την τελευταία ημερομηνία του ταξιδιού.',
   'dayplan.deleteDayLast': 'Ένα ταξίδι χρειάζεται τουλάχιστον μία ημέρα',
   'dayplan.daysOffline': 'Η αλλαγή ημερών απαιτεί σύνδεση',
   'dayplan.deleteDaySuccess': 'Η ημέρα διαγράφηκε',

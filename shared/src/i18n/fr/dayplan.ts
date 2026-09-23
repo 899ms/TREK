@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': "L'arrivée ou le départ a lieu ce jour-là, le séjour est donc annulé.",
   'dayplan.deleteDayStayBookedHint':
     "L'arrivée ou le départ a lieu ce jour-là, le séjour est donc annulé, ainsi que la réservation « {booking} » et sa dépense.",
+  'dayplan.deleteDayStayBookingHint':
+    "L'arrivée ou le départ a lieu ce jour-là, le séjour est donc annulé, ainsi que la réservation « {booking} ».",
+  'dayplan.deleteDayStayPaidHint':
+    "L'arrivée ou le départ a lieu ce jour-là, le séjour est donc annulé, ainsi que la réservation « {booking} » et sa dépense de {amount}.",
   'dayplan.deleteDayShift': 'Jours suivants : {count}',
   'dayplan.deleteDayShiftHint': 'Chacun passe à la date précédente.',
   'dayplan.deleteDayShiftBookingsHint': 'Chacun passe à la date précédente. Réservations déplacées avec eux : {count}',
   'dayplan.deleteDayShrink': 'Le voyage se termine désormais le {date}',
   'dayplan.deleteDayShrinkHint': 'Aucun jour sans date ne peut reprendre la dernière date.',
+  'dayplan.impactStayShorter': 'Séjour à {name} : une nuit de moins',
+  'dayplan.deleteDayStayShorterHint': 'Il couvre ce jour et le départ a désormais lieu le {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Il couvre ce jour et se termine désormais un jour plus tôt.',
+  'dayplan.deleteDaySpareDated': '{day} reçoit la date {date}',
+  'dayplan.deleteDaySpareDatedHint': "C'est le premier jour sans date, et il reprend la dernière date du voyage.",
   'dayplan.deleteDayLast': 'Un voyage doit compter au moins un jour',
   'dayplan.daysOffline': 'Modifier les jours nécessite une connexion',
   'dayplan.deleteDaySuccess': 'Jour supprimé',

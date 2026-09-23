@@ -104,11 +104,22 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Check-in atau check-out jatuh pada hari tersebut, jadi penginapan dibatalkan.',
   'dayplan.deleteDayStayBookedHint':
     'Check-in atau check-out jatuh pada hari tersebut, jadi penginapan dibatalkan bersama pemesanan “{booking}” dan pengeluarannya.',
+  'dayplan.deleteDayStayBookingHint':
+    'Check-in atau check-out jatuh pada hari tersebut, jadi penginapan dibatalkan bersama pemesanan “{booking}”.',
+  'dayplan.deleteDayStayPaidHint':
+    'Check-in atau check-out jatuh pada hari tersebut, jadi penginapan dibatalkan bersama pemesanan “{booking}” dan pengeluarannya sebesar {amount}.',
   'dayplan.deleteDayShift': 'Hari berikutnya: {count}',
   'dayplan.deleteDayShiftHint': 'Masing-masing maju satu tanggal.',
   'dayplan.deleteDayShiftBookingsHint': 'Masing-masing maju satu tanggal. Pemesanan yang ikut berpindah: {count}',
   'dayplan.deleteDayShrink': 'Perjalanan kini berakhir pada {date}',
   'dayplan.deleteDayShrinkHint': 'Tidak ada hari tanpa tanggal yang dapat mengambil tanggal terakhir.',
+  'dayplan.impactStayShorter': 'Menginap di {name}: berkurang satu malam',
+  'dayplan.deleteDayStayShorterHint': 'Penginapan ini melewati hari tersebut dan kini check-out pada {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint':
+    'Penginapan ini melewati hari tersebut dan kini berakhir satu hari lebih awal.',
+  'dayplan.deleteDaySpareDated': '{day} mendapat tanggal {date}',
+  'dayplan.deleteDaySpareDatedHint':
+    'Ini hari pertama tanpa tanggal, dan hari ini mengambil tanggal terakhir perjalanan.',
   'dayplan.deleteDayLast': 'Perjalanan memerlukan setidaknya satu hari',
   'dayplan.daysOffline': 'Mengubah hari memerlukan koneksi',
   'dayplan.deleteDaySuccess': 'Hari dihapus',

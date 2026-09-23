@@ -1,6 +1,6 @@
 /**
  * DayRemovalService: deleting one day, the way the reorder dialog, the MCP tool
- * and the plugin RPC all do it. DAY-DEL-001 to DAY-DEL-018.
+ * and the plugin RPC all do it. DAY-DEL-001 to DAY-DEL-019.
  *
  * Real in-memory SQLite with the real accommodations and assignments services,
  * so the foreign key cascades and the stay cancellation are the ones production runs.
@@ -366,6 +366,32 @@ describe('DayRemovalService.remove', () => {
       removed: [{ id: 2, dayId: rows[0].id }],
       vias: [{ dayId: rows[0].id, vias: [] }],
     }]);
+  });
+
+  it('DAY-DEL-019 a hole left in the numbering closes too, and the boundaries follow their own days into it', () => {
+    const { user, trip, rows } = datedTrip('2026-01-01', '2026-01-05');
+    const place = createPlace(testDb, trip.id);
+    const stops = rows.map(r => createDayAssignment(testDb, r.id, place.id));
+    // Days 1, 2, 4 and 5: the third went through the old bare delete, which left
+    // its number empty and one boundary on it. Another one sits past the last day.
+    boundary(trip.id, 2, stops[1].id);
+    boundary(trip.id, 3, stops[0].id);
+    boundary(trip.id, 4, stops[3].id);
+    boundary(trip.id, 5, stops[4].id);
+    boundary(trip.id, 7, stops[0].id);
+    testDb.prepare('DELETE FROM days WHERE id = ?').run(rows[2].id);
+
+    const result = removal.remove(trip.id, rows[1].id, { userId: user.id });
+
+    expect(dayRows(trip.id).map(r => [r.id, r.day_number])).toEqual([[rows[0].id, 1], [rows[3].id, 2], [rows[4].id, 3]]);
+    const expected = [
+      { day_number: 2, from_assignment_id: stops[3].id, to_assignment_id: null, fraction: 1 },
+      { day_number: 3, from_assignment_id: stops[4].id, to_assignment_id: null, fraction: 1 },
+      { day_number: 5, from_assignment_id: stops[0].id, to_assignment_id: null, fraction: 1 },
+    ];
+    expect(testDb.prepare('SELECT day_number, from_assignment_id, to_assignment_id, fraction FROM roadtrip_day_boundaries WHERE trip_id = ? ORDER BY day_number').all(trip.id))
+      .toEqual(expected);
+    expect(result.boundaries).toEqual(expected);
   });
 });
 

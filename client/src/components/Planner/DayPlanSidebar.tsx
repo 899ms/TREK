@@ -113,7 +113,8 @@ interface DayPlanSidebarProps {
   /** Open the place form already pointed at this day, to create a new place there. */
   onCreatePlaceForDay?: (dayId: number) => void
   onExpandedDaysChange?: (expandedDayIds: Set<number>) => void
-  pushUndo?: (label: string, undoFn: () => Promise<void> | void) => void
+  /** `dayIds`: the days the step acts on, so deleting one of them drops it. */
+  pushUndo?: (label: string, undoFn: () => Promise<void> | void, dayIds?: number[]) => void
   canUndo?: boolean
   lastActionLabel?: string | null
   onUndo?: () => void
@@ -898,7 +899,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
         const capturedPrevIds = prevAssignmentIds
         pushUndo?.(t('undo.reorder'), async () => {
           await tripActions.reorderAssignments(tripId, capturedDayId, capturedPrevIds)
-        })
+        }, [capturedDayId])
       }
     } catch (err: unknown) {
       rollBackReservations()
@@ -1073,7 +1074,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     const capturedDayId = dayId
     pushUndo?.(t('undo.optimize'), async () => {
       await tripActions.reorderAssignments(tripId, capturedDayId, prevIds)
-    })
+    }, [capturedDayId])
   }
 
 
@@ -1097,7 +1098,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
         .then(() => {
           pushUndo?.(t('undo.moveDay'), async () => {
             await tripActions.moveAssignment(tripId, Number(assignmentId), dayId, capturedFromDayId, capturedOrderIndex)
-          })
+          }, [Number(dayId), Number(capturedFromDayId)])
         })
         .catch((err: unknown) => toast.error(err instanceof Error ? err.message : t('common.unknownError')))
     } else if (noteId && fromDayId !== dayId) {

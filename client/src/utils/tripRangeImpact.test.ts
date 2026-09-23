@@ -99,7 +99,8 @@ describe('tripRangeImpact', () => {
       buildReservation({ id: 41, day_id: 10, title: 'Ferry' }),
     ]
     const impact = impactFor('2026-10-01', '2026-10-08', { startMoved: false }, days, data)
-    expect(impact.content.stays).toEqual([{ id: 5, name: 'Harbour Hotel', booking: 'Harbour, 2 nights' }])
+    // No expenses handed in: the booking may carry one, which the list then says.
+    expect(impact.content.stays).toEqual([{ id: 5, name: 'Harbour Hotel', booking: 'Harbour, 2 nights', moreBookings: 0, expense: { amount: null } }])
     expect(impact.content.bookings).toBe(1)
   })
 

@@ -96,7 +96,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Mover tudo',
   'dashboard.dateShiftAllDesc': 'Todo o itinerário acompanha as novas datas, incluindo reservas e hospedagens.',
   'dashboard.dateShiftHint':
-    'Dica: para mover apenas parte do itinerário, adicione um dia em “Reordenar dias” no planejador e mova-o para onde a lacuna deve ficar.',
+    'Dica: para mover apenas parte do itinerário, abra “Reordenar dias” no planejador, adicione o dia seguinte ao fim da viagem pelo botão que mostra a data dele e mova esse dia para onde a lacuna deve ficar.',
   'dashboard.shrinkTitle': 'Remover dias?',
   'dashboard.shrinkIntro': 'Ao salvar as novas datas, estes dias serão removidos:',
   'dashboard.shrinkMoreDays': '+{count} outros',
@@ -109,6 +109,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'O check-in ou o check-out é em um dia removido, então a hospedagem inteira é removida.',
   'dashboard.shrinkStayBookedHint':
     'O check-in ou o check-out é em um dia removido, então a hospedagem inteira é removida. A reserva “{booking}” e a despesa dela continuam em Reservas.',
+  'dashboard.shrinkStayBookingHint':
+    'O check-in ou o check-out é em um dia removido, então a hospedagem inteira é removida. A reserva “{booking}” continua em Reservas.',
   'dashboard.shrinkConfirm': 'Remover dias e salvar',
   'dashboard.shrinkUnknown':
     'Não foi possível verificar os dias desta viagem. Se as novas datas tiverem menos dias, salvar remove os últimos dias e tudo o que está planejado neles.',

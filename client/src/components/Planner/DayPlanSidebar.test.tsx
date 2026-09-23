@@ -2891,7 +2891,8 @@ describe('DayPlanSidebar', () => {
     expect(onRouteRefresh).toHaveBeenCalled()
     // The store carries the new slot per day so the merged list stays stable.
     expect(useTripStore.getState().reservations[0].day_positions).toEqual({ 10: expect.any(Number) })
-    // Undoing restores the original assignment order.
+    // Undoing restores the original assignment order; the step names its day, so deleting the day drops it.
+    expect(pushUndo.mock.calls[0][2]).toEqual([10])
     const undo = pushUndo.mock.calls[0][1] as () => Promise<void>
     await undo()
     expect(reorderAssignments).toHaveBeenCalledWith(1, 10, [11, 12])
@@ -3477,8 +3478,9 @@ describe('DayPlanSidebar', () => {
       fireEvent.drop(dayHeader('Day 2'), { dataTransfer: { getData: vi.fn(() => '') } })
       expect(onMoveToDay).toHaveBeenCalledWith(21, 10, 11, 1)
       expect(moveAssignment).not.toHaveBeenCalled()
-      // Still offered back once the planner has made the move.
+      // Still offered back once the planner has made the move, tagged with both days it touches.
       await waitFor(() => expect(pushUndo).toHaveBeenCalledTimes(1))
+      expect(pushUndo.mock.calls[0][2]).toEqual([11, 10])
     })
   })
 
@@ -4376,6 +4378,7 @@ describe('DayPlanSidebar', () => {
     render(<DayPlanSidebar {...makeDefaultProps({ days: [day], assignments, selectedDayId: 10, pushUndo, onReorder })} />)
     await user.click(screen.getByRole('button', { name: 'Optimize' }))
     await waitFor(() => expect(onReorder).toHaveBeenCalled())
+    expect(pushUndo.mock.calls[0][2]).toEqual([10])
     const undo = pushUndo.mock.calls[0][1] as () => Promise<void>
     await undo()
     expect(reorderAssignments).toHaveBeenCalledWith(1, 10, [11, 12, 13])

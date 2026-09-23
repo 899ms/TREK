@@ -403,7 +403,10 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      // In the review step Escape, the close button and a click beside the
+      // dialog go back to the form, like Back, instead of throwing the whole
+      // edit away. Outside that step they close the dialog as before.
+      onClose={pendingReview ? () => { if (!busy) setPendingReview(null) } : onClose}
       title={pendingReview
         ? t(pendingReview.askShift ? 'dashboard.dateShiftTitle' : 'dashboard.shrinkTitle')
         : isEditing ? t('dashboard.editTrip') : t('dashboard.createTrip')}

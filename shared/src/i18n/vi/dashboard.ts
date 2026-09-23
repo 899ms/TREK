@@ -105,7 +105,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Dời tất cả',
   'dashboard.dateShiftAllDesc': 'Toàn bộ lịch trình sẽ dời theo ngày mới, bao gồm cả đặt chỗ và chỗ ở.',
   'dashboard.dateShiftHint':
-    'Mẹo: để chỉ dời một phần lịch trình, hãy thêm một ngày trong “Sắp xếp lại ngày” ở trình lập kế hoạch rồi chuyển nó đến chỗ cần tạo khoảng trống.',
+    'Mẹo: để chỉ dời một phần lịch trình, hãy mở “Sắp xếp lại ngày” trong trình lập kế hoạch, thêm ngày sau khi chuyến đi kết thúc bằng nút hiển thị ngày đó, rồi chuyển ngày đó đến chỗ cần tạo khoảng trống.',
   'dashboard.shrinkTitle': 'Bỏ bớt ngày?',
   'dashboard.shrinkIntro': 'Khi lưu ngày mới, những ngày này sẽ bị bỏ:',
   'dashboard.shrinkMoreDays': '+{count} ngày khác',
@@ -118,6 +118,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Nhận phòng hoặc trả phòng rơi vào một ngày bị bỏ, nên toàn bộ chỗ lưu trú bị bỏ.',
   'dashboard.shrinkStayBookedHint':
     'Nhận phòng hoặc trả phòng rơi vào một ngày bị bỏ, nên toàn bộ chỗ lưu trú bị bỏ. Đặt chỗ “{booking}” và chi phí của nó vẫn nằm trong Đặt chỗ.',
+  'dashboard.shrinkStayBookingHint':
+    'Nhận phòng hoặc trả phòng rơi vào một ngày bị bỏ, nên toàn bộ chỗ lưu trú bị bỏ. Đặt chỗ “{booking}” vẫn nằm trong Đặt chỗ.',
   'dashboard.shrinkConfirm': 'Bỏ ngày và lưu',
   'dashboard.shrinkUnknown':
     'Không thể kiểm tra các ngày của chuyến đi này. Nếu ngày mới có ít ngày hơn, việc lưu sẽ bỏ những ngày cuối và mọi thứ đã lên kế hoạch trong đó.',

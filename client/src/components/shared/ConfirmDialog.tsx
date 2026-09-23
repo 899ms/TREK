@@ -65,12 +65,14 @@ export default function ConfirmDialog({
       style={{ paddingBottom: 'var(--bottom-nav-h)' }}
       onClick={onClose}
     >
+      {/* Capped at the viewport: a long list of what goes along scrolls on its
+          own, and the two buttons below it always stay in reach. */}
       <div
         role="presentation"
-        className={`trek-modal-enter rounded-2xl shadow-2xl w-full ${children ? 'max-w-md' : 'max-w-sm'} p-6 bg-surface-card`}
+        className={`trek-modal-enter flex max-h-[calc(100dvh-2rem-var(--bottom-nav-h,0px))] flex-col rounded-2xl shadow-2xl w-full ${children ? 'max-w-md' : 'max-w-sm'} p-6 bg-surface-card`}
         onClick={e => e.stopPropagation()}
       >
-        <div className="flex items-start gap-4">
+        <div className="flex min-h-0 items-start gap-4 overflow-y-auto overscroll-contain">
           {danger && (
             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-danger-soft flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-danger" />
@@ -87,7 +89,7 @@ export default function ConfirmDialog({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="flex flex-none justify-end gap-3 mt-6">
           <button type="button"
             onClick={onClose}
             className="px-4 py-2 text-sm font-medium rounded-lg transition-colors text-content-secondary border border-edge-secondary"

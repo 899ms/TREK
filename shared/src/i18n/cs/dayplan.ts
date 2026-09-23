@@ -104,12 +104,21 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Příjezd nebo odjezd připadá na tento den, proto se ubytování zruší.',
   'dayplan.deleteDayStayBookedHint':
     'Příjezd nebo odjezd připadá na tento den, proto se ubytování zruší spolu s rezervací „{booking}“ a jejím výdajem.',
+  'dayplan.deleteDayStayBookingHint':
+    'Příjezd nebo odjezd připadá na tento den, proto se ubytování zruší spolu s rezervací „{booking}“.',
+  'dayplan.deleteDayStayPaidHint':
+    'Příjezd nebo odjezd připadá na tento den, proto se ubytování zruší spolu s rezervací „{booking}“ a jejím výdajem {amount}.',
   'dayplan.deleteDayShift': 'Pozdější dny: {count}',
   'dayplan.deleteDayShiftHint': 'Každý se posune o jedno datum dříve.',
   'dayplan.deleteDayShiftBookingsHint':
     'Každý se posune o jedno datum dříve. Rezervace, které se posunou s nimi: {count}',
   'dayplan.deleteDayShrink': 'Cesta nyní končí {date}',
   'dayplan.deleteDayShrinkHint': 'Nezbývá žádný den bez data, který by převzal poslední datum.',
+  'dayplan.impactStayShorter': 'Ubytování v {name}: o noc kratší',
+  'dayplan.deleteDayStayShorterHint': 'Zasahuje přes tento den, odjezd je teď {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Zasahuje přes tento den, teď končí o den dříve.',
+  'dayplan.deleteDaySpareDated': '{day} dostane datum {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Je to první den bez data a převezme poslední datum cesty.',
   'dayplan.deleteDayLast': 'Cesta musí mít alespoň jeden den',
   'dayplan.daysOffline': 'Změna dnů vyžaduje připojení',
   'dayplan.deleteDaySuccess': 'Den smazán',

@@ -93,7 +93,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Przesuń wszystko',
   'dashboard.dateShiftAllDesc': 'Cały plan podróży przesunie się wraz z nowymi datami, w tym rezerwacje i noclegi.',
   'dashboard.dateShiftHint':
-    'Wskazówka: aby przesunąć tylko część planu podróży, dodaj dzień w „Zmień kolejność dni” w planerze i przenieś go tam, gdzie ma powstać przerwa.',
+    'Wskazówka: aby przesunąć tylko część planu podróży, otwórz w planerze „Zmień kolejność dni”, dodaj dzień po zakończeniu podróży przyciskiem z jego datą i przenieś ten dzień tam, gdzie ma powstać przerwa.',
   'dashboard.shrinkTitle': 'Usunąć dni?',
   'dashboard.shrinkIntro': 'Zapisanie nowych dat usunie te dni:',
   'dashboard.shrinkMoreDays': '+{count} więcej',
@@ -106,6 +106,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Zameldowanie lub wymeldowanie przypada na usuwany dzień, więc usuwany jest cały nocleg.',
   'dashboard.shrinkStayBookedHint':
     'Zameldowanie lub wymeldowanie przypada na usuwany dzień, więc usuwany jest cały nocleg. Jego rezerwacja „{booking}” i jej wydatek pozostają w Rezerwacjach.',
+  'dashboard.shrinkStayBookingHint':
+    'Zameldowanie lub wymeldowanie przypada na usuwany dzień, więc usuwany jest cały nocleg. Jego rezerwacja „{booking}” pozostaje w Rezerwacjach.',
   'dashboard.shrinkConfirm': 'Usuń dni i zapisz',
   'dashboard.shrinkUnknown':
     'Nie udało się sprawdzić dni tej podróży. Jeśli nowe daty obejmują mniej dni, zapisanie usunie ostatnie dni i wszystko, co na nie zaplanowano.',

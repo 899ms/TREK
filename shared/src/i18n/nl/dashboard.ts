@@ -98,7 +98,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAllDesc':
     'De volledige reisplanning verschuift mee met de nieuwe datums, inclusief reserveringen en accommodaties.',
   'dashboard.dateShiftHint':
-    'Tip: om maar een deel van je reisplanning te verschuiven, voeg je in de planner onder ‘Dagen herordenen’ een dag toe en zet je die op de plek waar het gat moet komen.',
+    'Tip: om maar een deel van je reisplanning te verschuiven, open je in de planner ‘Dagen herordenen’, voeg je met de knop die de datum toont de dag na de reis toe en zet je die dag op de plek waar het gat moet komen.',
   'dashboard.shrinkTitle': 'Dagen verwijderen?',
   'dashboard.shrinkIntro': 'Bij het opslaan van de nieuwe datums worden deze dagen verwijderd:',
   'dashboard.shrinkMoreDays': '+{count} meer',
@@ -112,6 +112,8 @@ const dashboard: TranslationStrings = {
     'Inchecken of uitchecken valt op een dag die wegvalt, dus het hele verblijf wordt verwijderd.',
   'dashboard.shrinkStayBookedHint':
     'Inchecken of uitchecken valt op een dag die wegvalt, dus het hele verblijf wordt verwijderd. De boeking ‘{booking}’ en de bijbehorende uitgave blijven onder Boekingen.',
+  'dashboard.shrinkStayBookingHint':
+    'Inchecken of uitchecken valt op een dag die wegvalt, dus het hele verblijf wordt verwijderd. De boeking ‘{booking}’ blijft onder Boekingen.',
   'dashboard.shrinkConfirm': 'Dagen verwijderen en opslaan',
   'dashboard.shrinkUnknown':
     'De dagen van deze reis konden niet worden gecontroleerd. Hebben de nieuwe datums minder dagen, dan verwijdert opslaan de laatste dagen en alles wat daarop gepland is.',

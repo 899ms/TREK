@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Giriş veya çıkış bu güne denk geldiği için konaklama iptal edilir.',
   'dayplan.deleteDayStayBookedHint':
     'Giriş veya çıkış bu güne denk geldiği için konaklama, “{booking}” rezervasyonu ve harcamasıyla birlikte iptal edilir.',
+  'dayplan.deleteDayStayBookingHint':
+    'Giriş veya çıkış bu güne denk geldiği için konaklama, “{booking}” rezervasyonuyla birlikte iptal edilir.',
+  'dayplan.deleteDayStayPaidHint':
+    'Giriş veya çıkış bu güne denk geldiği için konaklama, “{booking}” rezervasyonu ve {amount} tutarındaki harcamasıyla birlikte iptal edilir.',
   'dayplan.deleteDayShift': 'Sonraki günler: {count}',
   'dayplan.deleteDayShiftHint': 'Her biri bir tarih öne kayar.',
   'dayplan.deleteDayShiftBookingsHint': 'Her biri bir tarih öne kayar. Onlarla birlikte kayan rezervasyonlar: {count}',
   'dayplan.deleteDayShrink': 'Seyahat artık {date} tarihinde bitiyor',
   'dayplan.deleteDayShrinkHint': 'Son tarihi devralacak tarihsiz bir gün yok.',
+  'dayplan.impactStayShorter': '{name} konaklaması: bir gece daha kısa',
+  'dayplan.deleteDayStayShorterHint': 'Bu günü kapsadığı için çıkış artık {date} tarihinde.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'Bu günü kapsadığı için artık bir gün erken biter.',
+  'dayplan.deleteDaySpareDated': '{day} yeni tarihini alır: {date}',
+  'dayplan.deleteDaySpareDatedHint': 'Tarihi olmayan ilk gündür ve seyahatin son tarihini devralır.',
   'dayplan.deleteDayLast': 'Bir seyahatin en az bir günü olmalı',
   'dayplan.daysOffline': 'Günleri değiştirmek için bağlantı gerekir',
   'dayplan.deleteDaySuccess': 'Gün silindi',

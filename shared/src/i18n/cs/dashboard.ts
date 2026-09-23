@@ -96,7 +96,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': 'Posunout vše',
   'dashboard.dateShiftAllDesc': 'Celý itinerář se posune podle nových termínů, včetně rezervací a ubytování.',
   'dashboard.dateShiftHint':
-    'Tip: pokud chcete posunout jen část itineráře, přidejte v plánovači v „Změnit pořadí dnů“ den a přesuňte ho tam, kde má vzniknout mezera.',
+    'Tip: pokud chcete posunout jen část itineráře, otevřete v plánovači „Změnit pořadí dnů“, přidejte den po konci cesty tlačítkem s jeho datem a přesuňte ho tam, kde má vzniknout mezera.',
   'dashboard.shrinkTitle': 'Odebrat dny?',
   'dashboard.shrinkIntro': 'Uložením nových dat se odeberou tyto dny:',
   'dashboard.shrinkMoreDays': '+{count} další',
@@ -109,6 +109,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': 'Příjezd nebo odjezd připadá na odebíraný den, proto se odebere celé ubytování.',
   'dashboard.shrinkStayBookedHint':
     'Příjezd nebo odjezd připadá na odebíraný den, proto se odebere celé ubytování. Jeho rezervace „{booking}“ a její výdaj zůstanou v Rezervacích.',
+  'dashboard.shrinkStayBookingHint':
+    'Příjezd nebo odjezd připadá na odebíraný den, proto se odebere celé ubytování. Jeho rezervace „{booking}“ zůstane v Rezervacích.',
   'dashboard.shrinkConfirm': 'Odebrat dny a uložit',
   'dashboard.shrinkUnknown':
     'Dny této cesty se nepodařilo ověřit. Pokud mají nová data méně dnů, uložení odebere poslední dny a vše, co je na nich naplánováno.',

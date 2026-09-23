@@ -94,7 +94,7 @@ A stay is tied to its check-in and check-out day, so it cannot outlive either of
 - **Deleting the day** in the **Reorder days** dialog cancels the stay cleanly, together with its Hotel booking and the expense of that booking. The question before the delete shows this line in red. See [Deleting a day](Day-Plans-and-Notes#deleting-a-day).
 - **Shortening the trip** removes the whole stay, also its nights that are still part of the trip, but leaves its booking under Bookings and its expense under Costs. The trip dialog shows the stay in red before it saves. See [Shortening a trip](Day-Plans-and-Notes#shortening-a-trip).
 
-A stay that only runs across a deleted day, with its check-in before and its check-out after it, is kept.
+A stay that only runs across a deleted day, with its check-in before and its check-out after it, is kept, one night shorter: its check-out day moves up with the days after the deleted one. The question before the delete names the stay and its new check-out date. Its Hotel booking is not changed, so a booking made with the hotel itself may need the same change there.
 
 ## In the day plan sidebar
 

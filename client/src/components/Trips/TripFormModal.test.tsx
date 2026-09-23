@@ -1,4 +1,4 @@
-// FE-COMP-TRIPFORM-001 to FE-COMP-TRIPFORM-095
+// FE-COMP-TRIPFORM-001 to FE-COMP-TRIPFORM-097
 import type { Mock } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
@@ -8,9 +8,9 @@ import { useTripStore } from '../../store/tripStore';
 import { useSettingsStore } from '../../store/settingsStore';
 import { usePermissionsStore } from '../../store/permissionsStore';
 import { resetAllStores, seedStore } from '../../../tests/helpers/store';
-import { buildUser, buildTrip, buildDay, buildAssignment, buildPlace, buildReservation } from '../../../tests/helpers/factories';
+import { buildUser, buildTrip, buildDay, buildAssignment, buildPlace, buildReservation, buildBudgetItem } from '../../../tests/helpers/factories';
 import { server } from '../../../tests/helpers/msw/server';
-import type { Accommodation, Reservation, Trip } from '../../types';
+import type { Accommodation, BudgetItem, Reservation, Trip } from '../../types';
 import { MAX_TRIP_DAYS } from '@trek/shared';
 import TripFormModal from './TripFormModal';
 
@@ -1295,7 +1295,7 @@ describe('TripFormModal', () => {
 
   /** A week in October with a place on its last two days, and the trip's bookings and stays. */
   const shrinkableTrip = () => buildTrip({ id: 1, title: 'Coast week', start_date: '2026-10-01', end_date: '2026-10-07' });
-  const seedTripDays = (extras: { reservations?: Reservation[]; accommodations?: Accommodation[]; empty?: boolean } = {}) => {
+  const seedTripDays = (extras: { reservations?: Reservation[]; accommodations?: Accommodation[]; budget?: BudgetItem[]; empty?: boolean } = {}) => {
     const days = Array.from({ length: 7 }, (_, i) => buildDay({
       id: 300 + i,
       trip_id: 1,
@@ -1307,6 +1307,7 @@ describe('TripFormModal', () => {
       http.get('/api/trips/:id/days', () => HttpResponse.json({ days })),
       http.get('/api/trips/:id/reservations', () => HttpResponse.json({ reservations: extras.reservations ?? [] })),
       http.get('/api/trips/:id/accommodations', () => HttpResponse.json({ accommodations: extras.accommodations ?? [] })),
+      http.get('/api/trips/:id/budget', () => HttpResponse.json({ items: extras.budget ?? [] })),
     );
   };
   const changeEndDate = async (user: ReturnType<typeof userEvent.setup>, iso: string) => {
@@ -1320,6 +1321,7 @@ describe('TripFormModal', () => {
     seedTripDays({
       accommodations: [{ id: 9, trip_id: 1, start_day_id: 304, end_day_id: 306, place_name: 'Harbour Hotel' } as Accommodation],
       reservations: [buildReservation({ id: 70, day_id: 304, type: 'hotel', title: 'Harbour, 2 nights', accommodation_id: 9 })],
+      budget: [buildBudgetItem({ reservation_id: 70, total_price: 240 })],
     });
     const user = userEvent.setup();
     const onSave = vi.fn().mockResolvedValue({});
@@ -1420,6 +1422,44 @@ describe('TripFormModal', () => {
     await waitFor(() => expect(screen.queryByRole('list', { name: 'Remove days?' })).not.toBeInTheDocument());
     expect(screen.getByDisplayValue('Coast week')).toBeInTheDocument();
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('FE-COMP-TRIPFORM-096: Escape in the warning goes back to the form, like Back, and keeps the edit', async () => {
+    seedTripDays();
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<TripFormModal {...defaultProps} onClose={onClose} trip={shrinkableTrip()} onSave={vi.fn()} />);
+
+    const title = screen.getByDisplayValue('Coast week');
+    await user.clear(title);
+    await user.type(title, 'Coast week, shorter');
+    await changeEndDate(user, '2026-10-05');
+    await user.click(screen.getByRole('button', { name: /Update/i }));
+    await screen.findByRole('list', { name: 'Remove days?' });
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('list', { name: 'Remove days?' })).not.toBeInTheDocument());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Coast week, shorter')).toBeInTheDocument();
+    // Out of the warning, Escape closes the dialog as before.
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('FE-COMP-TRIPFORM-097: a removed stay whose booking carries no expense does not claim one', async () => {
+    seedTripDays({
+      accommodations: [{ id: 9, trip_id: 1, start_day_id: 304, end_day_id: 306, place_name: 'Harbour Hotel' } as Accommodation],
+      reservations: [buildReservation({ id: 70, day_id: 304, type: 'hotel', title: 'Harbour, 2 nights', accommodation_id: 9 })],
+    });
+    const user = userEvent.setup();
+    render(<TripFormModal {...defaultProps} trip={shrinkableTrip()} onSave={vi.fn()} />);
+
+    await changeEndDate(user, '2026-10-05');
+    await user.click(screen.getByRole('button', { name: /Update/i }));
+
+    const list = await screen.findByRole('list', { name: 'Remove days?' });
+    expect(within(list).getByText('Checks in or out on a removed day, so the whole stay is removed. Its booking "Harbour, 2 nights" stays under Bookings.')).toBeInTheDocument();
+    expect(within(list).queryByText(/its expense/)).not.toBeInTheDocument();
   });
 
   it('FE-COMP-TRIPFORM-094: when the days cannot be read it still warns, in general terms', async () => {

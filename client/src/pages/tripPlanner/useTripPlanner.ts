@@ -122,12 +122,14 @@ export function useTripPlanner() {
   const tripActions = useRef(useTripStore.getState()).current
   const can = useCanDo()
   const canUploadFiles = can('file_upload', trip)
-  const { pushUndo, undo, canUndo, lastActionLabel } = usePlannerHistory()
+  const { pushUndo, undo, forgetDay, canUndo, lastActionLabel } = usePlannerHistory()
 
+  // A step that could not be taken back says so instead of claiming it was.
   const handleUndo = useCallback(async () => {
     const label = lastActionLabel
-    await undo()
-    toast.info(t('undo.done', { action: label ?? '' }))
+    const undone = await undo()
+    if (undone === false) toast.error(t('undo.failed', { action: label ?? '' }))
+    else if (undone) toast.info(t('undo.done', { action: label ?? '' }))
   }, [undo, lastActionLabel, toast])
 
   const [enabledAddons, setEnabledAddons] = useState<Record<string, boolean>>({ packing: true, budget: true, documents: true, collab: false, roadtrip: false, dawarich: false })
@@ -304,7 +306,10 @@ export function useTripPlanner() {
     startResizeLeft, startResizeRight,
   } = useResizablePanels()
   const { selectedPlaceId, selectedAssignmentId, setSelectedPlaceId, selectAssignment } = usePlaceSelection()
-  const [showDayDetail, setShowDayDetail] = useState<Day | null>(null)
+  const [dayDetail, setShowDayDetail] = useState<Day | null>(null)
+  // A day deleted while its panel is open, here or by a fellow traveller, takes
+  // the panel along instead of leaving it on a day that is gone.
+  const showDayDetail = dayDetail && days.some(d => d.id === dayDetail.id) ? dayDetail : null
   const [dayDetailCollapsed, setDayDetailCollapsed] = useState(false)
   const [showPlaceForm, setShowPlaceForm] = useState<boolean>(false)
   const [editingPlace, setEditingPlace] = useState<Place | null>(null)
@@ -2330,8 +2335,9 @@ export function useTripPlanner() {
             route_geometry: capturedPlace.route_geometry,
             route_color: capturedPlace.route_color,
           })
+          const live = new Set(useTripStore.getState().days.map(d => d.id))
           for (const { dayId, orderIndex } of capturedAssignments) {
-            await tripActions.assignPlaceToDay(tripId, dayId, newPlace.id, orderIndex)
+            if (live.has(dayId)) await tripActions.assignPlaceToDay(tripId, dayId, newPlace.id, orderIndex)
           }
         })
       }
@@ -2354,6 +2360,7 @@ export function useTripPlanner() {
       toast.success(t('trip.toast.placesDeleted', { count: capturedPlaces.length }))
       if (capturedPlaces.length > 0) {
         pushUndo(t('undo.deletePlaces'), async () => {
+          const live = new Set(useTripStore.getState().days.map(d => d.id))
           for (const place of capturedPlaces) {
             const newPlace = await tripActions.addPlace(tripId, {
               name: place.name, description: place.description,
@@ -2361,7 +2368,7 @@ export function useTripPlanner() {
               category_id: place.category_id, price: place.price,
               route_geometry: place.route_geometry, route_color: place.route_color,
             })
-            for (const a of capturedAssignments.filter(x => x.placeId === place.id)) {
+            for (const a of capturedAssignments.filter(x => x.placeId === place.id && live.has(x.dayId))) {
               await tripActions.assignPlaceToDay(tripId, a.dayId, newPlace.id, a.orderIndex)
             }
           }
@@ -2414,7 +2421,7 @@ export function useTripPlanner() {
         const capturedTarget = target
         pushUndo(t('undo.assignPlace'), async () => {
           await tripActions.removeAssignment(tripId, capturedTarget, capturedAssignmentId)
-        })
+        }, [capturedTarget])
       }
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : t('common.unknownError')) }
   }, [selectedDayId, tripId, toast, updateRouteForDay, pushUndo, t, places, storedAssignments, tripAccommodations, roadtripVias, viasAfterInsert])
@@ -2462,7 +2469,7 @@ export function useTripPlanner() {
         const capturedPos = capturedOrderIndex
         pushUndo(t('undo.removeAssignment'), async () => {
           await tripActions.assignPlaceToDay(tripId, capturedDayId, capturedPlaceId, capturedPos)
-        })
+        }, [capturedDayId])
       }
     }
     catch (err: unknown) { toast.error(err instanceof Error ? err.message : t('common.unknownError')) }
@@ -2491,7 +2498,7 @@ export function useTripPlanner() {
           const capturedPrevIds = prevIds
           pushUndo(t('undo.reorder'), async () => {
             await tripActions.reorderAssignments(tripId, capturedDayId, capturedPrevIds)
-          })
+          }, [capturedDayId])
         })
         .catch(err => toast.error(err instanceof Error ? err.message : t('trip.toast.reorderError')))
       updateRouteForDay(dayId)
@@ -2527,11 +2534,14 @@ export function useTripPlanner() {
   })
 
   // A deleted day can take a stay along, and the selected day's route may have
-  // lost its day or its stops.
-  const afterDayDeleted = useCallback(() => {
+  // lost its day or its stops. Its panel closes, and undo steps that would act
+  // on it are dropped rather than left to fail.
+  const afterDayDeleted = useCallback((dayId: number) => {
+    setShowDayDetail(open => (open?.id === dayId ? null : open))
+    forgetDay(dayId)
     loadAccommodations()
     updateRouteForDay(useTripStore.getState().selectedDayId)
-  }, [loadAccommodations, updateRouteForDay])
+  }, [loadAccommodations, updateRouteForDay, forgetDay])
   const dayDelete = useDayDelete({
     tripId, trip, days, places: allPlaces, reservations, accommodations: tripAccommodations,
     canEditDays: can('day_edit', trip), t, locale, toast, onDeleted: afterDayDeleted,

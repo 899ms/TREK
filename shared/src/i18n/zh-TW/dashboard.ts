@@ -96,7 +96,7 @@ const dashboard: TranslationStrings = {
   'dashboard.dateShiftAll': '全部移動',
   'dashboard.dateShiftAllDesc': '整個行程都會隨新日期移動，包括預訂和住宿。',
   'dashboard.dateShiftHint':
-    '提示：若只想移動部分行程，請在規劃頁面的「重新排序日期」中新增一天，並將它移到需要空出的位置。',
+    '提示：若只想移動部分行程，請在規劃頁面開啟「重新排序日期」，用顯示日期的按鈕新增行程結束後的那一天，再將它移到需要空出的位置。',
   'dashboard.shrinkTitle': '移除天數？',
   'dashboard.shrinkIntro': '儲存新日期後，將移除以下這些天：',
   'dashboard.shrinkMoreDays': '另外 {count} 天',
@@ -107,6 +107,8 @@ const dashboard: TranslationStrings = {
   'dashboard.shrinkStayHint': '入住或退房在被移除的某一天，因此整個住宿都會被移除。',
   'dashboard.shrinkStayBookedHint':
     '入住或退房在被移除的某一天，因此整個住宿都會被移除。其預訂「{booking}」及費用會保留在「預訂」中。',
+  'dashboard.shrinkStayBookingHint':
+    '入住或退房在被移除的某一天，因此整個住宿都會被移除。其預訂「{booking}」會保留在「預訂」中。',
   'dashboard.shrinkConfirm': '移除天數並儲存',
   'dashboard.shrinkUnknown':
     '無法檢查此旅行的天數。如果新日期包含的天數較少，儲存時會移除最後幾天及其中規劃的所有內容。',

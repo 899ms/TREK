@@ -557,7 +557,10 @@ export function handleRemoteEvent(set: SetState, get: GetState, event: WebSocket
   }
 
   // A deleted day cancels a stay that checked in or out on it, and the stays
-  // live in page-local planner state rather than this store.
+  // live in page-local planner state rather than this store. This rides the
+  // planner's existing accommodations:refresh event on purpose, the legacy
+  // window bus the place image and trip date handlers here use as well.
+  // Retiring it means moving the stays into a store slice, a change of its own.
   if (type === 'day:deleted') window.dispatchEvent(new CustomEvent('accommodations:refresh'))
 
   // A reorder/insert re-pins dates and re-stamps booking times server-side, so

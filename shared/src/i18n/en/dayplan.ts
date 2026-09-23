@@ -104,11 +104,20 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayStayHint': 'Checks in or out on this day and is cancelled.',
   'dayplan.deleteDayStayBookedHint':
     'Checks in or out on this day and is cancelled, together with the booking “{booking}” and its expense.',
+  'dayplan.deleteDayStayBookingHint':
+    'Checks in or out on this day and is cancelled, together with the booking “{booking}”.',
+  'dayplan.deleteDayStayPaidHint':
+    'Checks in or out on this day and is cancelled, together with the booking “{booking}” and its expense of {amount}.',
   'dayplan.deleteDayShift': 'Later days: {count}',
   'dayplan.deleteDayShiftHint': 'Each moves one date earlier.',
   'dayplan.deleteDayShiftBookingsHint': 'Each moves one date earlier. Bookings moving along: {count}',
   'dayplan.deleteDayShrink': 'Trip now ends on {date}',
   'dayplan.deleteDayShrinkHint': 'There is no day without a date to take over the last date.',
+  'dayplan.impactStayShorter': 'Stay at {name}: one night less',
+  'dayplan.deleteDayStayShorterHint': 'It runs across this day and now checks out on {date}.',
+  'dayplan.deleteDayStayShorterUndatedHint': 'It runs across this day and now ends one day earlier.',
+  'dayplan.deleteDaySpareDated': '{day} takes the date {date}',
+  'dayplan.deleteDaySpareDatedHint': 'It is the first day without a date, and it takes over the last date of the trip.',
   'dayplan.deleteDayLast': 'A trip needs at least one day',
   'dayplan.daysOffline': 'Changing days needs a connection',
   'dayplan.deleteDaySuccess': 'Day deleted',
