@@ -946,6 +946,14 @@ describe('MapView selection panning (#921)', () => {
     expect(mapMock.panTo).toHaveBeenCalledWith([48, 2], { animate: true })
   })
 
+  it('FE-COMP-MAPVIEW-083: pans to a selected stay whose pin a filter keeps off the map', () => {
+    const places = [buildMapPlace({ id: 9, lat: 48, lng: 2 })]
+    const stay = buildMapPlace({ id: 11, lat: 50, lng: 4 })
+    const { rerender } = render(<MapView places={places} selectedPlaceId={null} />)
+    rerender(<MapView places={places} selectedPlaceId={11} selectedPlace={stay} />)
+    expect(mapMock.panTo).toHaveBeenCalledWith([50, 4], { animate: true })
+  })
+
   it('FE-COMP-MAPVIEW-053: a selected place without coordinates is not panned to', () => {
     const places = [buildMapPlace({ id: 10, lat: null, lng: null })]
     const { rerender } = render(<MapView places={places} selectedPlaceId={null} />)

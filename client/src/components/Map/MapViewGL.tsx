@@ -42,6 +42,7 @@ import { buildPoiPopupHtml } from './placePopup'
 import { pluginsApi, type PluginMapMarker, type PluginMapLayer } from '../../api/client'
 import { DEFAULT_MAP_CENTER, DEFAULT_MAP_ZOOM, SATELLITE_TILE_URL, SATELLITE_TILE_ATTRIBUTION, SATELLITE_TILE_MAXZOOM } from '../../constants/mapDefaults'
 import { computeMapViewport, TILE_SIZE_GL, type ViewportPadding } from '../../utils/mapViewport'
+import { selectedPlaceTarget } from './selectedPlaceTarget'
 
 function categoryIconSvg(iconName: string | null | undefined, size: number): string {
   const IconComponent = (iconName && CATEGORY_ICON_MAP[iconName]) || CATEGORY_ICON_MAP['MapPin']
@@ -147,6 +148,8 @@ interface Props {
   routeColors?: ({ line: string; casing: string } | undefined)[] | null
   routeSegments?: RouteSegment[]
   selectedPlaceId?: number | null
+  /** The selected place itself, for when no pin on this map stands for it. */
+  selectedPlace?: Place | null
   onMarkerClick?: (id: number) => void
   hoverDisabled?: boolean
   onMapClick?: (info: { latlng: { lat: number; lng: number } }) => void
@@ -676,6 +679,7 @@ export function MapViewGL({
   routeColors = null,
   routeSegments = NO_ROUTE_SEGMENTS,
   selectedPlaceId = null,
+  selectedPlace = null,
   hoverDisabled = false,
   onMarkerClick,
   onMapClick,
@@ -2308,7 +2312,7 @@ export function MapViewGL({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !selectedPlaceId) return
-    const target = places.find(p => p.id === selectedPlaceId) || dayPlaces.find(p => p.id === selectedPlaceId)
+    const target = selectedPlaceTarget(selectedPlaceId, places, dayPlaces, selectedPlace)
     if (!target?.lat || !target?.lng) return
     try {
       map.flyTo({

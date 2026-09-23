@@ -432,6 +432,7 @@ function TripPlannerPageDesktop(): React.ReactElement | null {
               selectedDayId={selectedDayId}
               routeSegments={roadtripActive ? roadtripRoutes.segments : overviewActive ? tripOverview.segments : routeSegments}
               selectedPlaceId={selectedPlaceId}
+              selectedPlace={selectedPlace}
               onMarkerClick={handleMarkerClick}
               onMapClick={handleMapClick}
               onMapContextMenu={handleMapContextMenu}

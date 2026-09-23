@@ -330,10 +330,11 @@ interface SelectionControllerProps {
   places: Place[]
   selectedPlaceId: number | null
   dayPlaces: Place[]
+  selectedPlace: Place | null
   paddingOpts: L.FitBoundsOptions
 }
 
-function SelectionController({ places, selectedPlaceId, dayPlaces, paddingOpts }: SelectionControllerProps) {
+function SelectionController({ places, selectedPlaceId, dayPlaces, selectedPlace, paddingOpts }: SelectionControllerProps) {
   const map = useMap()
   const prev = useRef(null)
 
@@ -343,7 +344,7 @@ function SelectionController({ places, selectedPlaceId, dayPlaces, paddingOpts }
       // side-panel + bottom-inspector padding so the pin lands in the middle of the
       // *visible* map area rather than the geometric centre (where the bottom panel
       // would cover it). Reuses the same paddingOpts the fit-bounds path uses.
-      const selected = places.find(p => p.id === selectedPlaceId)
+      const selected = selectedPlaceTarget(selectedPlaceId, places, dayPlaces, selectedPlace)
       if (selected?.lat != null && selected?.lng != null) {
         const latlng: [number, number] = [selected.lat, selected.lng]
         const tl = paddingOpts.paddingTopLeft as [number, number] | undefined
@@ -357,7 +358,7 @@ function SelectionController({ places, selectedPlaceId, dayPlaces, paddingOpts }
       }
     }
     prev.current = selectedPlaceId
-  }, [selectedPlaceId, places, map])
+  }, [selectedPlaceId, places, dayPlaces, selectedPlace, map])
 
   return null
 }
@@ -553,6 +554,7 @@ import { useIsPhone } from '../../mobile/useIsPhone'
 // shared useGeolocation hook so the Leaflet and Mapbox variants behave
 // identically. Heading is shown as a rotated conic SVG when available.
 import type { GeoPosition, TrackingMode } from '../../hooks/useGeolocation'
+import { selectedPlaceTarget } from './selectedPlaceTarget'
 
 function LeafletLocationLayer({ position, mode }: { position: GeoPosition | null; mode: TrackingMode }) {
   const map = useMap()
@@ -678,6 +680,8 @@ export const MapView = memo(function MapView({
   routeColors = null,
   routeSegments = [],
   selectedPlaceId = null,
+  // The selected place itself, for when no pin on this map stands for it.
+  selectedPlace = null,
   hoverDisabled = false,
   onMarkerClick,
   onMapClick,
@@ -1130,7 +1134,7 @@ export const MapView = memo(function MapView({
 
       <MapController center={center} zoom={zoom} />
       <BoundsController places={dayPlaces.length > 0 ? dayPlaces : places} routeCoords={dayPlaces.length > 0 ? routeCoords : []} fitKey={fitKey} paddingOpts={paddingOpts} framedOnMount={initialView.framed} focusPoints={focusPoints} fitPadding={fitPadding} />
-      <SelectionController places={places} selectedPlaceId={selectedPlaceId} dayPlaces={dayPlaces} paddingOpts={paddingOpts} />
+      <SelectionController places={places} selectedPlaceId={selectedPlaceId} dayPlaces={dayPlaces} selectedPlace={selectedPlace} paddingOpts={paddingOpts} />
       <MapClickHandler onClick={onMapClick} />
       <MapContextMenuHandler onContextMenu={onMapContextMenu} />
       <CameraHoverGuard movingRef={mapMovingRef} onMoveStart={clearHover} onZoom={setMapZoom} />
