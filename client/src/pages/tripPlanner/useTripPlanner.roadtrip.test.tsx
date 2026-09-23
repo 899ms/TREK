@@ -1167,7 +1167,11 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
       routedDay()
       openWith([detour({ hasFerry: true, avoids: 'motorway', engine: 'valhalla' })])
       rt.legRoute.mockResolvedValue(answer(RAIL_LINE, { hasFerry: false }))
-      const { result } = await renderRoadtrip()
+      // Road trip MODE never turns on at phone width (the drive lives on its own tab), so
+      // this mounts the way the phone suites do and waits for that tab instead.
+      const { result } = renderHook(() => useTripPlanner(), { wrapper })
+      await act(async () => { await Promise.resolve() })
+      await waitFor(() => expect(result.current.TRIP_TABS.some(tab => tab.id === 'roadtrip')).toBe(true))
 
       await act(async () => { await result.current.chooseRouteAlternative(1) })
 
