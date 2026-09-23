@@ -38,15 +38,16 @@ export default function MConfirmSheet({
       <div className="flex min-h-0 flex-col p-[18px]">
         <div className="flex-none text-[0.9375rem] font-extrabold text-m-ink">{title}</div>
         <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-          <p className="mt-2 text-[0.78125rem] leading-relaxed text-m-muted">{message}</p>
+          <p className="mt-2 text-[0.78125rem] leading-relaxed text-m-muted text-pretty">{message}</p>
           {children}
         </div>
-        <div className="mt-4 flex flex-none justify-end gap-2">
-          <MSetButton variant="ghost" onClick={onClose}>
+        {/* A long label moves its button to a row of its own instead of wrapping inside it. */}
+        <div className="mt-4 flex flex-none flex-wrap justify-end gap-2">
+          <MSetButton variant="ghost" onClick={onClose} className="whitespace-nowrap">
             {cancelLabel}
           </MSetButton>
           {onConfirm && confirmLabel && (
-            <MSetButton variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy}>
+            <MSetButton variant={danger ? 'danger' : 'primary'} onClick={onConfirm} disabled={busy} className="whitespace-nowrap">
               {confirmLabel}
             </MSetButton>
           )}

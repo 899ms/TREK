@@ -6,7 +6,7 @@ import { buildPlanner, buildShell } from '../../../helpers/mobileTrip'
 import { resetAllStores } from '../../../helpers/store'
 import { cleanup, fireEvent, render, screen } from '../../../helpers/render'
 
-// FE-MOB-DAYSS-001 to FE-MOB-DAYSS-019
+// FE-MOB-DAYSS-001 to FE-MOB-DAYSS-020
 //
 // The sheet reads its copy from the real TranslationProvider (useTranslation),
 // not from planner.t — assertions therefore go against the English strings.
@@ -148,46 +148,61 @@ describe('MDaysSheet', () => {
     const dayAdd = (overrides: Partial<TripPlanner['dayAdd']> = {}): TripPlanner['dayAdd'] => ({
       nextDate: '2026-10-13', blocked: null, datedBlocked: null, busy: false, onAddDated: vi.fn(), ...overrides,
     })
-    const datedTile = () => screen.getByRole('button', { name: /^Add .*Oct 13/ })
-    const undatedTile = () => screen.getByRole('button', { name: /^Add day without date/ })
+    const datedButton = () => screen.getByRole('button', { name: /^Add .*Oct 13/ })
+    const undatedButton = () => screen.getByRole('button', { name: 'Without date' })
 
-    it('FE-MOB-DAYSS-016: two tiles, the next date and a day without one, each with what it does', () => {
+    it('FE-MOB-DAYSS-016: two buttons, the next date and a day without one, under a line saying what the dated one does', () => {
       const { planner } = renderSheet({ dayAdd: dayAdd() })
       // formatDate adds the year once the date lies outside the current year.
-      expect(datedTile()).toHaveTextContent(/Extends the trip by one day, until .*Oct 13(, \d{4})?\./)
-      expect(undatedTile()).toHaveTextContent('The trip dates stay as they are.')
+      expect(screen.getByText(/^Extends the trip by one day, until .*Oct 13(, \d{4})?\.$/)).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Add day' })).not.toBeInTheDocument()
 
-      fireEvent.click(datedTile())
+      fireEvent.click(datedButton())
       expect(planner.dayAdd.onAddDated).toHaveBeenCalledTimes(1)
       expect(planner.handleAddDay).not.toHaveBeenCalled()
-      fireEvent.click(undatedTile())
+      fireEvent.click(undatedButton())
       expect(planner.handleAddDay).toHaveBeenCalledTimes(1)
     })
 
-    it('FE-MOB-DAYSS-017: a read-only member gets neither tile', () => {
+    it('FE-MOB-DAYSS-017: a read-only member gets neither button', () => {
       renderSheet({ can: vi.fn(() => false), dayAdd: dayAdd() })
       expect(screen.queryByRole('button', { name: /^Add/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Without date' })).not.toBeInTheDocument()
     })
 
     it('FE-MOB-DAYSS-018: busy or offline turns both off, and the offline sentence is said once', () => {
       renderSheet({ dayAdd: dayAdd({ busy: true }) })
-      expect(datedTile()).toBeDisabled()
-      expect(undatedTile()).toBeDisabled()
+      expect(datedButton()).toBeDisabled()
+      expect(undatedButton()).toBeDisabled()
       cleanup()
 
       const offline = 'Changing days needs a connection'
       renderSheet({ deleteDayBlocked: offline, dayAdd: dayAdd({ blocked: offline }) })
-      expect(datedTile()).toBeDisabled()
-      expect(undatedTile()).toBeDisabled()
+      expect(datedButton()).toBeDisabled()
+      expect(undatedButton()).toBeDisabled()
       expect(screen.getAllByText(offline)).toHaveLength(1)
+      // The offline sentence stands in for the dated line, not beside it.
+      expect(screen.queryByText(/^Extends the trip/)).not.toBeInTheDocument()
     })
 
-    it('FE-MOB-DAYSS-019: a trip at the day limit keeps the undated tile and says why the dated one is off', () => {
+    it('FE-MOB-DAYSS-019: a trip at the day limit keeps the undated button and says why the dated one is off', () => {
       renderSheet({ dayAdd: dayAdd({ datedBlocked: 'A trip can span at most 999 days' }) })
-      expect(datedTile()).toBeDisabled()
-      expect(datedTile()).toHaveTextContent('A trip can span at most 999 days')
-      expect(undatedTile()).toBeEnabled()
+      expect(datedButton()).toBeDisabled()
+      expect(screen.getByText('A trip can span at most 999 days')).toBeInTheDocument()
+      expect(undatedButton()).toBeEnabled()
+    })
+
+    it('FE-MOB-DAYSS-020: the add buttons stay in reach below the list, which scrolls on its own', () => {
+      renderSheet({ dayAdd: dayAdd() })
+      const list = screen.getByText('Old Town').closest('.overflow-y-auto')
+      expect(list).not.toBeNull()
+      expect(list).not.toContainElement(datedButton())
+      expect(list).not.toContainElement(undatedButton())
+      // One tap size for both, and a label that never wraps inside its button.
+      for (const button of [datedButton(), undatedButton()]) {
+        expect(button).toHaveClass('h-11')
+        expect(button).toHaveClass('whitespace-nowrap')
+      }
     })
   })
 })

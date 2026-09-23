@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 import MConfirmSheet from '../../../../src/mobile/screens/settings/MConfirmSheet'
 
-// FE-MOB-CONFIRM-001 to FE-MOB-CONFIRM-003
+// FE-MOB-CONFIRM-001 to FE-MOB-CONFIRM-004
 
 describe('MConfirmSheet', () => {
   it('FE-MOB-CONFIRM-001: a long list scrolls between the title and the buttons, which stay in reach', () => {
@@ -42,5 +42,12 @@ describe('MConfirmSheet', () => {
   it('FE-MOB-CONFIRM-003: without onConfirm it is a notice with a single button', () => {
     render(<MConfirmSheet open onClose={vi.fn()} title="Heads up" message="Nothing to confirm." cancelLabel="OK" />)
     expect(screen.getAllByRole('button').map(b => b.textContent)).toEqual(['OK'])
+  })
+  it('FE-MOB-CONFIRM-004: a long label never wraps inside its button; the row makes room instead', () => {
+    render(<MConfirmSheet open onClose={vi.fn()} title="Remove days?" message="Saving removes these days:" confirmLabel="Retirer les jours et enregistrer" cancelLabel="Annuler" danger onConfirm={vi.fn()} />)
+    const confirm = screen.getByRole('button', { name: 'Retirer les jours et enregistrer' })
+    expect(confirm).toHaveClass('whitespace-nowrap')
+    expect(screen.getByRole('button', { name: 'Annuler' })).toHaveClass('whitespace-nowrap')
+    expect(confirm.parentElement).toHaveClass('flex-wrap')
   })
 })

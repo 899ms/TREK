@@ -122,7 +122,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Modifier les jours nécessite une connexion',
   'dayplan.deleteDaySuccess': 'Jour supprimé',
   'dayplan.deleteDayError': 'Échec de la suppression du jour',
-  'dayplan.addUndatedDay': 'Ajouter un jour sans date',
+  'dayplan.addUndatedDay': 'Sans date',
   'dayplan.addUndatedDayHint': 'Ajoute un jour sans date à la fin. Les dates du voyage ne changent pas.',
   'dayplan.addDatedDay': 'Ajouter {date}',
   'dayplan.addDatedDayHint': "Prolonge le voyage d'un jour, jusqu'au {date}.",

@@ -23,6 +23,18 @@ export interface ImpactLine {
 }
 
 /**
+ * The delete question while it is open. The reorder dialog asks it in place of
+ * its day list: which day, the title and the list, and the two ways out.
+ */
+export interface DayDeleteQuestion {
+  dayId: number
+  title: string
+  lines: ImpactLine[]
+  onCancel: () => void
+  onConfirm: () => void
+}
+
+/**
  * The question the list answers. Deleting a day cancels a stay cleanly, with
  * its booking and expense. Shortening a trip removes the stay through the day
  * rows instead and leaves its booking behind. So the hints are looked up per

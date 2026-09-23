@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react'
 import { useTripStore } from '../../store/tripStore'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { dayDeleteImpact, deleteDayBlockedReason } from '../../utils/dayDeleteImpact'
-import { deleteDayLines as buildDeleteDayLines, type ImpactLine } from '../../utils/dayImpactLines'
+import { deleteDayLines as buildDeleteDayLines, type DayDeleteQuestion, type ImpactLine } from '../../utils/dayImpactLines'
 import { dayLabel } from '../../utils/dayLabel'
 import { formatDate } from '../../utils/formatters'
 import type { Accommodation, Day, Place, Reservation, Trip } from '../../types'
@@ -39,6 +39,8 @@ export interface DayDelete {
   deleteDayBlocked: string | null
   handleDeleteDay: (dayId: number) => void
   confirmDeleteDay: () => Promise<void>
+  /** The same question as one object, for the reorder dialog to ask in place; null while none is open. */
+  deleteDayQuestion: DayDeleteQuestion | null
 }
 
 const byNumber = (a: Day, b: Day): number => (a.day_number ?? 0) - (b.day_number ?? 0)
@@ -100,5 +102,13 @@ export function useDayDelete(options: DayDeleteOptions): DayDelete {
     toast.success(t('dayplan.deleteDaySuccess'))
   }, [deleteDayId, tripId, toast, t, onDeleted])
 
-  return { deleteDayId, setDeleteDayId, deleteDayTitle, deleteDayLines, deleteDayBlocked, handleDeleteDay, confirmDeleteDay }
+  const cancelDeleteDay = useCallback(() => setDeleteDayId(null), [])
+  const deleteDayQuestion = useMemo<DayDeleteQuestion | null>(
+    () => (target
+      ? { dayId: target.id, title: deleteDayTitle, lines: deleteDayLines, onCancel: cancelDeleteDay, onConfirm: () => { void confirmDeleteDay() } }
+      : null),
+    [target, deleteDayTitle, deleteDayLines, cancelDeleteDay, confirmDeleteDay],
+  )
+
+  return { deleteDayId, setDeleteDayId, deleteDayTitle, deleteDayLines, deleteDayBlocked, handleDeleteDay, confirmDeleteDay, deleteDayQuestion }
 }

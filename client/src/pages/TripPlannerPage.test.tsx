@@ -1771,24 +1771,26 @@ describe('TripPlannerPage', () => {
         expect(screen.getByTestId('day-plan-sidebar')).toBeInTheDocument();
       });
 
-      // The sidebar hands the reorder dialog its delete action; nothing opens until it is used.
+      // The sidebar hands the reorder dialog its delete action; no question is open until it is used.
       expect(typeof capturedDayPlanSidebarProps.current.onDeleteDay).toBe('function');
-      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
+      expect(capturedDayPlanSidebarProps.current.deleteDayQuestion).toBeNull();
 
       await act(async () => { capturedDayPlanSidebarProps.current.onDeleteDay(harbour.id); });
 
+      // The question goes to the reorder dialog, which asks it in place of its
+      // list; the page stacks no second dialog on top of it.
       await waitFor(() => {
-        expect(capturedConfirmDialogsByTitle.current['Delete Harbour day?']?.isOpen).toBe(true);
+        expect(capturedDayPlanSidebarProps.current.deleteDayQuestion?.dayId).toBe(harbour.id);
       });
-      const dialog = capturedConfirmDialogsByTitle.current['Delete Harbour day?'];
-      expect(dialog.message).toBe('The day is removed from the trip. This cannot be undone.');
-      expect(dialog.confirmLabel).toBe('Delete day');
-      expect(screen.getByRole('list', { name: 'Delete Harbour day?' })).toHaveTextContent('Day titles and descriptions: 1');
+      expect(capturedConfirmDialogsByTitle.current['Delete Harbour day?']).toBeUndefined();
+      const question = capturedDayPlanSidebarProps.current.deleteDayQuestion;
+      expect(question.title).toBe('Delete Harbour day?');
+      expect(question.lines.map((l: { text: string }) => l.text)).toContain('Day titles and descriptions: 1');
 
-      await act(async () => { await dialog.onConfirm?.(); });
+      await act(async () => { question.onConfirm(); });
       expect(deleteDay).toHaveBeenCalledWith(42, harbour.id);
       await waitFor(() => {
-        expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
+        expect(capturedDayPlanSidebarProps.current.deleteDayQuestion).toBeNull();
       });
     });
   });

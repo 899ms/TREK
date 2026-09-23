@@ -123,7 +123,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Změna dnů vyžaduje připojení',
   'dayplan.deleteDaySuccess': 'Den smazán',
   'dayplan.deleteDayError': 'Den se nepodařilo smazat',
-  'dayplan.addUndatedDay': 'Přidat den bez data',
+  'dayplan.addUndatedDay': 'Bez data',
   'dayplan.addUndatedDayHint': 'Přidá na konec den bez data. Termín cesty zůstane stejný.',
   'dayplan.addDatedDay': 'Přidat {date}',
   'dayplan.addDatedDayHint': 'Prodlouží cestu o jeden den, do {date}.',

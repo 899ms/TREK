@@ -125,7 +125,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'Η αλλαγή ημερών απαιτεί σύνδεση',
   'dayplan.deleteDaySuccess': 'Η ημέρα διαγράφηκε',
   'dayplan.deleteDayError': 'Η διαγραφή της ημέρας απέτυχε',
-  'dayplan.addUndatedDay': 'Προσθήκη ημέρας χωρίς ημερομηνία',
+  'dayplan.addUndatedDay': 'Χωρίς ημερομηνία',
   'dayplan.addUndatedDayHint':
     'Προσθέτει στο τέλος μια ημέρα χωρίς ημερομηνία. Οι ημερομηνίες του ταξιδιού μένουν ίδιες.',
   'dayplan.addDatedDay': 'Προσθήκη {date}',

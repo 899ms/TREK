@@ -5,67 +5,23 @@ import { INNER_CLS, TileHeader } from './MTripSheetUi'
 import { useTranslation } from '../../../../i18n'
 import { dayLabel } from '../../../../utils/dayLabel'
 import { formatDate } from '../../../../utils/formatters'
-import type { DayAddControls } from '../../../../utils/dayAdd'
 import type { MTripSheetsProps } from '../MTripShell'
 
-const TILE = 'flex w-full items-center gap-[10px] rounded-[13px] px-[11px] text-left disabled:opacity-40'
-const TILE_ICON = 'flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full'
-const TILE_TITLE = 'block text-[0.8125rem] font-semibold leading-tight'
-const TILE_HINT = 'mt-[2px] block text-[0.6875rem] leading-snug'
-
-/**
- * The two ways to add a day on a trip with dates, as tiles: the next date on
- * top in the action colour, since it is the one that moves the trip's end, and
- * a day without a date below it in the dashed look the single button had.
- */
-function DayAddTiles({ dayAdd, date, onAddUndated, t }: {
-  dayAdd: DayAddControls
-  date: string
-  onAddUndated: () => void
-  t: (key: string, params?: Record<string, string | number>) => string
-}) {
-  const addOff = dayAdd.busy || !!dayAdd.blocked
-  return (
-    <div className="mt-[10px] flex flex-col gap-[6px]">
-      <button
-        type="button"
-        onClick={dayAdd.onAddDated}
-        disabled={addOff || !!dayAdd.datedBlocked}
-        className={`${TILE} bg-m-act py-[9px] text-m-actfg`}
-      >
-        <span className={`${TILE_ICON} bg-[color:color-mix(in_srgb,var(--m-actfg)_14%,transparent)]`}>
-          <CalendarPlus size={14} strokeWidth={2.2} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className={TILE_TITLE}>{t('dayplan.addDatedDay', { date })}</span>
-          <span className={`${TILE_HINT} opacity-70`}>{dayAdd.datedBlocked ?? t('dayplan.addDatedDayHint', { date })}</span>
-        </span>
-      </button>
-      <button
-        type="button"
-        onClick={onAddUndated}
-        disabled={addOff}
-        className={`${TILE} border-[1.5px] border-dashed border-[color:var(--m-faint)] py-[8px] text-m-muted`}
-      >
-        <span className={`${TILE_ICON} bg-[color:var(--m-ic)]`}>
-          <Plus size={14} strokeWidth={2.2} />
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className={`${TILE_TITLE} text-m-ink`}>{t('dayplan.addUndatedDay')}</span>
-          <span className={TILE_HINT}>{t('dayplan.addUndatedDayHint')}</span>
-        </span>
-      </button>
-    </div>
-  )
-}
+/** A 44px pill, the tap size of the sheet's other actions; the label never wraps, the row does. */
+const PILL = 'inline-flex h-11 flex-1 basis-auto items-center justify-center gap-[6px] whitespace-nowrap rounded-full px-4 text-[0.8125rem] font-semibold disabled:opacity-40'
+const PILL_MAIN = `${PILL} bg-m-act text-m-actfg`
+const PILL_QUIET = `${PILL} border border-[color:var(--m-rowbr)] bg-[color:var(--m-ic)] text-m-ink`
 
 /**
  * Day management sheet ('days'): move whole days up/down, add a day or delete
  * one, the mobile counterpart of the desktop DayReorderPopup and button-based
  * like the rest of the touch reordering (#1432). A day's places, notes and
  * bookings move with it (store handles that optimistically). Delete only asks;
- * the confirm sheet with what goes with the day is MTripSheets'. On a trip with
- * dates a day can be added with the next date as well as without one.
+ * the confirm sheet with what goes with the day is MTripSheets'.
+ *
+ * Adding sits under the list and stays in reach while the list scrolls: on a
+ * trip with dates the next date, which extends the trip, and a day without a
+ * date, with one line above them saying what the dated one does.
  */
 export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
   const { t, locale } = useTranslation()
@@ -74,8 +30,13 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
   const ordered = [...planner.days].sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
   const deleteBlocked = planner.deleteDayBlocked
   const { dayAdd } = planner
-  // Offline, both say the same sentence; it is shown once.
-  const notices = [deleteBlocked, dayAdd.blocked].filter((n, i, all): n is string => !!n && all.indexOf(n) === i)
+  const addOff = dayAdd.busy || !!dayAdd.blocked
+  const date = dayAdd.nextDate ? formatDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate : null
+  // The lines above the buttons: why a day cannot be deleted, and what the
+  // dated button does or why adding is off. Offline both say the same
+  // sentence; it is shown once.
+  const addLine = dayAdd.blocked ?? (date ? dayAdd.datedBlocked ?? t('dayplan.addDatedDayHint', { date }) : null)
+  const captions = [deleteBlocked, addLine].filter((n, i, all): n is string => !!n && all.indexOf(n) === i)
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ordered.length || from === to) return
@@ -98,7 +59,7 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
         />
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[18px] pt-[14px]">
+      <div className="min-h-0 flex-1 overflow-y-auto px-[18px] pb-[14px] pt-[14px]">
         <div className="flex flex-col gap-[6px]">
           {ordered.map((day, i) => (
             <div key={day.id} className={`flex items-center gap-[10px] rounded-[13px] px-[11px] py-[7px] ${INNER_CLS}`}>
@@ -122,7 +83,7 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
                   disabled={!!deleteBlocked}
                   aria-label={t('dayplan.deleteDay')}
                   title={deleteBlocked ?? undefined}
-                  className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] text-[color:var(--m-st-danger)] disabled:text-m-faint disabled:opacity-40"
+                  className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] text-m-muted active:text-[color:var(--m-st-danger)] disabled:opacity-30"
                 >
                   <Trash2 size={13} strokeWidth={2.2} />
                 </button>
@@ -130,29 +91,34 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
             </div>
           ))}
         </div>
-        {canEditDays && dayAdd.nextDate && (
-          <DayAddTiles
-            dayAdd={dayAdd}
-            date={formatDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate}
-            onAddUndated={() => planner.handleAddDay()}
-            t={t}
-          />
-        )}
-        {canEditDays && !dayAdd.nextDate && (
-          <button
-            type="button"
-            onClick={() => planner.handleAddDay()}
-            disabled={dayAdd.busy || !!dayAdd.blocked}
-            className="mt-[10px] flex w-full items-center justify-center gap-[6px] rounded-[13px] border-[1.5px] border-dashed border-[color:var(--m-faint)] py-[9px] text-[0.75rem] font-semibold text-m-muted disabled:opacity-40"
-          >
-            <Plus size={13} strokeWidth={2.2} />
-            {t('dayplan.addDay')}
-          </button>
-        )}
-        {canEditDays && notices.map(notice => (
-          <p key={notice} className="mt-[10px] text-center text-[0.6875rem] text-m-muted">{notice}</p>
-        ))}
       </div>
+
+      {canEditDays && (
+        <div className="flex-none border-t border-[color:var(--m-rowbr)] px-[18px] pb-[16px] pt-[10px]">
+          {captions.map(line => (
+            <p key={line} className="mb-[8px] text-[0.6875rem] leading-snug text-m-muted">{line}</p>
+          ))}
+          <div className="flex flex-wrap gap-[8px]">
+            {date ? (
+              <>
+                <button type="button" onClick={dayAdd.onAddDated} disabled={addOff || !!dayAdd.datedBlocked} className={PILL_MAIN}>
+                  <CalendarPlus size={15} strokeWidth={2.2} />
+                  {t('dayplan.addDatedDay', { date })}
+                </button>
+                <button type="button" onClick={() => planner.handleAddDay()} disabled={addOff} className={PILL_QUIET}>
+                  <Plus size={15} strokeWidth={2.2} />
+                  {t('dayplan.addUndatedDay')}
+                </button>
+              </>
+            ) : (
+              <button type="button" onClick={() => planner.handleAddDay()} disabled={addOff} className={PILL_MAIN}>
+                <Plus size={15} strokeWidth={2.2} />
+                {t('dayplan.addDay')}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </MSheet>
   )
 }

@@ -121,7 +121,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': 'تغيير الأيام يتطلب اتصالًا',
   'dayplan.deleteDaySuccess': 'تم حذف اليوم',
   'dayplan.deleteDayError': 'تعذّر حذف اليوم',
-  'dayplan.addUndatedDay': 'إضافة يوم بلا تاريخ',
+  'dayplan.addUndatedDay': 'بلا تاريخ',
   'dayplan.addUndatedDayHint': 'يضيف يومًا بلا تاريخ في النهاية. تبقى تواريخ الرحلة كما هي.',
   'dayplan.addDatedDay': 'إضافة {date}',
   'dayplan.addDatedDayHint': 'يمدّد الرحلة يومًا واحدًا حتى {date}.',

@@ -1,4 +1,4 @@
-// FE-TP-HOOK-001 to FE-TP-HOOK-134
+// FE-TP-HOOK-001 to FE-TP-HOOK-135
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -2336,6 +2336,27 @@ describe('useTripPlanner: deleting a day', () => {
     expect(result.current.deleteDayTitle).toBe('Delete Harbour day?')
     expect(result.current.deleteDayLines.map(l => l.key)).toEqual(['places', 'texts', 'shift', 'shrink'])
     expect(result.current.deleteDayLines.find(l => l.key === 'places')?.text).toBe('Planned places: 1')
+  })
+
+  it('FE-TP-HOOK-135: the open question comes as one object for the reorder dialog, whose answers close it', async () => {
+    seedDays()
+    const { result } = await renderPlanner()
+    expect(result.current.deleteDayQuestion).toBeNull()
+
+    act(() => { result.current.handleDeleteDay(2) })
+    const asked = result.current.deleteDayQuestion
+    expect(asked?.dayId).toBe(2)
+    expect(asked?.title).toBe('Delete Harbour day?')
+    expect(asked?.lines).toBe(result.current.deleteDayLines)
+
+    act(() => { asked?.onCancel() })
+    expect(result.current.deleteDayQuestion).toBeNull()
+    expect(actions.deleteDay).not.toHaveBeenCalled()
+
+    act(() => { result.current.handleDeleteDay(2) })
+    await act(async () => { result.current.deleteDayQuestion?.onConfirm() })
+    await waitFor(() => expect(actions.deleteDay).toHaveBeenCalledWith(42, 2))
+    expect(result.current.deleteDayQuestion).toBeNull()
   })
 
   it('FE-TP-HOOK-123: confirming deletes through the store, closes the question and reloads the stays', async () => {

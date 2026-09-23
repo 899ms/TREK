@@ -393,7 +393,7 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
   const labelCls = "flex items-center gap-1 text-caption font-semibold uppercase tracking-[0.14em] text-content-faint mb-2"
   const ghostBtnCls = "px-4 py-2.5 text-body font-medium text-content-secondary hover:text-content border border-edge rounded-xl hover:bg-surface-hover transition-colors"
   const primaryBtnCls = "px-5 py-2.5 text-body font-medium bg-accent hover:bg-accent-hover disabled:opacity-50 text-accent-text rounded-xl shadow-card transition-colors flex items-center gap-2"
-  const dangerBtnCls = "px-5 py-2.5 text-body font-medium bg-danger hover:opacity-90 disabled:opacity-50 text-white rounded-xl shadow-card transition-opacity flex items-center gap-2"
+  const dangerBtnCls = "px-5 py-2.5 text-body font-medium whitespace-nowrap bg-danger hover:opacity-90 disabled:opacity-50 text-white rounded-xl shadow-card transition-opacity flex items-center gap-2"
   /* Two columns once there is room for them: the form had grown to eight stacked
      blocks and the create button sat a full screen below the title. Left is what
      the trip looks like, right is when and with whom. One column below md. */

@@ -38,12 +38,12 @@ export default function TripDateReview({ askShift, shiftMode, onShiftMode, remov
           <p className="text-body text-content-secondary">{t('dashboard.dateShiftIntro')}</p>
           {modes.map(({ mode, label, desc }) => (
             <label key={mode}
-              className={`flex items-start gap-3 p-3 border rounded-xl cursor-pointer transition-colors ${shiftMode === mode ? 'border-accent bg-surface-selected' : 'border-edge hover:bg-surface-hover'}`}>
+              className={`flex items-start gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-colors ${shiftMode === mode ? 'border-accent bg-surface-selected' : 'border-edge hover:bg-surface-hover'}`}>
               <input type="radio" name="date_shift_mode" value={mode} checked={shiftMode === mode}
                 onChange={() => onShiftMode(mode)} className="mt-1 accent-[var(--accent)]" />
-              <span className="block text-body font-medium text-content">
+              <span className="block text-body font-medium leading-snug text-content">
                 {label}
-                <span className="block text-body font-normal text-content-muted mt-0.5">{desc}</span>
+                <span className="mt-0.5 block text-caption font-normal text-content-muted text-pretty">{desc}</span>
               </span>
             </label>
           ))}

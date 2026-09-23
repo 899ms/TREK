@@ -119,7 +119,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': '變更日期需要網路連線',
   'dayplan.deleteDaySuccess': '已刪除這一天',
   'dayplan.deleteDayError': '刪除這一天失敗',
-  'dayplan.addUndatedDay': '新增無日期的一天',
+  'dayplan.addUndatedDay': '無日期',
   'dayplan.addUndatedDayHint': '在最後新增一天沒有日期的行程。旅程日期不變。',
   'dayplan.addDatedDay': '新增 {date}',
   'dayplan.addDatedDayHint': '旅程延長一天，到 {date} 為止。',

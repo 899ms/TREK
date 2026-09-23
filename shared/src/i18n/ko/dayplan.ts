@@ -121,7 +121,7 @@ const dayplan: TranslationStrings = {
   'dayplan.daysOffline': '날짜를 변경하려면 연결이 필요합니다',
   'dayplan.deleteDaySuccess': '날짜가 삭제되었습니다',
   'dayplan.deleteDayError': '날짜를 삭제하지 못했습니다',
-  'dayplan.addUndatedDay': '날짜 없는 날 추가',
+  'dayplan.addUndatedDay': '날짜 없이',
   'dayplan.addUndatedDayHint': '날짜 없는 날을 마지막에 추가합니다. 여행 날짜는 그대로입니다.',
   'dayplan.addDatedDay': '{date} 추가',
   'dayplan.addDatedDayHint': '여행을 하루 늘려 {date}까지로 만듭니다.',

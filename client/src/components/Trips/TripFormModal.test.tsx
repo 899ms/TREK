@@ -1340,7 +1340,8 @@ describe('TripFormModal', () => {
     expect(within(list).getByText('Planned places: 2')).toBeInTheDocument();
     // No start moved, so no shift question.
     expect(screen.queryByText('Keep bookings on their dates')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove days and save' })).toHaveClass('bg-danger');
+    // The longest confirm label of any language stays on one line.
+    expect(screen.getByRole('button', { name: 'Remove days and save' })).toHaveClass('bg-danger', 'whitespace-nowrap');
     expect(onSave).not.toHaveBeenCalled();
   });
 

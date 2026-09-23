@@ -1,10 +1,12 @@
-// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-021
+// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-028
 import { render, screen, fireEvent } from '../../../tests/helpers/render'
 import userEvent from '@testing-library/user-event'
+import { MapPin } from 'lucide-react'
 import { buildDay } from '../../../tests/helpers/factories'
 import { DayReorderPopup } from './DayReorderPopup'
 import { setForcedOffline } from '../../sync/networkMode'
 import type { DayAddControls } from '../../utils/dayAdd'
+import type { DayDeleteQuestion } from '../../utils/dayImpactLines'
 import type { Day } from '../../types'
 
 // The component takes `t` as a prop, so returning the key keeps assertions exact.
@@ -123,9 +125,9 @@ describe('DayReorderPopup', () => {
     fireEvent.dragStart(first)
     fireEvent.dragOver(second)
     // The hovered row is highlighted while a drag is in flight.
-    expect(second.style.outline).toContain('dashed')
+    expect(second).toHaveClass('outline-dashed')
     fireEvent.dragEnd(first)
-    expect(second.style.outline).toBe('none')
+    expect(second).not.toHaveClass('outline-dashed')
     expect(onReorder).not.toHaveBeenCalled()
   })
 
@@ -258,6 +260,106 @@ describe('DayReorderPopup', () => {
       // Both buttons are described by that line.
       const hintId = screen.getByText('dayplan.addDatedDayHint').id
       expect(undated).toHaveAttribute('aria-describedby', hintId)
+    })
+  })
+
+  describe('the delete question, asked in place of the list', () => {
+    const question = (overrides: Partial<DayDeleteQuestion> = {}): DayDeleteQuestion => ({
+      dayId: 7,
+      title: 'Delete Lyon?',
+      lines: [{ key: 'places', icon: MapPin, tone: 'neutral', text: 'Planned places: 2', hint: 'They stay in the place list.' }],
+      onCancel: vi.fn(),
+      onConfirm: vi.fn(),
+      ...overrides,
+    })
+
+    it('FE-PLANNER-DAYREORDER-022: the question takes the place of the rows and the add buttons, in the same dialog', () => {
+      const dayAdd: DayAddControls = { nextDate: '2026-10-13', blocked: null, datedBlocked: null, busy: false, onAddDated: vi.fn() }
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: question(), dayAdd })} />)
+      expect(rows()).toHaveLength(0)
+      expect(screen.queryByRole('button', { name: 'dayplan.addUndatedDay' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'common.close' })).not.toBeInTheDocument()
+      // Still the reorder dialog: its own title stays, the question sits under it.
+      expect(screen.getByText('dayplan.reorderTitle')).toBeInTheDocument()
+      const section = screen.getByRole('region', { name: 'Delete Lyon?' })
+      expect(section).toHaveAccessibleDescription('dayplan.deleteDayBody')
+      expect(screen.getByRole('list', { name: 'Delete Lyon?' })).toHaveTextContent('Planned places: 2')
+      expect(screen.getByRole('button', { name: 'common.cancel' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'dayplan.deleteDay' })).toBeInTheDocument()
+    })
+
+    it('FE-PLANNER-DAYREORDER-023: Cancel takes the question back, the delete button answers it', async () => {
+      const user = userEvent.setup()
+      const q = question()
+      const onClose = vi.fn()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: q, onClose })} />)
+      await user.click(screen.getByRole('button', { name: 'common.cancel' }))
+      expect(q.onCancel).toHaveBeenCalledTimes(1)
+      expect(onClose).not.toHaveBeenCalled()
+      await user.click(screen.getByRole('button', { name: 'dayplan.deleteDay' }))
+      expect(q.onConfirm).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-PLANNER-DAYREORDER-024: Escape takes back only the question, not the dialog', async () => {
+      const user = userEvent.setup()
+      const q = question()
+      const onClose = vi.fn()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: q, onClose })} />)
+      await user.keyboard('{Escape}')
+      expect(q.onCancel).toHaveBeenCalledTimes(1)
+      expect(onClose).not.toHaveBeenCalled()
+    })
+
+    it('FE-PLANNER-DAYREORDER-025: closing the dialog also drops an open question', async () => {
+      const user = userEvent.setup()
+      const q = question()
+      const onClose = vi.fn()
+      const { rerender } = render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: q, onClose })} />)
+      const closeX = document.querySelector<HTMLButtonElement>('h2 + button')
+      expect(closeX).not.toBeNull()
+      await user.click(closeX as HTMLButtonElement)
+      expect(q.onCancel).toHaveBeenCalledTimes(1)
+      expect(onClose).toHaveBeenCalledTimes(1)
+
+      // A dialog closed from outside takes its question with it as well.
+      const again = question()
+      rerender(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: again, onClose })} />)
+      rerender(<DayReorderPopup {...makeProps({ isOpen: false, days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: again, onClose })} />)
+      expect(again.onCancel).toHaveBeenCalled()
+    })
+
+    it('FE-PLANNER-DAYREORDER-026: a question about a day that is no longer there is not asked', () => {
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn(), deleteQuestion: question({ dayId: 99 }) })} />)
+      expect(rows()).toHaveLength(3)
+      expect(screen.queryByRole('region', { name: 'Delete Lyon?' })).not.toBeInTheDocument()
+    })
+
+    it('FE-PLANNER-DAYREORDER-027: the focus goes to Cancel, and back to the row asked about when the list returns', async () => {
+      const user = userEvent.setup()
+      const days = threeDays()
+      const onDeleteDay = vi.fn()
+      const { rerender } = render(<DayReorderPopup {...makeProps({ days, onDeleteDay })} />)
+      await user.click(screen.getAllByRole('button', { name: 'dayplan.deleteDay' })[1])
+      expect(onDeleteDay).toHaveBeenCalledWith(7)
+
+      rerender(<DayReorderPopup {...makeProps({ days, onDeleteDay, deleteQuestion: question() })} />)
+      expect(screen.getByRole('button', { name: 'common.cancel' })).toHaveFocus()
+
+      rerender(<DayReorderPopup {...makeProps({ days, onDeleteDay, deleteQuestion: null })} />)
+      expect(screen.getAllByRole('button', { name: 'dayplan.deleteDay' })[1]).toHaveFocus()
+    })
+
+    it('FE-PLANNER-DAYREORDER-028: after the day went, the focus lands on the row that took its place', async () => {
+      const user = userEvent.setup()
+      const days = threeDays()
+      const { rerender } = render(<DayReorderPopup {...makeProps({ days, onDeleteDay: vi.fn() })} />)
+      await user.click(screen.getAllByRole('button', { name: 'dayplan.deleteDay' })[1])
+      rerender(<DayReorderPopup {...makeProps({ days, onDeleteDay: vi.fn(), deleteQuestion: question() })} />)
+      const left = days.filter(d => d.id !== 7)
+      rerender(<DayReorderPopup {...makeProps({ days: left, onDeleteDay: vi.fn(), deleteQuestion: null })} />)
+      const buttons = screen.getAllByRole('button', { name: 'dayplan.deleteDay' })
+      expect(buttons).toHaveLength(2)
+      expect(buttons[1]).toHaveFocus()
     })
   })
 })
