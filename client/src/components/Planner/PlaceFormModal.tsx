@@ -1196,9 +1196,8 @@ export default function PlaceFormModal(props: PlaceFormModalProps) {
                 options={[
                   { value: '', label: t('places.noCategory') },
                   ...(categories || []).map(c => ({
-                    // form.category_id is a string; CustomSelect matches options by
-                    // strict equality, so the option value must be a string too —
-                    // otherwise the chosen category never renders in the trigger.
+                    // A string like form.category_id, so the picked option hands
+                    // back the same kind of value the form already keeps.
                     value: String(c.id),
                     label: c.name,
                   })),
