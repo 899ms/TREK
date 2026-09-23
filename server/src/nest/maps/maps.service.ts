@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { isOutsideChina } from '@trek/shared';
+import { isOutsideChina, normalizePlaceWebsite } from '@trek/shared';
 import type {
   MapsSearchResult,
   MapsAutocompleteResult,
@@ -972,7 +972,7 @@ export class MapsService {
               category: labelFor(p.category ?? null, p.categoryPath ?? null) ?? wanted[0],
               poi_type: p.category ?? wanted[0],
               address: p.address?.freeform ?? null,
-              website: p.contact?.website ?? null,
+              website: normalizePlaceWebsite(p.contact?.website),
               phone: p.contact?.phone ?? null,
               opening_hours: p.hours?.osm ?? null,
               // The index carries the chain and its Wikidata item, which is what
@@ -1493,7 +1493,7 @@ export class MapsService {
         category: categoryOfFilter.get(matched) ?? categories[0],
         poi_type: matched,
         address: addr,
-        website: tags.website || tags['contact:website'] || null,
+        website: normalizePlaceWebsite(tags.website) ?? normalizePlaceWebsite(tags['contact:website']),
         phone: tags.phone || tags['contact:phone'] || null,
         opening_hours: tags.opening_hours || null,
         cuisine: tags.cuisine || null,
@@ -2208,7 +2208,7 @@ export class MapsService {
       lat: p.location?.latitude ?? null,
       lng: p.location?.longitude ?? null,
       rating: p.rating || null,
-      website: p.websiteUri || null,
+      website: normalizePlaceWebsite(p.websiteUri),
       phone: p.nationalPhoneNumber || null,
       types: p.types || [],
       source: 'google',
@@ -2570,7 +2570,7 @@ export class MapsService {
       lng: data.location?.longitude ?? null,
       rating: data.rating || null,
       rating_count: data.userRatingCount || null,
-      website: data.websiteUri || null,
+      website: normalizePlaceWebsite(data.websiteUri),
       phone: data.nationalPhoneNumber || null,
       opening_hours: data.regularOpeningHours?.weekdayDescriptions || null,
       open_now: data.regularOpeningHours?.openNow ?? null,
@@ -2715,7 +2715,7 @@ export class MapsService {
       lng: data.location?.longitude ?? null,
       rating: data.rating || null,
       rating_count: data.userRatingCount || null,
-      website: data.websiteUri || null,
+      website: normalizePlaceWebsite(data.websiteUri),
       phone: data.nationalPhoneNumber || null,
       opening_hours: data.regularOpeningHours?.weekdayDescriptions || null,
       open_now: data.regularOpeningHours?.openNow ?? null,

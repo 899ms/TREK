@@ -29,7 +29,7 @@
  * the same way a place found on OpenStreetMap does.
  */
 import { createHash } from 'node:crypto';
-import { fromAmapLocation, gcj02ToWgs84, toAmapLocation } from '@trek/shared';
+import { fromAmapLocation, gcj02ToWgs84, normalizePlaceWebsite, toAmapLocation } from '@trek/shared';
 import { readEnv } from '../../../app-config';
 import { safeFetchFollow } from '../../../utils/ssrfGuard';
 import { discardBody, exceedsDeclaredLength, readCappedJson } from '../../../utils/cappedFetch';
@@ -403,7 +403,8 @@ export class AmapPlacesProvider implements PlacesProvider {
       lng: coords?.lng ?? null,
       rating: amapNumber(business.rating ?? bizExt.rating),
       rating_count: null,
-      website: amapText(poi.website) || null,
+      // Free text, often a bare host: it gains https here like any other source's.
+      website: normalizePlaceWebsite(amapText(poi.website)),
       phone: amapText(business.tel ?? poi.tel) || null,
       // Amap's type is a slash-separated taxonomy ("餐饮服务;中餐厅;川菜"); split so
       // it reads like the string array every other provider returns.

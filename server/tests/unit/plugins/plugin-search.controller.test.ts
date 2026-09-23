@@ -152,6 +152,19 @@ describe('PluginSearchController', () => {
     expect(places[2].rating).toBeNull();
   });
 
+  // #2483: a plugin index is one more source of websites typed without a scheme.
+  it('PLUGIN-SEARCH-2483-01: a website without a scheme gains https like one from the core search', async () => {
+    const { c } = controller({
+      searchPlaces: vi.fn(async () => [
+        hit({ id: 'a', website: 'www.ristorante.example/menu' }),
+        hit({ id: 'b', website: '//ristorante.example' }),
+        hit({ id: 'c', website: 'mailto:info@ristorante.example' }),
+      ]) as unknown as PluginHooks['searchPlaces'],
+    });
+    const { places } = await c.search('milan', undefined, undefined, undefined, undefined, req(5));
+    expect(places.map((p) => p.website)).toEqual(['https://www.ristorante.example/menu', 'https://ristorante.example', null]);
+  });
+
   it('caps one provider at 20 hits', async () => {
     const { c } = controller({
       searchPlaces: vi.fn(async () =>

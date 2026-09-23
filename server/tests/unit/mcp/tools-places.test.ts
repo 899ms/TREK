@@ -1271,3 +1271,62 @@ describe('journey hooks on the MCP delete paths', () => {
     expect(skeletonFor(journey.id, foreign.id)).toBeDefined();
   });
 });
+
+// ---------------------------------------------------------------------------
+// A website without a scheme (#2483): the tools parse it the way REST does
+// ---------------------------------------------------------------------------
+
+describe('place tools and a website without a scheme (#2483)', () => {
+  const SITE = 'fr.wikipedia.org/wiki/Chapelle_Sainte-Barbe_du_Faouët';
+  const websiteOf = (placeId: number) =>
+    (testDb.prepare('SELECT website FROM places WHERE id = ?').get(placeId) as { website: string | null }).website;
+
+  it('MCP-PLACES-2483-01: create_place, create_and_assign_place, update_place and bulk_update_places store https', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+
+    await withHarness(user.id, async (h) => {
+      const created = parseToolResult(await h.client.callTool({ name: 'create_place', arguments: { tripId: trip.id, name: 'Chapelle', website: SITE } })) as { place: { id: number } };
+      expect(websiteOf(created.place.id)).toBe(`https://${SITE}`);
+
+      const assigned = parseToolResult(await h.client.callTool({
+        name: 'create_and_assign_place',
+        arguments: { tripId: trip.id, dayId: day.id, name: 'Halles', website: 'www.example.fr/halles' },
+      })) as { place: { id: number } };
+      expect(websiteOf(assigned.place.id)).toBe('https://www.example.fr/halles');
+
+      await h.client.callTool({ name: 'update_place', arguments: { tripId: trip.id, placeId: created.place.id, website: '//www.example.fr' } });
+      expect(websiteOf(created.place.id)).toBe('https://www.example.fr');
+
+      await h.client.callTool({ name: 'bulk_update_places', arguments: { tripId: trip.id, placeIds: [created.place.id, assigned.place.id], website: 'example.fr:8080/x' } });
+      expect([websiteOf(created.place.id), websiteOf(assigned.place.id)]).toEqual(['https://example.fr:8080/x', 'https://example.fr:8080/x']);
+    });
+  });
+
+  it('MCP-PLACES-2483-02: a script link or another scheme is still refused and stores nothing', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+
+    await withHarness(user.id, async (h) => {
+      for (const website of ['javascript:alert(1)', 'mailto:mairie@example.fr', 'Chapelle']) {
+        const result = await h.client.callTool({ name: 'create_place', arguments: { tripId: trip.id, name: 'Hostile', website } });
+        expect(result.isError, website).toBe(true);
+        expect((result.content as { text: string }[])[0].text).toMatch(/Invalid arguments/);
+      }
+    });
+
+    expect(testDb.prepare('SELECT COUNT(*) AS n FROM places WHERE trip_id = ?').get(trip.id)).toEqual({ n: 0 });
+  });
+
+  it('MCP-PLACES-2483-03: tools/list still describes the field as a plain capped string', async () => {
+    const { user } = createUser(testDb);
+    await withHarness(user.id, async (h) => {
+      const { tools } = await h.client.listTools();
+      for (const name of ['create_place', 'create_and_assign_place', 'update_place', 'bulk_update_places']) {
+        const tool = tools.find((t) => t.name === name);
+        expect((tool?.inputSchema.properties as Record<string, unknown>).website, name).toEqual({ type: 'string', maxLength: 500 });
+      }
+    });
+  });
+});

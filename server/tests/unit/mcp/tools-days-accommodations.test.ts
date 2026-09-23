@@ -335,6 +335,28 @@ describe('Tool: delete_accommodation', () => {
 // ---------------------------------------------------------------------------
 
 describe('Tool: create_place_accommodation', () => {
+  // #2483: the place it creates takes its website through the same contract as
+  // create_place, so a bare host from search_place lands as https.
+  it('MCP-ACCOM-2483-01: a website without a scheme is stored with https, a script link is refused', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    await withHarness(user.id, async (h) => {
+      const data = parseToolResult(await h.client.callTool({
+        name: 'create_place_accommodation',
+        arguments: { tripId: trip.id, name: 'Hôtel du Faouët', start_day_id: day.id, end_day_id: day.id, website: 'www.hotel-faouet.example' },
+      })) as { place: { id: number } };
+      expect(testDb.prepare('SELECT website FROM places WHERE id = ?').get(data.place.id)).toEqual({ website: 'https://www.hotel-faouet.example' });
+
+      const refused = await h.client.callTool({
+        name: 'create_place_accommodation',
+        arguments: { tripId: trip.id, name: 'Hostile', start_day_id: day.id, end_day_id: day.id, website: 'javascript:alert(1)' },
+      });
+      expect(refused.isError).toBe(true);
+    });
+    expect(testDb.prepare("SELECT COUNT(*) AS n FROM places WHERE trip_id = ? AND name = 'Hostile'").get(trip.id)).toEqual({ n: 0 });
+  });
+
   it('creates the place and the accommodation atomically and broadcasts both', async () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);

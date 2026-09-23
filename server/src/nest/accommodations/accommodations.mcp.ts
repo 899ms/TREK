@@ -4,6 +4,7 @@ import {
   demoDenied, ok,
 } from '../../nest-mcp';
 import { McpToolGuardsService } from '../mcp-shared/mcp-tool-guards.service';
+import { placeWebsiteSchema } from '@trek/shared';
 import { z } from 'zod';
 import { AuthService } from '../auth/auth.service';
 import { PlacesService } from '../places/places.service';
@@ -92,7 +93,8 @@ export class AccommodationsMcp {
       google_ftid: z.string().optional().describe('Google Maps feature ID from search_place — enables direct Google Maps links'),
       osm_id: z.string().optional().describe('OpenStreetMap ID from search_place (e.g. "way:12345")'),
       place_notes: z.string().max(2000).optional().describe('Notes for the place'),
-      website: z.string().max(500).optional(),
+      // The place contract create_place uses: a bare host gains https (#2483).
+      website: placeWebsiteSchema.optional(),
       phone: z.string().max(50).optional(),
       start_day_id: z.number().int().positive().describe('Check-in day ID'),
       end_day_id: z.number().int().positive().describe('Check-out day ID'),

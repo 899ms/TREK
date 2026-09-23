@@ -230,6 +230,23 @@ describe('AmapPlacesProvider.searchText', () => {
     expect(place.website).toBeNull();
   });
 
+  // #2483: a site in Amap is free text, and often a bare host.
+  it('AMAP-012b: a website without a scheme gains https, one that is no website becomes null', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        ok({
+          pois: [
+            { id: 'B3', name: '故宫博物院', website: 'www.dpm.org.cn', location: TIANANMEN_LOCATION },
+            { id: 'B4', name: '某小店', website: 'javascript:alert(1)', location: TIANANMEN_LOCATION },
+          ],
+        }),
+      ),
+    );
+    const places = await provider().searchText('故宫');
+    expect(places.map((p) => p.website)).toEqual(['https://www.dpm.org.cn', null]);
+  });
+
   it('AMAP-013: uses place/around with a bias, because text search cannot be biased', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(ok({ pois: [] })));
     await provider().searchText('咖啡', 'zh', { lat: 31.2304, lng: 121.4737, radius: 3000 });

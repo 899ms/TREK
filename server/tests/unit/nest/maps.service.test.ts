@@ -3516,3 +3516,75 @@ describe('brandLogo', () => {
     expect(await service().brandLogo('Q3')).toBeNull();
   });
 })
+
+// ── Websites without a scheme (#2483) ─────────────────────────────────────────
+//
+// Every source hands its website through normalizePlaceWebsite, so a place that
+// is picked from any of them saves without a 400 over a field nobody sees.
+
+describe('websites from the map sources (#2483)', () => {
+  it('MAPS-2483-01: OSM details complete a bare host and skip a contact:website that is no website', () => {
+    expect(buildOsmDetails({ website: 'www.example.fr/patrimoine' }, 'way', '1').website).toBe(
+      'https://www.example.fr/patrimoine',
+    );
+    expect(buildOsmDetails({ 'contact:website': 'mailto:mairie@example.fr', website: 'example.fr' }, 'node', '1').website).toBe(
+      'https://example.fr',
+    );
+    expect(buildOsmDetails({ website: 'javascript:alert(1)' }, 'node', '1').website).toBeNull();
+  });
+
+  it('MAPS-2483-02: an Overpass POI gets https on a bare host and falls back past a script link', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          elements: [
+            { type: 'node', id: 1, lat: 48.03, lon: -3.49, tags: { name: 'Chapelle', tourism: 'attraction', website: 'fr.wikipedia.org/wiki/Chapelle_Sainte-Barbe_du_Faouët' } },
+            { type: 'node', id: 2, lat: 48.04, lon: -3.49, tags: { name: 'Mairie', tourism: 'attraction', website: 'javascript:alert(1)', 'contact:website': '//www.example.fr' } },
+            { type: 'node', id: 3, lat: 48.05, lon: -3.49, tags: { name: 'Halles', tourism: 'attraction', website: 'Halles' } },
+          ],
+        }),
+      }),
+    );
+    const { pois } = await svc.searchOverpassPois('sights', { south: 48.0, west: -3.6, north: 48.1, east: -3.4 }, 'fr-FR');
+    expect(pois.map((p) => p.website)).toEqual([
+      'https://fr.wikipedia.org/wiki/Chapelle_Sainte-Barbe_du_Faouët',
+      'https://www.example.fr',
+      null,
+    ]);
+  });
+
+  it('MAPS-2483-03: a Google search result goes through the same helper', async () => {
+    mockDbGet.mockReturnValueOnce({ maps_api_key: 'ENCRYPTED' }).mockReturnValueOnce(null);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          places: [{ id: 'gid-web', displayName: { text: 'Chapelle' }, location: { latitude: 48, longitude: -3 }, websiteUri: 'www.example.fr' }],
+        }),
+      }),
+    );
+    const search = await svc.searchPlaces(1, 'Chapelle');
+    expect((search.places[0] as { website: unknown }).website).toBe('https://www.example.fr');
+  });
+
+  const googleDetails = (websiteUri: string) =>
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({ id: 'ChIJWeb', websiteUri }) }));
+
+  it('MAPS-2483-04: so does the website of a Google details lookup', async () => {
+    mockDbGet.mockReturnValueOnce({ maps_api_key: 'gkey' });
+    googleDetails('example.fr/visite');
+    const place = (await svc.getPlaceDetails(1, 'ChIJWeb-lean')).place as { website: unknown };
+    expect(place.website).toBe('https://example.fr/visite');
+  });
+
+  it('MAPS-2483-05: and of the expanded one, where a value that is no page becomes null', async () => {
+    mockDbGet.mockReturnValueOnce({ maps_api_key: 'gkey' });
+    mockDbGet.mockReturnValueOnce(undefined);
+    googleDetails('data:text/html,x');
+    const place = (await svc.getPlaceDetailsExpanded(1, 'ChIJWeb-expanded')).place as { website: unknown };
+    expect(place.website).toBeNull();
+  });
+});
