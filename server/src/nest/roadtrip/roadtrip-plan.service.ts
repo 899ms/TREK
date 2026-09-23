@@ -19,6 +19,7 @@ import {
   formatDistance,
   formatDurationShort,
   seatCarrierStops,
+  undatedRides,
   viasLeaving,
   type CarrierBooking,
   type CarrierSeam,
@@ -128,11 +129,35 @@ export class RoadtripPlanService {
    * reservations graph.
    */
   private carriers(tripId: number): CarrierBooking[] {
+    return this.withTerminals(
+      tripId,
+      this.db.all<CarrierRow>(
+        `SELECT id, type, title, day_id, end_day_id, reservation_time, reservation_end_time, metadata, day_plan_position
+         FROM reservations WHERE trip_id = ? AND type IN ('flight', 'train', 'ferry', 'cruise', 'bus', 'car') AND day_id IS NOT NULL`,
+        tripId,
+      ),
+    );
+  }
+
+  /**
+   * The rides the drive leaves out because they are on no day: a flight, train, ferry,
+   * cruise or bus with both terminals located and no day to leave on (#2461). The map
+   * draws their arcs all the same, so the answer names them rather than leaving an
+   * assistant to read a drive around a booked crossing as the plan. Which ones count is
+   * `undatedRides` alone, the rule the planner's rail lists them by, so the statement
+   * names no types of its own.
+   */
+  undatedRides(tripId: number): { id: number; type: string; title: string }[] {
     const rows = this.db.all<CarrierRow>(
       `SELECT id, type, title, day_id, end_day_id, reservation_time, reservation_end_time, metadata, day_plan_position
-       FROM reservations WHERE trip_id = ? AND type IN ('flight', 'train', 'ferry', 'cruise', 'bus', 'car') AND day_id IS NOT NULL`,
+       FROM reservations WHERE trip_id = ? AND day_id IS NULL`,
       tripId,
     );
+    return undatedRides(this.withTerminals(tripId, rows)).map(({ id, type, title }) => ({ id, type, title }));
+  }
+
+  /** The rows with their terminals and the slots the day plan gave them joined on. */
+  private withTerminals(tripId: number, rows: CarrierRow[]): CarrierBooking[] {
     if (!rows.length) return [];
     const endpoints = this.db.all<{
       reservation_id: number;
@@ -359,6 +384,7 @@ export class RoadtripPlanService {
       calculated,
       failures,
       omittedVisits: context.visits.filter((v) => v.lat === null || v.lng === null).map((v) => v.id),
+      undatedRides: this.undatedRides(tripId),
     };
   }
 }

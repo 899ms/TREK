@@ -281,6 +281,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Ophalen {time}',
   'roadtrip.ride.return': 'Inleveren {time}',
   'roadtrip.ride.open': 'Boeking openen',
+  'roadtrip.ride.undated': 'De boeking {title} heeft geen datum, dus de rit houdt er geen rekening mee.',
   'roadtrip.bookings.loose': 'Ook geboekt op deze dag',
 };
 export default roadtrip;

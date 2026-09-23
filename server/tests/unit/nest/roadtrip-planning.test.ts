@@ -241,6 +241,29 @@ describe('browser-independent roadtrip calculation', () => {
     expect(day).not.toHaveProperty('legLines');
     expect(day).not.toHaveProperty('arrivingLine');
   });
+  it('answers calculate_roadtrip with the rides on no day, an empty list when there are none (#2461)', async () => {
+    // Additive: the rest of the answer is what it was. The rides themselves are read off the
+    // real tables in roadtrip-plan.service.test.ts; this pins the field and the words for it.
+    const s = setup();
+    const mcp = new RoadtripPlanningMcp(s.plans, {} as never, {} as never);
+    const body = JSON.parse((await mcp.calculate({ tripId: 10, includeGeometry: false }, ctx)).content[0].text as string);
+    expect(body.undatedRides).toEqual([]);
+    expect(body.days.length).toBeGreaterThan(0);
+    // And the tool says what the field is, or an assistant has no reason to read it.
+    const addons = { isAddonEnabled: vi.fn(() => true) };
+    const registry = createTestRegistry([new RoadtripPlanningMcp(s.plans, {} as never, addons as never)], {
+      accessPolicy: trekMcpAccessPolicy,
+      validateAccess: trekMcpValidateAccess,
+    });
+    const described = new Map<string, string>();
+    const registrar = {
+      registerTool: (name: string, config: { description?: string }) => {
+        described.set(name, config.description ?? '');
+      },
+    };
+    registry.attach(registrar as never, { ...ctx, scopes: ['trips:read'] });
+    expect(described.get('calculate_roadtrip')).toContain('undatedRides');
+  });
   it('keeps explicit end-day visits and manual boundaries in the shared planning path', async () => {
     const s = setup();
     s.visits[0].end_day = 1;

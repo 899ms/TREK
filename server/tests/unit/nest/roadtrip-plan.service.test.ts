@@ -6,8 +6,10 @@
  * column the statement never selects would go unnoticed there. These run the statement.
  */
 import { db } from '../../../src/db/database';
+import type { McpContext } from '../../../src/nest-mcp';
 import { DatabaseService } from '../../../src/nest/database/database.service';
 import { RoadtripPlanService } from '../../../src/nest/roadtrip/roadtrip-plan.service';
+import { RoadtripPlanningMcp } from '../../../src/nest/roadtrip/roadtrip-planning.mcp';
 import { createDay, createDayAccommodation, createDayAssignment, createPlace, createTrip, createUser } from '../../helpers/factories';
 import { resetTestDb } from '../../helpers/test-db';
 
@@ -177,6 +179,10 @@ describe('a booking the traveller rides (#2428)', () => {
   it('seats the terminals in the day and never asks the router for the ride', async () => {
     const { user, trip, visits, plans } = setup();
     db.prepare("UPDATE day_assignments SET assignment_time = '10:00' WHERE id = ?").run(visits[1].id);
+    // Pinned to the minute the drive reaches it anyway, so the clock alone seats the
+    // flight here. Untimed, Celle lies south of Lueneburg with the airport north of both,
+    // and the flight would go where it adds the least road (#2461, see below).
+    db.prepare("UPDATE day_assignments SET assignment_time = '15:30' WHERE id = ?").run(visits[2].id);
     const day = db.prepare('SELECT day_id FROM day_assignments WHERE id = ?').get(visits[0].id) as { day_id: number };
     const flightId = withFlight(day.day_id, trip.id);
 
@@ -185,7 +191,7 @@ describe('a booking the traveller rides (#2428)', () => {
     expect(context.carriers).toHaveLength(1);
     expect(context.carriers[0].endpoints).toHaveLength(2);
     const card = calculated.days[0];
-    // Behind Lueneburg (10:00), before the untimed Celle: the day plan's own seat.
+    // Behind Lueneburg (10:00), before Celle (15:30): the day plan's own seat.
     expect(card.stops.map((s) => s.carrier?.role ?? s.name)).toEqual(['Hamburg', 'Lueneburg', 'departure', 'arrival', 'Celle']);
     const departure = card.stops[2];
     expect(departure.carrier).toMatchObject({ reservationId: flightId, type: 'flight', code: 'HAM', at: '13:20' });
@@ -264,5 +270,91 @@ describe('a booking the traveller rides (#2428)', () => {
     expect(card.schedule.entries[0]).toMatchObject({ arrival: '08:00', departure: '08:00' });
     expect(card.distance).toBe(240_000);
     expect(calculated.totalStops).toBe(3);
+  });
+});
+
+/**
+ * The crossing from the report behind #2461: Amsterdam and Newcastle on one day, neither
+ * with a clock, and a ferry from IJmuiden to the Port of Tyne. A day sailing here, so the
+ * drive on from the far pier ends before midnight and the one-day trip stays one card.
+ */
+describe('a ferry across the day, and one on no day (#2461)', () => {
+  function crossing() {
+    const { user } = createUser(db);
+    const trip = createTrip(db, user.id);
+    const day = createDay(db, trip.id);
+    for (const [name, lat, lng] of [
+      ['Amsterdam', 52.3731, 4.8926],
+      ['Newcastle', 54.9783, -1.6178],
+    ] as const) {
+      createDayAssignment(db, day.id, createPlace(db, trip.id, { name, lat, lng }).id);
+    }
+    const router = hourlyRouter();
+    const plans = new RoadtripPlanService(
+      new DatabaseService(db),
+      { getUserSettings: () => ({}) } as never,
+      { read: () => ({}) } as never,
+      router as never,
+      { listForTrip: () => [], tracksForTrip: () => [] } as never,
+      { list: () => [] } as never,
+    );
+    return { user, trip, day, router, plans };
+  }
+
+  function withFerry(tripId: number, dayId: number | null, title: string, located = true): number {
+    const id = Number(
+      db
+        .prepare(
+          `INSERT INTO reservations (trip_id, title, type, day_id, end_day_id, reservation_time, reservation_end_time)
+           VALUES (?, ?, 'ferry', ?, ?, '09:30', '15:00')`,
+        )
+        .run(tripId, title, dayId, dayId).lastInsertRowid,
+    );
+    if (located) {
+      const endpoint = db.prepare(
+        'INSERT INTO reservation_endpoints (reservation_id, role, sequence, name, code, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      );
+      endpoint.run(id, 'from', 0, 'IJmuiden', null, 52.4581, 4.5879);
+      endpoint.run(id, 'to', 1, 'Port of Tyne', null, 54.9925, -1.4522);
+    }
+    return id;
+  }
+
+  it('drives to the pier and on from the far one, and never overland between the two shores', async () => {
+    const { user, trip, day, router, plans } = crossing();
+    withFerry(trip.id, day.id, 'IJmuiden to Newcastle');
+
+    const { calculated, undatedRides } = await plans.calculate(trip.id, user.id);
+
+    const card = calculated.days[0];
+    // By the clock alone the ferry closed the day: Amsterdam to Newcastle overland, back
+    // to IJmuiden, and only then the crossing.
+    expect(card.stops.map((s) => s.carrier?.role ?? s.name)).toEqual(['Amsterdam', 'departure', 'arrival', 'Newcastle']);
+    expect(card.legs.map((l) => l?.mode)).toEqual(['driving', 'ferry', 'driving']);
+    // Two roads, one to each side of the crossing, and nothing between the two cities.
+    expect(router.route).toHaveBeenCalledTimes(2);
+    expect(card.distance).toBe(120_000);
+    expect(undatedRides).toEqual([]);
+  });
+
+  it('names a located ride on no day, and the tool answers with the same list', async () => {
+    const { user, trip, day, plans } = crossing();
+    const undated = withFerry(trip.id, null, 'Ferry without a date');
+    withFerry(trip.id, day.id, 'Ferry on the day');
+    withFerry(trip.id, null, 'Ferry without terminals', false);
+    db.prepare("INSERT INTO reservations (trip_id, title, type) VALUES (?, 'Dinner', 'restaurant')").run(trip.id);
+
+    const plan = await plans.calculate(trip.id, user.id);
+
+    expect(plan.undatedRides).toEqual([{ id: undated, type: 'ferry', title: 'Ferry without a date' }]);
+    // It is on the drive nowhere, which is why it is named.
+    expect(plan.context.carriers.map((c) => c.id)).not.toContain(undated);
+    expect(plan.calculated.days.flatMap((d) => d.stops).some((s) => s.carrier?.reservationId === undated)).toBe(false);
+
+    const tool = new RoadtripPlanningMcp(plans, {} as never, {} as never);
+    const answer = await tool.calculate({ tripId: trip.id, includeGeometry: false }, { userId: user.id } as McpContext);
+    const body = JSON.parse(answer.content[0].text as string);
+    expect(body.undatedRides).toEqual(plan.undatedRides);
+    expect(body.complete).toBe(true);
   });
 });

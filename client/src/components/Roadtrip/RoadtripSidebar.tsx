@@ -23,7 +23,7 @@ import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
 import { useVehicleRange } from './useVehicleRange'
 import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
-import { isCarrierMode, type CarrierTerminal } from '@trek/shared/roadtrip'
+import { isCarrierMode, undatedRides, type CarrierTerminal } from '@trek/shared/roadtrip'
 import type { QuietDay, RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
 import type { SpillMark } from './nightSpill'
 import { ARRIVING_DRIVE, openOn, type LegAlternatives, type RailDrive } from './useRouteAlternatives'
@@ -2026,6 +2026,42 @@ function QuietDaySection({ day, onMoveStopToDay, drag }: {
 }
 
 /**
+ * The rides the drive leaves out because they are on no day (#2461).
+ *
+ * The map draws such a booking's arc between its terminals all the same, so without this
+ * the ferry looked planned while the rail drove round it by road. One line each, with the
+ * booking a click away, since the fix is a date in the booking itself.
+ */
+function UndatedRides({ rides, onOpenBooking }: {
+  rides: readonly Reservation[]
+  onOpenBooking?: RoadtripSidebarProps['onOpenBooking']
+}): React.ReactElement | null {
+  const { t } = useTranslation()
+  if (!rides.length) return null
+  return (
+    <div role="status" className="mx-3.5 mt-2 rounded-xl bg-warning-soft p-3 text-caption text-content">
+      <ul className="flex flex-col gap-1.5">
+        {rides.map(ride => (
+          <li key={ride.id} className="flex items-start gap-2">
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" className="mt-0.5 shrink-0 text-warning" />
+            <span className="min-w-0 flex-1">{t('roadtrip.ride.undated', { title: ride.title })}</span>
+            {onOpenBooking ? (
+              <button
+                type="button"
+                onClick={() => onOpenBooking(ride.id)}
+                className="shrink-0 font-semibold text-content underline underline-offset-2 hover:text-content-secondary"
+              >
+                {t('roadtrip.ride.open')}
+              </button>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
  * The road trip rail: the whole trip as one chain of stops with the driving distance
  * and time between them.
  *
@@ -2057,6 +2093,7 @@ export default function RoadtripSidebar({
     const numbers = new Map([...routes.days, ...routes.quietDays].map(d => [d.dayId, d.dayNumber]))
     return (dayId: number): number | null => numbers.get(dayId) ?? null
   }, [routes.days, routes.quietDays])
+  const undated = useMemo(() => undatedRides(reservations ?? []), [reservations])
 
   // Nothing to total up, so nothing pretends to: no "0 km" standing above "No route yet".
   if (routes.days.length === 0) {
@@ -2091,6 +2128,7 @@ export default function RoadtripSidebar({
             {t(`roadtrip.window.${routes.dayWindowIssue}`, { days: MAX_TRIP_DAYS })}
           </p>
         ) : null}
+        <UndatedRides rides={undated} onOpenBooking={onOpenBooking} />
       </div>
       <div className="roadtrip-rail-scroll flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-3.5">
         {routes.days.map(day => (

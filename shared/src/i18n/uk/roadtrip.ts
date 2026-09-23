@@ -280,6 +280,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Отримання {time}',
   'roadtrip.ride.return': 'Повернення {time}',
   'roadtrip.ride.open': 'Відкрити бронювання',
+  'roadtrip.ride.undated': 'Бронювання {title} не має дати, тому маршрут його не враховує.',
   'roadtrip.bookings.loose': 'Також заброньовано цього дня',
 };
 export default roadtrip;

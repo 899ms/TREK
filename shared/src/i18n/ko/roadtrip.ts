@@ -274,6 +274,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '픽업 {time}',
   'roadtrip.ride.return': '반납 {time}',
   'roadtrip.ride.open': '예약 열기',
+  'roadtrip.ride.undated': '{title}에 날짜가 없어 주행에 반영되지 않습니다.',
   'roadtrip.bookings.loose': '이날의 다른 예약',
 };
 export default roadtrip;

@@ -10,7 +10,7 @@ import type { CarrierTerminal, RoadtripDay, RoadtripRoutes, RoadtripStop, RouteS
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-060
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-061
 //
 // The stage bar pictures the place its day ends at. It reads that place out of the trip
 // store rather than the planner, the unfiltered list, so the picture tests seed the store.
@@ -915,6 +915,27 @@ describe('MRoadtripTab', () => {
       expect(p.setEditingReservation).not.toHaveBeenCalled()
       expect(p.setShowReservationModal).not.toHaveBeenCalled()
       expect(shell.openSheet).toHaveBeenCalledTimes(1)
+    })
+
+    it('FE-MOB-RTTAB-061: a ride on no day is named above the stage and opens in the transport sheet; one on a day is not (#2461)', () => {
+      // The map draws the crossing all the same, so without the line the chain going
+      // round it by road looked like the plan.
+      const terminals = [
+        { role: 'from', sequence: 0, name: 'IJmuiden', code: null, lat: 52.4581, lng: 4.5879 },
+        { role: 'to', sequence: 1, name: 'Port of Tyne', code: null, lat: 54.9925, lng: -1.4522 },
+      ]
+      const reservations = [
+        booking({ id: 70, title: 'IJmuiden to Newcastle', type: 'ferry', day_id: null, endpoints: terminals } as unknown as Partial<Reservation>),
+        booking({ id: 71, title: 'Dated ferry', type: 'ferry', endpoints: terminals } as unknown as Partial<Reservation>),
+      ]
+      const { shell } = renderTab(planner({ reservations }))
+
+      const notice = screen.getByText('roadtrip.ride.undated:IJmuiden to Newcastle').closest('[role="status"]') as HTMLElement
+      expect(within(notice).getAllByRole('listitem')).toHaveLength(1)
+      expect(screen.queryByText('roadtrip.ride.undated:Dated ferry')).toBeNull()
+
+      fireEvent.click(within(notice).getByRole('button', { name: 'roadtrip.ride.open' }))
+      expect(shell.openSheet).toHaveBeenCalledWith('transport', { reservationId: 70 })
     })
   })
 

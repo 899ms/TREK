@@ -282,6 +282,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Recogida {time}',
   'roadtrip.ride.return': 'Devolución {time}',
   'roadtrip.ride.open': 'Abrir reserva',
+  'roadtrip.ride.undated': 'La reserva {title} no tiene fecha, así que el trayecto no la tiene en cuenta.',
   'roadtrip.bookings.loose': 'También reservado este día',
 };
 export default roadtrip;

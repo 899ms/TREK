@@ -274,6 +274,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'الاستلام {time}',
   'roadtrip.ride.return': 'الإرجاع {time}',
   'roadtrip.ride.open': 'فتح الحجز',
+  'roadtrip.ride.undated': 'لا يوجد تاريخ للحجز {title}، لذلك لا يستخدمه المسار.',
   'roadtrip.bookings.loose': 'محجوز أيضًا في هذا اليوم',
 };
 export default roadtrip;

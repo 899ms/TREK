@@ -1397,4 +1397,41 @@ describe('RoadtripSidebar with the drive in from the day before (#2461)', () => 
     wrap(<RoadtripSidebar routes={routes({ days: [joined({ arrivingLine: undefined })] })} onAskAlternatives={vi.fn()} />)
     expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
   })
+
+  describe('a ride on no day (#2461)', () => {
+    const terminals = [
+      { role: 'from', sequence: 0, name: 'IJmuiden', code: null, lat: 52.4581, lng: 4.5879, timezone: null, local_date: null, local_time: null },
+      { role: 'to', sequence: 1, name: 'Port of Tyne', code: null, lat: 54.9925, lng: -1.4522, timezone: null, local_date: null, local_time: null },
+    ]
+    const ferry = (over: Partial<Reservation>): Reservation =>
+      ({ id: 70, trip_id: 1, type: 'ferry', title: 'IJmuiden to Newcastle', status: 'confirmed', day_id: null, endpoints: terminals, ...over }) as unknown as Reservation
+
+    it('FE-ROADTRIP-SIDEBAR-062: is named under the totals with its booking a click away; one on a day or without terminals is not', () => {
+      const onOpenBooking = vi.fn()
+      const reservations = [
+        ferry({}),
+        // On a day it is on the drive already; without terminals nothing says where it runs.
+        ferry({ id: 71, title: 'Dated ferry', day_id: 1 }),
+        ferry({ id: 72, title: 'Unlocated ferry', endpoints: [] } as Partial<Reservation>),
+        ferry({ id: 73, title: 'Table', type: 'restaurant' }),
+      ]
+      wrap(<RoadtripSidebar routes={routes()} reservations={reservations} onOpenBooking={onOpenBooking} />)
+
+      const notice = screen.getByRole('status')
+      expect(within(notice).getByText('IJmuiden to Newcastle has no date, so the drive does not use it.')).toBeInTheDocument()
+      expect(within(notice).getAllByRole('listitem')).toHaveLength(1)
+      fireEvent.click(within(notice).getByRole('button', { name: 'Open booking' }))
+      expect(onOpenBooking).toHaveBeenCalledWith(70)
+    })
+
+    it('FE-ROADTRIP-SIDEBAR-063: says so without a button where bookings cannot be opened, and says nothing when every ride has a day', () => {
+      const reader = wrap(<RoadtripSidebar routes={routes()} reservations={[ferry({})]} />)
+      expect(screen.getByText('IJmuiden to Newcastle has no date, so the drive does not use it.')).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Open booking' })).toBeNull()
+      reader.unmount()
+
+      wrap(<RoadtripSidebar routes={routes()} reservations={[ferry({ day_id: 1 })]} onOpenBooking={vi.fn()} />)
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+  })
 })

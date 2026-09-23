@@ -20,7 +20,8 @@ import { arrivingReroutable, legReroutable, type StopRow } from '../../../../com
 import { ARRIVING_DRIVE, type RailDrive } from '../../../../components/Roadtrip/useRouteAlternatives'
 import { dayBookings } from '../../../../components/Roadtrip/stopBookings'
 import { getDayOrder } from '../../../../utils/dayOrder'
-import type { Reservation } from '../../../../types'
+import { undatedRides } from '@trek/shared/roadtrip'
+import type { Reservation, TranslationFn } from '../../../../types'
 
 /**
  * The road trip tab: one day of the drive, as a chain or on the map.
@@ -102,6 +103,8 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
     if (stage && byIndex) for (const [i, list] of byIndex.atStop) atStop.set(stage.stops[i]!.assignmentId, list)
     return { atStop, loose: byIndex?.loose ?? [] }
   }, [stage, planner.reservations, dayOrder])
+  // The rides on no day, which the drive leaves out: listed above the stage, whichever it is.
+  const undated = useMemo(() => undatedRides(planner.reservations), [planner.reservations])
   // A chip that may not be opened is not a button in the first place (`bookingOpens`),
   // so nothing is turned away silently here.
   const canEditBookings = planner.can('reservation_edit', planner.trip)
@@ -169,6 +172,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
           searchBar ? 'pt-[calc(var(--m-safe-top,12px)+150px)]' : 'pt-[calc(var(--m-safe-top,12px)+102px)]'
         }`}
       >
+        <UndatedRides rides={undated} t={t} onOpen={openBooking} />
         {noDayPicked ? (
           <PickDay planner={planner} />
         ) : rt.empty || !stage ? (
@@ -411,6 +415,37 @@ function UpNext({ planner, shell, rt, stageDayId, onOpen }: {
         </button>
       </div>
     </section>
+  )
+}
+
+/**
+ * The rides the drive leaves out because they are on no day (#2461), each with its
+ * booking a tap away.
+ *
+ * The map half draws such a booking's arc between its terminals all the same, so without
+ * this the ferry looked planned while the chain went round it by road. Which bookings
+ * these are is decided once, in @trek/shared (`undatedRides`), for the desktop rail too.
+ */
+function UndatedRides({ rides, t, onOpen }: {
+  rides: readonly Reservation[]
+  t: TranslationFn
+  onOpen: (res: Reservation) => void
+}) {
+  if (!rides.length) return null
+  return (
+    <div role="status" className="mb-2.5 rounded-[18px] bg-[color-mix(in_srgb,var(--m-st-pending)_12%,transparent)] px-3.5 py-2.5">
+      <ul className="flex flex-col gap-1.5">
+        {rides.map(ride => (
+          <li key={ride.id} className="flex items-start gap-2 text-caption font-semibold text-[color:var(--m-st-pending)]">
+            <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" className="mt-[2px] shrink-0" />
+            <span className="min-w-0 flex-1">{t('roadtrip.ride.undated', { title: ride.title })}</span>
+            <button type="button" onClick={() => onOpen(ride)} className="shrink-0 text-m-ink underline underline-offset-2">
+              {t('roadtrip.ride.open')}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 

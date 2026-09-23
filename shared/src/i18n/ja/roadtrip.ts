@@ -277,6 +277,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '受取 {time}',
   'roadtrip.ride.return': '返却 {time}',
   'roadtrip.ride.open': '予約を開く',
+  'roadtrip.ride.undated': '{title} には日付がないため、走行では使われません。',
   'roadtrip.bookings.loose': 'この日のその他の予約',
 };
 export default roadtrip;

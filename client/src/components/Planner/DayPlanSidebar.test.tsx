@@ -2522,6 +2522,55 @@ describe('DayPlanSidebar', () => {
     expect(stored!.day_plan_position).toBe(positions[1].day_plan_position)
   })
 
+  // The crossing from the report behind #2461: Amsterdam and Newcastle on the day, the
+  // ferry from IJmuiden to the Port of Tyne in the evening. The slot written here is the
+  // one every other reader takes from then on, the road trip included.
+  const crossing = (newcastleAt: string | null, withAmsterdam = true) => {
+    const day = buildDay({ id: 10, date: '2026-10-06', title: 'Day 2' })
+    const amsterdam = buildPlace({ id: 1, name: 'Amsterdam', lat: 52.3731, lng: 4.8926 })
+    const newcastle = buildPlace({ id: 2, name: 'Newcastle', lat: 54.9783, lng: -1.6178, place_time: newcastleAt })
+    const stops = [
+      buildAssignment({ id: 11, day_id: 10, order_index: 0, place: amsterdam }),
+      buildAssignment({ id: 12, day_id: 10, order_index: 1, place: newcastle }),
+    ].filter(a => withAmsterdam || a.id !== 11)
+    const ferry = buildReservation({
+      id: 69, type: 'ferry', title: 'IJmuiden to Newcastle', day_id: 10,
+      reservation_time: '2026-10-06T17:30', reservation_end_time: '2026-10-06T23:00',
+      endpoints: [
+        { role: 'from', sequence: 0, name: 'IJmuiden', code: null, lat: 52.4581, lng: 4.5879, timezone: null, local_date: null, local_time: null },
+        { role: 'to', sequence: 1, name: 'Port of Tyne', code: null, lat: 54.9925, lng: -1.4522, timezone: null, local_date: null, local_time: null },
+      ],
+    })
+    seedStore(useTripStore, { reservations: [ferry] })
+    render(<DayPlanSidebar {...makeDefaultProps({
+      days: [day], places: [amsterdam, newcastle], reservations: [ferry], assignments: { '10': stops },
+    })} />)
+  }
+
+  it('FE-PLANNER-DAYPLAN-218: a ferry between two untimed stops on its two shores is given the slot between them (#2461)', async () => {
+    const { reservationsApi } = await import('../../api/client')
+    crossing(null)
+    await waitFor(() => expect(vi.mocked(reservationsApi.updatePositions)).toHaveBeenCalled())
+    // By the clock alone it closed the day at 2.5, and the drive went overland first.
+    expect(vi.mocked(reservationsApi.updatePositions).mock.calls[0][1]).toEqual([{ id: 69, day_plan_position: 0.5 }])
+    expect(useTripStore.getState().reservations.find(r => r.id === 69)!.day_plan_position).toBe(0.5)
+  })
+
+  it('FE-PLANNER-DAYPLAN-219: a stop timed before the ferry keeps it behind that stop (#2461)', async () => {
+    const { reservationsApi } = await import('../../api/client')
+    crossing('10:00')
+    await waitFor(() => expect(vi.mocked(reservationsApi.updatePositions)).toHaveBeenCalled())
+    expect(vi.mocked(reservationsApi.updatePositions).mock.calls[0][1]).toEqual([{ id: 69, day_plan_position: 1.5 }])
+  })
+
+  it('FE-PLANNER-DAYPLAN-220: a ferry landing next to the only stop of the day opens it (#2461)', async () => {
+    const { reservationsApi } = await import('../../api/client')
+    crossing(null, false)
+    await waitFor(() => expect(vi.mocked(reservationsApi.updatePositions)).toHaveBeenCalled())
+    // Ahead of Newcastle, which is stored at order_index 1 here.
+    expect(vi.mocked(reservationsApi.updatePositions).mock.calls[0][1]).toEqual([{ id: 69, day_plan_position: 0.5 }])
+  })
+
   it('FE-PLANNER-DAYPLAN-204: a rejected slot write puts the bookings back where the server has them', async () => {
     const { reservationsApi } = await import('../../api/client')
     vi.mocked(reservationsApi.updatePositions).mockRejectedValueOnce(new Error('offline'))

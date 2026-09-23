@@ -278,6 +278,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Upphämtning {time}',
   'roadtrip.ride.return': 'Återlämning {time}',
   'roadtrip.ride.open': 'Öppna bokning',
+  'roadtrip.ride.undated': 'Bokningen {title} har inget datum, så körningen tar inte med den.',
   'roadtrip.bookings.loose': 'Även bokat denna dag',
 };
 export default roadtrip;

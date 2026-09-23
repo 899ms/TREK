@@ -284,6 +284,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Παραλαβή {time}',
   'roadtrip.ride.return': 'Επιστροφή {time}',
   'roadtrip.ride.open': 'Άνοιγμα κράτησης',
+  'roadtrip.ride.undated': 'Η κράτηση {title} δεν έχει ημερομηνία, οπότε η διαδρομή δεν τη λαμβάνει υπόψη.',
   'roadtrip.bookings.loose': 'Επίσης κρατημένο αυτή τη μέρα',
 };
 export default roadtrip;

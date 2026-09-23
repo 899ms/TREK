@@ -278,6 +278,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Nhận xe {time}',
   'roadtrip.ride.return': 'Trả xe {time}',
   'roadtrip.ride.open': 'Mở đặt chỗ',
+  'roadtrip.ride.undated': 'Đặt chỗ {title} chưa có ngày, nên hành trình không tính đến nó.',
   'roadtrip.bookings.loose': 'Cũng đã đặt trong ngày này',
 };
 export default roadtrip;

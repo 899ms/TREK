@@ -1,4 +1,5 @@
 import { chronoOrder } from '@trek/shared'
+import { rideSeatAfter, sameDayRide, type CarrierBooking, type SeatItem } from '@trek/shared/roadtrip'
 // `orderedEndpoints` is the geometry order's single source of truth, in the module
 // that documents the multi-leg model. Sorting endpoints a second time here is how
 // the two drift.
@@ -289,6 +290,38 @@ function applyChronoOrder(
   })
 }
 
+/** A row of the day list as the seat of a ride reads it; a note is none (see rideSeatKey). */
+function seatItemsOf(row: MergedItem): SeatItem[] {
+  if (row.type === 'place') {
+    const place = row.data?.place
+    const located = Number.isFinite(place?.lat) && Number.isFinite(place?.lng)
+    return [{
+      key: row.sortKey,
+      minutes: parseTimeToMinutes(place?.place_time),
+      point: located ? { lat: place.lat, lng: place.lng } : null,
+    }]
+  }
+  if (row.type === 'transport') {
+    return [{ key: row.sortKey, minutes: parseTimeToMinutes(row.data?.reservation_time), point: null }]
+  }
+  return []
+}
+
+/**
+ * Where a booking without a saved slot goes among the day's rows by where it goes: the
+ * key of the row it goes behind, -Infinity to open the day, or null to leave it to the
+ * clock. Only a ride that leaves and lands on this day, with both terminals located,
+ * has a say (`sameDayRide`); the rule itself is `rideSeatAfter` in @trek/shared, which
+ * the road trip seats its terminals with, so the list and the drive keep one order.
+ *
+ * A place counts with its time and its coordinates, another booking with its time, a
+ * note not at all: the clock rule this refines never read a note's time either.
+ */
+export function rideSeatKey(r: CarrierBooking, rows: readonly MergedItem[]): number | null {
+  const ride = sameDayRide(r)
+  return ride ? rideSeatAfter(rows.flatMap(seatItemsOf), ride) : null
+}
+
 /** Merge places, notes, and transports into a single ordered day timeline. */
 export function getMergedItems(opts: {
   dayAssignments: any[]
@@ -345,11 +378,19 @@ export function getMergedItems(opts: {
         if (tm !== null && tm <= minutes) insertAfterKey = item.sortKey
       }
     }
+    // A ride that lands today may sit elsewhere between the same clocks, where it adds
+    // the least road. Without that, a ferry between two untimed stops closed the day and
+    // the drive went to the far shore overland before the crossing (#2461).
+    const seat = rideSeatKey(timed.data, result)
+    if (seat !== null) insertAfterKey = seat
 
     const lastKey = result.length > 0 ? Math.max(...result.map(i => i.sortKey)) : 0
-    const sortKey = insertAfterKey === -Infinity
-      ? lastKey + 0.5 + ti * 0.01
-      : insertAfterKey + 0.01 + ti * 0.001
+    const firstKey = result.length > 0 ? Math.min(...result.map(i => i.sortKey)) : 0
+    const sortKey = seat === -Infinity
+      ? firstKey - 0.5 - ti * 0.01
+      : insertAfterKey === -Infinity
+        ? lastKey + 0.5 + ti * 0.01
+        : insertAfterKey + 0.01 + ti * 0.001
 
     result.push({ type: timed.type, sortKey, data: timed.data })
   }

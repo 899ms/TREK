@@ -280,6 +280,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Alış {time}',
   'roadtrip.ride.return': 'İade {time}',
   'roadtrip.ride.open': 'Rezervasyonu aç',
+  'roadtrip.ride.undated': '{title} rezervasyonunun tarihi yok, bu yüzden sürüş onu hesaba katmıyor.',
   'roadtrip.bookings.loose': 'Bu gün için ayrıca rezerve edildi',
 };
 export default roadtrip;

@@ -282,6 +282,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Pengambilan {time}',
   'roadtrip.ride.return': 'Pengembalian {time}',
   'roadtrip.ride.open': 'Buka pemesanan',
+  'roadtrip.ride.undated': 'Pemesanan {title} tidak memiliki tanggal, jadi perjalanan tidak memperhitungkannya.',
   'roadtrip.bookings.loose': 'Juga dipesan hari ini',
 };
 export default roadtrip;

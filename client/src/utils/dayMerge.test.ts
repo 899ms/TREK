@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems, timedSlot } from './dayMerge'
+import { parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getTransportRouteEndpoints, getDisplayTimeForDay, getTransportForDay, getAssignmentReservations, getMergedItems, rideSeatKey, timedSlot } from './dayMerge'
 
 describe('parseTimeToMinutes', () => {
   it('parses HH:MM string', () => {
@@ -301,6 +301,59 @@ describe('getMergedItems', () => {
     const dayNotes = [{ id: 10, sort_order: 0.5, time: '12:00' }]
     const result = getMergedItems({ dayAssignments, dayNotes, dayTransports: [], dayId: 5 })
     expect(result.map(i => i.data.id)).toEqual([1, 3, 10, 2])
+  })
+})
+
+// The crossing from the report behind #2461: Amsterdam and Newcastle on the day, the
+// ferry from IJmuiden to the Port of Tyne in the evening. The road trip seats its
+// terminals by the same rule (`rideSeatAfter` in @trek/shared), so list and drive agree.
+describe('getMergedItems: a ride within one day, seated by where it goes (#2461)', () => {
+  const place = (id: number, order_index: number, lat: number, lng: number, place_time: string | null = null) =>
+    ({ id, order_index, place: { lat, lng, place_time } })
+  const amsterdam = (at: string | null = null) => place(1, 0, 52.3731, 4.8926, at)
+  const newcastle = (at: string | null = null) => place(2, 1, 54.9783, -1.6178, at)
+  const ferry = (over: Record<string, unknown> = {}) => ({
+    id: 69, type: 'ferry', title: 'IJmuiden to Newcastle', day_id: 5, end_day_id: 5,
+    reservation_time: '2026-10-06T17:30', reservation_end_time: '2026-10-06T23:00',
+    endpoints: [
+      { role: 'from', sequence: 0, name: 'IJmuiden', lat: 52.4581, lng: 4.5879 },
+      { role: 'to', sequence: 1, name: 'Port of Tyne', lat: 54.9925, lng: -1.4522 },
+    ],
+    ...over,
+  })
+  const read = (dayAssignments: unknown[], dayTransports: unknown[], dayNotes: unknown[] = []) =>
+    getMergedItems({ dayAssignments, dayNotes, dayTransports, dayId: 5 }).map(i => `${i.type}:${i.data.id}`)
+
+  it('puts a ferry between the stops on its two shores rather than at the end of the day', () => {
+    expect(read([amsterdam(), newcastle()], [ferry()])).toEqual(['place:1', 'transport:69', 'place:2'])
+  })
+
+  it('keeps it behind a stop timed before its departure, and leaves a ferry without terminals to the clock', () => {
+    expect(read([amsterdam(), newcastle('10:00')], [ferry()])).toEqual(['place:1', 'place:2', 'transport:69'])
+    expect(read([amsterdam(), newcastle()], [ferry({ endpoints: [] })])).toEqual(['place:1', 'place:2', 'transport:69'])
+    // One that lands tomorrow has no seat of its own on this day either.
+    expect(read([amsterdam(), newcastle()], [ferry({ end_day_id: 6 })])).toEqual(['place:1', 'place:2', 'transport:69'])
+  })
+
+  it('opens the day with a ride that lands next to its first stop, ahead of a note too', () => {
+    expect(read([newcastle()], [ferry()], [{ id: 10, sort_order: 0 }])).toEqual(['transport:69', 'place:2', 'note:10'])
+  })
+
+  it('leaves a slot somebody stored where it is', () => {
+    expect(read([amsterdam(), newcastle()], [ferry({ day_positions: { 5: 1.5 } })])).toEqual(['place:1', 'place:2', 'transport:69'])
+  })
+
+  it('reads a note as nothing and another booking as its clock only', () => {
+    const rows = [
+      { type: 'place' as const, sortKey: 0, data: amsterdam() },
+      { type: 'note' as const, sortKey: 0.5, data: { id: 10, time: '20:00' } },
+      { type: 'place' as const, sortKey: 1, data: newcastle() },
+    ]
+    expect(rideSeatKey(ferry(), rows)).toBe(0)
+    // A bus at 18:00 between the two is a clock after the departure: the ferry stays ahead of it.
+    const bus = { type: 'transport' as const, sortKey: 0.5, data: { id: 11, type: 'bus', reservation_time: '18:00' } }
+    expect(rideSeatKey(ferry(), [rows[0], bus, rows[2]])).toBeNull()
+    expect(rideSeatKey({ ...ferry(), type: 'taxi' }, rows)).toBeNull()
   })
 })
 

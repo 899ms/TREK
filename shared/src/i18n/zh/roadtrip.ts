@@ -266,6 +266,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': '取车 {time}',
   'roadtrip.ride.return': '还车 {time}',
   'roadtrip.ride.open': '打开预订',
+  'roadtrip.ride.undated': '{title} 没有日期，因此行程不会用到它。',
   'roadtrip.bookings.loose': '当天的其他预订',
 };
 export default roadtrip;

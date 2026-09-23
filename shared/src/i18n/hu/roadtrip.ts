@@ -279,6 +279,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.pickup': 'Felvétel {time}',
   'roadtrip.ride.return': 'Visszaadás {time}',
   'roadtrip.ride.open': 'Foglalás megnyitása',
+  'roadtrip.ride.undated': '{title}: a foglalásnak nincs dátuma, ezért az útvonal nem számol vele.',
   'roadtrip.bookings.loose': 'Erre a napra még lefoglalva',
 };
 export default roadtrip;

@@ -35,7 +35,7 @@ import { isDayInAccommodationRange, getAccommodationAnchors, getDayBookendHotels
 import {
   TRANSPORT_TYPES, parseTimeToMinutes, getSpanPhase, hidesOnMiddleDay, getDisplayTimeForDay, getTransportRouteEndpoints,
   getTransportForDay as _getTransportForDay, getMergedItems as _getMergedItems, isCarrierTransport, hasCarrierEndpointOnDay,
-  getAssignmentReservations, timedSlot,
+  getAssignmentReservations, timedSlot, rideSeatKey,
   type MergedItem,
 } from '../../utils/dayMerge'
 import { withinDriveRange } from '../../utils/geo'
@@ -439,6 +439,13 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
 
   // Compute initial day_plan_position for a transport based on time
   const computeTransportPosition = (r, da) => {
+    // A ride that lands today goes where it adds the least road between the same clocks,
+    // by the rule the list and the road trip seat it with (`rideSeatKey`). This slot is
+    // stored, so seated by the clock alone a ferry between two untimed stops stayed at
+    // the end of the day, and the drive went overland before the crossing (#2461).
+    const seat = rideSeatKey(r, da.map(a => ({ type: 'place' as const, sortKey: a.order_index, data: a })))
+    if (seat === -Infinity) return Math.min(...da.map(a => a.order_index)) - 0.5
+    if (seat !== null) return seat + 0.5
     const minutes = parseTimeToMinutes(r.reservation_time) ?? 0
     // Find the last place with time <= transport time
     let afterIdx = -1
