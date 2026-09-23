@@ -337,7 +337,7 @@ describe('Tool: delete_accommodation', () => {
 describe('Tool: create_place_accommodation', () => {
   // #2483: the place it creates takes its website through the same contract as
   // create_place, so a bare host from search_place lands as https.
-  it('MCP-ACCOM-2483-01: a website without a scheme is stored with https, a script link is refused', async () => {
+  it('MCP-ACCOM-2483-01: a website without a scheme is stored with https', async () => {
     const { user } = createUser(testDb);
     const trip = createTrip(testDb, user.id);
     const day = createDay(testDb, trip.id);
@@ -347,14 +347,29 @@ describe('Tool: create_place_accommodation', () => {
         arguments: { tripId: trip.id, name: 'Hôtel du Faouët', start_day_id: day.id, end_day_id: day.id, website: 'www.hotel-faouet.example' },
       })) as { place: { id: number } };
       expect(testDb.prepare('SELECT website FROM places WHERE id = ?').get(data.place.id)).toEqual({ website: 'https://www.hotel-faouet.example' });
-
-      const refused = await h.client.callTool({
-        name: 'create_place_accommodation',
-        arguments: { tripId: trip.id, name: 'Hostile', start_day_id: day.id, end_day_id: day.id, website: 'javascript:alert(1)' },
-      });
-      expect(refused.isError).toBe(true);
     });
-    expect(testDb.prepare("SELECT COUNT(*) AS n FROM places WHERE trip_id = ? AND name = 'Hostile'").get(trip.id)).toEqual({ n: 0 });
+  });
+
+  // The tool always took any text as the website. It still does, so no call that
+  // went through before fails now; a value the place contract refuses is left
+  // off rather than stored, and '' stays "no website" as it is on REST.
+  it('MCP-ACCOM-2483-02: a website that is empty, free text or a script link books the stay without one', async () => {
+    const { user } = createUser(testDb);
+    const trip = createTrip(testDb, user.id);
+    const day = createDay(testDb, trip.id);
+    await withHarness(user.id, async (h) => {
+      for (const [name, website] of [['Empty', ''], ['Words', 'ask at the front desk'], ['Hostile', 'javascript:alert(1)']]) {
+        const result = await h.client.callTool({
+          name: 'create_place_accommodation',
+          arguments: { tripId: trip.id, name, start_day_id: day.id, end_day_id: day.id, website },
+        });
+        expect(result.isError, name).toBeFalsy();
+        const data = parseToolResult(result) as { place: { id: number; website: unknown }; accommodation: { id: number } };
+        expect(data.place.website, name).toBeNull();
+        expect(data.accommodation.id, name).toBeGreaterThan(0);
+        expect(testDb.prepare('SELECT website FROM places WHERE id = ?').get(data.place.id), name).toEqual({ website: null });
+      }
+    });
   });
 
   it('creates the place and the accommodation atomically and broadcasts both', async () => {

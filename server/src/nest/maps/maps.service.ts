@@ -673,6 +673,17 @@ export const PLACES_PROVIDER_SETTING = 'places_provider';
 export const PLACES_GOOGLE_ONLY_SETTING = 'places_google_only';
 
 /**
+ * A details row as the cache holds it. A row written before #2483 still has a
+ * source's website as it came, `www.hotel.cn` from Amap for one, and keeps for a
+ * week (an expanded one until a refresh), so the website is normalized on the
+ * way out of the cache as well as on the way in.
+ */
+function cachedDetails(payload: string): Record<string, unknown> | null {
+  const place = JSON.parse(payload) as Record<string, unknown> | null;
+  return place && 'website' in place ? { ...place, website: normalizePlaceWebsite(place.website) } : place;
+}
+
+/**
  * Whoever holds the keyed slot beside the index for one request: Google's
  * credential, an Amap provider, or nobody (the OpenStreetMap stack alone).
  */
@@ -2532,7 +2543,7 @@ export class MapsService {
       placeId,
       langKey,
     );
-    if (cached && Date.now() - cached.fetched_at < DETAILS_TTL) return { place: JSON.parse(cached.payload_json) };
+    if (cached && Date.now() - cached.fetched_at < DETAILS_TTL) return { place: cachedDetails(cached.payload_json) };
 
     // Closes the autocomplete session this lookup belongs to, so Google bills
     // the search once instead of per keystroke. A cache hit above never reaches
@@ -2625,7 +2636,7 @@ export class MapsService {
       placeId,
       langKey,
     );
-    if (cached && Date.now() - cached.fetched_at < DETAILS_TTL) return { place: JSON.parse(cached.payload_json) };
+    if (cached && Date.now() - cached.fetched_at < DETAILS_TTL) return { place: cachedDetails(cached.payload_json) };
 
     const place = await provider.placeDetails(placeId, lang);
     if (!place) return { place: null };
@@ -2681,7 +2692,7 @@ export class MapsService {
         placeId,
         langKey,
       );
-      if (cached) return { place: JSON.parse(cached.payload_json) };
+      if (cached) return { place: cachedDetails(cached.payload_json) };
     }
 
     const response = await googleFetch(

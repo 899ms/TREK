@@ -3587,4 +3587,36 @@ describe('websites from the map sources (#2483)', () => {
     const place = (await svc.getPlaceDetailsExpanded(1, 'ChIJWeb-expanded')).place as { website: unknown };
     expect(place.website).toBeNull();
   });
+
+  // A details row cached before the fix still holds the website as the source
+  // sent it, and keeps for a week; an expanded row keeps until a refresh. The
+  // cache hands it out through the same helper.
+  const cachedRow = (place: Record<string, unknown>) => ({ payload_json: JSON.stringify(place), fetched_at: Date.now() });
+
+  it('MAPS-2483-06: a cached details row with a bare website is served with https, without a Google call', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    mockDbGet
+      .mockReturnValueOnce({ maps_api_key: 'gkey' })
+      .mockReturnValueOnce(cachedRow({ google_place_id: 'ChIJOld', name: 'Chapelle', website: 'example.fr/visite' }));
+    const { place } = await svc.getPlaceDetails(1, 'ChIJOld');
+    expect(place).toMatchObject({ name: 'Chapelle', website: 'https://example.fr/visite' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('MAPS-2483-07: so is an expanded row, where a script link becomes null and a row without the field stays as it is', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    mockDbGet
+      .mockReturnValueOnce({ maps_api_key: 'gkey' })
+      .mockReturnValueOnce(cachedRow({ google_place_id: 'ChIJOldX', website: '//www.example.fr', reviews: [] }))
+      .mockReturnValueOnce({ maps_api_key: 'gkey' })
+      .mockReturnValueOnce(cachedRow({ google_place_id: 'ChIJOldY', website: 'javascript:alert(1)' }))
+      .mockReturnValueOnce({ maps_api_key: 'gkey' })
+      .mockReturnValueOnce(cachedRow({ google_place_id: 'ChIJOldZ', name: 'No site' }));
+    expect((await svc.getPlaceDetailsExpanded(1, 'ChIJOldX')).place).toMatchObject({ website: 'https://www.example.fr', reviews: [] });
+    expect((await svc.getPlaceDetailsExpanded(1, 'ChIJOldY')).place).toMatchObject({ website: null });
+    expect((await svc.getPlaceDetailsExpanded(1, 'ChIJOldZ')).place).toEqual({ google_place_id: 'ChIJOldZ', name: 'No site' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

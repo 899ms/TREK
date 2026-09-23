@@ -1,4 +1,5 @@
 import { PLACE_WEBSITE_MAX_LENGTH, normalizePlaceWebsite } from './place-website';
+import { placeWebsiteSchema } from './place.schema';
 
 import { describe, expect, it } from 'vitest';
 
@@ -66,8 +67,8 @@ describe('normalizePlaceWebsite (#2483)', () => {
       'example-.com',
       'example.com.',
       'https://',
-      'https://localhost:3000',
       'https://exa mple.com',
+      'http://%zz/',
     ]) {
       expect(normalizePlaceWebsite(value), value).toBeNull();
     }
@@ -102,5 +103,39 @@ describe('normalizePlaceWebsite (#2483)', () => {
     expect(normalizePlaceWebsite(undefined)).toBeNull();
     expect(normalizePlaceWebsite(42)).toBeNull();
     expect(normalizePlaceWebsite({ href: 'https://example.com' })).toBeNull();
+  });
+
+  // The dot is how a bare host is told from a word. A value that names http(s)
+  // has settled that already, so it is kept whenever a browser opens it, the
+  // way the write contract keeps it: a plugin on the same network may answer
+  // with an intranet address.
+  it('SHARED-WEBSITE-013: an http(s) value the contract stores is kept, whatever its host looks like', () => {
+    for (const value of [
+      'https://localhost:3000',
+      'http://intranet/wiki',
+      'https://[2001:db8::1]:8443/x',
+      'http://[::1]/',
+      'https://example.com.',
+      'https://ex%41mple.com',
+    ]) {
+      expect(normalizePlaceWebsite(value), value).toBe(value);
+      expect(placeWebsiteSchema.safeParse(value).data, value).toBe(value);
+    }
+  });
+
+  it('SHARED-WEBSITE-014: a backslash never turns a value into another scheme or a bare host into a kept one', () => {
+    // A browser reads the backslash as a slash, so this opens localhost over
+    // https. It is kept like any other intranet address: the scheme is http(s).
+    expect(normalizePlaceWebsite('https://localhost\\@example.com')).toBe('https://localhost\\@example.com');
+    for (const value of [
+      'https:\\\\evil.example',
+      '\\\\evil.example',
+      '//\\evil.example',
+      'example.com\\@evil.example',
+      'intranet\\@example.com',
+      'javascript:1\\@example.com',
+    ]) {
+      expect(normalizePlaceWebsite(value), value).toBeNull();
+    }
   });
 });

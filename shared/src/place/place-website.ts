@@ -35,7 +35,8 @@ function authorityOf(rest: string): string {
 
 /**
  * A name with at least one dot and a top-level label that has a letter in it,
- * or an IPv4 address. "Chapelle", "localhost" and "3.5" are not websites.
+ * or an IPv4 address. Without a scheme, "Chapelle", "localhost" and "3.5" are
+ * not websites.
  */
 function isHostName(host: string): boolean {
   const labels = host.split('.');
@@ -55,10 +56,13 @@ function hasHost(authority: string): boolean {
 /**
  * The website a place gets from `value`, or null.
  *
- * Trimmed; http and https stay as they are; a bare host or a protocol-relative
- * `//host` gains https. Any other scheme (`javascript:`, `data:`, `mailto:`,
- * `ftp:`), free text, a host without a dot and anything a browser cannot
- * parse come back as null, as does a value longer than the contract allows.
+ * Trimmed; http and https stay as they are whenever a browser can open them,
+ * an intranet host or an IPv6 literal included, which is what the write
+ * contract keeps as well. A bare host or a protocol-relative `//host` gains
+ * https, and only there does the host need a dot: it is what tells a site
+ * from a word. Any other scheme (`javascript:`, `data:`, `mailto:`, `ftp:`),
+ * free text and anything a browser cannot parse come back as null, as does a
+ * value longer than the contract allows.
  */
 export function normalizePlaceWebsite(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -67,9 +71,6 @@ export function normalizePlaceWebsite(value: unknown): string | null {
 
   let url: string;
   if (HTTP_URL.test(text)) {
-    const authority = authorityOf(text.replace(HTTP_URL, ''));
-    // Credentials in front of the host are not part of the name being checked.
-    if (!hasHost(authority.slice(authority.lastIndexOf('@') + 1))) return null;
     url = text;
   } else if (text.startsWith('//')) {
     if (!hasHost(authorityOf(text.slice(2)))) return null;

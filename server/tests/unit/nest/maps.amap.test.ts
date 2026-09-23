@@ -760,6 +760,22 @@ describe('MapsService.keyedProvider', () => {
     expect(place!.source).toBe('amap');
     expect(calledUrl()).not.toContain('overpass');
   });
+
+  // #2483: a details row cached before the fix holds Amap's website as it came,
+  // often a bare host, and keeps for a week.
+  it('AMAP-079: a cached details row with a bare website is served with https', async () => {
+    mockProviderGet.mockReturnValue({ value: 'amap' });
+    const row = { payload_json: JSON.stringify({ name: '旧酒店', website: 'www.hotel.cn', source: 'amap' }), fetched_at: Date.now() };
+    // The cache lookup binds the place id, the key lookup the user id.
+    mockDbGet.mockImplementation((...args: unknown[]) =>
+      args[0] === 'amap:B7' ? row : { maps_api_key: null, amap_api_key: 'akey' },
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { place } = await svc.getPlaceDetails(1, 'amap:B7');
+    expect(place).toMatchObject({ name: '旧酒店', website: 'https://www.hotel.cn' });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });
 
 describe('MapsService with Amap in the keyed slot', () => {

@@ -165,6 +165,17 @@ describe('PluginSearchController', () => {
     expect(places.map((p) => p.website)).toEqual(['https://www.ristorante.example/menu', 'https://ristorante.example', null]);
   });
 
+  // A plugin on the same network may answer with an intranet address. The old
+  // check kept every http(s) url a browser opens, and so does the helper.
+  it('PLUGIN-SEARCH-2483-02: an http(s) website keeps its host whatever it looks like', async () => {
+    const urls = ['http://localhost:8080/poi/1', 'http://intranet/poi/2', 'https://[2001:db8::1]/poi/3'];
+    const { c } = controller({
+      searchPlaces: vi.fn(async () => urls.map((website, i) => hit({ id: `h${i}`, website }))) as unknown as PluginHooks['searchPlaces'],
+    });
+    const { places } = await c.search('poi', undefined, undefined, undefined, undefined, req(5));
+    expect(places.map((p) => p.website)).toEqual(urls);
+  });
+
   it('caps one provider at 20 hits', async () => {
     const { c } = controller({
       searchPlaces: vi.fn(async () =>

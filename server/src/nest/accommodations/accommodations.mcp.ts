@@ -93,8 +93,7 @@ export class AccommodationsMcp {
       google_ftid: z.string().optional().describe('Google Maps feature ID from search_place — enables direct Google Maps links'),
       osm_id: z.string().optional().describe('OpenStreetMap ID from search_place (e.g. "way:12345")'),
       place_notes: z.string().max(2000).optional().describe('Notes for the place'),
-      // The place contract create_place uses: a bare host gains https (#2483).
-      website: placeWebsiteSchema.optional(),
+      website: z.string().max(500).optional(),
       phone: z.string().max(50).optional(),
       start_day_id: z.number().int().positive().describe('Check-in day ID'),
       end_day_id: z.number().int().positive().describe('Check-out day ID'),
@@ -124,9 +123,13 @@ export class AccommodationsMcp {
     if (!this.guards.hasTripPermission('day_edit', tripId, ctx.userId)) return permissionDenied();
     const dayErrors = this.accommodations.validateAccommodationRefs(tripId, undefined, start_day_id, end_day_id);
     if (dayErrors.length > 0) return { content: [{ type: 'text' as const, text: dayErrors.map(e => e.message).join(', ') }], isError: true };
+    // The website takes the place contract create_place uses, so a bare host
+    // gains https (#2483). A value that contract refuses is left off instead of
+    // failing the booking: this tool always took any text here, '' as none.
+    const site = website ? placeWebsiteSchema.safeParse(website) : null;
     try {
       const result = this.db.transaction(() => {
-        const place = this.places.create(String(tripId), { name, description, lat, lng, address, category_id, google_place_id, google_ftid, osm_id, notes: place_notes, website, phone, price, currency });
+        const place = this.places.create(String(tripId), { name, description, lat, lng, address, category_id, google_place_id, google_ftid, osm_id, notes: place_notes, website: site?.success ? site.data : undefined, phone, price, currency });
         const { accommodation, mirror } = this.accommodations.createAccommodation(tripId, { place_id: place.id, start_day_id, end_day_id, check_in, check_in_end, check_out, confirmation, notes: accommodation_notes });
         return { place, accommodation, mirror };
       });
