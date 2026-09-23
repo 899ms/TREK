@@ -27,10 +27,17 @@ export function mergeRouteSegments(parts: RouteSegment[], unit: DistanceUnit): R
   const distance = parts.reduce((sum, leg) => sum + (leg.distance ?? 0), 0);
   const duration = parts.reduce((sum, leg) => sum + (leg.duration ?? 0), 0);
   const durationText = formatDurationShort(duration);
+  // A leg a provider handed over without its ends keeps the first piece's; the texts are
+  // what the reader was shown wrong, the ends only place the label.
+  const ends = first.from && last.to ? { from: first.from, to: last.to } : null;
   return {
     ...first,
-    to: last.to,
-    mid: [(first.from[0] + last.to[0]) / 2, (first.from[1] + last.to[1]) / 2],
+    ...(ends
+      ? {
+          to: ends.to,
+          mid: [(ends.from[0] + ends.to[0]) / 2, (ends.from[1] + ends.to[1]) / 2] as [number, number],
+        }
+      : {}),
     distance,
     duration,
     distanceText: formatDistance(distance / 1000, unit),
