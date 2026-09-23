@@ -1,10 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { MAX_PINS, pinAlternative, railLegAt } from './alternativePins'
+import { MAX_PINS, pinAlternative, railDriveOn, railLegAt } from './alternativePins'
 import type { RailLegRoute, RailLegRouter, RoadtripDay, RoadtripStop } from './useRoadtripRoutes'
 import type { OfferedRoute } from './useRouteAlternatives'
 
 /**
- * FE-ALTPIN-001..010: proving a choice with the rail's own router before it is saved.
+ * FE-ALTPIN-001..011: proving a choice with the rail's own router before it is saved.
  *
  * A choice used to be one via at the point where the offer strayed furthest, written
  * without asking whether the router then drove the offer. On a ferry it did not (OSRM
@@ -147,5 +147,38 @@ describe('railLegAt', () => {
     expect(railLegAt(days, { dayId: 1, afterIndex: 0 })).toMatchObject({ from: { assignmentId: 10 }, to: { assignmentId: 11 } })
     expect(railLegAt(days, { dayId: 1, afterIndex: 1 })).toBeNull()
     expect(railLegAt(days, { dayId: 3, afterIndex: 0 })).toBeNull()
+  })
+})
+
+describe('railDriveOn', () => {
+  const stop = (assignmentId: number, ownerDayId: number, ownerIndex: number) =>
+    ({ assignmentId, ownerDayId, ownerIndex, lat: 50, lng: 10 }) as RoadtripStop
+  const seg = (distance: number) => ({ distance, duration: distance / 20 }) as RoadtripDay['legs'][number]
+  const LEG_LINE: [number, number][] = [[50, 10], [50.2, 10.4]]
+  const DRIVE_IN: [number, number][] = [[51, 9], [50, 10]]
+  const card = (over: Partial<RoadtripDay> = {}) => ({
+    dayId: 2,
+    stops: [stop(20, 2, 0), stop(21, 2, 1)],
+    legs: [seg(40_000)],
+    legLines: [LEG_LINE],
+    arrivingFrom: stop(12, 1, 2),
+    arrivingLeg: seg(90_000),
+    arrivingLine: DRIVE_IN,
+    ...over,
+  }) as RoadtripDay
+
+  it('FE-ALTPIN-011: a leg is read off its index, the drive in off the stop the day before ended on', () => {
+    expect(railDriveOn(card(), { kind: 'leg', index: 0 })).toMatchObject({
+      from: { assignmentId: 20 }, to: { assignmentId: 21 }, seg: { distance: 40_000 }, line: LEG_LINE,
+    })
+    expect(railDriveOn(card(), { kind: 'arriving' })).toMatchObject({
+      from: { assignmentId: 12, ownerDayId: 1, ownerIndex: 2 }, to: { assignmentId: 20 }, seg: { distance: 90_000 }, line: DRIVE_IN,
+    })
+    // Nothing past the last stop, no drive in on a card nothing joins, and no road yet.
+    expect(railDriveOn(card(), { kind: 'leg', index: 1 })).toBeNull()
+    expect(railDriveOn(card({ arrivingFrom: undefined, arrivingLeg: undefined }), { kind: 'arriving' })).toBeNull()
+    expect(railDriveOn(card({ legs: [] }), { kind: 'leg', index: 0 })).toBeNull()
+    // A line the card does not have yet is no reason to refuse the drive.
+    expect(railDriveOn(card({ legLines: undefined }), { kind: 'leg', index: 0 })?.line).toBeUndefined()
   })
 })

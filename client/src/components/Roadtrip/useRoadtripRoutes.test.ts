@@ -776,6 +776,31 @@ describe('useRoadtripRoutes', () => {
       expect(inboundDry.lat).toBeGreaterThan(BERLIN[0])
       expect(inboundDry.lat).toBeLessThan(LUENEBURG[0])
     })
+
+    it('FE-ROADTRIP-ROUTES-049: switching what the trip avoids asks for the join again, with the new classes', async () => {
+      // The seam round skipped every join it already had an answer for, whatever that
+      // answer had been asked with, so the drive between two days kept its old road and
+      // its old minutes until the page was loaded again.
+      //
+      // The clock the requests are spaced by is held still and moved by hand, so neither
+      // round waits for real time between its requests.
+      let now = 10_000
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        setting({ roadtrip_connect_days: true })
+        const { days: daysList, assignments } = twoDays()
+        renderHook(() => useRoadtripRoutes(7, daysList, assignments))
+        await waitFor(() => expect(askedFor(LUENEBURG, BERLIN)).toHaveLength(1))
+        expect(askedFor(LUENEBURG, BERLIN)[0][1]).toMatchObject({ avoid: [] })
+
+        now += 10_000
+        setting({ roadtrip_avoid: 'toll' })
+        await waitFor(() => expect(askedFor(LUENEBURG, BERLIN)).toHaveLength(2))
+        expect(askedFor(LUENEBURG, BERLIN)[1][1]).toMatchObject({ profile: 'driving', avoid: ['toll'] })
+      } finally {
+        clock.mockRestore()
+      }
+    })
   })
 })
 

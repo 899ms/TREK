@@ -241,6 +241,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Usar meu padrão',
   'roadtrip.stop.fillSet': 'Definir quanto abastecer nesta parada',
   'roadtrip.leg.pending': 'Sem rota',
+  'roadtrip.leg.arrivingFrom': 'Saindo de {name}',
   'roadtrip.stop.addTitle': 'Adicionar como parada',
   'roadtrip.stop.kind': 'Tipo de parada',
   'roadtrip.stop.landsOn': 'Dia {day}, como parada {position}',

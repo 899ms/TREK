@@ -145,7 +145,7 @@ const DRAWN = ['places', 'route', 'routeColors', 'accessLines', 'focusPoints'] a
 /** A picker open on leg 0 of day 3, with or without roads back yet. */
 function withPicker(overlays: AlternativeOverlay[], over: Partial<TripPlanner> = {}): Partial<TripPlanner> {
   const base = buildPlanner()
-  const open: LegAlternatives = openLeg({ dayId: 3, index: 0, loading: overlays.length === 0 })
+  const open: LegAlternatives = openLeg({ dayId: 3, drive: { kind: 'leg', index: 0 }, loading: overlays.length === 0 })
   return {
     routeAlternatives: { ...base.routeAlternatives, open },
     alternativeOverlays: overlays,

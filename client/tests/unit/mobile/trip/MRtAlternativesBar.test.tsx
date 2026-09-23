@@ -31,7 +31,7 @@ function overlays(routes: OfferedRoute[] = ROUTES) {
 
 function planner(open: Partial<LegAlternatives> | null, over: Partial<TripPlanner> = {}): TripPlanner {
   const base = buildPlanner()
-  const leg = open ? openLeg({ dayId: 2, index: 0, routes: ROUTES, ...open }) : null
+  const leg = open ? openLeg({ dayId: 2, drive: { kind: 'leg', index: 0 }, routes: ROUTES, ...open }) : null
   return buildPlanner({
     selectedDayId: 2,
     routeAlternatives: { ...base.routeAlternatives, open: leg },

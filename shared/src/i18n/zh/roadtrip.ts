@@ -227,6 +227,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': '使用我的默认值',
   'roadtrip.stop.fillSet': '设置这一站加到多少',
   'roadtrip.leg.pending': '无路线',
+  'roadtrip.leg.arrivingFrom': '从 {name} 出发',
   'roadtrip.stop.addTitle': '添加为停靠点',
   'roadtrip.stop.kind': '停靠类型',
   'roadtrip.stop.landsOn': '第 {day} 天，第 {position} 个停靠点',

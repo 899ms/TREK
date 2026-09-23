@@ -1,5 +1,5 @@
 import { isServiceStopType, type ScheduleEntry, type ScheduleWarning } from './roadtripModel'
-import type { CarrierTerminal, RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
+import { isCarrierMode, type CarrierTerminal, type RoadtripDay, type RoadtripStop, type RouteSegment } from '@trek/shared/roadtrip'
 import { readStay } from './stayReading'
 
 /**
@@ -21,6 +21,12 @@ export type RoadtripRow =
   | { kind: 'spill'; fromDayNumber: number; departs: string | null; stops: StopRow[] }
   | StopRow
   | { kind: 'leg'; index: number; seg: RouteSegment | undefined; mode: string | null }
+  /**
+   * The drive in from where the day before ended, above the card's first stop, on a trip
+   * with connected days. `from` is that last stop of the day before, which the card does
+   * not draw, so the row names it.
+   */
+  | { kind: 'arriving'; seg: RouteSegment; from: RoadtripStop; mode: string | null }
   /**
    * A ride that leaves and lands on the day (#2428), as one row: the booking with both
    * its terminals inside it, in place of two stop rows and the leg between them. The
@@ -156,6 +162,20 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
   const rows: RoadtripRow[] = []
   const spills = day.spills ?? []
 
+  // The drive in from yesterday, where the desktop rail draws its band: above the first
+  // stop, because that is where it happens. A hop is left out like any other, and so is
+  // a ride: the terminal row it lands on already carries the booking, and a pill would
+  // read "No route" under a flight that has no road.
+  const arriving = day.arrivingLeg
+  if (arriving && day.arrivingFrom && !isHop(arriving) && !isCarrierMode(arriving.mode)) {
+    rows.push({
+      kind: 'arriving',
+      seg: arriving,
+      from: day.arrivingFrom,
+      mode: day.stops[0]?.incomingLegMode ?? day.arrivingFrom.legMode ?? null,
+    })
+  }
+
   let number = 0
   day.stops.forEach((stop, i) => {
     const spill = spills.find(s => s.at === i)
@@ -248,6 +268,29 @@ export function legReroutable(day: RoadtripDay, index: number): boolean {
     // index of the stop after it. The road INTO a departure terminal leaves a stored
     // stop and can be offered other ways like any other.
     && !day.stops[index].carrier
+}
+
+/**
+ * Whether the drive arriving at the head of a connected card can be offered other ways.
+ *
+ * The same rule as `legReroutable`, read for the one drive a card holds without a stop of
+ * its own at its start: it leaves the last stop of the day before (`arrivingFrom`), and a
+ * choice is filed behind that stop, on that day, where the map already files a point
+ * dropped on this drive. It needs its road and the line it is drawn on, since that is
+ * what the picker offers as the current way. A ride has no other way, a hop is nothing to
+ * weigh, a terminal leaves nothing a via can be filed behind, and an automatic night at
+ * either end is a marker on the road rather than a stop anybody chose.
+ */
+export function arrivingReroutable(day: RoadtripDay): boolean {
+  const seg = day.arrivingLeg
+  const from = day.arrivingFrom
+  const to = day.stops[0]
+  return !!seg && !!from && !!to && !!day.arrivingLine
+    && !isCarrierMode(seg.mode)
+    && !isHop(seg)
+    && !from.carrier
+    && !from.automaticNight
+    && !to.automaticNight
 }
 
 /** Stops that carry a number, for a count that agrees with the numbering above. */

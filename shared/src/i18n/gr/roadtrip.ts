@@ -244,6 +244,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Χρήση της προεπιλογής μου',
   'roadtrip.stop.fillSet': 'Όρισε πόσο γεμίζει αυτή η στάση',
   'roadtrip.leg.pending': 'Χωρίς διαδρομή',
+  'roadtrip.leg.arrivingFrom': 'Από {name}',
   'roadtrip.stop.addTitle': 'Προσθήκη ως στάση',
   'roadtrip.stop.kind': 'Είδος στάσης',
   'roadtrip.stop.landsOn': 'Ημέρα {day}, ως στάση {position}',

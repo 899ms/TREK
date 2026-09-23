@@ -1341,3 +1341,60 @@ describe('RoadtripSidebar with a hire car and the day\'s bookings (#2428)', () =
     expect(onOpenBooking).toHaveBeenCalledWith(12)
   })
 })
+
+describe('RoadtripSidebar with the drive in from the day before (#2461)', () => {
+  /** Where day 1 ended, three stops in, and a card joined to it by the road from there. */
+  const yesterday = stop({ assignmentId: 9, name: 'Lüneburg', ownerDayId: 1, ownerIndex: 2 })
+  const joined = (over: Partial<RoadtripDay> = {}) => day({
+    dayId: 2,
+    dayNumber: 2,
+    arrivingLeg: leg({ distance: 120000, duration: 5400, distanceText: '120 km', durationText: '1 h 30 min' }),
+    arrivingFrom: yesterday,
+    arrivingLine: [[53.2, 10.4], [52.5, 13.4]],
+    ...over,
+  })
+  const pressed = () => screen.getAllByLabelText('Other ways').map(icon => icon.closest('button')?.getAttribute('aria-pressed'))
+
+  it('FE-ROADTRIP-SIDEBAR-060: the drive in offers other ways as the drive it is, and shows pressed while they are open', () => {
+    // #2461: the band above the first stop was the one drive on the rail without the
+    // control, so the road between two days could not be changed at all.
+    const onAskAlternatives = vi.fn()
+    const first = wrap(<RoadtripSidebar routes={routes({ days: [joined()] })} onAskAlternatives={onAskAlternatives} />)
+
+    // The drive in, then the card's own leg.
+    expect(pressed()).toEqual(['false', 'false'])
+    fireEvent.click(screen.getAllByLabelText('Other ways')[0])
+    expect(onAskAlternatives).toHaveBeenCalledWith(2, { kind: 'arriving' })
+    first.unmount()
+
+    const open = wrap(
+      <RoadtripSidebar routes={routes({ days: [joined()] })} onAskAlternatives={vi.fn()} openAlternatives={{ dayId: 2, drive: { kind: 'arriving' } }} />,
+    )
+    expect(pressed()).toEqual(['true', 'false'])
+    open.unmount()
+
+    // The card's first leg is another drive, even at the index the drive in would borrow.
+    wrap(<RoadtripSidebar routes={routes({ days: [joined()] })} onAskAlternatives={vi.fn()} openAlternatives={{ dayId: 2, drive: { kind: 'leg', index: 0 } }} />)
+    expect(pressed()).toEqual(['false', 'true'])
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-061: no control for a reader, for a drive from a terminal, or for one the rail has no line for', () => {
+    const reader = wrap(<RoadtripSidebar routes={routes({ days: [joined()] })} />)
+    expect(screen.queryAllByLabelText('Other ways')).toHaveLength(0)
+    // The band is still drawn, only not as a control.
+    expect(screen.getByText('120 km in 1 h 30 min')).toBeInTheDocument()
+    reader.unmount()
+
+    const landed = stop({
+      assignmentId: -3000000141,
+      name: 'Munich Airport',
+      carrier: { reservationId: 70, type: 'flight', role: 'arrival', title: 'LH 2020', code: 'MUC', at: '14:30' },
+    })
+    const fromTerminal = wrap(<RoadtripSidebar routes={routes({ days: [joined({ arrivingFrom: landed })] })} onAskAlternatives={vi.fn()} />)
+    expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
+    fromTerminal.unmount()
+
+    wrap(<RoadtripSidebar routes={routes({ days: [joined({ arrivingLine: undefined })] })} onAskAlternatives={vi.fn()} />)
+    expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
+  })
+})

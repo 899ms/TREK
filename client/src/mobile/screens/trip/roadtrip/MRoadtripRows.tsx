@@ -329,10 +329,16 @@ function legText(seg: RouteSegment | undefined, { t, unit }: RowChrome): string 
  * reads as a button that was pressed and stuck. Offline it keeps its place but dims,
  * because a choice is saved as a via and vias are online only. Without `onAlternatives`
  * (no permission, or a leg that cannot be rerouted) the column stays empty.
+ *
+ * With `origin` it is the drive in from where the day before ended, at the head of the
+ * card. The stop it leaves is not on this card, so its name goes above the pill; without
+ * it the chain would open on a drive from nowhere.
  */
-export function RtLegRow({ seg, mode, chrome, onAlternatives, alternativesOpen = false, alternativesDisabled = false }: {
+export function RtLegRow({ seg, mode, origin, chrome, onAlternatives, alternativesOpen = false, alternativesDisabled = false }: {
   seg: RouteSegment | undefined
   mode: string | null
+  /** The place the drive leaves from, named when it is not the stop drawn above it. */
+  origin?: string
   chrome: RowChrome
   /** Asks for other ways of driving this leg. Absent means the leg offers none. */
   onAlternatives?: () => void
@@ -343,6 +349,12 @@ export function RtLegRow({ seg, mode, chrome, onAlternatives, alternativesOpen =
   const { t } = chrome
   const Icon = mode && LEG_ICONS[mode] ? LEG_ICONS[mode] : mode?.startsWith('plugin:') ? Zap : CarFront
   const text = legText(seg, chrome)
+  const pill = (
+    <span className="my-1.5 flex min-w-0 items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px]">
+      <Icon size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
+      <span className="truncate text-[0.75rem] font-semibold tabular-nums text-m-ink">{text}</span>
+    </span>
+  )
   return (
     <div className="grid items-center gap-x-[10px]" style={{ gridTemplateColumns: '34px 1fr auto' }}>
       {/* flex-col, not flex: in a row the dashes would stretch sideways and read as
@@ -351,10 +363,14 @@ export function RtLegRow({ seg, mode, chrome, onAlternatives, alternativesOpen =
       <span className="flex min-h-[40px] flex-col items-center" aria-hidden="true">
         <span className="w-[2px] flex-1" style={{ backgroundImage: 'repeating-linear-gradient(var(--m-conn) 0 4px, transparent 4px 8px)' }} />
       </span>
-      <span className="my-1.5 flex min-w-0 items-center gap-[7px] rounded-[13px] bg-[color:var(--m-ic)] px-[11px] py-[7px]">
-        <Icon size={14} strokeWidth={2} className="flex-none text-m-muted" aria-hidden="true" />
-        <span className="truncate text-[0.75rem] font-semibold tabular-nums text-m-ink">{text}</span>
-      </span>
+      {origin ? (
+        <span className="min-w-0">
+          <span className="mt-1.5 block truncate font-geist text-[0.65625rem] font-semibold text-m-muted">
+            {t('roadtrip.leg.arrivingFrom', { name: origin })}
+          </span>
+          {pill}
+        </span>
+      ) : pill}
       {onAlternatives ? (
         <button
           type="button"

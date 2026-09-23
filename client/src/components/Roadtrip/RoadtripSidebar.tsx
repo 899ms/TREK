@@ -17,7 +17,7 @@ import { formatDistance } from '../../utils/units'
 import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
-import { destinationCount, isHop, legReroutable } from './roadtripRowModel'
+import { arrivingReroutable, destinationCount, isHop, legReroutable } from './roadtripRowModel'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -26,7 +26,7 @@ import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
 import { isCarrierMode, type CarrierTerminal } from '@trek/shared/roadtrip'
 import type { QuietDay, RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
 import type { SpillMark } from './nightSpill'
-import type { RailDrive } from './useRouteAlternatives'
+import { ARRIVING_DRIVE, openOn, type LegAlternatives, type RailDrive } from './useRouteAlternatives'
 import { dayColor } from './dayColors'
 import type { RouteVia } from '../../types'
 import { FS } from './typeScale'
@@ -63,8 +63,8 @@ interface RoadtripSidebarProps {
   refuel?: RefuelSearch
   onAskRefuel?: (dayId: number, dry: DryPoint & { lat: number; lng: number }) => void
   onAcceptRefuel?: (dayId: number, poi: RefuelCandidate, dry: DryPoint & { lat: number; lng: number }) => void
-  /** Which leg's alternatives are on show, so the rail can mark it. */
-  openAlternatives?: { dayId: number; index: number } | null
+  /** Which drive's alternatives are on show, so the rail can mark it. */
+  openAlternatives?: Pick<LegAlternatives, 'dayId' | 'drive'> | null
   /**
    * Opens the dialog for how long a stop takes. Absent leaves every stay read-only —
    * which is also what a viewer sees.
@@ -1734,7 +1734,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
           <DriveBand
             leg={day.legs[i]}
             onAskAlternatives={onAskAlternatives && legReroutable(day, i) ? () => onAskAlternatives(day.dayId, { kind: 'leg', index: i }) : undefined}
-            alternativesOpen={openAlternatives?.dayId === day.dayId && openAlternatives.index === i}
+            alternativesOpen={openOn(openAlternatives, day.dayId, { kind: 'leg', index: i })}
           />
         ) : null}
         {refuelBandsFor(i)}
@@ -1906,8 +1906,17 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
             08:00 looks like eleven minutes went missing. A day whose first stop crossed
             over instead gets that road under its own block, so this is left out there. */}
         {/* A day that opens on an arrival terminal is joined by the ride, and the
-            terminal carries the booking the band names. */}
-        {day.arrivingLeg ? <DriveBand leg={day.arrivingLeg} carrier={day.stops[0]?.carrier} /> : null}
+            terminal carries the booking the band names. A drive by road is offered other
+            ways like any leg (`arrivingReroutable`); a choice is filed behind the stop it
+            leaves, on the day before, where the map files a point dropped on it. */}
+        {day.arrivingLeg ? (
+          <DriveBand
+            leg={day.arrivingLeg}
+            carrier={day.stops[0]?.carrier}
+            onAskAlternatives={onAskAlternatives && arrivingReroutable(day) ? () => onAskAlternatives(day.dayId, ARRIVING_DRIVE) : undefined}
+            alternativesOpen={openOn(openAlternatives, day.dayId, ARRIVING_DRIVE)}
+          />
+        ) : null}
         {runs.map(run => (
           run.spill ? (
             <SpillBlock key={`spill-${run.from}`} spill={run.spill}>

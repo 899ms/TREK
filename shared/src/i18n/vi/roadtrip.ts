@@ -239,6 +239,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Dùng mặc định của tôi',
   'roadtrip.stop.fillSet': 'Đặt mức đổ tại điểm dừng này',
   'roadtrip.leg.pending': 'Không có lộ trình',
+  'roadtrip.leg.arrivingFrom': 'Từ {name}',
   'roadtrip.stop.addTitle': 'Thêm làm điểm dừng',
   'roadtrip.stop.kind': 'Loại điểm dừng',
   'roadtrip.stop.landsOn': 'Ngày {day}, là điểm dừng {position}',

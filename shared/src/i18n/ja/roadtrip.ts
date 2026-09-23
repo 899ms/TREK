@@ -238,6 +238,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': '自分の既定値を使う',
   'roadtrip.stop.fillSet': 'この停車地でどこまで補給するか決める',
   'roadtrip.leg.pending': 'ルートなし',
+  'roadtrip.leg.arrivingFrom': '{name}から',
   'roadtrip.stop.addTitle': '立ち寄り先として追加',
   'roadtrip.stop.kind': '立ち寄りの種類',
   'roadtrip.stop.landsOn': '{day} 日目、{position} 番目の立ち寄り先',

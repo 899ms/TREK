@@ -542,6 +542,36 @@ export interface Reanchoring {
 
 const EMPTY_REANCHORING: Reanchoring = { vias: [], remove: [] };
 
+/**
+ * Where a via filed behind a day's last stop goes once the day's stops change: from its
+ * old index `from` to `to`, the index that stop has now. Null when the stop is no longer
+ * the day's last, and such a via is then read like any other.
+ *
+ * Such a via bends no leg of its own day. It shapes the drive from the day's last stop
+ * into the next day, on a trip with connected days or a night drive: the planner files a
+ * point dropped on that drive there (`anchorFor`), and a way chosen for it is written
+ * there. Read as a leg it leads nowhere and is dropped, which is right for a stop that has
+ * just become last and wrong for one that was last already: sorting the day, or taking a
+ * stop out of its middle, deleted a drive into tomorrow somebody had picked. And a last
+ * stop taken out, or dragged up the day, left its via on a number no stop has, bending
+ * nothing at all.
+ *
+ * The one rule for every writer that renumbers a day, the planner's drags and removals as
+ * much as the server's sorts and seated nights. `previousIds` and `nextIds` are the day's
+ * located stops in order, before and after.
+ */
+export function carriedSeam(
+  previousIds: readonly number[],
+  nextIds: readonly number[],
+): { from: number; to: number } | null {
+  const from = previousIds.length - 1;
+  const to = nextIds.length - 1;
+  return from >= 0 && to >= 0 && previousIds[from] === nextIds[to] ? { from, to } : null;
+}
+
+/** The stops of a day as their own positions, for asking `carriedSeam` about a positional edit. */
+const positions = (count: number): number[] => Array.from({ length: count }, (_, i) => i);
+
 function collect(vias: AnchoredVia[], at: (index: number) => number | null): Reanchoring {
   const moved: ReanchoredVia[] = [];
   const remove: number[] = [];
@@ -574,8 +604,15 @@ export function reanchorAfterInsert(
 export function reanchorAfterRemove(vias: AnchoredVia[], position: number, stopCount: number): Reanchoring {
   if (!vias.length) return EMPTY_REANCHORING;
 
-  if (stopCount <= 2) return { vias: [], remove: vias.map((v) => v.id) };
+  const before = positions(stopCount);
+  const after = before.filter((i) => i !== position);
+  const seam = carriedSeam(before, after);
+  const last = stopCount - 1;
+  // A day left with one stop has no leg, and only the drive out of it into the next day
+  // can keep its points.
+  if (stopCount <= 2) return collect(vias, (i) => (i === last ? (seam?.to ?? null) : null));
   return collect(vias, (i) => {
+    if (i === last) return seam?.to ?? null;
     if (position === 0) return i === 0 ? null : i - 1;
     if (position === stopCount - 1) return i === position - 1 ? null : i;
     if (i === position) return position - 1;
@@ -585,9 +622,14 @@ export function reanchorAfterRemove(vias: AnchoredVia[], position: number, stopC
 
 export function reanchorByStopOrder(vias: AnchoredVia[], previousIds: number[], nextIds: number[]): Reanchoring {
   if (!vias.length) return EMPTY_REANCHORING;
+  const seam = carriedSeam(previousIds, nextIds);
   const moved: ReanchoredVia[] = [];
   const remove: number[] = [];
   for (const via of vias) {
+    if (seam && via.after_order_index === seam.from) {
+      if (seam.to !== seam.from) moved.push({ id: via.id, after_order_index: seam.to });
+      continue;
+    }
     const stopId = previousIds[via.after_order_index]!;
     const next = stopId === undefined ? -1 : nextIds.indexOf(stopId);
 
@@ -603,7 +645,12 @@ export function reanchorByStopOrder(vias: AnchoredVia[], previousIds: number[], 
 export function reanchorAfterReorder(vias: AnchoredVia[], from: number, to: number, stopCount: number): Reanchoring {
   if (!vias.length || from === to) return EMPTY_REANCHORING;
 
-  if (stopCount <= 2) return EMPTY_REANCHORING;
+  // Two stops swapped keep their one leg, driven the other way round. The drive into the
+  // next day left from the stop that is first now, so its points go.
+  if (stopCount <= 2) {
+    const seam = vias.filter((v) => v.after_order_index === stopCount - 1).map((v) => v.id);
+    return seam.length ? { vias: [], remove: seam } : EMPTY_REANCHORING;
+  }
   const afterRemove = reanchorAfterRemove(vias, from, stopCount);
   const dropped = new Set(afterRemove.remove);
   const movedTo = new Map(afterRemove.vias.map((v) => [v.id, v.after_order_index] as const));

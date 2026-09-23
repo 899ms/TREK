@@ -240,6 +240,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Kendi varsayılanımı kullan',
   'roadtrip.stop.fillSet': 'Bu molada ne kadar doldurulacağını ayarla',
   'roadtrip.leg.pending': 'Rota yok',
+  'roadtrip.leg.arrivingFrom': 'Çıkış: {name}',
   'roadtrip.stop.addTitle': 'Mola olarak ekle',
   'roadtrip.stop.kind': 'Mola türü',
   'roadtrip.stop.landsOn': '{day}. gün, {position}. mola',

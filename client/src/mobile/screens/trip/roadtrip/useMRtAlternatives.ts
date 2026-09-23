@@ -1,6 +1,6 @@
 import { useEffect, useTransition } from 'react'
 import { alternativesBusy, alternativesPhase, type AlternativeOverlay, type AlternativesPhase } from '../../../../components/Roadtrip/alternativeOverlays'
-import type { LegAlternatives } from '../../../../components/Roadtrip/useRouteAlternatives'
+import { openOn, type LegAlternatives, type RailDrive } from '../../../../components/Roadtrip/useRouteAlternatives'
 import type { MTripShellApi, TripPlanner } from '../MTripShell'
 
 /**
@@ -39,8 +39,9 @@ export interface MRtAlternativesController {
   canConfirm: boolean
   /** True while the chosen road is being checked against the router and written. */
   saving: boolean
-  isOpenFor: (dayId: number, legIndex: number) => boolean
-  ask: (dayId: number, legIndex: number) => void
+  /** True while the picker is open on this drive of this card: a leg, or the drive in. */
+  isOpenFor: (dayId: number, drive: RailDrive) => boolean
+  ask: (dayId: number, drive: RailDrive) => void
   pick: (index: number) => void
   confirm: () => void
   cancel: () => void
@@ -80,7 +81,7 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
   // picker, which the close button already does without pretending to save.
   const canConfirm = !!picked && phase === 'choose' && !open?.routes[picked.index]?.current && editable && !saving
 
-  const isOpenFor = (dayId: number, legIndex: number) => open?.dayId === dayId && open.index === legIndex
+  const isOpenFor = (dayId: number, drive: RailDrive) => openOn(open, dayId, drive)
 
   // The day chips, a swipe and the all days switch all move the stage under an open
   // picker. `close` is the planner's stable callback, so this runs when the leg or the
@@ -90,11 +91,11 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
     if (open && open.dayId !== selectedDayId) close()
   }, [open, selectedDayId, close])
 
-  const ask = (dayId: number, legIndex: number) => {
+  const ask = (dayId: number, drive: RailDrive) => {
     // The planner's own ask toggles a leg that is already open, which is the desk
     // button's second click. Here the pressed button on the chain is the way back to the
     // answer on the map, so it must not close what it is pointing at.
-    if (!isOpenFor(dayId, legIndex)) {
+    if (!isOpenFor(dayId, drive)) {
       // A pick belongs to the leg it was made on. Carried over, it would light a road
       // on the next leg by its position in a list that leg never offered.
       planner.setHighlightedAlternative(null)
@@ -103,7 +104,7 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
       planner.refuel.close()
       // The card's day, as the desk passes it: the planner looks the stops up on that
       // card and works out the day each one is stored on by itself.
-      planner.askRouteAlternatives(dayId, { kind: 'leg', index: legIndex })
+      planner.askRouteAlternatives(dayId, drive)
     }
     if (shell.rtView === 'list') shell.toggleRtView()
   }

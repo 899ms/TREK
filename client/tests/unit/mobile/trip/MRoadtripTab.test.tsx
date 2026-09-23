@@ -10,7 +10,7 @@ import type { CarrierTerminal, RoadtripDay, RoadtripRoutes, RoadtripStop, RouteS
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-057
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-060
 //
 // The stage bar pictures the place its day ends at. It reads that place out of the trip
 // store rather than the planner, the unfiltered list, so the picture tests seed the store.
@@ -625,7 +625,7 @@ describe('MRoadtripTab', () => {
     function withPicker(open: Partial<LegAlternatives>, over: Partial<TripPlanner> = {}): TripPlanner {
       const base = buildPlanner()
       return planner({
-        routeAlternatives: { ...base.routeAlternatives, open: openLeg({ dayId: 2, index: 0, loading: true, ...open }) },
+        routeAlternatives: { ...base.routeAlternatives, open: openLeg({ dayId: 2, drive: { kind: 'leg', index: 0 }, loading: true, ...open }) },
         ...over,
       })
     }
@@ -676,7 +676,7 @@ describe('MRoadtripTab', () => {
     })
 
     it('FE-MOB-RTTAB-047: the leg with the picker open shows pressed, and tapping it goes back to the answer without asking again', () => {
-      const p = withPicker({ index: 0 })
+      const p = withPicker({ drive: { kind: 'leg', index: 0 } })
       const { shell } = renderTab(p)
 
       const [open, other] = askButtons()
@@ -728,10 +728,65 @@ describe('MRoadtripTab', () => {
       first.unmount()
 
       // The chain is a look back at the stage, not a way out of the question.
-      const here = withPicker({ dayId: 2, index: 1 })
+      const here = withPicker({ dayId: 2, drive: { kind: 'leg', index: 1 } })
       renderTab(here)
       expect(here.routeAlternatives.close).not.toHaveBeenCalled()
       expect(askButtons()[1]).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    /**
+     * The stage joined to the day before by the road from where that day ended, with no
+     * night drive between them: the drive in is drawn at the head of this card.
+     */
+    const joinedStage = () => stage({
+      spills: [],
+      arrivingLeg: seg('95 km', '1 h 10 min'),
+      arrivingFrom: {
+        assignmentId: 499, ownerDayId: 1, ownerIndex: 2, placeId: 99, name: 'Hakone',
+        lat: 35.23, lng: 139.02, time: null, dwellMinutes: null,
+        legMode: null, incomingLegMode: null, stopType: null,
+      },
+      arrivingLine: [[35.23, 139.02], [35.36, 138.73]],
+    } as Partial<RoadtripDay>)
+    const joined = (over: Partial<TripPlanner> = {}) => planner({ roadtripRoutes: routes({ days: [joinedStage()] }), ...over })
+
+    it('FE-MOB-RTTAB-058: the drive in from the day before heads the chain, names where it leaves, and asks as the drive it is', () => {
+      // #2461: the phone had no row for this drive at all, so it could neither be read
+      // nor offered another way.
+      const p = joined()
+      renderTab(p)
+
+      const origin = screen.getByText('roadtrip.leg.arrivingFrom:Hakone')
+      expect(screen.getByText('roadtrip.leg.driveText:95 km,1 h 10 min')).toBeInTheDocument()
+      // Above the first stop, where the desk rail draws its band.
+      expect(origin.compareDocumentPosition(screen.getByText('Fuji Viewpoint')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      // A drive, not a stop: the count and the numbering stay as they were.
+      expect(screen.getByText('roadtrip.day.stopCount:2')).toBeInTheDocument()
+      expect(screen.queryByText('3')).toBeNull()
+
+      // The drive in, then the two legs the stage offered before.
+      expect(askButtons()).toHaveLength(3)
+      fireEvent.click(askButtons()[0])
+      expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'arriving' })
+    })
+
+    it('FE-MOB-RTTAB-059: the drive in and the first leg are told apart while a picker is open on either', () => {
+      const onDriveIn = withPicker({ drive: { kind: 'arriving' } }, { roadtripRoutes: routes({ days: [joinedStage()] }) })
+      const first = renderTab(onDriveIn)
+      expect(askButtons().map(b => b.getAttribute('aria-pressed'))).toEqual(['true', 'false', 'false'])
+      // Pressed, it goes back to the answer instead of asking again.
+      fireEvent.click(askButtons()[0])
+      expect(onDriveIn.askRouteAlternatives).not.toHaveBeenCalled()
+      first.unmount()
+
+      renderTab(withPicker({ drive: { kind: 'leg', index: 0 } }, { roadtripRoutes: routes({ days: [joinedStage()] }) }))
+      expect(askButtons().map(b => b.getAttribute('aria-pressed'))).toEqual(['false', 'true', 'false'])
+    })
+
+    it('FE-MOB-RTTAB-060: a reader sees the drive in without the question', () => {
+      renderTab(joined({ can: vi.fn(() => false) }))
+      expect(screen.getByText('roadtrip.leg.arrivingFrom:Hakone')).toBeInTheDocument()
+      expect(askButtons()).toHaveLength(0)
     })
   })
 

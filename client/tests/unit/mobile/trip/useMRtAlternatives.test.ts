@@ -9,7 +9,7 @@ import type { LegAlternatives, OfferedRoute } from '../../../../src/components/R
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTALTH-001 to FE-MOB-RTALTH-010
+// FE-MOB-RTALTH-001 to FE-MOB-RTALTH-011
 //
 // The hook holds no picker state, so every case is a planner shape and what the hook
 // reads out of it or asks of it.
@@ -26,7 +26,7 @@ const OVERLAYS = buildAlternativeOverlays(ROUTES, {
 })
 
 function leg(over: Partial<LegAlternatives> = {}): LegAlternatives {
-  return openLeg({ dayId: 2, index: 1, routes: ROUTES, ...over })
+  return openLeg({ dayId: 2, drive: { kind: 'leg', index: 1 }, routes: ROUTES, ...over })
 }
 
 /** A planner with the picker open on leg 1 of day 2, answered with three roads. */
@@ -49,13 +49,13 @@ describe('useMRtAlternatives', () => {
   it('FE-MOB-RTALTH-001: a leg is open only when both its day and its position match', () => {
     const { result } = setup()
 
-    expect(result.current.isOpenFor(2, 1)).toBe(true)
+    expect(result.current.isOpenFor(2, { kind: 'leg', index: 1 })).toBe(true)
     // The same position on another card, and another leg of the same card.
-    expect(result.current.isOpenFor(1, 1)).toBe(false)
-    expect(result.current.isOpenFor(2, 0)).toBe(false)
+    expect(result.current.isOpenFor(1, { kind: 'leg', index: 1 })).toBe(false)
+    expect(result.current.isOpenFor(2, { kind: 'leg', index: 0 })).toBe(false)
 
     const closed = setup(planner({}, null))
-    expect(closed.result.current.isOpenFor(2, 1)).toBe(false)
+    expect(closed.result.current.isOpenFor(2, { kind: 'leg', index: 1 })).toBe(false)
   })
 
   it('FE-MOB-RTALTH-002: reads the phase and the picked road off the planner, and has neither while closed', () => {
@@ -98,7 +98,7 @@ describe('useMRtAlternatives', () => {
     const shell = buildShell({ rtView: 'list' })
     const { result } = setup(p, shell)
 
-    act(() => { result.current.ask(2, 0) })
+    act(() => { result.current.ask(2, { kind: 'leg', index: 0 }) })
 
     expect(p.setHighlightedAlternative).toHaveBeenCalledWith(null)
     expect(p.refuel.close).toHaveBeenCalledTimes(1)
@@ -111,7 +111,7 @@ describe('useMRtAlternatives', () => {
     // Already on the map, the switch would take the traveller back to the chain.
     const onMap = buildShell({ rtView: 'map' })
     const second = setup(planner({}, null), onMap)
-    act(() => { second.result.current.ask(2, 0) })
+    act(() => { second.result.current.ask(2, { kind: 'leg', index: 0 }) })
     expect(second.planner.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'leg', index: 0 })
     expect(onMap.toggleRtView).not.toHaveBeenCalled()
   })
@@ -121,7 +121,7 @@ describe('useMRtAlternatives', () => {
     const shell = buildShell({ rtView: 'list' })
     const { result } = setup(p, shell)
 
-    act(() => { result.current.ask(2, 1) })
+    act(() => { result.current.ask(2, { kind: 'leg', index: 1 }) })
 
     // The planner's ask toggles an open leg shut, and the pick on it is still wanted.
     expect(p.askRouteAlternatives).not.toHaveBeenCalled()
@@ -206,6 +206,19 @@ describe('useMRtAlternatives', () => {
     expect(result.current.canConfirm).toBe(false)
     act(() => { result.current.confirm() })
     expect(p.chooseRouteAlternative).not.toHaveBeenCalled()
+  })
+
+  it('FE-MOB-RTALTH-011: the drive in from the day before is a drive of its own, told apart from the first leg', () => {
+    const { result } = setup(planner({}, leg({ drive: { kind: 'arriving' } })))
+    expect(result.current.isOpenFor(2, { kind: 'arriving' })).toBe(true)
+    expect(result.current.isOpenFor(2, { kind: 'leg', index: 0 })).toBe(false)
+    expect(result.current.isOpenFor(1, { kind: 'arriving' })).toBe(false)
+
+    // Open on a leg, asking about the drive in is a new question and goes to the planner.
+    const p = planner({}, leg())
+    const onMap = setup(p, buildShell({ rtView: 'map' }))
+    act(() => { onMap.result.current.ask(2, { kind: 'arriving' }) })
+    expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'arriving' })
   })
 
   it('FE-MOB-RTALTH-009: the map lifts its floor by the bar and the gap it keeps from the dock', () => {

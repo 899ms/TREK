@@ -243,6 +243,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Utiliser ma valeur par défaut',
   'roadtrip.stop.fillSet': 'Définir le niveau de remplissage de cet arrêt',
   'roadtrip.leg.pending': 'Pas d’itinéraire',
+  'roadtrip.leg.arrivingFrom': 'Depuis {name}',
   'roadtrip.stop.addTitle': 'Ajouter comme arrêt',
   'roadtrip.stop.kind': 'Type d’arrêt',
   'roadtrip.stop.landsOn': 'Jour {day}, en tant qu’arrêt {position}',

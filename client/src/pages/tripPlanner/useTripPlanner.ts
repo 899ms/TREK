@@ -41,9 +41,9 @@ import { useRoadtripVias } from '../../components/Roadtrip/useRoadtripVias'
 import { useRefuelSearch } from '../../components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../components/Roadtrip/refuelSuggestion'
 import { useFollowTrack } from '../../components/Roadtrip/useFollowTrack'
-import { useRouteAlternatives, type RailDrive } from '../../components/Roadtrip/useRouteAlternatives'
+import { openOn, useRouteAlternatives, type RailDrive } from '../../components/Roadtrip/useRouteAlternatives'
 import { alternativesBusy, buildAlternativeOverlays } from '../../components/Roadtrip/alternativeOverlays'
-import { pinAlternative, railLegAt, type PinProof } from '../../components/Roadtrip/alternativePins'
+import { pinAlternative, railDriveOn, railLegAt, type PinProof } from '../../components/Roadtrip/alternativePins'
 import { stopArrival } from '../../components/Roadtrip/stopArrival'
 import type { CorridorPoi } from '../../components/Roadtrip/useCorridorPois'
 import { projectOntoRoute, sliceAtMeters, type LatLng } from '../../components/Roadtrip/corridor'
@@ -1584,8 +1584,12 @@ export function useTripPlanner() {
    * The rail as it stands now, for a choice that is written several router answers after
    * the render that started it. Checked against before anything is written.
    */
-  const railDaysRef = useRef(roadtripRoutes.days)
-  useEffect(() => { railDaysRef.current = roadtripRoutes.days }, [roadtripRoutes.days])
+  const railDaysRef = useRef<Parameters<typeof railLegAt>[0]>(roadtripRoutes.days)
+  // The days with a single stop as well, in day order: they draw no card, but a drive
+  // into the day after one leaves from its stop, and a choice for that drive is filed there.
+  useEffect(() => {
+    railDaysRef.current = [...roadtripRoutes.days, ...roadtripRoutes.quietDays].sort((a, b) => a.dayNumber - b.dayNumber)
+  }, [roadtripRoutes.days, roadtripRoutes.quietDays])
 
   /**
    * Asks the rail's own router for other ways of one drive on a card.
@@ -1593,26 +1597,32 @@ export function useTripPlanner() {
    * The picker is handed everything about the leg as the rail has it: the road it is on
    * now, which heads the list as the current one; where a choice would be written; and
    * the router with the leg's own mode and avoided classes, not the trip-wide profile.
+   *
+   * The drive arriving at the head of a connected card is asked about the same way, as
+   * the pair from the last stop of the day before to the card's first. Its router is the
+   * one the rail drives that seam with, under the card it arrives on, and a choice is
+   * filed behind the stop it leaves, where the map already files a point dropped on it.
+   * It used to be the one drive on the rail that could not be offered another way.
    */
   const askRouteAlternatives = useCallback((dayId: number, drive: RailDrive) => {
     const day = roadtripRoutes.days.find(d => d.dayId === dayId)
-    const from = day?.stops[drive.index]
-    const to = day?.stops[drive.index + 1]
-    const leg = day?.legs[drive.index]
-    const router = from && to ? roadtripRoutes.legRouter?.(from, to, dayId) : undefined
-    if (!day || !from || !to || !leg || !router) return
-    if (routeAlternatives.open?.dayId === dayId && routeAlternatives.open.index === drive.index) {
+    const found = day ? railDriveOn(day, drive) : null
+    const router = found ? roadtripRoutes.legRouter?.(found.from, found.to, dayId) : undefined
+    if (!found || !router) return
+    if (openOn(routeAlternatives.open, dayId, drive)) {
       routeAlternatives.close()
       return
     }
+    const { from, to, seg, line } = found
     routeAlternatives.ask({
       dayId,
-      index: drive.index,
+      drive,
       from: { lat: from.lat, lng: from.lng },
       to: { lat: to.lat, lng: to.lng },
-      driven: { coordinates: day.legLines?.[drive.index] ?? [], distance: leg.distance, duration: leg.duration },
+      driven: { coordinates: line ?? [], distance: seg.distance, duration: seg.duration },
       // The vias of a leg are filed behind the stop it leaves, on the day that stop is
-      // stored on, which on a card holding a night drive is not the card's own day.
+      // stored on, which on a card holding a night drive or a drive in from yesterday is
+      // not the card's own day.
       anchor: { dayId: from.ownerDayId, afterIndex: from.ownerIndex },
       ends: { from: from.assignmentId, to: to.assignmentId },
       router,

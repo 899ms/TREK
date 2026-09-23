@@ -1,6 +1,7 @@
 import { furthestFrom, sameRoad, type RoadLine } from '../Map/RouteCalculator'
+import type { RouteSegment } from '@trek/shared/roadtrip'
 import type { RailLegRoute, RailLegRouter, RoadtripDay, RoadtripStop } from './useRoadtripRoutes'
-import type { OfferedRoute, ViaAnchor } from './useRouteAlternatives'
+import type { OfferedRoute, RailDrive, ViaAnchor } from './useRouteAlternatives'
 
 /**
  * The most points one choice may pin to the road.
@@ -87,14 +88,41 @@ export async function pinAlternative({
  * The leg the rail drives from the stop filed at `anchor` now, or null when no stop sits
  * there any more.
  *
- * Read across every card in order, so the stop after it is found whether the leg runs
- * inside one card or across to the next. The markers an automatic night puts on the
- * chain stand on or between stops without being one, and a terminal borrows the index of
- * a stored stop to be seated by, so neither can answer for the anchor.
+ * Read across every day in order, so the stop after it is found whether the leg runs
+ * inside one card or across to the next. The caller hands in the days with a single stop
+ * too: they draw no card, but the drive into the day after one leaves from its stop. The
+ * markers an automatic night puts on the chain stand on or between stops without being
+ * one, and a terminal borrows the index of a stored stop to be seated by, so neither can
+ * answer for the anchor.
  */
-export function railLegAt(days: readonly RoadtripDay[], anchor: ViaAnchor): { from: RoadtripStop; to: RoadtripStop } | null {
+export function railLegAt(days: readonly Pick<RoadtripDay, 'stops'>[], anchor: ViaAnchor): { from: RoadtripStop; to: RoadtripStop } | null {
   const chain = days.flatMap(day => day.stops).filter(stop => !stop.automaticNight)
   const at = chain.findIndex(stop => !stop.carrier && stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
   const to = at >= 0 ? chain[at + 1] : undefined
   return to ? { from: chain[at], to } : null
+}
+
+/** One drive on a card as the rail has it: its two stops, its road and the line it is drawn on. */
+export interface RailDriveOnCard {
+  from: RoadtripStop
+  to: RoadtripStop
+  seg: RouteSegment
+  line: [number, number][] | undefined
+}
+
+/**
+ * The drive `drive` names on `day`, or null while the card has no such drive or no road
+ * for it yet.
+ *
+ * A leg runs from stop `index` to the next one. The drive arriving at the head of a
+ * connected card has no index on it: it leaves the last stop of the day before, which the
+ * card keeps as `arrivingFrom`, and ends at the card's first stop. Read here once, so the
+ * picker is handed the same two stops, figures and line whichever of the two it opens on.
+ */
+export function railDriveOn(day: RoadtripDay, drive: RailDrive): RailDriveOnCard | null {
+  const found = drive.kind === 'arriving'
+    ? { from: day.arrivingFrom, to: day.stops[0], seg: day.arrivingLeg, line: day.arrivingLine }
+    : { from: day.stops[drive.index], to: day.stops[drive.index + 1], seg: day.legs[drive.index], line: day.legLines?.[drive.index] }
+  const { from, to, seg, line } = found
+  return from && to && seg ? { from, to, seg, line } : null
 }

@@ -243,6 +243,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Usa el meu valor per defecte',
   'roadtrip.stop.fillSet': 'Defineix quant s’omple en aquesta parada',
   'roadtrip.leg.pending': 'Sense ruta',
+  'roadtrip.leg.arrivingFrom': 'Des de {name}',
   'roadtrip.stop.addTitle': 'Afegeix com a parada',
   'roadtrip.stop.kind': 'Tipus de parada',
   'roadtrip.stop.landsOn': 'Dia {day}, com a parada {position}',

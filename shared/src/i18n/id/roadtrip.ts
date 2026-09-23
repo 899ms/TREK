@@ -242,6 +242,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Pakai bawaan saya',
   'roadtrip.stop.fillSet': 'Atur seberapa penuh perhentian ini mengisi',
   'roadtrip.leg.pending': 'Tidak ada rute',
+  'roadtrip.leg.arrivingFrom': 'Dari {name}',
   'roadtrip.stop.addTitle': 'Tambahkan sebagai perhentian',
   'roadtrip.stop.kind': 'Jenis perhentian',
   'roadtrip.stop.landsOn': 'Hari {day}, sebagai perhentian {position}',

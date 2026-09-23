@@ -53,16 +53,25 @@ const stopKey = (s: RoadtripStop): string =>
   `${s.lat.toFixed(5)},${s.lng.toFixed(5)},${s.legMode ?? ''},${s.incomingLegMode ?? ''}`
 
 /**
- * The via points that shape the drive leaving a stop, as one comparable string.
+ * Everything a seam's answer depends on besides its two stops, as one comparable string:
+ * the mode it is driven in, the classes the trip avoids, and the via points that shape
+ * the drive leaving `from`.
  *
  * Read in two places that must agree: when deciding whether a seam still matches the
  * answer already in hand, and when recording what an answer was fetched for. One function
- * so the two cannot drift and quietly stop refetching.
+ * so the two cannot drift and quietly stop refetching. The mode and the classes are in it
+ * because the vias alone were: switching motorways off, or the day's profile, re-ran the
+ * seam round and found every seam already answered, so the drive between two days kept
+ * its old road and its old minutes until the page was loaded again.
  */
-const seamShape = (from: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>): string =>
-  viasLeaving(from, viasByDay[from.ownerDayId] ?? [])
-    .map(v => `${v.lat.toFixed(5)},${v.lng.toFixed(5)}`)
-    .join('|')
+const seamShape = (from: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>, mode: string, avoidKey: string): string =>
+  [
+    mode,
+    avoidKey,
+    viasLeaving(from, viasByDay[from.ownerDayId] ?? [])
+      .map(v => `${v.lat.toFixed(5)},${v.lng.toFixed(5)}`)
+      .join('|'),
+  ].join('#')
 
 /** The drive from one stop to the next, identified the same way `planKey` identifies them. */
 const legKey = (from: RoadtripStop, to: RoadtripStop): string => `${stopKey(from)}>${stopKey(to)}`
@@ -558,7 +567,7 @@ export function useRoadtripRoutes(
    * day in two pieces with a gap across the middle.
    */
   const seams = useMemo(() => {
-    const out: { from: RoadtripStop; to: RoadtripStop; dayId: number }[] = []
+    const out: { from: RoadtripStop; to: RoadtripStop; dayId: number; mode: string; shape: string }[] = []
     const want = (from: RoadtripStop, to: RoadtripStop, dayId: number): void => {
       // The two ends of one ride: the leg between them is the booking's, never a road.
       if (rideLegs[legKey(from, to)]) return
@@ -569,9 +578,11 @@ export function useRoadtripRoutes(
       // now. Skipping it whenever any answer existed is what made a via on a seam do
       // nothing at all: the first answer was cached under the pair, and dragging the
       // point changed the request nobody was going to send again.
+      const mode = legModeOf(from, to, dayId)
+      const shape = seamShape(from, viasByDay, mode, avoidKey)
       const have = seamLegs[legKey(from, to)]
-      if (have && have.shape === seamShape(from, viasByDay)) return
-      out.push({ from, to, dayId })
+      if (have && have.shape === shape) return
+      out.push({ from, to, dayId, mode, shape })
     }
     const routingChains = window
       ? [...plan, ...quietDays].sort((a, b) => a.dayNumber - b.dayNumber).filter(d => d.stops.length)
@@ -595,8 +606,8 @@ export function useRoadtripRoutes(
       }
     }
     return out
-  }, [chains, plan, quietDays, window, legsByDay, seamLegs, rideLegs, viasByDay, connectDays])
-  const seamKey = seams.map(s => `${legKey(s.from, s.to)}#${seamShape(s.from, viasByDay)}`).join(';')
+  }, [chains, plan, quietDays, window, legsByDay, seamLegs, rideLegs, viasByDay, connectDays, legModeOf, avoidKey])
+  const seamKey = seams.map(s => `${legKey(s.from, s.to)}#${s.shape}`).join(';')
   /**
    * When the last request outside the routing round went out, across every run of the
    * effect below: a seam, or a leg asked for again on demand (see `legRouter`). One clock
@@ -616,7 +627,7 @@ export function useRoadtripRoutes(
     void (async () => {
       for (const seam of seams) {
         if (controller.signal.aborted) return
-        const mode = legModeOf(seam.from, seam.to, seam.dayId)
+        const { mode, shape } = seam
         // No router knows a ride. A booked ride's own pair has its leg in `rideLegs` and
         // never reaches here; what is left is a terminal seamed to an ordinary stop on
         // another card, which is a join of no minutes rather than a road. Filed here,
@@ -625,7 +636,7 @@ export function useRoadtripRoutes(
           const key = legKey(seam.from, seam.to)
           const legs = carrierLegsFor([seam.from, seam.to], mode, (from, to) => dayNumberOf(to.ownerDayId) - dayNumberOf(from.ownerDayId), legKey)
           const leg = legs?.[key]
-          if (leg) setSeamLegs(prev => ({ ...prev, [key]: { ...leg, shape: seamShape(seam.from, viasByDay) } }))
+          if (leg) setSeamLegs(prev => ({ ...prev, [key]: { ...leg, shape } }))
           continue
         }
         // Paced before the request, against a clock that outlives this effect.
@@ -670,7 +681,7 @@ export function useRoadtripRoutes(
               seg: { ...merged, mode },
               line: r.coordinates,
               vias: [],
-              shape: seamShape(seam.from, viasByDay),
+              shape,
             },
           }))
         } catch {

@@ -240,6 +240,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Az alapértelmezettet használom',
   'roadtrip.stop.fillSet': 'Beállítás: mennyire tölt fel ez a megálló',
   'roadtrip.leg.pending': 'Nincs útvonal',
+  'roadtrip.leg.arrivingFrom': 'Indulás: {name}',
   'roadtrip.stop.addTitle': 'Hozzáadás megállóként',
   'roadtrip.stop.kind': 'Megálló típusa',
   'roadtrip.stop.landsOn': '{day}. nap, {position}. megállóként',

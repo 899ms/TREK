@@ -242,6 +242,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Mijn standaard gebruiken',
   'roadtrip.stop.fillSet': 'Instellen hoe vol er hier wordt getankt',
   'roadtrip.leg.pending': 'Geen route',
+  'roadtrip.leg.arrivingFrom': 'Vanaf {name}',
   'roadtrip.stop.addTitle': 'Als stop toevoegen',
   'roadtrip.stop.kind': 'Soort stop',
   'roadtrip.stop.landsOn': 'Dag {day}, als stop {position}',

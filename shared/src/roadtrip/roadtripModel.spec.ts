@@ -14,6 +14,9 @@ import {
   refuelStopTypeFor,
   leaveAfter,
   scheduleStopOf,
+  carriedSeam,
+  reanchorAfterRemove,
+  reanchorByStopOrder,
 } from './roadtripModel';
 
 import { describe, it, expect } from 'vitest';
@@ -1167,5 +1170,31 @@ describe('a check-in holds a booked night the way a pinned time does', () => {
       [14 * 60],
     );
     expect(schedule.warnings).toContainEqual({ index: 1, code: 'late', minutes: 314 });
+  });
+});
+
+describe('carriedSeam', () => {
+  it('FE-ROADTRIP-MODEL-107: the via behind a last stop stays with it while it is last, whatever its number', () => {
+    expect(carriedSeam([10, 20, 30], [20, 10, 30])).toEqual({ from: 2, to: 2 });
+    // A stop taken out ahead of it, and a night seated ahead of it.
+    expect(carriedSeam([10, 20, 30], [10, 30])).toEqual({ from: 2, to: 1 });
+    expect(carriedSeam([10, 20, 30], [10, 20, 25, 30])).toEqual({ from: 2, to: 3 });
+    // Another stop is last now, or the day has none.
+    expect(carriedSeam([10, 20, 30], [30, 10, 20])).toBeNull();
+    expect(carriedSeam([10, 20, 30], [10, 20, 30, 40])).toBeNull();
+    expect(carriedSeam([10, 20, 30], [10, 20])).toBeNull();
+    expect(carriedSeam([], [10])).toBeNull();
+    expect(carriedSeam([10], [])).toBeNull();
+  });
+
+  it('FE-ROADTRIP-MODEL-108: the reorder and the removal the planner and the server run both keep to it', () => {
+    const via = (id: number, after: number) => ({ id, after_order_index: after, lat: 53, lng: 10 });
+    expect(reanchorByStopOrder([via(9, 2)], [10, 20, 30], [10, 30])).toEqual({
+      vias: [{ id: 9, after_order_index: 1 }],
+      remove: [],
+    });
+    expect(reanchorByStopOrder([via(9, 2)], [10, 20, 30], [20, 10, 30])).toEqual({ vias: [], remove: [] });
+    expect(reanchorAfterRemove([via(9, 2)], 2, 3)).toEqual({ vias: [], remove: [9] });
+    expect(reanchorAfterRemove([via(9, 2)], 0, 3)).toEqual({ vias: [{ id: 9, after_order_index: 1 }], remove: [] });
   });
 });

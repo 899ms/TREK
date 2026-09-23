@@ -10,12 +10,12 @@ import type { LegAlternatives } from '../../src/components/Roadtrip/useRouteAlte
 export function openLeg(over: Partial<LegAlternatives> = {}): LegAlternatives {
   return {
     dayId: 2,
-    index: 0,
+    drive: { kind: 'leg', index: 0 },
     routes: [],
     loading: false,
     error: false,
     proving: null,
-    anchor: { dayId: over.dayId ?? 2, afterIndex: over.index ?? 0 },
+    anchor: { dayId: over.dayId ?? 2, afterIndex: over.drive?.kind === 'leg' ? over.drive.index : 0 },
     ends: { from: 1, to: 2 },
     engine: 'osrm',
     route: vi.fn(),

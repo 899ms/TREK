@@ -239,6 +239,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Använd mitt standardvärde',
   'roadtrip.stop.fillSet': 'Ange hur mycket det här stoppet fyller',
   'roadtrip.leg.pending': 'Ingen rutt',
+  'roadtrip.leg.arrivingFrom': 'Från {name}',
   'roadtrip.stop.addTitle': 'Lägg till som stopp',
   'roadtrip.stop.kind': 'Typ av stopp',
   'roadtrip.stop.landsOn': 'Dag {day}, som stopp {position}',

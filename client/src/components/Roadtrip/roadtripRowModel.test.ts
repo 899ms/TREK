@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  arrivingReroutable,
   destinationCount,
   firstStopOfPlace,
   legReroutable,
@@ -15,7 +16,7 @@ import {
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
 import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-055
+// FE-RTROW-001 to FE-RTROW-058
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -647,5 +648,55 @@ describe('roadtripRows with a ride (#2428)', () => {
     expect(end?.stop.name).toBe('Hamburg Airport')
     expect(end?.time).toBe('14:30')
     expect(stageEnd(roadtripRows(opensOnRide()))?.stop.name).toBe('Hotel')
+  })
+})
+
+describe('the drive in from the day before (#2461)', () => {
+  /** Where yesterday ended: stored on day 6, its third stop, and drawn on no stop of this card. */
+  const yesterday = stop('Lüneburg', { ownerDayId: 6, ownerIndex: 2, legMode: null })
+  const drive: RouteSegment = { ...seg(4), distance: 120_000, duration: 5_400 }
+  /** A card joined to the one before it, with the drive and the line it is drawn on. */
+  const joined = (over: Partial<RoadtripDay> = {}) => day([stop('Berlin', { incomingLegMode: 'driving' }), stop('Potsdam')], {
+    arrivingLeg: drive,
+    arrivingFrom: yesterday,
+    arrivingLine: [[53.2, 10.4], [52.5, 13.4]],
+    ...over,
+  })
+
+  it('FE-RTROW-056: heads the card with a row of its own that names where it leaves, and counts no stop for it', () => {
+    const rows = roadtripRows(joined())
+    expect(rows.map(r => r.kind)).toEqual(['arriving', 'stop', 'leg', 'stop'])
+    expect(rows[0]).toMatchObject({ kind: 'arriving', seg: drive, from: { name: 'Lüneburg' }, mode: 'driving' })
+    // Still two stops, numbered from one: the stop it leaves is not on this card.
+    expect(stopRows(rows).map(r => r.number)).toEqual([1, 2])
+    expect(destinationCount(joined())).toBe(2)
+    expect(stageClocks(rows)).toEqual(stageClocks(roadtripRows(joined({ arrivingLeg: undefined }))))
+    expect(stageEnd(rows)?.stop.name).toBe('Potsdam')
+  })
+
+  it('FE-RTROW-057: no row for a hop, a ride, or a drive whose start the card was not told', () => {
+    const hop: RouteSegment = { ...seg(0), distance: 80, duration: 60 }
+    const ride: RouteSegment = { ...seg(0), distance: 0, duration: 9 * 3600, mode: 'flight' }
+    for (const over of [{ arrivingLeg: hop }, { arrivingLeg: ride }, { arrivingFrom: undefined }, { arrivingLeg: undefined }]) {
+      expect(roadtripRows(joined(over)).map(r => r.kind)).toEqual(['stop', 'leg', 'stop'])
+    }
+  })
+
+  it('FE-RTROW-058: other ways are offered on it exactly where a leg would be offered them', () => {
+    expect(arrivingReroutable(joined())).toBe(true)
+    // Nothing to offer against: no drive, no line, no stop it leaves or reaches.
+    expect(arrivingReroutable(joined({ arrivingLeg: undefined }))).toBe(false)
+    expect(arrivingReroutable(joined({ arrivingLine: undefined }))).toBe(false)
+    expect(arrivingReroutable(joined({ arrivingFrom: undefined }))).toBe(false)
+    expect(arrivingReroutable(joined({ stops: [] }))).toBe(false)
+    // A ride has no other way, and a hop is nothing to weigh.
+    expect(arrivingReroutable(joined({ arrivingLeg: { ...drive, mode: 'train' } }))).toBe(false)
+    expect(arrivingReroutable(joined({ arrivingLeg: { ...drive, distance: 80, duration: 60 } }))).toBe(false)
+    // A terminal leaves nothing a via can be filed behind.
+    const terminal = stop('Hamburg Airport', { carrier: { reservationId: 7, type: 'flight', role: 'arrival', title: 'LH 2020', code: null, at: '07:00' } })
+    expect(arrivingReroutable(joined({ arrivingFrom: terminal }))).toBe(false)
+    // An automatic night at either end is a marker on the road, not a stop anybody chose.
+    expect(arrivingReroutable(joined({ arrivingFrom: night() }))).toBe(false)
+    expect(arrivingReroutable(joined({ stops: [night('start'), stop('Potsdam')] }))).toBe(false)
   })
 })

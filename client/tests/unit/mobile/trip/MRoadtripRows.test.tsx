@@ -9,7 +9,7 @@ import type { Reservation, TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-055
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-056
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -490,6 +490,20 @@ describe('RtLegRow', () => {
     expect(open.className).toContain('text-m-ink')
     // A filled chip in a column of quiet rows reads as a button pressed and stuck.
     expect(open.className).not.toContain('bg-m-act')
+  })
+
+  it('FE-MOB-RTROW-056: the drive in from the day before names where it leaves, above its pill', () => {
+    // The stop it leaves is on the card before, so the chain would open on a drive from
+    // nowhere without it. Only a leg given an origin says one.
+    const onAlternatives = vi.fn()
+    render(<RtLegRow seg={SEG} mode="driving" origin="Hakone" chrome={chrome} onAlternatives={onAlternatives} />)
+
+    const origin = screen.getByText('roadtrip.leg.arrivingFrom:Hakone')
+    const drive = screen.getByText('roadtrip.leg.driveText:210 km,2 h 40 min')
+    expect(origin.compareDocumentPosition(drive) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(origin.closest('button')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'roadtrip.alt.ask' }))
+    expect(onAlternatives).toHaveBeenCalledTimes(1)
   })
 
   it('FE-MOB-RTROW-040: offline the button keeps its place but does nothing', () => {

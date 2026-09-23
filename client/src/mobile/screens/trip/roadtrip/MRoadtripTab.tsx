@@ -16,7 +16,8 @@ import { formatDistance } from '../../../../utils/units'
 import { formatClockTime } from '../../../../utils/formatters'
 import { isRtlLanguage } from '../../../../i18n'
 import type { MTripTabPanelProps } from '../MTripShell'
-import { legReroutable, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import { arrivingReroutable, legReroutable, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import { ARRIVING_DRIVE, type RailDrive } from '../../../../components/Roadtrip/useRouteAlternatives'
 import { dayBookings } from '../../../../components/Roadtrip/stopBookings'
 import { getDayOrder } from '../../../../utils/dayOrder'
 import type { Reservation } from '../../../../types'
@@ -276,18 +277,22 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
                     </Fragment>
                   )
                 }
-                if (row.kind === 'leg') {
-                  // Only where the desk rail offers it too (legReroutable), and with the
-                  // card's day id, the one the desk passes: the planner finds the day each
-                  // stop is stored on by itself.
+                if (row.kind === 'leg' || row.kind === 'arriving') {
+                  // Only where the desk rail offers it too (legReroutable, arrivingReroutable),
+                  // and with the card's day id, the one the desk passes: the planner finds the
+                  // day each stop is stored on by itself.
+                  const leg = row.kind === 'leg'
+                  const drive: RailDrive = leg ? { kind: 'leg', index: row.index } : ARRIVING_DRIVE
+                  const reroutable = leg ? legReroutable(stage, row.index) : arrivingReroutable(stage)
                   return (
                     <RtLegRow
                       key={`l${i}`}
                       seg={row.seg}
                       mode={row.mode}
+                      origin={leg ? undefined : row.from.name}
                       chrome={chrome}
-                      onAlternatives={alts.canAsk && legReroutable(stage, row.index) ? () => alts.ask(stage.dayId, row.index) : undefined}
-                      alternativesOpen={alts.isOpenFor(stage.dayId, row.index)}
+                      onAlternatives={alts.canAsk && reroutable ? () => alts.ask(stage.dayId, drive) : undefined}
+                      alternativesOpen={alts.isOpenFor(stage.dayId, drive)}
                       alternativesDisabled={!alts.editable}
                     />
                   )

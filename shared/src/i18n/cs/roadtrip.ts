@@ -239,6 +239,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Použít moji výchozí hodnotu',
   'roadtrip.stop.fillSet': 'Nastavit, na kolik se tady tankuje',
   'roadtrip.leg.pending': 'Bez trasy',
+  'roadtrip.leg.arrivingFrom': 'Z místa {name}',
   'roadtrip.stop.addTitle': 'Přidat jako zastávku',
   'roadtrip.stop.kind': 'Druh zastávky',
   'roadtrip.stop.landsOn': '{day}. den, jako {position}. zastávka',

@@ -240,6 +240,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Użyj mojej wartości domyślnej',
   'roadtrip.stop.fillSet': 'Ustaw, do ile tankować na tym postoju',
   'roadtrip.leg.pending': 'Brak trasy',
+  'roadtrip.leg.arrivingFrom': 'Z miejsca {name}',
   'roadtrip.stop.addTitle': 'Dodaj jako przystanek',
   'roadtrip.stop.kind': 'Rodzaj przystanku',
   'roadtrip.stop.landsOn': 'Dzień {day}, jako przystanek {position}',

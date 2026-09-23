@@ -235,6 +235,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'استخدام الإعداد الافتراضي الخاص بي',
   'roadtrip.stop.fillSet': 'حدد مقدار التعبئة في هذه المحطة',
   'roadtrip.leg.pending': 'لا يوجد مسار',
+  'roadtrip.leg.arrivingFrom': 'من {name}',
   'roadtrip.stop.addTitle': 'إضافة كمحطة توقف',
   'roadtrip.stop.kind': 'نوع المحطة',
   'roadtrip.stop.landsOn': 'اليوم {day}، المحطة {position}',

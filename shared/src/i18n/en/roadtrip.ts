@@ -236,6 +236,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Use my default',
   'roadtrip.stop.fillSet': 'Set how full this stop fills',
   'roadtrip.leg.pending': 'No route',
+  'roadtrip.leg.arrivingFrom': 'From {name}',
   'roadtrip.stop.addTitle': 'Add as a stop',
   'roadtrip.stop.kind': 'Kind of stop',
   'roadtrip.stop.landsOn': 'Day {day}, as stop {position}',

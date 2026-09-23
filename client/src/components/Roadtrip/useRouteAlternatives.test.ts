@@ -9,11 +9,11 @@ vi.mock('../Map/RouteCalculator', async importOriginal => ({
   calculateAlternatives,
 }))
 
-import { useRouteAlternatives, type AlternativesRequest } from './useRouteAlternatives'
+import { ARRIVING_DRIVE, openOn, sameDrive, useRouteAlternatives, type AlternativesRequest } from './useRouteAlternatives'
 import type { RailLegRouter } from './useRoadtripRoutes'
 
 /**
- * FE-ALTHOOK-001..012: asking for other ways of driving one leg.
+ * FE-ALTHOOK-001..013: asking for other ways of driving one leg.
  *
  * The case that carries the feature: the road the rail drives is always the first entry,
  * taken from the rail, and the offers come from the engine the rail drives the leg with.
@@ -40,7 +40,7 @@ const route = vi.fn()
 function request(router: Partial<RailLegRouter> = {}, over: Partial<AlternativesRequest> = {}): AlternativesRequest {
   return {
     dayId: 4,
-    index: 1,
+    drive: { kind: 'leg', index: 1 },
     from: { lat: 53.55, lng: 9.99 },
     to: { lat: 52.52, lng: 13.4 },
     driven: { coordinates: RAIL, distance: 290_000, duration: 10_800 },
@@ -67,7 +67,7 @@ describe('useRouteAlternatives', () => {
 
     act(() => { result.current.ask(request()) })
     expect(result.current.open).toMatchObject({
-      dayId: 4, index: 1, loading: true, routes: [], proving: null, engine: 'osrm',
+      dayId: 4, drive: { kind: 'leg', index: 1 }, loading: true, routes: [], proving: null, engine: 'osrm',
       anchor: { dayId: 3, afterIndex: 2 },
       ends: { from: 11, to: 12 },
     })
@@ -173,11 +173,11 @@ describe('useRouteAlternatives', () => {
     const { result } = renderHook(() => useRouteAlternatives())
 
     act(() => { result.current.ask(request()) })
-    act(() => { result.current.ask(request({}, { index: 2 })) })
+    act(() => { result.current.ask(request({}, { drive: { kind: 'leg', index: 2 } })) })
 
     expect(signals[0].aborted).toBe(true)
     expect(signals[1].aborted).toBe(false)
-    expect(result.current.open?.index).toBe(2)
+    expect(result.current.open?.drive).toEqual({ kind: 'leg', index: 2 })
 
     act(() => { result.current.close() })
     expect(signals[1].aborted).toBe(true)
@@ -242,14 +242,30 @@ describe('useRouteAlternatives', () => {
     expect(first?.aborted).toBe(true)
     expect(second?.aborted).toBe(false)
 
-    act(() => { result.current.ask(request({}, { index: 0 })) })
+    act(() => { result.current.ask(request({}, { drive: { kind: 'leg', index: 0 } })) })
     expect(second?.aborted).toBe(true)
-    expect(result.current.open).toMatchObject({ index: 0, proving: null })
+    expect(result.current.open).toMatchObject({ drive: { kind: 'leg', index: 0 }, proving: null })
 
     // Nothing open, nothing to mark.
     act(() => { result.current.close() })
     act(() => { result.current.prove(1) })
     act(() => { result.current.settle() })
     expect(result.current.open).toBeNull()
+  })
+})
+
+describe('which drive a picker is open on', () => {
+  it('FE-ALTHOOK-013: the drive in from the day before is its own drive, never a leg at some index', () => {
+    expect(sameDrive(ARRIVING_DRIVE, { kind: 'arriving' })).toBe(true)
+    expect(sameDrive({ kind: 'leg', index: 0 }, { kind: 'leg', index: 0 })).toBe(true)
+    expect(sameDrive({ kind: 'leg', index: 0 }, { kind: 'leg', index: 1 })).toBe(false)
+    expect(sameDrive(ARRIVING_DRIVE, { kind: 'leg', index: 0 })).toBe(false)
+    expect(sameDrive({ kind: 'leg', index: 0 }, ARRIVING_DRIVE)).toBe(false)
+
+    const open = { dayId: 2, drive: ARRIVING_DRIVE }
+    expect(openOn(open, 2, { kind: 'arriving' })).toBe(true)
+    expect(openOn(open, 3, { kind: 'arriving' })).toBe(false)
+    expect(openOn(open, 2, { kind: 'leg', index: 0 })).toBe(false)
+    expect(openOn(null, 2, ARRIVING_DRIVE)).toBe(false)
   })
 })

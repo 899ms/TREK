@@ -241,6 +241,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': 'Узяти моє значення за замовчуванням',
   'roadtrip.stop.fillSet': 'Задати, наскільки заправлятися на цій зупинці',
   'roadtrip.leg.pending': 'Немає маршруту',
+  'roadtrip.leg.arrivingFrom': 'Відправлення: {name}',
   'roadtrip.stop.addTitle': 'Додати як зупинку',
   'roadtrip.stop.kind': 'Тип зупинки',
   'roadtrip.stop.landsOn': 'День {day}, зупинка {position}',

@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-127
+// FE-TP-ROAD-001 to FE-TP-ROAD-134
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -163,7 +163,10 @@ vi.mock('../../components/Roadtrip/useRoadtripRoutes', () => ({
   useRoadtripRoutes: (...args: unknown[]) => { rt.routesArgs.current = args; return rt.routes },
 }))
 vi.mock('../../components/Roadtrip/useRoadtripCorridor', () => ({ useRoadtripCorridor: () => rt.corridor }))
-vi.mock('../../components/Roadtrip/useRouteAlternatives', () => ({
+// Only the hook is a fixture. The drive helpers beside it stay real, since which drive a
+// picker is open on is part of what these cases are about.
+vi.mock('../../components/Roadtrip/useRouteAlternatives', async importOriginal => ({
+  ...(await importOriginal<typeof import('../../components/Roadtrip/useRouteAlternatives')>()),
   useRouteAlternatives: () => (rt.altFresh.current ? { ...rt.alt } : rt.alt),
 }))
 vi.mock('../../components/Roadtrip/useFollowTrack', () => ({
@@ -319,6 +322,7 @@ beforeEach(() => {
   rt.routes.legRouter.mockReset().mockImplementation(() => ({ mode: 'driving', avoid: [], engine: 'osrm', route: rt.legRoute }))
   rt.alt.prove.mockReset().mockImplementation(() => new AbortController().signal)
   rt.routes.days = []
+  rt.routes.quietDays = []
   rt.routesArgs.current = []
   rt.routes.lines = []
   rt.routes.lineDays = []
@@ -924,7 +928,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
   /** The picker as `useRouteAlternatives` leaves it once asked: the rail's road, then the offers. */
   const openWith = (offers: Array<Record<string, unknown>>, over: Record<string, unknown> = {}) => {
     rt.alt.open = {
-      dayId: 5, index: 0, loading: false, error: false, proving: null,
+      dayId: 5, drive: { kind: 'leg', index: 0 }, loading: false, error: false, proving: null,
       anchor: { dayId: 5, afterIndex: 0 },
       ends: { from: 11, to: 12 },
       engine: 'osrm',
@@ -955,7 +959,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     const [request] = rt.alt.ask.mock.calls[0] as [Record<string, unknown>]
     expect(request).toMatchObject({
       dayId: 5,
-      index: 0,
+      drive: { kind: 'leg', index: 0 },
       from: { lat: 53.55, lng: 9.99 },
       to: { lat: 52.52, lng: 13.4 },
       // "Current" is the rail's own leg: its line, its figures, nothing asked for again.
@@ -971,7 +975,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
   it('FE-TP-ROAD-035: asking again for the leg already open closes it instead', async () => {
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: false, error: false }
     const { result } = await renderRoadtrip()
 
     act(() => { result.current.askRouteAlternatives(5, { kind: 'leg', index: 0 }) })
@@ -1075,7 +1079,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
   it('FE-TP-ROAD-042: choosing an index nothing was offered at does nothing', async () => {
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: false, error: false }
     const { result } = await renderRoadtrip()
 
     await act(async () => { await result.current.chooseRouteAlternative(3) })
@@ -1288,7 +1292,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
   it('FE-TP-ROAD-043: the overlays and the frame come from the open leg, and empty when it closes', async () => {
     routedDay()
     rt.alt.open = {
-      dayId: 5, index: 0, loading: false, error: false,
+      dayId: 5, drive: { kind: 'leg', index: 0 }, loading: false, error: false,
       routes: [
         { coordinates: [[53.5, 10], [52.5, 13]], distance: 290_000, duration: 10_800, divergence: { lat: 53, lng: 11 } },
         { coordinates: [[53.5, 10], [53, 12], [52.5, 13]], distance: 310_000, duration: 11_400, divergence: { lat: 53, lng: 12 } },
@@ -1307,7 +1311,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     // the overlay depends only on the picker: flipping the mode off left pale blue
     // alternatives drawn on an ordinary planner map with no way to dismiss them.
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: false, error: false }
     const { result } = await renderRoadtrip()
     rt.alt.close.mockClear()
 
@@ -1319,7 +1323,7 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
   it('FE-TP-ROAD-045: closing the picker clears the road it had lit up', async () => {
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: false, error: false }
     const { result, rerender } = await renderRoadtrip()
 
     act(() => { result.current.setHighlightedAlternative(1) })
@@ -2103,7 +2107,7 @@ describe('useTripPlanner road trip: somewhere to fill up', () => {
     // be judged. Averaging the two frames would have shown neither properly.
     drivenCard()
     rt.alt.open = {
-      dayId: 6, index: 0, loading: false, error: false,
+      dayId: 6, drive: { kind: 'leg', index: 0 }, loading: false, error: false,
       // Two of them, because one road is not a choice and the picker draws nothing for it.
       routes: [
         { coordinates: [[53, 10], [51, 10]], distance: 222_000, duration: 8_400, divergence: { lat: 52, lng: 10 } },
@@ -2401,7 +2405,7 @@ describe('useTripPlanner road trip: the phone feed', () => {
     // whatever identity the hook keeps.
     seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
     sessionStorage.setItem('trip-tab-42', 'roadtrip')
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: true, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: true, error: false }
     rt.altFresh.current = true
 
     const { result, rerender } = await renderPhone()
@@ -2419,7 +2423,7 @@ describe('useTripPlanner road trip: the phone feed', () => {
     // a tab that no longer shows the bar must not leave the other roads drawn on its map.
     seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
     sessionStorage.setItem('trip-tab-42', 'roadtrip')
-    rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
+    rt.alt.open = { dayId: 5, drive: { kind: 'leg', index: 0 }, routes: [], loading: false, error: false }
 
     const { result } = await renderPhone()
     rt.alt.close.mockClear()
@@ -2802,5 +2806,202 @@ describe('useTripPlanner road trip: a ride on the drive (#2428)', () => {
     const { result } = await renderRoadtrip()
 
     expect(result.current.roadtripConnections).toContain(70)
+  })
+})
+
+describe('useTripPlanner road trip: the drive between two days (#2461)', () => {
+  /** The road the rail drives from the last stop of day 5 to the first of day 6, and one north of it. */
+  const SEAM_LINE: [number, number][] = [[53.25, 10.41], [52.9, 12.0], [52.52, 13.4]]
+  const NORTH: [number, number][] = [[53.25, 10.41], [53.3, 11.6], [53.0, 12.9], [52.52, 13.4]]
+
+  const lastOfDay5 = { assignmentId: 13, placeId: 1013, name: 'Lüneburg', lat: 53.25, lng: 10.41, ownerDayId: 5, ownerIndex: 2 }
+  const firstOfDay6 = { assignmentId: 21, placeId: 1021, name: 'Berlin', lat: 52.52, lng: 13.4, ownerDayId: 6, ownerIndex: 0 }
+
+  /**
+   * Two connected cards. Day 5 ends on its third stop, so the drive into day 6 is filed
+   * behind index 2 of day 5, which nothing on card 6 could name.
+   */
+  const connectedCards = () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    rt.routes.days = [
+      {
+        dayId: 5,
+        dayNumber: 1,
+        stops: [
+          { assignmentId: 11, placeId: 1011, lat: 53.55, lng: 9.99 },
+          { assignmentId: 12, placeId: 1012, lat: 53.4, lng: 10.2 },
+          lastOfDay5,
+        ],
+        legs: [{ distance: 20_000, duration: 1_200 }, { distance: 25_000, duration: 1_500 }],
+        geometry: [[53.55, 9.99], [53.4, 10.2], [53.25, 10.41]],
+      },
+      {
+        dayId: 6,
+        dayNumber: 2,
+        stops: [firstOfDay6, { assignmentId: 22, placeId: 1022, lat: 52.3, lng: 14.0 }],
+        legs: [{ distance: 60_000, duration: 3_000 }],
+        arrivingFrom: lastOfDay5,
+        arrivingLeg: { distance: 280_000, duration: 10_000 },
+        arrivingLine: SEAM_LINE,
+        geometry: [...SEAM_LINE, [52.3, 14.0]],
+      },
+    ]
+  }
+
+  const openOnSeam = (over: Record<string, unknown> = {}) => {
+    rt.alt.open = {
+      dayId: 6, drive: { kind: 'arriving' }, loading: false, error: false, proving: null,
+      anchor: { dayId: 5, afterIndex: 2 },
+      ends: { from: 13, to: 21 },
+      engine: 'osrm',
+      route: rt.legRoute,
+      routes: [
+        { coordinates: SEAM_LINE, distance: 280_000, duration: 10_000, divergence: null, current: true },
+        { coordinates: NORTH, distance: 300_000, duration: 10_800, divergence: null },
+      ],
+      ...over,
+    }
+  }
+
+  it('FE-TP-ROAD-128: asking about the drive in hands over the pair from yesterday, filed behind the stop it leaves', async () => {
+    connectedCards()
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.askRouteAlternatives(6, { kind: 'arriving' }) })
+
+    const [request] = rt.alt.ask.mock.calls[0] as [Record<string, unknown>]
+    expect(request).toMatchObject({
+      dayId: 6,
+      drive: { kind: 'arriving' },
+      from: { lat: 53.25, lng: 10.41 },
+      to: { lat: 52.52, lng: 13.4 },
+      // The road the rail drives across the join, as the current way.
+      driven: { coordinates: SEAM_LINE, distance: 280_000, duration: 10_000 },
+      // Day 5, behind its last stop: where the map files a point dropped on this drive.
+      anchor: { dayId: 5, afterIndex: 2 },
+      ends: { from: 13, to: 21 },
+    })
+    // The seam's own router, asked under the card it arrives on.
+    const [from, to, cardDayId] = rt.routes.legRouter.mock.calls[0] as [{ assignmentId: number }, { assignmentId: number }, number]
+    expect([from.assignmentId, to.assignmentId, cardDayId]).toEqual([13, 21, 6])
+  })
+
+  it('FE-TP-ROAD-129: a card with no drive in asks nothing, and asking again closes the picker on it', async () => {
+    connectedCards()
+    const { result, rerender } = await renderRoadtrip()
+
+    act(() => { result.current.askRouteAlternatives(5, { kind: 'arriving' }) })
+    expect(rt.alt.ask).not.toHaveBeenCalled()
+
+    // Open on the drive in: the first leg of the same card is another drive.
+    openOnSeam()
+    rerender()
+    act(() => { result.current.askRouteAlternatives(6, { kind: 'leg', index: 0 }) })
+    expect(rt.alt.ask).toHaveBeenCalledTimes(1)
+    rt.alt.close.mockClear()
+
+    act(() => { result.current.askRouteAlternatives(6, { kind: 'arriving' }) })
+    expect(rt.alt.close).toHaveBeenCalled()
+    expect(rt.alt.ask).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-TP-ROAD-130: a way chosen for the drive in is proven, then written behind the last stop of the day before', async () => {
+    connectedCards()
+    openOnSeam()
+    rt.legRoute.mockResolvedValue({ coordinates: NORTH, distance: 300_000, duration: 10_800, fellBack: false })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.legRoute).toHaveBeenCalledTimes(1)
+    const [pins] = rt.legRoute.mock.calls[0] as [Array<{ lat: number; lng: number }>]
+    expect(pins).toHaveLength(1)
+    // Replacing what bent that drive before, on day 5 and not on the card it is drawn on.
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 2, ...pins[0] }], [2])
+    expect(rt.alt.close).toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-131: taking the router own road on a bent drive in clears it in one write', async () => {
+    connectedCards()
+    rt.vias.byDay = { 5: [via(9, 5, 2, 0, 53.4, 11.8)] }
+    openOnSeam({
+      routes: [
+        { coordinates: NORTH, distance: 300_000, duration: 10_800, divergence: null, current: true },
+        { coordinates: SEAM_LINE, distance: 280_000, duration: 10_000, divergence: null, direct: true },
+      ],
+    })
+    rt.legRoute.mockResolvedValue({ coordinates: SEAM_LINE, distance: 280_000, duration: 10_000, fellBack: false })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.legRoute.mock.calls[0][0]).toEqual([])
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [], [2])
+  })
+
+  it('FE-TP-ROAD-134: a drive in that leaves a day of a single stop is written behind that stop', async () => {
+    // Such a day draws no card, so the cards alone do not hold the stop the drive in leaves
+    // from. Checked against them only, every choice on this drive was refused as a leg that
+    // had changed.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 6, dayNumber: 2 }
+    const lone = { ...lastOfDay5, ownerIndex: 0 }
+    rt.routes.quietDays = [{ dayId: 5, dayNumber: 1, date: null, title: null, stops: [lone] }]
+    rt.routes.days = [{
+      dayId: 6,
+      dayNumber: 2,
+      stops: [firstOfDay6, { assignmentId: 22, placeId: 1022, lat: 52.3, lng: 14.0 }],
+      legs: [{ distance: 60_000, duration: 3_000 }],
+      arrivingFrom: lone,
+      arrivingLeg: { distance: 280_000, duration: 10_000 },
+      arrivingLine: SEAM_LINE,
+      geometry: [...SEAM_LINE, [52.3, 14.0]],
+    }]
+    openOnSeam({ anchor: { dayId: 5, afterIndex: 0 } })
+    rt.legRoute.mockResolvedValue({ coordinates: NORTH, distance: 300_000, duration: 10_800, fellBack: false })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    const [pins] = rt.legRoute.mock.calls[0] as [Array<{ lat: number; lng: number }>]
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 0, ...pins[0] }], [0])
+    expect(toasts).not.toContainEqual(expect.objectContaining({ message: 'This leg changed while the way was being checked, so nothing was saved.' }))
+  })
+
+  /** Day 5 with three stops, a via on its first leg, and one behind its last: the drive into day 6. */
+  const threeStops = () => {
+    seedTrip({
+      days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })],
+      assignments: {
+        '5': [stopAt(11, 5, 0), stopAt(12, 5, 1), stopAt(13, 5, 2)],
+        '6': [stopAt(21, 6, 0)],
+      },
+    })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.vias.byDay = { 5: [via(1, 5, 0), via(9, 5, 2, 0, 53.4, 11.8)] }
+  }
+
+  it('FE-TP-ROAD-132: a drag under Days that leaves the last stop last keeps the drive into the next day', async () => {
+    // It used to be deleted: measured as a leg, the last stop leads nowhere.
+    threeStops()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => result.current.handleReorder(5, [12, 11, 13]))
+
+    await waitFor(() => expect(rt.vias.reanchor).toHaveBeenCalledWith(5, { vias: [{ id: 1, after_order_index: 1 }], remove: [] }))
+  })
+
+  it('FE-TP-ROAD-133: a last stop taken out or dragged up the day takes the drive behind it along', async () => {
+    // Left where it was, the via sat on a number no stop has and bent nothing, or bent
+    // the drive of whichever stop came to stand there.
+    threeStops()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.reorderRoadtripStop(5, 13, 0) })
+    expect(rt.vias.reanchor).toHaveBeenLastCalledWith(5, { vias: [{ id: 1, after_order_index: 1 }], remove: [9] })
+
+    await act(async () => { await result.current.handleRemoveAssignment(5, 13) })
+    expect(rt.vias.reanchor).toHaveBeenLastCalledWith(5, { vias: [], remove: [9] })
   })
 })

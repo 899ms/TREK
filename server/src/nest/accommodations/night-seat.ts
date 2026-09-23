@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { carriedSeam } from '@trek/shared/roadtrip';
 
 /**
  * Where a booked night sits in its day, and how the drawn roads follow when a stop
@@ -176,7 +177,8 @@ export function reseatOwnStop(
  * its stop, a stop that left the day hands its road to the stop before it, and a
  * stop that is last has no leg to keep a via on. A via behind the day's last stop
  * bends the drive into the next day and stays with that stop while it is still last,
- * whatever its number is now; measured as a leg it would be dropped.
+ * whatever its number is now; measured as a leg it would be dropped. That last rule is
+ * the planner's own (`carriedSeam`), so the two cannot disagree about it.
  *
  * Returns what changed, or null when nothing did.
  */
@@ -185,14 +187,12 @@ export function carryVias(db: SeatConnection, dayId: number, previousIds: number
   const vias = db.prepare('SELECT id, after_order_index, sequence FROM roadtrip_vias WHERE day_id = ?').all(dayId) as PinnedVia[];
   if (!vias.length) return null;
 
-  const previousLast = previousIds.length - 1;
-  const nextLast = nextIds.length - 1;
-  const lastStayed = previousLast >= 0 && previousIds[previousLast] === nextIds[nextLast];
+  const seam = carriedSeam(previousIds, nextIds);
   const remove: number[] = [];
   const moved: { id: number; after_order_index: number }[] = [];
   for (const via of vias) {
-    const next = lastStayed && via.after_order_index === previousLast
-      ? nextLast
+    const next = seam && via.after_order_index === seam.from
+      ? seam.to
       : legAfter(via.after_order_index, previousIds, nextIds);
     if (next === null) remove.push(via.id);
     else if (next !== via.after_order_index) moved.push({ id: via.id, after_order_index: next });

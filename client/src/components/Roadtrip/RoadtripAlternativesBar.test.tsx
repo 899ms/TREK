@@ -32,7 +32,7 @@ const overlay = (over: Partial<AlternativeOverlay> = {}): AlternativeOverlay => 
   ...over,
 })
 
-const leg = (over: Partial<LegAlternatives> = {}): LegAlternatives => openLeg({ dayId: 4, index: 1, ...over })
+const leg = (over: Partial<LegAlternatives> = {}): LegAlternatives => openLeg({ dayId: 4, drive: { kind: 'leg', index: 1 }, ...over })
 
 beforeEach(() => {
   useSettingsStore.setState({ settings: { distance_unit: 'metric' } as never })

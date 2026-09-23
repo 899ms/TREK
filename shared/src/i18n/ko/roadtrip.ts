@@ -235,6 +235,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.stop.fillDefault': '내 기본값 사용',
   'roadtrip.stop.fillSet': '이 정차지에서 얼마나 충전할지 설정',
   'roadtrip.leg.pending': '경로 없음',
+  'roadtrip.leg.arrivingFrom': '{name}에서 출발',
   'roadtrip.stop.addTitle': '경유지로 추가',
   'roadtrip.stop.kind': '경유지 종류',
   'roadtrip.stop.landsOn': '{day}일차, {position}번째 경유지',

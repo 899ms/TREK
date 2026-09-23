@@ -11,13 +11,30 @@ export interface OfferedRoute extends RouteAlternative {
 }
 
 /**
- * Which drive on a card a picker is asked about: the leg from stop `index` to the next one.
+ * Which drive on a card a picker is asked about: the leg from stop `index` to the next
+ * one, or the drive `arriving` at the card's first stop from where the day before ended.
  *
  * A tagged union rather than a bare index, so the drive arriving at the head of a
- * connected card can join it as a target of its own instead of borrowing an index no
- * stop has.
+ * connected card is a target of its own instead of borrowing an index no stop has.
  */
-export type RailDrive = { kind: 'leg'; index: number }
+export type RailDrive = { kind: 'leg'; index: number } | { kind: 'arriving' }
+
+/** The drive into a card from the day before. A card has one at most, so it needs no index. */
+export const ARRIVING_DRIVE: RailDrive = { kind: 'arriving' }
+
+/** Whether two drives are the same one of their card. */
+export function sameDrive(a: RailDrive, b: RailDrive): boolean {
+  if (a.kind === 'arriving' || b.kind === 'arriving') return a.kind === b.kind
+  return a.index === b.index
+}
+
+/**
+ * Whether the picker is open on this drive of this card. The one test the rail, the
+ * planner and the phone ask, so a drive shows pressed exactly where the picker is.
+ */
+export function openOn(open: Pick<LegAlternatives, 'dayId' | 'drive'> | null | undefined, dayId: number, drive: RailDrive): boolean {
+  return !!open && open.dayId === dayId && sameDrive(open.drive, drive)
+}
 
 /** Where the vias that shape a leg are stored: after stop `afterIndex` of day `dayId`. */
 export interface ViaAnchor {
@@ -27,9 +44,10 @@ export interface ViaAnchor {
 
 /** Which leg is being reconsidered, and what was offered for it. */
 export interface LegAlternatives {
+  /** The card the drive is drawn on. */
   dayId: number
-  /** Index of the leg within the day: the drive from stop `index` to `index + 1`. */
-  index: number
+  /** Which drive of that card: one of its legs, or the drive arriving at its head. */
+  drive: RailDrive
   /** Where a choice is written. Read off the stop the leg leaves, when it was asked about. */
   anchor: ViaAnchor
   /**
@@ -52,7 +70,7 @@ export interface LegAlternatives {
 /** Everything a picker needs to know about the leg it is opened on. */
 export interface AlternativesRequest {
   dayId: number
-  index: number
+  drive: RailDrive
   from: { lat: number; lng: number }
   to: { lat: number; lng: number }
   /** The leg as the rail drives it now: its line, its figures, and the engine behind them. */
@@ -115,8 +133,8 @@ export function useRouteAlternatives(): RouteAlternativesState {
     stopProving()
     const controller = new AbortController()
     abortRef.current = controller
-    const { dayId, index, from, to, driven, anchor, ends, router } = request
-    const leg = { dayId, index, anchor, ends, engine: router.engine, route: router.route, proving: null }
+    const { dayId, drive, from, to, driven, anchor, ends, router } = request
+    const leg = { dayId, drive, anchor, ends, engine: router.engine, route: router.route, proving: null }
     setOpen({ ...leg, routes: [], loading: true, error: false })
 
     const current: OfferedRoute = {
