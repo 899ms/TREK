@@ -191,6 +191,10 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
   const [acHighlight, setAcHighlight] = useState(-1)
   const acDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const acAbortRef = useRef<AbortController | null>(null)
+  // Counts the closings of this dialog, so an answer still on its way when it
+  // closed can tell that the opening it was asked for is over. A counter rather
+  // than an abort, because the full search takes no signal.
+  const searchEpochRef = useRef(0)
   // Ties one search's keystrokes and its details lookup into a single Google
   // billing session (see utils/placesSession).
   const placesSessionRef = useRef(new PlacesSession())
@@ -318,10 +322,29 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [place, prefillCoords, isOpen, assignmentId])
 
+  // The planner keeps this dialog mounted while it is closed (Modal only stops
+  // drawing it), so everything the search block holds would greet the next
+  // opening: the last query, its list, the Google line offering that list's
+  // query again, suggestions still on their way. A pick from that list writes
+  // over the place being edited, whichever place that is by then. Reset when
+  // it closes, in an effect of its own: the one above also reruns while the
+  // dialog is open, when a right-click's reverse lookup fills prefillCoords,
+  // and must not wipe a search the user has started since.
   useEffect(() => {
-    if (!isOpen) {
-      setMapsSearch('')
-    }
+    if (isOpen) return
+    searchEpochRef.current += 1
+    if (acDebounceRef.current) clearTimeout(acDebounceRef.current)
+    acAbortRef.current?.abort()
+    placesSessionRef.current.end()
+    searchMetaRef.current = null
+    acMetaRef.current = null
+    setMapsSearch('')
+    setMapsResults([])
+    setSearchSource('')
+    setAcSuggestions([])
+    setAcSource('')
+    setAcHighlight(-1)
+    setIsSearchingMaps(false)
   }, [isOpen])
 
   useEffect(() => {
@@ -409,11 +432,13 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     // it promises the same query.
     const trimmed = provider ? (searchMetaRef.current?.query ?? '') : mapsSearch.trim()
     if (!trimmed) return
+    const epoch = searchEpochRef.current
     setIsSearchingMaps(true)
     try {
       // A pasted Google Maps or Amap link resolves server-side into a place
       if (!provider && isMapUrl(trimmed)) {
         const resolved = await mapsApi.resolveUrl(trimmed)
+        if (epoch !== searchEpochRef.current) return
         if (resolved.lat && resolved.lng) {
           setForm(prev => ({
             ...prev,
@@ -430,13 +455,15 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
         }
       }
       const result = await mapsApi.search(trimmed, language, locationBiasPoint, provider)
+      if (epoch !== searchEpochRef.current) return
       searchMetaRef.current = { query: trimmed, source: result.source || 'unknown' }
       setMapsResults(result.places || [])
       setSearchSource(result.source || '')
     } catch (err: unknown) {
+      if (epoch !== searchEpochRef.current) return
       toast.error(getApiErrorMessage(err, t('places.mapsSearchError')))
     } finally {
-      setIsSearchingMaps(false)
+      if (epoch === searchEpochRef.current) setIsSearchingMaps(false)
     }
   }
 
@@ -496,6 +523,7 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
     setAcSuggestions([])
     setAcHighlight(-1)
     const previousSearch = mapsSearch
+    const epoch = searchEpochRef.current
     setMapsSearch('')
     setForm(prev => ({ ...prev, name: suggestion.mainText }))
     setIsSearchingMaps(true)
@@ -517,6 +545,10 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
       } catch (err) {
         console.error('Failed to fetch place details:', err)
       }
+      // Closed while the details were on their way: the pick belongs to an
+      // opening that is over, and the fallback search below is not worth a
+      // request nobody will see.
+      if (epoch !== searchEpochRef.current) return
       if (!place && suggestion.source === 'openstreetmap' && suggestion.lat != null && suggestion.lng != null) {
         // The layer's rows carry no address; their second line is the name
         // written on the building. Searching for "Tokio Hauptbahnhof, 東京駅"
@@ -535,6 +567,7 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
       if (!place) {
         const query = [suggestion.mainText, suggestion.secondaryText].filter(Boolean).join(', ')
         const search = await mapsApi.search(query, language, locationBiasPoint)
+        if (epoch !== searchEpochRef.current) return
         place = search.places?.[0] ?? null
       }
       if (place) {
@@ -544,12 +577,17 @@ function usePlaceFormModal(props: PlaceFormModalProps) {
         toast.error(t('places.mapsSearchError'))
       }
     } catch (err) {
+      if (epoch !== searchEpochRef.current) return
       console.error('Place suggestion lookup failed:', err)
       setMapsSearch(previousSearch)
       toast.error(getApiErrorMessage(err, t('places.mapsSearchError')))
     } finally {
-      setIsSearchingMaps(false)
-      placesSessionRef.current.end()
+      // Closing already ended this session; ending it again here would cut off
+      // the one a new opening may have started meanwhile.
+      if (epoch === searchEpochRef.current) {
+        setIsSearchingMaps(false)
+        placesSessionRef.current.end()
+      }
     }
   }
 
