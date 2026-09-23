@@ -116,6 +116,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Napok összekötése',
   'roadtrip.line.dayColors': 'Naponta egy szín',
   'roadtrip.line.hint': 'A két nap közti szakaszt is kiszámolja, és az érkezés napjához adja.',
+  'roadtrip.line.hotelBookends': 'Minden nap a szálláson kezdődjön és érjen véget',
+  'roadtrip.line.hotelBookendsHint':
+    'Egy lefoglalt éjszaka után a nap ott kezdődik, ahol aludtál, egy lefoglalt éjszaka előtt pedig ott ér véget.',
   'roadtrip.avoid.section': 'Kerülés, ha lehet',
   'roadtrip.avoid.toll': 'Fizetős utak',
   'roadtrip.avoid.motorway': 'Autópályák',

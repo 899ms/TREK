@@ -114,6 +114,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Koppla ihop dagarna',
   'roadtrip.line.dayColors': 'En färg per dag',
   'roadtrip.line.hint': 'Beräknar även sträckan mellan två dagar och räknar den på ankomstdagen.',
+  'roadtrip.line.hotelBookends': 'Börja och avsluta varje dag vid ditt boende',
+  'roadtrip.line.hotelBookendsHint':
+    'Efter en bokad natt börjar dagen där du sov, och före en bokad natt slutar den där.',
   'roadtrip.avoid.section': 'Undvik om det går',
   'roadtrip.avoid.toll': 'Avgiftsvägar',
   'roadtrip.avoid.motorway': 'Motorvägar',

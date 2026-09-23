@@ -114,6 +114,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Tage verbinden',
   'roadtrip.line.dayColors': 'Farbe je Tag',
   'roadtrip.line.hint': 'Verbindungsfahrten zählen zum Ankunftstag.',
+  'roadtrip.line.hotelBookends': 'Jeden Tag an der Unterkunft beginnen und beenden',
+  'roadtrip.line.hotelBookendsHint':
+    'Nach einer gebuchten Nacht beginnt der Tag dort, wo du geschlafen hast, und vor einer endet er dort.',
   'roadtrip.avoid.section': 'Möglichst meiden',
   'roadtrip.avoid.toll': 'Mautstraßen',
   'roadtrip.avoid.motorway': 'Autobahnen',

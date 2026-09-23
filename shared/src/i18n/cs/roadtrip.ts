@@ -115,6 +115,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Propojit dny',
   'roadtrip.line.dayColors': 'Barva na den',
   'roadtrip.line.hint': 'Spočítá i úsek mezi dvěma dny a připočte ho ke dni příjezdu.',
+  'roadtrip.line.hotelBookends': 'Začínat a končit každý den v ubytování',
+  'roadtrip.line.hotelBookendsHint': 'Po zarezervované noci začíná den tam, kde jste spali, a před ní tam končí.',
   'roadtrip.avoid.section': 'Vyhnout se, pokud to jde',
   'roadtrip.avoid.toll': 'Mýtné silnice',
   'roadtrip.avoid.motorway': 'Dálnice',

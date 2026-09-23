@@ -114,6 +114,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'ربط الأيام',
   'roadtrip.line.dayColors': 'لون لكل يوم',
   'roadtrip.line.hint': 'يحسب أيضًا المسافة بين يومين ويحتسبها على يوم الوصول.',
+  'roadtrip.line.hotelBookends': 'ابدأ كل يوم وأنهِه في مكان إقامتك',
+  'roadtrip.line.hotelBookendsHint': 'بعد ليلة محجوزة يبدأ اليوم حيث نمت، وقبل ليلة محجوزة ينتهي هناك.',
   'roadtrip.avoid.section': 'التجنب قدر الإمكان',
   'roadtrip.avoid.toll': 'الطرق ذات الرسوم',
   'roadtrip.avoid.motorway': 'الطرق السريعة',

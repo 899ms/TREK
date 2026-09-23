@@ -116,6 +116,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': '日をつなぐ',
   'roadtrip.line.dayColors': '日ごとに色を分ける',
   'roadtrip.line.hint': '日と日の間の区間も計算し、到着した日に加えます。',
+  'roadtrip.line.hotelBookends': '毎日を宿泊先で始めて宿泊先で終える',
+  'roadtrip.line.hotelBookendsHint': '予約した夜の翌日は泊まった宿から始まり、予約した夜の日はその宿で終わります。',
   'roadtrip.avoid.section': 'できるだけ避ける',
   'roadtrip.avoid.toll': '有料道路',
   'roadtrip.avoid.motorway': '高速道路',

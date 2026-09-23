@@ -83,6 +83,8 @@ import { RuntimeEnvService } from '../../src/nest/app-config/runtime-env.service
 import { makeNotificationsService, makeNotificationPreferencesService } from './notifications';
 import { AddonsService } from '../../src/nest/addons/addons.service';
 import { RoadtripMcp } from '../../src/nest/roadtrip/roadtrip.mcp';
+import { RoadtripPreferencesMcp } from '../../src/nest/roadtrip/roadtrip-preferences.mcp';
+import { RoadtripPreferencesService } from '../../src/nest/roadtrip/roadtrip-preferences.service';
 import { RoadtripService } from '../../src/nest/roadtrip/roadtrip.service';
 import { notificationsStub } from './notifications';
 import { EphemeralTokenService } from '../../src/nest/auth/ephemeral-token.service';
@@ -223,6 +225,7 @@ export function createMcpTestRegistry(): McpRegistry {
       new DayNotesMcp(new DayNotesService(dbService, permissionsService, realtimeService), authService, guards),
       new DaysMcp(daysService, authService, guards),
       new RoadtripMcp(new RoadtripService(dbService, realtimeService), dbService, guards, authService, addonsService),
+      new RoadtripPreferencesMcp(new RoadtripPreferencesService(dbService, realtimeService), authService, addonsService, dbService, guards),
       new FilesMcp(new FilesService(dbService, permissionsService, realtimeService, new EphemeralTokenService(), generalStorage), authService, guards),
       new AccommodationsMcp(accommodationsService, dbService, placesService, authService, guards),
       new AssignmentsMcp(assignmentsService, daysService, authService, guards),

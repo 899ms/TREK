@@ -18,6 +18,9 @@ import { FS } from './typeScale'
 import DayWindowFields from './DayWindowFields'
 import SettingsHint from './SettingsHint'
 import { dayWindow } from './dayWindow'
+import { Tooltip } from '../shared/Tooltip'
+import { BOOKEND_ICON } from './nightBookend'
+import { useHotelBookends } from './useHotelBookends'
 
 /**
  * Everything that decides when the rail speaks up about the driving.
@@ -162,18 +165,22 @@ function LimitRow({ icon: Icon, label, suffix, value, placeholder, step, derived
  * Disabled rather than hidden when there is no engine that can answer: an operator who
  * pointed the instance at their own OSRM has no second engine, and a switch that flips
  * and changes nothing is worse than one that says why it cannot.
+ *
+ * A `hint` is the sentence a switch needs and its panel has no room for, on the label.
  */
-function AvoidRow({ icon: Icon, label, on, disabled, onToggle }: {
+function AvoidRow({ icon: Icon, label, hint, on, disabled, onToggle }: {
   icon: typeof Coins
   label: string
+  hint?: string
   on: boolean
   disabled: boolean
   onToggle: () => void
 }): React.ReactElement {
+  const text = <span tabIndex={hint ? 0 : undefined} className="min-w-0 flex-1 text-body text-content-secondary">{label}</span>
   return (
     <div className={`flex items-center gap-3 ${disabled ? 'opacity-50' : ''}`}>
       <Icon size={16} className="shrink-0 text-content-faint" aria-hidden />
-      <span className="min-w-0 flex-1 text-body text-content-secondary">{label}</span>
+      {hint ? <Tooltip label={hint} placement="top">{text}</Tooltip> : text}
       {disabled
         ? <span className="text-caption text-content-faint">{'—'}</span>
         : <ToggleSwitch on={on} onToggle={onToggle} label={label} />}
@@ -281,6 +288,7 @@ export default function RoadtripLimitsCard({ onSave, onResetDayBoundaries, loadi
   // days gets the dialog with the trip's figures in it, not a form that takes a number
   // and drops it.
   const readOnly = !onSave
+  const bookends = useHotelBookends(onSave)
 
   const legMinutes = settings.roadtrip_leg_minutes
   const dayMinutes = settings.roadtrip_day_minutes
@@ -657,6 +665,18 @@ export default function RoadtripLimitsCard({ onSave, onResetDayBoundaries, loadi
                     disabled={readOnly}
                     onToggle={() => onSave?.('roadtrip_connect_days', !settings.roadtrip_connect_days)}
                   />}
+                  {/* Where a day begins and ends rather than what joins them: after a booked
+                      night the drive sets off from the stay, and before one it ends there.
+                      Off by default, because it adds a leg to most days of a trip that has
+                      stays and changes their kilometres and times. */}
+                  <AvoidRow
+                    icon={BOOKEND_ICON}
+                    label={t('roadtrip.line.hotelBookends')}
+                    hint={t('roadtrip.line.hotelBookendsHint')}
+                    on={bookends.on}
+                    disabled={!bookends.toggle}
+                    onToggle={() => bookends.toggle?.()}
+                  />
                   {/* Which matters most once the line IS continuous: end to end it is one
                       stroke, and a colour per day is what puts the days back into it. */}
                   <AvoidRow

@@ -115,6 +115,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Połącz dni',
   'roadtrip.line.dayColors': 'Kolor na dzień',
   'roadtrip.line.hint': 'Wyznacza też odcinek między dniami i liczy go do dnia przyjazdu.',
+  'roadtrip.line.hotelBookends': 'Zaczynaj i kończ każdy dzień w noclegu',
+  'roadtrip.line.hotelBookendsHint':
+    'Po zarezerwowanej nocy dzień zaczyna się w miejscu noclegu, a przed taką nocą tam się kończy.',
   'roadtrip.avoid.section': 'Omijaj, jeśli się da',
   'roadtrip.avoid.toll': 'Drogi płatne',
   'roadtrip.avoid.motorway': 'Autostrady',

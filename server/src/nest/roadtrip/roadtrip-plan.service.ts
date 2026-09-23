@@ -11,6 +11,7 @@ import {
   carrierLegsFor,
   carrierSeam,
   foldRouteRun,
+  hotelBookendsOn,
   isStationaryJoin,
   splitIntoRuns,
   spillChains,
@@ -20,8 +21,10 @@ import {
   formatDistance,
   formatDurationShort,
   seatCarrierStops,
+  seatNightBookends,
   undatedRides,
   viasOnLeg,
+  type BookendStay,
   type CarrierBooking,
   type CarrierSeam,
   type DistanceUnit,
@@ -79,6 +82,13 @@ interface VisitRow {
   stop_type: string | null;
   fill_percent: number | null;
 }
+/**
+ * A booked night as the road trip reads it: the stay, the days it spans, where it is and
+ * the earliest booking linked to it. The rule reads these for the hotel at the edges of
+ * the days around the night (`seatNightBookends`); get_roadtrip_context reports them as
+ * they are, with the check-in beside the check-out.
+ */
+type StayRow = BookendStay & { check_in: string | null };
 const stopKey = (s: RoadtripStop) =>
   `${s.lat.toFixed(5)},${s.lng.toFixed(5)},${s.legMode ?? ''},${s.incomingLegMode ?? ''}`;
 
@@ -110,9 +120,21 @@ export class RoadtripPlanService {
       WHERE d.trip_id = ? ORDER BY d.day_number, a.order_index, a.created_at`,
       tripId,
     );
+    // Every stay of the trip in id order, the order the rule reads them in, so a browser
+    // holding them in another order still picks the same hotel where two overlap. The
+    // booking is the earliest linked one, the one the planner opens from the hotel's row.
+    const stays = this.db.all<StayRow>(
+      `SELECT a.id, a.place_id, a.start_day_id, a.end_day_id, a.check_in, a.check_out,
+      p.name AS place_name, p.lat AS place_lat, p.lng AS place_lng,
+      (SELECT MIN(r.id) FROM reservations r WHERE r.accommodation_id = a.id) AS reservation_id
+      FROM day_accommodations a LEFT JOIN places p ON p.id = a.place_id
+      WHERE a.trip_id = ? ORDER BY a.id`,
+      tripId,
+    );
     return {
       days,
       visits,
+      stays,
       carriers: this.carriers(tripId),
       settings: this.preferences.read(tripId),
       profiles: this.router.profiles(),
@@ -200,7 +222,7 @@ export class RoadtripPlanService {
       throw new HttpException({ error: 'Day end must be later than day start.' }, 400);
     const seams = context.carriers.map((booking) => carrierSeam(booking)).filter((seam): seam is CarrierSeam => seam !== null);
     const dayNumberOf = (dayId: number): number => context.days.find((d) => d.id === dayId)?.day_number ?? 0;
-    const plan: PlanDay[] = context.days.map((day) => {
+    const stored: PlanDay[] = context.days.map((day) => {
       const visits = context.visits.filter((v) => v.day_id === day.id && v.lat !== null && v.lng !== null);
       const stops = visits.map(
         (v, index): RoadtripStop => ({
@@ -239,6 +261,10 @@ export class RoadtripPlanService {
         ),
       };
     });
+    // A day after a booked night starts at the stay and a day before one ends there, by
+    // the rule the planner runs in the browser, and only while the trip (or the preview's
+    // own settings) has it switched on. Everything below reads the seated days.
+    const plan = hotelBookendsOn(preferences) ? seatNightBookends(stored, context.days, context.stays) : stored;
     const allLegs: Record<string, RoutedLeg> = {};
     const snapByDay: Record<number, Record<string, SnappedWaypoint>> = {};
     const missedByDay: Record<number, RouteAvoidClass[]> = {};

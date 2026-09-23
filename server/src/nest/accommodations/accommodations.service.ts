@@ -356,8 +356,10 @@ export class AccommodationsService {
    *
    * Only the check-in day gets a stop, even for a fortnight's stay: that is the
    * day you drive there, and it is exactly what the road-trip side writes for a
-   * night it books itself. The later nights ride on the stay row, which is where
-   * the rail reads check-out from.
+   * night it books itself. The later nights ride on the stay row: a trip that
+   * starts and ends its days at the stay seats the hotel at the edges of the days
+   * around them from it (`seatNightBookends`), and reads the check-out there as a
+   * label only.
    *
    * Runs inside the caller's transaction.
    */

@@ -116,6 +116,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Hubungkan hari',
   'roadtrip.line.dayColors': 'Satu warna per hari',
   'roadtrip.line.hint': 'Juga menghitung ruas antara dua hari dan memasukkannya ke hari kedatangan.',
+  'roadtrip.line.hotelBookends': 'Mulai dan akhiri setiap hari di penginapan Anda',
+  'roadtrip.line.hotelBookendsHint':
+    'Setelah malam yang dipesan, hari dimulai di tempat Anda menginap, dan sebelum malam yang dipesan, hari berakhir di sana.',
   'roadtrip.avoid.section': 'Hindari bila bisa',
   'roadtrip.avoid.toll': 'Jalan tol',
   'roadtrip.avoid.motorway': 'Jalan bebas hambatan',

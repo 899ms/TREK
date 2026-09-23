@@ -1,6 +1,6 @@
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import type { Assignment, AssignmentsMap, Day, Settings } from '../../types'
+import type { Accommodation, Assignment, AssignmentsMap, Day, Reservation, Settings } from '../../types'
 import type { RoadtripStop } from './useRoadtripRoutes'
 
 // Hoisted together with the mock: the module factory runs before the file body, so a
@@ -1161,5 +1161,199 @@ describe('a leg asked for again on demand', () => {
     await waitFor(() => expect(calculateRouteWithLegs).toHaveBeenCalledTimes(2))
     await waitFor(() => expect(result.current.legRouter!(from, to, 1).standIn).toBe(false))
     expect(result.current.days[0].avoidMissed ?? []).toEqual([])
+  })
+})
+
+/**
+ * FE-ROADTRIP-ROUTES-052..059: a booked night at both ends of the days around it.
+ *
+ * The first cases here that hand the hook the trip's stays. What is pinned is what goes to
+ * the router: the drive from the hotel slept in and to tonight's is part of the day's own
+ * run, a night spent at one hotel asks for nothing, no via bends the hotel's legs, and with
+ * the switch off the days are the stored ones and nothing else.
+ */
+describe('a booked night at both ends of its days', () => {
+  const GETAWAY: [number, number] = [-33.71, 150.31]
+  const LOOKOUT: [number, number] = [-33.73, 150.35]
+  const FALLS: [number, number] = [-33.65, 150.38]
+  const WALLINGA: [number, number] = [-34.1, 150.9]
+  const HOTEL: [number, number] = [45.07, 7.68]
+  const P: [number, number][] = [1, 2, 3, 4, 5, 6].map(n => [45 + n * 0.1, 7 + n * 0.1])
+  const VIA: [number, number] = [44.5, 7.5]
+
+  /** A stay whose place is the one stop spec `stopId` stands for (`place_id` is id * 10). */
+  const stayOf = (id: number, stopId: number, start: number, end: number, at: [number, number], over: Record<string, unknown> = {}) =>
+    ({
+      id, trip_id: 7, place_id: stopId * 10, start_day_id: start, end_day_id: end,
+      check_in: null, check_out: '10:00', place_name: `Stay ${id}`, place_lat: at[0], place_lng: at[1],
+      ...over,
+    }) as unknown as Accommodation
+  const booking = (id: number, accommodationId: number) =>
+    ({ id, trip_id: 7, title: 'Motel', type: 'hotel', status: 'confirmed', accommodation_id: accommodationId }) as unknown as Reservation
+
+  /** An hour and 100 km for whatever pair the router is handed. */
+  const hourly = (points: { lat: number; lng: number }[]) => ({
+    coordinates: points.map(p => [p.lat, p.lng] as [number, number]),
+    distance: 100000 * (points.length - 1),
+    duration: 3600 * (points.length - 1),
+    legs: points.slice(1).map(() => ({ distance: 100000, duration: 3600, text: '' })),
+  })
+  /** Every run the router was asked for, as its waypoints' latitudes. */
+  const asked = () => calculateRouteWithLegs.mock.calls.map(c => c[0].map((p: { lat: number }) => p.lat))
+  const shape = (stops: RoadtripStop[]) =>
+    stops.map(s => (s.bookend ? `${s.bookend.phase}:${s.bookend.accommodationId}` : s.name))
+  const switchTo = (on: boolean) =>
+    act(() => { useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, roadtrip_hotel_bookends: on } as never }) })
+
+  beforeEach(() => {
+    calculateRouteWithLegs.mockImplementation(async (points: { lat: number; lng: number }[]) => hourly(points))
+    switchTo(true)
+  })
+  afterEach(() => act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })))
+
+  /** A check-in with two places, then a transfer day that is only the next check-in. */
+  const cam = () => ({
+    days: [day(1, 1), day(2, 2), day(3, 3)],
+    assignments: {
+      ...map(1, [{ id: 1, at: GETAWAY }, { id: 2, at: LOOKOUT }, { id: 3, at: FALLS }]),
+      ...map(2, [{ id: 4, at: WALLINGA }]),
+    } as AssignmentsMap,
+    stays: [stayOf(1, 1, 1, 2, GETAWAY, { check_in: '14:00' }), stayOf(2, 4, 2, 3, WALLINGA, { check_in: '15:00' })],
+  })
+
+  /** Three nights in one hotel with two places on every day before the check-out. */
+  const simeon = () => ({
+    days: [day(1, 1), day(2, 2), day(3, 3), day(4, 4)],
+    assignments: {
+      ...map(1, [{ id: 10, at: HOTEL }, { id: 11, at: P[0] }, { id: 12, at: P[1] }]),
+      ...map(2, [{ id: 13, at: P[2] }, { id: 14, at: P[3] }]),
+      ...map(3, [{ id: 15, at: P[4] }, { id: 16, at: P[5] }]),
+    } as AssignmentsMap,
+    stays: [stayOf(5, 10, 1, 4, HOTEL, { check_in: '15:00' })],
+  })
+
+  it('FE-ROADTRIP-ROUTES-052: the check-in day drives back to the stay, the transfer day sets off from it', async () => {
+    const { days, assignments, stays } = cam()
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays, [booking(90, 1)]))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.days.map(d => shape(d.stops))).toEqual([
+      ['Stop 1', 'Stop 2', 'Stop 3', 'evening:1'],
+      ['morning:1', 'Stop 4'],
+    ])
+    // One run per day, the hotel legs inside it.
+    expect(asked()).toEqual([
+      [GETAWAY[0], LOOKOUT[0], FALLS[0], GETAWAY[0]],
+      [GETAWAY[0], WALLINGA[0]],
+    ])
+    expect(result.current.days[1].stops[0].bookend).toMatchObject({ checkingOut: true, checkOut: '10:00', reservationId: 90 })
+    expect(result.current.days[0].legs).toHaveLength(3)
+    // Nothing numbered changes: the hotel is a service stop, the day's own stops are counted.
+    expect(result.current.totalStops).toBe(4)
+    // The check-out day with nothing of its own is no card.
+    expect(result.current.days.map(d => d.dayId)).toEqual([1, 2])
+  })
+
+  it('FE-ROADTRIP-ROUTES-053: every day between the nights starts and ends at the hotel', async () => {
+    const { days, assignments, stays } = simeon()
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.days.map(d => shape(d.stops))).toEqual([
+      ['Stop 10', 'Stop 11', 'Stop 12', 'evening:5'],
+      ['morning:5', 'Stop 13', 'Stop 14', 'evening:5'],
+      ['morning:5', 'Stop 15', 'Stop 16', 'evening:5'],
+    ])
+    expect(asked()).toEqual([
+      [HOTEL[0], P[0][0], P[1][0], HOTEL[0]],
+      [HOTEL[0], P[2][0], P[3][0], HOTEL[0]],
+      [HOTEL[0], P[4][0], P[5][0], HOTEL[0]],
+    ])
+    // The check-out day has nothing of its own and is not driven.
+    expect(result.current.days.map(d => d.dayId)).toEqual([1, 2, 3])
+  })
+
+  it('FE-ROADTRIP-ROUTES-054: with the days connected, a night spent at one hotel asks the router nothing', async () => {
+    act(() => { useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_connect_days: true } })) })
+    const { days, assignments, stays } = cam()
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // The two day runs and nothing else: no seam from the Getaway to the Getaway.
+    expect(asked()).toEqual([
+      [GETAWAY[0], LOOKOUT[0], FALLS[0], GETAWAY[0]],
+      [GETAWAY[0], WALLINGA[0]],
+    ])
+    expect(result.current.days[1].arrivingLeg).toBeFalsy()
+    expect(result.current.totalDistance).toBe(400000)
+  })
+
+  it('FE-ROADTRIP-ROUTES-055: a via behind the last place of a day does not bend the drive to tonight’s stay', async () => {
+    const { days, assignments, stays } = cam()
+    const vias = { 1: [{ id: 1, day_id: 1, after_order_index: 2, sequence: 0, lat: VIA[0], lng: VIA[1] }] }
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', vias, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(asked()[0]).toEqual([GETAWAY[0], LOOKOUT[0], FALLS[0], GETAWAY[0]])
+    expect(asked().flat()).not.toContain(VIA[0])
+  })
+
+  it('FE-ROADTRIP-ROUTES-056: no via leaves the morning hotel; one after the first place stays after it', async () => {
+    const { days, assignments, stays } = simeon()
+    const vias = { 2: [{ id: 1, day_id: 2, after_order_index: 0, sequence: 0, lat: VIA[0], lng: VIA[1] }] }
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', vias, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(asked()[1]).toEqual([HOTEL[0], P[2][0], VIA[0], P[3][0], HOTEL[0]])
+  })
+
+  it('FE-ROADTRIP-ROUTES-057: a transfer day with nothing stored drives from one stay to the other', async () => {
+    const days = [day(1, 1), day(2, 2), day(3, 3)]
+    const assignments = { ...map(1, [{ id: 1, at: GETAWAY }, { id: 2, at: LOOKOUT }]) } as AssignmentsMap
+    const stays = [stayOf(1, 1, 1, 2, GETAWAY), stayOf(2, 4, 2, 3, WALLINGA)]
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    const transfer = result.current.days.find(d => d.dayId === 2)!
+    expect(shape(transfer.stops)).toEqual(['morning:1', 'evening:2'])
+    expect(transfer.stops.map(s => s.bookend && [s.bookend.checkingOut, s.bookend.checkingIn])).toEqual([[true, false], [false, true]])
+    expect(asked()).toContainEqual([GETAWAY[0], WALLINGA[0]])
+  })
+
+  it('FE-ROADTRIP-ROUTES-058: switched off, the days are the stored ones, and back on and off again they are again', async () => {
+    switchTo(false)
+    const { days, assignments, stays } = simeon()
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const stored = result.current.days.map(d => d.stops)
+    expect(stored.flat().some(s => s.bookend)).toBe(false)
+    expect(asked()).toEqual([
+      [HOTEL[0], P[0][0], P[1][0]],
+      [P[2][0], P[3][0]],
+      [P[4][0], P[5][0]],
+    ])
+
+    switchTo(true)
+    await waitFor(() => expect(result.current.days[1]?.stops[0]?.bookend?.phase).toBe('morning'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    switchTo(false)
+    await waitFor(() => expect(result.current.days.flatMap(d => d.stops).some(s => s.bookend)).toBe(false))
+    expect(result.current.days.map(d => d.stops)).toEqual(stored)
+  })
+
+  it('FE-ROADTRIP-ROUTES-059: linking a booking to the stay changes the hotel row, not the road', async () => {
+    const { days, assignments, stays } = cam()
+    const { result, rerender } = renderHook(
+      ({ reservations }) => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays, reservations),
+      { initialProps: { reservations: [] as Reservation[] } },
+    )
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.days[1].stops[0].bookend?.reservationId).toBeNull()
+    const calls = calculateRouteWithLegs.mock.calls.length
+
+    rerender({ reservations: [booking(91, 1), booking(90, 1)] })
+    // The earliest booking of the stay, and the router is not asked again.
+    await waitFor(() => expect(result.current.days[1].stops[0].bookend?.reservationId).toBe(90))
+    expect(calculateRouteWithLegs).toHaveBeenCalledTimes(calls)
   })
 })

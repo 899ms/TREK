@@ -115,6 +115,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Nối các ngày',
   'roadtrip.line.dayColors': 'Mỗi ngày một màu',
   'roadtrip.line.hint': 'Cũng tính đoạn giữa hai ngày và cộng vào ngày tới nơi.',
+  'roadtrip.line.hotelBookends': 'Bắt đầu và kết thúc mỗi ngày tại nơi lưu trú',
+  'roadtrip.line.hotelBookendsHint':
+    'Sau một đêm đã đặt, ngày bắt đầu ở nơi bạn ngủ, và trước một đêm đã đặt, ngày kết thúc ở đó.',
   'roadtrip.avoid.section': 'Tránh nếu có thể',
   'roadtrip.avoid.toll': 'Đường thu phí',
   'roadtrip.avoid.motorway': 'Đường cao tốc',

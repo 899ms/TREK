@@ -1,5 +1,5 @@
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
-import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, isStationaryJoin, mergeRouteSegments, seatCarrierStops, standsAsDay, terminalAssignmentId, viasOnLeg, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
+import { assembleRoadtrip, bookendStaysOf, carrierLegsFor, carrierSeam, foldRouteRun, hotelBookendsOn, isCarrierMode, isStationaryJoin, mergeRouteSegments, seatCarrierStops, seatNightBookends, standsAsDay, terminalAssignmentId, viasOnLeg, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avoidedClasses, calculateRouteWithLegs, routeEngineFor, RoutingRefusedError, type RouteEngine } from '../Map/RouteCalculator'
 import { resolveLegMode } from '../Planner/legMode'
@@ -328,9 +328,29 @@ export function useRoadtripRoutes(
       })
   }, [days, assignments, accommodations, rideSeams])
 
-  const plan = useMemo<PlanDay[]>(() => storedDays.filter(d => standsAsDay(d.stops)), [storedDays])
+  /**
+   * Whether a day after a booked night starts at the stay and a day before one ends there.
+   * Off until the trip switches it on, so a trip drives exactly as it did before.
+   */
+  const bookendsOn = useRoadtripSettings(hotelBookendsOn, tripId)
+  // The nights as the rule reads them, with the booking behind each. Read only while the
+  // switch is on, so a new booking on a trip without it touches nothing downstream.
+  const stays = useMemo(
+    () => (bookendsOn ? bookendStaysOf(accommodations, reservations) : []),
+    [bookendsOn, accommodations, reservations],
+  )
+  // The stored days with the night before and the night after seated at their edges, by
+  // the rule the server's calculate_roadtrip runs too. Before a day is asked whether it
+  // stands as one: a day with a bookend always has two stops. A linked booking changes a
+  // bookend's reservation and nothing `planKey` reads, so it asks the router nothing.
+  const seatedDays = useMemo<PlanDay[]>(
+    () => (bookendsOn ? seatNightBookends(storedDays, days, stays) : storedDays),
+    [bookendsOn, storedDays, days, stays],
+  )
 
-  const quietDays = useMemo<QuietDay[]>(() => storedDays.filter(d => !standsAsDay(d.stops)), [storedDays])
+  const plan = useMemo<PlanDay[]>(() => seatedDays.filter(d => standsAsDay(d.stops)), [seatedDays])
+
+  const quietDays = useMemo<QuietDay[]>(() => seatedDays.filter(d => !standsAsDay(d.stops)), [seatedDays])
 
   /** Days apart, for a ride that lands on a later day than it left. */
   const dayNumberOf = (dayId: number): number => days.find(d => d.id === dayId)?.day_number ?? 0

@@ -118,6 +118,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Σύνδεση των ημερών',
   'roadtrip.line.dayColors': 'Ένα χρώμα ανά ημέρα',
   'roadtrip.line.hint': 'Υπολογίζει και το τμήμα ανάμεσα σε δύο ημέρες, στην ημέρα άφιξης.',
+  'roadtrip.line.hotelBookends': 'Έναρξη και λήξη κάθε ημέρας στο κατάλυμα',
+  'roadtrip.line.hotelBookendsHint':
+    'Μετά από μια κρατημένη νύχτα η ημέρα ξεκινά εκεί όπου κοιμηθήκατε, και πριν από μία τελειώνει εκεί.',
   'roadtrip.avoid.section': 'Αποφυγή όπου γίνεται',
   'roadtrip.avoid.toll': 'Δρόμοι με διόδια',
   'roadtrip.avoid.motorway': 'Αυτοκινητόδρομοι',

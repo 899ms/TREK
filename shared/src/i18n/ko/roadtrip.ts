@@ -115,6 +115,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': '날짜 잇기',
   'roadtrip.line.dayColors': '날짜별 색상',
   'roadtrip.line.hint': '두 날 사이 구간도 계산해 도착한 날에 더합니다.',
+  'roadtrip.line.hotelBookends': '매일 숙소에서 시작하고 숙소에서 끝내기',
+  'roadtrip.line.hotelBookendsHint':
+    '예약한 밤 다음 날은 묵은 곳에서 시작하고, 예약한 밤이 있는 날은 그곳에서 끝납니다.',
   'roadtrip.avoid.section': '가능하면 피하기',
   'roadtrip.avoid.toll': '유료 도로',
   'roadtrip.avoid.motorway': '고속도로',

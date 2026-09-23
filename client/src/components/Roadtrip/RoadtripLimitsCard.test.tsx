@@ -277,6 +277,36 @@ describe('RoadtripLimitsCard', () => {
       fireEvent.click(toggle)
       expect(onSave).toHaveBeenCalledWith('roadtrip_connect_days', false)
     })
+
+    it('FE-ROADTRIP-LIMITS-018: starting and ending each day at the stay is off until it is asked for', async () => {
+      const onSave = vi.fn()
+      open(onSave)
+
+      const toggle = screen.getByRole('button', { name: 'Start and end each day at your stay' })
+      // Missing is off: a trip drives as it always has until somebody switches it on.
+      expect(toggle).toHaveAttribute('aria-pressed', 'false')
+      fireEvent.click(toggle)
+      expect(onSave).toHaveBeenCalledWith('roadtrip_hotel_bookends', true)
+      expect(onSave).toHaveBeenCalledTimes(1)
+      // What it does is said on the label, where the panel has no room for it.
+      fireEvent.mouseEnter(screen.getByText('Start and end each day at your stay'))
+      expect(await screen.findByRole('tooltip')).toHaveTextContent(
+        'After a booked night the day starts where you slept, and before one it ends there.',
+      )
+    })
+
+    it('FE-ROADTRIP-LIMITS-019: switched on, it reads on and reports the way back off', () => {
+      useSettingsStore.setState({
+        settings: { roadtrip_hotel_bookends: true, distance_unit: 'metric' } as never,
+      })
+      const onSave = vi.fn()
+      open(onSave)
+
+      const toggle = screen.getByRole('button', { name: 'Start and end each day at your stay' })
+      expect(toggle).toHaveAttribute('aria-pressed', 'true')
+      fireEvent.click(toggle)
+      expect(onSave).toHaveBeenCalledWith('roadtrip_hotel_bookends', false)
+    })
   })
 
   /**
@@ -312,6 +342,16 @@ describe('RoadtripLimitsCard', () => {
       // without a way to save: a switch withheld is not a setting that vanished.
       expect(screen.getByText('Connect the days')).toBeInTheDocument()
       expect(screen.getByText('A colour per day')).toBeInTheDocument()
+    })
+
+    it('FE-ROADTRIP-LIMITS-020: the stay switch shows its row and offers no switch', () => {
+      useSettingsStore.setState({
+        settings: { roadtrip_hotel_bookends: true, distance_unit: 'metric' } as never,
+      })
+      open(undefined)
+
+      expect(screen.queryByRole('button', { name: 'Start and end each day at your stay' })).not.toBeInTheDocument()
+      expect(screen.getByText('Start and end each day at your stay')).toBeInTheDocument()
     })
   })
 })

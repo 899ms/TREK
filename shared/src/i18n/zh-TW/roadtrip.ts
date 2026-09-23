@@ -109,6 +109,8 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': '連接各天',
   'roadtrip.line.dayColors': '每天一種顏色',
   'roadtrip.line.hint': '也會規劃兩天之間的路段，並計入抵達的那一天。',
+  'roadtrip.line.hotelBookends': '每天從住宿地點出發，並在住宿地點結束',
+  'roadtrip.line.hotelBookendsHint': '預訂的一晚之後，當天從你住的地方出發；預訂的一晚之前，當天在那裡結束。',
   'roadtrip.avoid.section': '盡量避開',
   'roadtrip.avoid.toll': '收費公路',
   'roadtrip.avoid.motorway': '高速公路',

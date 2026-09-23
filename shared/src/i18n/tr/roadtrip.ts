@@ -116,6 +116,9 @@ const roadtrip: TranslationStrings = {
   'roadtrip.line.connect': 'Günleri birleştir',
   'roadtrip.line.dayColors': 'Her güne bir renk',
   'roadtrip.line.hint': 'İki gün arasındaki yolu da hesaplar ve varış gününe sayar.',
+  'roadtrip.line.hotelBookends': 'Her güne konaklama yerinde başla ve orada bitir',
+  'roadtrip.line.hotelBookendsHint':
+    'Rezerve edilmiş bir geceden sonra gün uyuduğunuz yerde başlar, böyle bir geceden önce de orada biter.',
   'roadtrip.avoid.section': 'Mümkünse kaçın',
   'roadtrip.avoid.toll': 'Paralı yollar',
   'roadtrip.avoid.motorway': 'Otoyollar',

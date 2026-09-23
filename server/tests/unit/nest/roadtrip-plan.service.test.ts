@@ -12,6 +12,8 @@ import { RoadtripPlanService } from '../../../src/nest/roadtrip/roadtrip-plan.se
 import { RoadtripPlanningMcp } from '../../../src/nest/roadtrip/roadtrip-planning.mcp';
 import { createDay, createDayAccommodation, createDayAssignment, createPlace, createTrip, createUser } from '../../helpers/factories';
 import { resetTestDb } from '../../helpers/test-db';
+import type { RoadtripPreferences } from '@trek/shared';
+import { bookendAssignmentId, type RoadtripStop } from '@trek/shared/roadtrip';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -356,5 +358,220 @@ describe('a ferry across the day, and one on no day (#2461)', () => {
     const body = JSON.parse(answer.content[0].text as string);
     expect(body.undatedRides).toEqual(plan.undatedRides);
     expect(body.complete).toBe(true);
+  });
+});
+
+/**
+ * A booked night at both ends of the days around it, read from the planning SELECTs.
+ *
+ * The same two trips as the rule's own cases in shared (nightBookends.spec.ts, ROADTRIP-
+ * BOOKENDS-001..005) with the same expected days, so the server's plan and the browser's
+ * cannot drift apart: the stays come off `context.stays`, the rule is the shared one, and
+ * only the router is a stand-in. Off unless the trip switches it on.
+ */
+describe('a booked night at both ends of its days', () => {
+  const GETAWAY = { lat: -33.71, lng: 150.31 };
+  const WALLINGA = { lat: -34.1, lng: 150.9 };
+  const HOTEL = { lat: 45.07, lng: 7.68 };
+
+  function trip(settings: RoadtripPreferences = { roadtrip_hotel_bookends: true }) {
+    const { user } = createUser(db);
+    const created = createTrip(db, user.id);
+    const router = hourlyRouter();
+    const plans = new RoadtripPlanService(
+      new DatabaseService(db),
+      { getUserSettings: () => ({}) } as never,
+      { read: () => settings } as never,
+      router as never,
+      { listForTrip: () => [], tracksForTrip: () => [] } as never,
+      { list: () => [] } as never,
+    );
+    return { user, trip: created, router, plans };
+  }
+  const visit = (tripId: number, dayId: number, name: string, at: { lat: number; lng: number }) => {
+    const place = createPlace(db, tripId, { name, ...at });
+    db.prepare('UPDATE places SET duration_minutes = 0 WHERE id = ?').run(place.id);
+    return { place, assignment: createDayAssignment(db, dayId, place.id) };
+  };
+  const linkBooking = (tripId: number, stayId: number) =>
+    Number(
+      db
+        .prepare("INSERT INTO reservations (trip_id, title, type, accommodation_id) VALUES (?, 'Motel', 'hotel', ?)")
+        .run(tripId, stayId).lastInsertRowid,
+    );
+  const shape = (stops: RoadtripStop[]) =>
+    stops.map((s) => (s.bookend ? `${s.bookend.phase}:${s.bookend.accommodationId}` : s.name));
+  const lats = (router: ReturnType<typeof hourlyRouter>) =>
+    router.route.mock.calls.map((call) => call[3].map((p: { lat: number }) => p.lat));
+
+  /** A check-in with two places, then a transfer day that is only the next check-in. */
+  function cam(settings?: RoadtripPreferences) {
+    const t = trip(settings);
+    const [d1, d2, d3] = [createDay(db, t.trip.id), createDay(db, t.trip.id), createDay(db, t.trip.id)];
+    const getaway = visit(t.trip.id, d1.id, 'Getaway', GETAWAY);
+    visit(t.trip.id, d1.id, 'Lookout', { lat: -33.73, lng: 150.35 });
+    visit(t.trip.id, d1.id, 'Falls', { lat: -33.65, lng: 150.38 });
+    const wallinga = visit(t.trip.id, d2.id, 'Wallinga', WALLINGA);
+    const stayA = createDayAccommodation(db, t.trip.id, getaway.place.id, d1.id, d2.id, {
+      check_in: '14:00',
+      check_out: '10:00',
+    });
+    const stayB = createDayAccommodation(db, t.trip.id, wallinga.place.id, d2.id, d3.id, { check_in: '15:00' });
+    return { ...t, days: [d1, d2, d3], stayA, stayB };
+  }
+
+  /** Three nights in one hotel with two places on every day before the check-out. */
+  function simeon(settings?: RoadtripPreferences) {
+    const t = trip(settings);
+    const days = [1, 2, 3, 4].map(() => createDay(db, t.trip.id));
+    const h = visit(t.trip.id, days[0].id, 'H', HOTEL);
+    (
+      [
+        [0, 'P1', 45.1],
+        [0, 'P2', 45.2],
+        [1, 'P3', 45.3],
+        [1, 'P4', 45.4],
+        [2, 'P5', 45.5],
+        [2, 'P6', 45.6],
+      ] as const
+    ).forEach(([day, name, lat]) => visit(t.trip.id, days[day].id, name, { lat, lng: 7.5 }));
+    const stay = createDayAccommodation(db, t.trip.id, h.place.id, days[0].id, days[3].id, { check_in: '15:00' });
+    return { ...t, days, stay };
+  }
+
+  it('seats the check-in day back at the stay and starts the transfer day there, as the rule in shared does', async () => {
+    const { user, trip: created, router, plans, days, stayA } = cam();
+    const reservationId = linkBooking(created.id, stayA.id);
+    linkBooking(created.id, stayA.id);
+
+    const { calculated, failures } = await plans.calculate(created.id, user.id);
+
+    expect(calculated.days.map((d) => shape(d.stops))).toEqual([
+      ['Getaway', 'Lookout', 'Falls', `evening:${stayA.id}`],
+      [`morning:${stayA.id}`, 'Wallinga'],
+    ]);
+    const [back, out] = [calculated.days[0].stops[3], calculated.days[1].stops[0]];
+    expect(back.bookend).toEqual({
+      phase: 'evening',
+      accommodationId: stayA.id,
+      reservationId,
+      checkingOut: false,
+      checkingIn: true,
+      checkOut: null,
+    });
+    expect(back).toMatchObject({ name: 'Getaway', lat: GETAWAY.lat, lng: GETAWAY.lng, stopType: 'hotel', time: null });
+    expect(back.assignmentId).toBe(bookendAssignmentId(days[0].id, 'evening'));
+    expect(out.bookend).toMatchObject({ phase: 'morning', checkingOut: true, checkOut: '10:00', reservationId });
+    // The check-out is a label: the drive leaves when it must to make the 15:00 check-in.
+    expect(calculated.days[1].schedule.entries.map((e) => [e.arrival, e.departure])).toEqual([
+      ['14:00', '14:00'],
+      ['15:00', expect.any(String)],
+    ]);
+    // One run a day, the hotel legs inside it, and the check-out day is no card.
+    expect(lats(router)).toEqual([
+      [GETAWAY.lat, -33.73, -33.65, GETAWAY.lat],
+      [GETAWAY.lat, WALLINGA.lat],
+    ]);
+    expect(calculated.days.map((d) => d.distance)).toEqual([180_000, 60_000]);
+    expect(calculated.totalStops).toBe(4);
+    expect(failures).toEqual([]);
+
+    // calculate_roadtrip hands the assistant the same stops.
+    const tool = new RoadtripPlanningMcp(plans, {} as never, {} as never);
+    const answer = await tool.calculate({ tripId: created.id, includeGeometry: false }, { userId: user.id } as McpContext);
+    const body = JSON.parse(answer.content[0].text as string);
+    expect(body.days[1].stops[0].bookend).toMatchObject({ phase: 'morning', accommodationId: stayA.id });
+  });
+
+  it('asks the router nothing for a night spent at one hotel when the days are connected', async () => {
+    const { user, trip: created, router, plans } = cam({ roadtrip_hotel_bookends: true, roadtrip_connect_days: true });
+
+    const { calculated } = await plans.calculate(created.id, user.id);
+
+    // The two day runs, and no seam from the Getaway to the Getaway.
+    expect(router.route).toHaveBeenCalledTimes(2);
+    expect(calculated.days[1].arrivingLeg).toBeFalsy();
+    expect(calculated.totalDistance).toBe(240_000);
+  });
+
+  it('starts and ends every day between the nights at the hotel, and leaves the check-out day undriven', async () => {
+    const { user, trip: created, router, plans, days, stay } = simeon();
+
+    const { calculated } = await plans.calculate(created.id, user.id);
+
+    expect(calculated.days.map((d) => shape(d.stops))).toEqual([
+      ['H', 'P1', 'P2', `evening:${stay.id}`],
+      [`morning:${stay.id}`, 'P3', 'P4', `evening:${stay.id}`],
+      [`morning:${stay.id}`, 'P5', 'P6', `evening:${stay.id}`],
+    ]);
+    expect(calculated.days[1].stops[0].bookend).toMatchObject({ checkingOut: false, checkingIn: false, checkOut: null });
+    // The evening keeps the index the next stored stop would have.
+    expect(calculated.days[1].stops[3].ownerIndex).toBe(2);
+    expect(calculated.days.map((d) => d.dayId)).not.toContain(days[3].id);
+    expect(router.route).toHaveBeenCalledTimes(3);
+    expect(lats(router)[1]).toEqual([HOTEL.lat, 45.3, 45.4, HOTEL.lat]);
+  });
+
+  it('drives the stored days while the trip has it off, and a preview can switch it either way', async () => {
+    const off = simeon({});
+    const stored = await off.plans.calculate(off.trip.id, off.user.id);
+    expect(stored.calculated.days.map((d) => shape(d.stops))).toEqual([
+      ['H', 'P1', 'P2'],
+      ['P3', 'P4'],
+      ['P5', 'P6'],
+    ]);
+
+    const preview = await off.plans.calculate(off.trip.id, off.user.id, { roadtrip_hotel_bookends: true });
+    expect(preview.calculated.days[1].stops.map((s) => s.bookend?.phase ?? null)).toEqual(['morning', null, null, 'evening']);
+    expect(preview.preferences.roadtrip_hotel_bookends).toBe(true);
+
+    const on = simeon();
+    const without = await on.plans.calculate(on.trip.id, on.user.id, { roadtrip_hotel_bookends: false });
+    expect(without.calculated.days.flatMap((d) => d.stops).some((s) => s.bookend)).toBe(false);
+  });
+
+  it('reads every stay with its place, its nights and its earliest booking into the context', () => {
+    const { user, trip: created, plans, days, stayA, stayB } = cam();
+    const first = linkBooking(created.id, stayA.id);
+    linkBooking(created.id, stayA.id);
+
+    const context = plans.context(created.id, user.id);
+
+    expect(context.stays).toEqual([
+      {
+        id: stayA.id,
+        place_id: expect.any(Number),
+        start_day_id: days[0].id,
+        end_day_id: days[1].id,
+        check_in: '14:00',
+        check_out: '10:00',
+        place_name: 'Getaway',
+        place_lat: GETAWAY.lat,
+        place_lng: GETAWAY.lng,
+        reservation_id: first,
+      },
+      expect.objectContaining({ id: stayB.id, place_name: 'Wallinga', check_in: '15:00', reservation_id: null }),
+    ]);
+  });
+
+  it('names the hotel in the failures of a run it pushes past the router’s waypoint limit', async () => {
+    const t = trip({});
+    const [d1, d2] = [createDay(db, t.trip.id), createDay(db, t.trip.id)];
+    for (let i = 0; i < 100; i++) visit(t.trip.id, d1.id, `Stop ${i}`, { lat: 40 + i * 0.01, lng: 5 });
+    const hotel = createPlace(db, t.trip.id, { name: 'Tonight', ...HOTEL });
+    createDayAccommodation(db, t.trip.id, hotel.id, d1.id, d2.id);
+
+    // A hundred stored stops are one run the router takes.
+    const stored = await t.plans.calculate(t.trip.id, t.user.id);
+    expect(stored.failures).toEqual([]);
+
+    // Tonight's hotel is the hundred and first waypoint.
+    const seated = await t.plans.calculate(t.trip.id, t.user.id, { roadtrip_hotel_bookends: true });
+    expect(seated.failures).toHaveLength(100);
+    expect(seated.failures[99]).toMatchObject({
+      toAssignmentId: bookendAssignmentId(d1.id, 'evening'),
+      reason: 'More than 100 waypoints in this run.',
+    });
+    expect(seated.failures[99].toAssignmentId).toBeLessThan(-6_000_000_000);
   });
 });
