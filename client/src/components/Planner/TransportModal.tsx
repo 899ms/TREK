@@ -1009,11 +1009,11 @@ export function TransportModal({ isOpen, onClose, onSave, reservation, days, sel
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className={labelClass}>{t('reservations.meta.from')}</label>
-                <LocationSelect value={fromPick.location || null} onChange={l => setFromPick({ location: l || undefined })} />
+                <LocationSelect value={fromPick.location || null} onChange={l => setFromPick({ location: l || undefined })} places={places} />
               </div>
               <div>
                 <label className={labelClass}>{t('reservations.meta.to')}</label>
-                <LocationSelect value={toPick.location || null} onChange={l => setToPick({ location: l || undefined })} />
+                <LocationSelect value={toPick.location || null} onChange={l => setToPick({ location: l || undefined })} places={places} />
               </div>
             </div>
 

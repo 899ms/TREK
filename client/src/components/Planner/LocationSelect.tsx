@@ -16,9 +16,10 @@ interface Props {
   onChange: (loc: LocationPoint | null) => void
   placeholder?: string
   style?: React.CSSProperties
+  places?: { name: string; lat: number; lng: number }[]
 }
 
-export default function LocationSelect({ value, onChange, placeholder, style }: Props) {
+export default function LocationSelect({ value, onChange, placeholder, style, places }: Props) {
   const { t, locale } = useTranslation()
   // Ohne Reisekontext ist der Hinweis leer, und die Suche laeuft wie bisher.
   const { point: locationBias } = useLocationBias()
@@ -46,7 +47,7 @@ export default function LocationSelect({ value, onChange, placeholder, style }: 
     if (debounceRef.current) clearTimeout(debounceRef.current)
     const trimmed = query.trim()
     if (trimmed.length < 3 || (value && trimmed === value.name)) {
-      setResults([])
+      setResults(trimmed.length < 3 && places ? places : [])
       return
     }
     debounceRef.current = setTimeout(async () => {
