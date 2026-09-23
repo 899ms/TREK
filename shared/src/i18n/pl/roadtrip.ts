@@ -294,6 +294,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Wyjazd: {name}',
   'roadtrip.bookend.back': 'Powrót: {name}',
   'roadtrip.bookend.checkIn': 'Zameldowanie · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Wyjazd po godzinie wymeldowania',
   'roadtrip.bookend.noVia':
     'Na trasie do noclegu ani z niego nie można dodać punktu pośredniego. Dodaj tam zamiast tego postój.',
 };

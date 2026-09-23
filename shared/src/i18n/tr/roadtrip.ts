@@ -296,6 +296,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Başlangıç: {name}',
   'roadtrip.bookend.back': 'Dönüş: {name}',
   'roadtrip.bookend.checkIn': 'Giriş · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Çıkış saatinden sonra hareket',
   'roadtrip.bookend.noVia':
     'Konaklama yerinize giden ya da oradan çıkan yola ara nokta konamaz. Bunun yerine oraya bir mola ekleyin.',
 };

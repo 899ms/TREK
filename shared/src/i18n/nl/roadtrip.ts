@@ -297,6 +297,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Vanaf {name}',
   'roadtrip.bookend.back': 'Terug naar {name}',
   'roadtrip.bookend.checkIn': 'Inchecken · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Vertrek na het uitchecken',
   'roadtrip.bookend.noVia':
     'Geen tussenpunt op de rit naar of van je verblijf. Voeg daar in plaats daarvan een stop toe.',
 };

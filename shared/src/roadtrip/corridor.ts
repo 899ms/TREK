@@ -59,22 +59,50 @@ export interface CorridorHit {
   alongKm: number;
 }
 
-export function projectOntoRoute(p: LatLng, line: LatLng[]): CorridorHit | null {
+/**
+ * Where `p` meets the line: how far off it is and how far into the drive the closest
+ * point comes.
+ *
+ * `within` keeps the answer to one stretch of the drive, in km from its start. A road
+ * driven twice in a day, out of a hotel and back past it later, is the same line twice
+ * over, and the answer for the whole line is always the first pass; a caller that needs
+ * the second one asks for the stretch it lies in. No part of that stretch on the line
+ * means no answer.
+ */
+export function projectOntoRoute(
+  p: LatLng,
+  line: LatLng[],
+  within?: { fromKm: number; toKm: number },
+): CorridorHit | null {
   if (line.length < 2) return null;
   let best = Number.POSITIVE_INFINITY;
   let bestAlong = 0;
   let travelled = 0;
+  let measured = false;
   for (let i = 0; i < line.length - 1; i++) {
     const a = line[i]!;
     const b = line[i + 1]!;
     const segment = haversineKm(a, b);
-    const { distanceKm: d, t } = projectOnSegment(p, a, b);
+    const start = travelled;
+    travelled += segment;
+    if (within && (travelled < within.fromKm || start > within.toKm)) continue;
+    measured = true;
+    let { distanceKm: d, t } = projectOnSegment(p, a, b);
+    if (within && segment > 0) {
+      // A segment the stretch starts or ends inside counts only up to that edge.
+      const lo = Math.max(0, (within.fromKm - start) / segment);
+      const hi = Math.min(1, (within.toKm - start) / segment);
+      if (t < lo || t > hi) {
+        t = t < lo ? lo : hi;
+        d = haversineKm(p, { lat: a.lat + t * (b.lat - a.lat), lng: a.lng + t * (b.lng - a.lng) });
+      }
+    }
     if (d < best) {
       best = d;
-      bestAlong = travelled + t * segment;
+      bestAlong = start + t * segment;
     }
-    travelled += segment;
   }
+  if (within && !measured) return null;
   return { offRouteKm: best, alongKm: bestAlong };
 }
 

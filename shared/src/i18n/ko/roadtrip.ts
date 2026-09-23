@@ -289,6 +289,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '{name}에서 출발',
   'roadtrip.bookend.back': '{name}(으)로 돌아가기',
   'roadtrip.bookend.checkIn': '체크인 · {name}',
+  'roadtrip.bookend.afterCheckOut': '체크아웃 후 출발',
   'roadtrip.bookend.noVia': '숙소를 오가는 구간에는 경유지를 둘 수 없습니다. 대신 그곳에 정차 지점을 추가하세요.',
 };
 export default roadtrip;

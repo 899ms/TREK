@@ -46,7 +46,7 @@ import { alternativesBusy, buildAlternativeOverlays } from '../../components/Roa
 import { pinAlternative, railDriveOn, railLegAt, refusalHint, type PinProof } from '../../components/Roadtrip/alternativePins'
 import { stopArrival } from '../../components/Roadtrip/stopArrival'
 import type { CorridorPoi } from '../../components/Roadtrip/useCorridorPois'
-import { projectOntoRoute, sliceAtMeters, type LatLng } from '../../components/Roadtrip/corridor'
+import { projectOntoRoute, sliceAtMeters, type CorridorHit, type LatLng } from '../../components/Roadtrip/corridor'
 import {
   insertIndexForAlong,
   reanchorAfterInsert,
@@ -1758,32 +1758,25 @@ export function useTripPlanner() {
     // the evening's drive is reached from the index that shapes the road into tomorrow.
     // `card` is where the point fell on the card it was measured on, the day and the index
     // of the stop before it there, -1 for the drive in before the card's first stop.
-    let best: {
+    type Anchor = {
       dayId: number
       afterIndex: number
       offRouteKm: number
       terminal: CarrierTerminal['role'] | null
       bookendLeg: boolean
       card: { dayId: number; index: number }
-    } | null = null
-    for (const day of roadtripRoutes.days) {
-      // NOT `day.dayId !== onlyDayId`. A dragged via has to stay on the day it is stored
-      // on, but that day's stops are no longer all on the card of the same name: after a
-      // night drive they are drawn on the next one (`nightSpill.ts`). Filtering by card
-      // measured the new position against a line that no longer covers those stops — a
-      // point dragged near Brandenburg was projected onto the short remainder of card 1
-      // and came back anchored to its last stop, which put the via on the night drive
-      // itself and pushed the stop before it over midnight.
-      //
-      // So every card is measured, and the answer is filtered by the day the ANCHOR is
-      // stored on. Same promise, kept against the stops rather than against the card.
-      if (day.geometry.length < 2) continue
-      const spine = day.geometry.map(([la, ln]) => ({ lat: la, lng: ln }))
-      const hit = projectOntoRoute({ lat, lng }, spine)
-      if (!hit) continue
-      if (best && hit.offRouteKm >= best.offRouteKm) continue
-      // Which stop the via follows: the last one the car passes before reaching it.
-      const stopsAlong = day.stops.map(stop => projectOntoRoute({ lat: stop.lat, lng: stop.lng }, spine)?.alongKm ?? 0)
+    }
+    // A road the day drives twice, out of the hotel in the morning and past it again later,
+    // is on the line twice, and the closer pass wins by metres at most. A pass that can
+    // take a via beats one on the hotel's drive, which files nothing, by this much.
+    const SAME_ROAD_KM = 0.03
+    const beats = (c: Anchor, b: Anchor | null) => {
+      if (!b) return true
+      if (c.bookendLeg === b.bookendLeg) return c.offRouteKm < b.offRouteKm
+      return c.bookendLeg ? c.offRouteKm + SAME_ROAD_KM < b.offRouteKm : c.offRouteKm <= b.offRouteKm + SAME_ROAD_KM
+    }
+    // Which stop of this card the point falls behind, for a hit measured on its line.
+    const readAnchor = (day: (typeof roadtripRoutes.days)[number], hit: CorridorHit, stopsAlong: number[]): Anchor | null => {
       // Before the card's first stop means a drive that arrives here but leaves from a
       // stop on the card BEFORE this one: the incoming night drive (`nightSpill.ts`), or
       // on a trip with connected days the drive from where yesterday ended, which is drawn
@@ -1800,8 +1793,8 @@ export function useTripPlanner() {
       const arrivedFrom = day.spills?.find(sp => sp.at === 0)?.fromStop ?? day.arrivingFrom
       if (arrivedFrom && hit.alongKm < (stopsAlong[0] ?? 0)) {
         const owner = arrivedFrom.ownerDayId ?? day.dayId
-        if (onlyDayId !== undefined && owner !== onlyDayId) continue
-        best = {
+        if (onlyDayId !== undefined && owner !== onlyDayId) return null
+        return {
           dayId: owner,
           afterIndex: arrivedFrom.ownerIndex ?? 0,
           offRouteKm: hit.offRouteKm,
@@ -1809,7 +1802,6 @@ export function useTripPlanner() {
           bookendLeg: !!arrivedFrom.bookend || !!day.stops[0]?.bookend,
           card: { dayId: day.dayId, index: -1 },
         }
-        continue
       }
       const at = insertIndexForAlong(stopsAlong, hit.alongKm) - 1
       // Named by the day the anchor stop is STORED on and its position there, not by the
@@ -1818,14 +1810,14 @@ export function useTripPlanner() {
       // night drive — and a via filed under the card's numbers matches no stop when the
       // route is next built, which reads as a drag that did nothing at all.
       const anchor = day.stops[at]
-      if (!anchor) continue
+      if (!anchor) return null
       // Falling back to the card's own numbers is not a guard against a bug, it is the
       // meaning: a stop that names no other day IS stored on the card it is drawn on,
       // which is every stop on a trip that never drives past midnight.
       const owner = anchor.ownerDayId ?? day.dayId
       // A drag stays on its own day; a fresh click may land wherever it landed.
-      if (onlyDayId !== undefined && owner !== onlyDayId) continue
-      best = {
+      if (onlyDayId !== undefined && owner !== onlyDayId) return null
+      return {
         dayId: owner,
         afterIndex: anchor.ownerIndex ?? at,
         offRouteKm: hit.offRouteKm,
@@ -1833,6 +1825,42 @@ export function useTripPlanner() {
         bookendLeg: !!anchor.bookend || !!day.stops[at + 1]?.bookend,
         card: { dayId: day.dayId, index: at },
       }
+    }
+    let best: Anchor | null = null
+    for (const day of roadtripRoutes.days) {
+      // NOT `day.dayId !== onlyDayId`. A dragged via has to stay on the day it is stored
+      // on, but that day's stops are no longer all on the card of the same name: after a
+      // night drive they are drawn on the next one (`nightSpill.ts`). Filtering by card
+      // measured the new position against a line that no longer covers those stops — a
+      // point dragged near Brandenburg was projected onto the short remainder of card 1
+      // and came back anchored to its last stop, which put the via on the night drive
+      // itself and pushed the stop before it over midnight.
+      //
+      // So every card is measured, and the answer is filtered by the day the ANCHOR is
+      // stored on. Same promise, kept against the stops rather than against the card.
+      if (day.geometry.length < 2) continue
+      const spine = day.geometry.map(([la, ln]) => ({ lat: la, lng: ln }))
+      const hit = projectOntoRoute({ lat, lng }, spine)
+      if (!hit) continue
+      if (best && hit.offRouteKm >= best.offRouteKm + SAME_ROAD_KM) continue
+      // Which stop the via follows: the last one the car passes before reaching it.
+      const stopsAlong = day.stops.map(stop => projectOntoRoute({ lat: stop.lat, lng: stop.lng }, spine)?.alongKm ?? 0)
+      let candidate = readAnchor(day, hit, stopsAlong)
+      if (candidate?.bookendLeg) {
+        // Landed on the drive to or from the hotel, a road the day can drive again between
+        // two of its own stops. Asked once more of the stretch between the day's first and
+        // last stop, and taken when that answer lies on the same road.
+        const first = day.stops.findIndex(stop => !stop.bookend)
+        const last = day.stops.length - 1 - [...day.stops].reverse().findIndex(stop => !stop.bookend)
+        const fromKm = stopsAlong[first] ?? 0
+        const toKm = stopsAlong[last] ?? 0
+        const inner = first >= 0 && first < last && fromKm < toKm
+          ? projectOntoRoute({ lat, lng }, spine, { fromKm, toKm })
+          : null
+        const retry = inner && inner.offRouteKm <= hit.offRouteKm + SAME_ROAD_KM ? readAnchor(day, inner, stopsAlong) : null
+        if (retry && !retry.bookendLeg) candidate = retry
+      }
+      if (candidate && beats(candidate, best)) best = candidate
     }
     return best
   }, [roadtripRoutes.days])

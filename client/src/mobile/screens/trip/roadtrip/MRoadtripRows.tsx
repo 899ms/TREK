@@ -4,7 +4,7 @@ import MDancingTrek from '../../../components/MDancingTrek'
 import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
 import { bookingOpens, carrierIcon, rideText, terminalLine } from '../../../../components/Roadtrip/carrierRide'
-import { BOOKEND_ICON, bookendMeta, bookendTitle } from '../../../../components/Roadtrip/nightBookend'
+import { BOOKEND_ICON, bookendMeta, bookendTitle, leavesAfterCheckOut } from '../../../../components/Roadtrip/nightBookend'
 import { bookingClock, bookingIcon } from '../../../../components/Roadtrip/stopBookings'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
@@ -207,6 +207,7 @@ export function RtBookendRow({ row, bookend, chrome, onOpen }: {
 }) {
   const { t } = chrome
   const meta = bookendMeta(bookend, t, chrome.is12h)
+  const afterCheckOut = leavesAfterCheckOut(bookend, row.entry)
   return (
     <TapRow onOpen={onOpen}>
       <span className="flex justify-center">
@@ -216,9 +217,10 @@ export function RtBookendRow({ row, bookend, chrome, onOpen }: {
       </span>
       <span className="min-w-0 py-2">
         <span className="line-clamp-2 block text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{bookendTitle(bookend, t)}</span>
-        {(meta || row.warning) && (
+        {(meta || afterCheckOut || row.warning) && (
           <span className="mt-[4px] flex flex-wrap items-center gap-[5px]">
             {meta && <span className="font-geist text-[0.65625rem] font-medium text-m-muted">{meta}</span>}
+            {afterCheckOut && <Mark tone="warn" icon={<AlertTriangle size={10} strokeWidth={2} />}>{t('roadtrip.bookend.afterCheckOut')}</Mark>}
             {row.warning && warningMark(row.warning, chrome)}
           </span>
         )}

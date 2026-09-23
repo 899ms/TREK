@@ -1,5 +1,6 @@
 import { BedDouble, type LucideIcon } from 'lucide-react'
 import { formatClockTime } from '../../utils/formatters'
+import { parseClock, type ScheduleEntry } from './roadtripModel'
 import type { TranslationFn } from '../../types'
 import type { BookendReading } from './roadtripRowModel'
 
@@ -27,6 +28,22 @@ export function bookendTitle(reading: BookendReading, t: TranslationFn): string 
  */
 export function bookendMeta(reading: BookendReading, t: TranslationFn, is12h: boolean): string | null {
   return reading.until ? t('roadtrip.stay.until', { time: formatClockTime(reading.until, is12h) }) : null
+}
+
+/**
+ * Whether the plan leaves the stay later than the room is handed back. The check-out hour
+ * never moves the start of the day, so a day that sets out at 12:30 from a room given up
+ * at 10:00 is a plan worth a second look, and the row says so instead of standing the two
+ * clocks side by side without a word.
+ */
+export function leavesAfterCheckOut(
+  reading: BookendReading,
+  entry: Pick<ScheduleEntry, 'arrival' | 'dayOffset'> | undefined,
+): boolean {
+  const until = parseClock(reading.until)
+  const leaves = parseClock(entry?.arrival)
+  if (until === null || leaves === null) return false
+  return leaves + (entry?.dayOffset ?? 0) * 24 * 60 > until
 }
 
 /** The fields of a trip place the hotel of a stay is read from. */

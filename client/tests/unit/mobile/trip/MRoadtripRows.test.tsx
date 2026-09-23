@@ -9,7 +9,7 @@ import type { Reservation, TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-058
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-059
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -841,5 +841,16 @@ describe('RtBookendRow', () => {
     render(<RtBookendRow row={row({ warning, time: '19:10' })} bookend={reading({ phase: 'evening', variant: 'back', until: null })} chrome={{ ...chrome, is12h: true }} onOpen={vi.fn()} />)
     expect(screen.getByText('30 min')).toBeInTheDocument()
     expect(screen.getByText('7:10 PM')).toBeInTheDocument()
+  })
+
+  it('FE-MOB-RTROW-059: a check-out morning the drive leaves after the room is handed back is marked', () => {
+    const entry = (arrival: string) => ({ arrival, departure: arrival, anchored: false, dayOffset: 0 })
+    const late = render(<RtBookendRow row={row({ time: '12:27', entry: entry('12:27') })} bookend={reading()} chrome={chrome} onOpen={vi.fn()} />)
+    expect(screen.getByText('roadtrip.stay.until:10:00')).toBeInTheDocument()
+    expect(screen.getByText('roadtrip.bookend.afterCheckOut')).toBeInTheDocument()
+    late.unmount()
+
+    render(<RtBookendRow row={row({ entry: entry('08:40') })} bookend={reading()} chrome={chrome} onOpen={vi.fn()} />)
+    expect(screen.queryByText('roadtrip.bookend.afterCheckOut')).toBeNull()
   })
 })

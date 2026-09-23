@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { BedDouble } from 'lucide-react'
-import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, staysAtTheirPlaces } from './nightBookend'
+import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, leavesAfterCheckOut, staysAtTheirPlaces } from './nightBookend'
 import type { BookendReading } from './roadtripRowModel'
 
-// FE-BOOKEND-001 to FE-BOOKEND-006
+// FE-BOOKEND-001 to FE-BOOKEND-008
 
 const reading = (over: Partial<BookendReading> = {}): BookendReading => ({
   phase: 'morning',
@@ -36,6 +36,22 @@ describe('a booked night as the rail and the phone say it', () => {
   it('FE-BOOKEND-003: nothing under the line when the morning hands no room back', () => {
     expect(bookendMeta(reading(), t, false)).toBeNull()
     expect(bookendMeta(reading({ phase: 'evening', variant: 'back' }), t, false)).toBeNull()
+  })
+
+  it('FE-BOOKEND-007: a day that sets out after the room is handed back says so', () => {
+    const checkOut = reading({ variant: 'checkOut', until: '10:00' })
+    expect(leavesAfterCheckOut(checkOut, { arrival: '12:27', dayOffset: 0 })).toBe(true)
+    expect(leavesAfterCheckOut(checkOut, { arrival: '10:01', dayOffset: 0 })).toBe(true)
+    expect(leavesAfterCheckOut(checkOut, { arrival: '10:00', dayOffset: 0 })).toBe(false)
+    expect(leavesAfterCheckOut(checkOut, { arrival: '08:30', dayOffset: 0 })).toBe(false)
+    // Past midnight it is later than any hour of the morning before.
+    expect(leavesAfterCheckOut(checkOut, { arrival: '01:00', dayOffset: 1 })).toBe(true)
+  })
+
+  it('FE-BOOKEND-008: nothing to say without a check-out hour or a clock to hold it against', () => {
+    expect(leavesAfterCheckOut(reading(), { arrival: '12:27', dayOffset: 0 })).toBe(false)
+    expect(leavesAfterCheckOut(reading({ variant: 'checkOut', until: '10:00' }), { arrival: null, dayOffset: 0 })).toBe(false)
+    expect(leavesAfterCheckOut(reading({ variant: 'checkOut', until: '10:00' }), undefined)).toBe(false)
   })
 
   it('FE-BOOKEND-004: a tap opens the booking behind the night for somebody who may edit bookings', () => {

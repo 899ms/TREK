@@ -297,6 +297,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Desde {name}',
   'roadtrip.bookend.back': 'Vuelta a {name}',
   'roadtrip.bookend.checkIn': 'Entrada · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Parte después de la hora de salida',
   'roadtrip.bookend.noVia':
     'No se puede poner un punto de paso en el trayecto hacia tu alojamiento o desde él. Añade una parada allí.',
 };

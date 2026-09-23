@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-150
+// FE-TP-ROAD-001 to FE-TP-ROAD-153
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -3345,5 +3345,83 @@ describe('useTripPlanner road trip: a booked night at the edge of a day', () => 
     // Folded, the card takes its hotel off the map with its stops.
     act(() => { result.current.toggleRoadtripDay(5) })
     expect(result.current.roadtripMapPlaces.map(p => p.id)).toEqual([])
+  })
+
+  it('FE-TP-ROAD-151: a road driven out of the hotel and again between two places takes a via on the second pass', async () => {
+    // Out of the hotel east to the lookout, then back west past the hotel to the falls:
+    // the road between the hotel and the lookout is driven twice, and only the second
+    // pass is a leg a via can be filed on.
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        bookend('morning', { ownerIndex: 0, lat: 53, lng: 10 }),
+        { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 11, name: 'Lookout' },
+        { assignmentId: 12, ownerIndex: 1, lat: 53, lng: 9, name: 'Falls' },
+      ],
+      geometry: [[53, 10], [53, 11], [53, 10], [53, 9]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53, 10.5) })
+    expect(rt.vias.add).toHaveBeenCalledWith(5, 0, 53, 10.5)
+    expect(toasts.filter(t => t.message === NO_VIA)).toEqual([])
+
+    await act(async () => { await result.current.moveRoadtripVia(5, 3, 53, 10.5) })
+    expect(rt.vias.move).toHaveBeenCalledWith(5, 3, 53, 10.5, 0)
+  })
+
+  it('FE-TP-ROAD-152: a road only the hotel’s drives use, out in the morning and back at night, still takes none', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        bookend('morning', { ownerIndex: 0, lat: 53, lng: 10 }),
+        { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 11, name: 'Lookout' },
+        bookend('evening', { ownerIndex: 1, lat: 53, lng: 10 }),
+      ],
+      geometry: [[53, 10], [53, 11], [53, 10]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53, 10.5) })
+
+    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: NO_VIA, type: 'info' })
+  })
+
+  it('FE-TP-ROAD-153: where yesterday’s drive into the hotel and today’s leg share a road, the click goes to today’s leg', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 }), buildDay({ id: 6, day_number: 2 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [
+      {
+        dayId: 5,
+        dayNumber: 1,
+        stops: [
+          { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 9, name: 'Harbour' },
+          bookend('evening', { ownerIndex: 1, lat: 53, lng: 10 }),
+        ],
+        geometry: [[53, 9], [53, 10]],
+      },
+      {
+        dayId: 6,
+        dayNumber: 2,
+        stops: [
+          { assignmentId: 21, ownerIndex: 0, lat: 53, lng: 9.2, name: 'Mill' },
+          { assignmentId: 22, ownerIndex: 1, lat: 53, lng: 9.8, name: 'Dunes' },
+        ],
+        geometry: [[53, 9.2], [53, 9.8]],
+      },
+    ]
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53, 9.5) })
+
+    expect(rt.vias.add).toHaveBeenCalledWith(6, 0, 53, 9.5)
+    expect(toasts.filter(t => t.message === NO_VIA)).toEqual([])
   })
 })

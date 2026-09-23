@@ -18,7 +18,7 @@ import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
 import { arrivingReroutable, bookendReading, destinationCount, isHop, legReroutable, movableWithin, resumeFoldsIntoBookend, type BookendReading } from './roadtripRowModel'
-import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle } from './nightBookend'
+import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, leavesAfterCheckOut } from './nightBookend'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -876,7 +876,8 @@ function BookendStop({ reading, entry, late, driveFindings, continues, starts, o
   const { t } = useTranslation()
   const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
   const meta = bookendMeta(reading, t, is12h)
-  const badges = late.length + driveFindings.length > 0
+  const afterCheckOut = leavesAfterCheckOut(reading, entry)
+  const badges = afterCheckOut || late.length + driveFindings.length > 0
   return (
     <DiscRow Icon={BOOKEND_ICON} starts={starts} continues={continues} onOpen={onOpen}>
       <span className="flex min-w-0 items-start gap-2 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
@@ -887,6 +888,12 @@ function BookendStop({ reading, entry, late, driveFindings, continues, starts, o
           {meta || badges ? (
             <span className="flex flex-wrap items-center gap-1">
               {meta ? <span className="text-content-muted" style={{ fontSize: FS.meta }}>{meta}</span> : null}
+              {afterCheckOut ? (
+                <span className="inline-flex items-center gap-1 font-medium text-warning" style={{ fontSize: FS.meta }}>
+                  <AlertTriangle size={10} aria-hidden="true" />
+                  {t('roadtrip.bookend.afterCheckOut')}
+                </span>
+              ) : null}
               {driveFindings.map(w => <DriveFindingBadge key={w.code} warning={w} />)}
               {late.map(w => <LateBadge key={w.code} late={w} />)}
             </span>

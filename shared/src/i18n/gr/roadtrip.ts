@@ -301,6 +301,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Από {name}',
   'roadtrip.bookend.back': 'Επιστροφή: {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Αναχώρηση μετά το check-out',
   'roadtrip.bookend.noVia':
     'Δεν μπαίνει ενδιάμεσο σημείο στη διαδρομή προς ή από το κατάλυμα. Προσθέστε εκεί μια στάση.',
 };

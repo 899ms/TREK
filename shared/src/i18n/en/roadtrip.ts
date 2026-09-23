@@ -290,6 +290,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'From {name}',
   'roadtrip.bookend.back': 'Back to {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Leaves after check-out',
   'roadtrip.bookend.noVia': 'No via point on the drive to or from your stay. Add a stop there instead.',
 };
 export default roadtrip;

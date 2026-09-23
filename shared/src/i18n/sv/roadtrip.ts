@@ -293,6 +293,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Från {name}',
   'roadtrip.bookend.back': 'Tillbaka till {name}',
   'roadtrip.bookend.checkIn': 'Incheckning · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Avresa efter utcheckning',
   'roadtrip.bookend.noVia':
     'Ingen mellanpunkt på resan till eller från ditt boende. Lägg till ett stopp där i stället.',
 };

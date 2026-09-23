@@ -1479,6 +1479,23 @@ describe('RoadtripSidebar with a booked night at the edge of the day', () => {
     expect(screen.getByText('11:40')).toBeInTheDocument()
   })
 
+  it('FE-ROADTRIP-SIDEBAR-074: a check-out morning left after the room is handed back says so, one left in time does not', () => {
+    const late = loop({
+      schedule: {
+        entries: ['12:27', '13:27', '14:27', '15:27'].map(arrival => ({ arrival, departure: arrival, anchored: false, dayOffset: 0 })),
+        warnings: [],
+      },
+    })
+    const { unmount } = wrap(<RoadtripSidebar routes={routes({ days: [late] })} />)
+    expect(screen.getByText('until 10:00')).toBeInTheDocument()
+    expect(screen.getByText('Leaves after check-out')).toBeInTheDocument()
+    unmount()
+
+    wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} />)
+    expect(screen.getByText('until 10:00')).toBeInTheDocument()
+    expect(screen.queryByText('Leaves after check-out')).toBeNull()
+  })
+
   it('FE-ROADTRIP-SIDEBAR-065: the hotel rows are neither dragged nor dropped on, and carry no stay, kind or fill control', () => {
     const { container } = wrap(
       <RoadtripSidebar routes={routes({ days: [loop()] })} onReorderStop={vi.fn()} onEditStay={vi.fn()} onSetStopKind={vi.fn()} onSetStopFill={vi.fn()} />,

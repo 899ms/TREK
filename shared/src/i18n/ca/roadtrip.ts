@@ -299,6 +299,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Des de {name}',
   'roadtrip.bookend.back': 'Tornada a {name}',
   'roadtrip.bookend.checkIn': 'Entrada · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Marxa després de l’hora de sortida',
   'roadtrip.bookend.noVia':
     'No es pot posar cap punt de pas al trajecte fins al teu allotjament o des d’ell. Afegeix-hi una parada.',
 };

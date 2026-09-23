@@ -294,6 +294,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Từ {name}',
   'roadtrip.bookend.back': 'Về lại {name}',
   'roadtrip.bookend.checkIn': 'Nhận phòng · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Khởi hành sau giờ trả phòng',
   'roadtrip.bookend.noVia':
     'Không thể đặt điểm trung gian trên chặng đi hoặc về nơi lưu trú. Hãy thêm một điểm dừng ở đó.',
 };

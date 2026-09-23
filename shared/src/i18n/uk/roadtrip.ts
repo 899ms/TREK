@@ -295,6 +295,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Відправлення: {name}',
   'roadtrip.bookend.back': 'Повернення: {name}',
   'roadtrip.bookend.checkIn': 'Заїзд · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Від’їзд пізніше розрахункової години',
   'roadtrip.bookend.noVia':
     'На маршрут до місця проживання чи від нього не можна поставити проміжну точку. Додайте там зупинку.',
 };

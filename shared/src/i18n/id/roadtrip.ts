@@ -298,6 +298,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Dari {name}',
   'roadtrip.bookend.back': 'Kembali ke {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Berangkat setelah check-out',
   'roadtrip.bookend.noVia':
     'Titik lintas tidak bisa ditaruh di perjalanan ke atau dari penginapan Anda. Tambahkan perhentian di sana.',
 };

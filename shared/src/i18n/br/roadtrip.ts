@@ -296,6 +296,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Saindo de {name}',
   'roadtrip.bookend.back': 'Volta para {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Saída depois do check-out',
   'roadtrip.bookend.noVia':
     'Não dá para colocar um ponto de passagem no trajeto de ida ou volta da sua hospedagem. Adicione uma parada ali.',
 };

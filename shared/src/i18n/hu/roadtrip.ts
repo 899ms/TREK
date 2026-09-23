@@ -295,6 +295,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Indulás: {name}',
   'roadtrip.bookend.back': 'Vissza: {name}',
   'roadtrip.bookend.checkIn': 'Bejelentkezés · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Indulás kijelentkezés után',
   'roadtrip.bookend.noVia':
     'A szálláshoz vezető vagy onnan induló útra nem kerülhet köztes pont. Adj hozzá inkább egy megállót ott.',
 };

@@ -292,6 +292,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '{name}から',
   'roadtrip.bookend.back': '{name}へ戻る',
   'roadtrip.bookend.checkIn': 'チェックイン · {name}',
+  'roadtrip.bookend.afterCheckOut': 'チェックアウト後に出発',
   'roadtrip.bookend.noVia': '宿泊先との間の区間には経由地を置けません。代わりにそこへ立ち寄り先を追加してください。',
 };
 export default roadtrip;

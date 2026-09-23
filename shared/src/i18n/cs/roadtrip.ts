@@ -293,6 +293,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'Z ubytování {name}',
   'roadtrip.bookend.back': 'Zpět do ubytování {name}',
   'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.afterCheckOut': 'Odjezd až po check-outu',
   'roadtrip.bookend.noVia':
     'Na trasu do ubytování ani z něj nelze přidat průjezdní bod. Přidejte tam místo toho zastávku.',
 };

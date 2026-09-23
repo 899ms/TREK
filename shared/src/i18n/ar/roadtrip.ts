@@ -290,6 +290,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': 'من {name}',
   'roadtrip.bookend.back': 'العودة إلى {name}',
   'roadtrip.bookend.checkIn': 'تسجيل الوصول · {name}',
+  'roadtrip.bookend.afterCheckOut': 'الانطلاق بعد موعد تسجيل المغادرة',
   'roadtrip.bookend.noVia': 'لا يمكن وضع نقطة عبور على الطريق من مكان إقامتك أو إليه. أضف توقفاً هناك بدلاً من ذلك.',
 };
 export default roadtrip;

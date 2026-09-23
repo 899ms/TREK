@@ -278,6 +278,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '從 {name} 出發',
   'roadtrip.bookend.back': '返回 {name}',
   'roadtrip.bookend.checkIn': '入住 · {name}',
+  'roadtrip.bookend.afterCheckOut': '退房後才出發',
   'roadtrip.bookend.noVia': '往返住宿地點的路段無法加入途經點。請改在那裡新增一個停靠點。',
 };
 export default roadtrip;

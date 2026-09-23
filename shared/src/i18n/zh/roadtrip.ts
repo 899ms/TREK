@@ -279,6 +279,7 @@ const roadtrip: TranslationStrings = {
   'roadtrip.bookend.from': '从 {name} 出发',
   'roadtrip.bookend.back': '返回 {name}',
   'roadtrip.bookend.checkIn': '入住 · {name}',
+  'roadtrip.bookend.afterCheckOut': '退房后才出发',
   'roadtrip.bookend.noVia': '往返住处的路段不能添加途经点。请改为在那里添加一个停靠点。',
 };
 export default roadtrip;

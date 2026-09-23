@@ -89,6 +89,45 @@ describe('projectOntoRoute', () => {
     expect(projectOntoRoute(BERLIN, [])).toBeNull();
     expect(projectOntoRoute(BERLIN, [BERLIN])).toBeNull();
   });
+
+  describe('within a stretch of the drive', () => {
+    // Out along a straight road and back over it: every point of the road is on the
+    // line twice, once on the way out and once on the way back.
+    const out = { lat: 52, lng: 13 };
+    const tip = { lat: 52, lng: 14 };
+    const outAndBack = [out, tip, out];
+    const onRoad = { lat: 52, lng: 13.3 };
+
+    it('answers with the first pass for the whole line', () => {
+      const whole = projectOntoRoute(onRoad, outAndBack)!;
+      const oneWay = haversineKm(out, tip);
+      expect(whole.offRouteKm).toBeLessThan(0.01);
+      expect(whole.alongKm).toBeLessThan(oneWay / 2);
+    });
+
+    it('finds the second pass when asked for the way back', () => {
+      const oneWay = haversineKm(out, tip);
+      const back = projectOntoRoute(onRoad, outAndBack, { fromKm: oneWay, toKm: 2 * oneWay })!;
+      expect(back.offRouteKm).toBeLessThan(0.01);
+      expect(back.alongKm).toBeGreaterThan(oneWay);
+      expect(back.alongKm).toBeCloseTo(2 * oneWay - haversineKm(out, onRoad), 1);
+    });
+
+    it('measures to the edge of the stretch when the point lies beyond it', () => {
+      const straight = [
+        { lat: 52, lng: 13 },
+        { lat: 52, lng: 15 },
+      ];
+      const length = haversineKm(straight[0]!, straight[1]!);
+      const hit = projectOntoRoute({ lat: 52, lng: 13.1 }, straight, { fromKm: length / 2, toKm: length })!;
+      expect(hit.alongKm).toBeCloseTo(length / 2, 3);
+      expect(hit.offRouteKm).toBeGreaterThan(55);
+    });
+
+    it('answers nothing for a stretch past the end of the line', () => {
+      expect(projectOntoRoute(onRoad, outAndBack, { fromKm: 10_000, toKm: 20_000 })).toBeNull();
+    });
+  });
 });
 
 describe('corridorTiles', () => {
