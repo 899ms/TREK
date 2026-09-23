@@ -222,6 +222,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} mais lenta',
   'roadtrip.alt.quicker': '{time} mais rápida',
   'roadtrip.alt.otherEngine': 'Tempo do roteador de desvios, não do principal.',
+  'roadtrip.alt.notHeld': 'O roteador da viagem não segue este caminho, então ele não foi salvo.',
+  'roadtrip.alt.ferryNotHeld':
+    'Este caminho atravessa de balsa. Adicione a balsa como reserva de transporte e o trajeto passa a segui-la.',
+  'roadtrip.alt.legChanged': 'Este trecho mudou enquanto o caminho era verificado, então nada foi salvo.',
+  'roadtrip.alt.offline': 'Outros caminhos só são salvos online. Reconecte-se para escolher este.',
   'roadtrip.day': 'Dia {number}',
   'roadtrip.quietDay.empty': 'Ainda sem paradas — solte uma aqui',
   'roadtrip.quietDay.one': 'Até agora só {name} — solte uma parada aqui',

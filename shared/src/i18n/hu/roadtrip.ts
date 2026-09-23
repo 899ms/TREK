@@ -221,6 +221,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time}-cel lassabb',
   'roadtrip.alt.quicker': '{time}-cel gyorsabb',
   'roadtrip.alt.otherEngine': 'Az időt a kerülő útvonaltervező számolta, nem a fő.',
+  'roadtrip.alt.notHeld': 'Az autós út útvonaltervezője nem követi ezt az utat, ezért nem mentettük el.',
+  'roadtrip.alt.ferryNotHeld':
+    'Ez az út komppal kel át. Add hozzá a kompot közlekedési foglalásként, és az út követni fogja.',
+  'roadtrip.alt.legChanged': 'A szakasz az ellenőrzés közben megváltozott, ezért semmi sem lett mentve.',
+  'roadtrip.alt.offline': 'A többi utat csak online lehet menteni. Csatlakozz újra, hogy ezt válaszd.',
   'roadtrip.day': '{number}. nap',
   'roadtrip.quietDay.empty': 'Még nincs megálló — húzzon ide egyet',
   'roadtrip.quietDay.one': 'Egyelőre csak {name} — húzzon ide egy megállót',

@@ -219,6 +219,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} 遅い',
   'roadtrip.alt.quicker': '{time} 速い',
   'roadtrip.alt.otherEngine': '所要時間は主エンジンではなく回避用エンジンでの計算です。',
+  'roadtrip.alt.notHeld': 'ロードトリップのルーティングサーバーがこの道をたどらないため、保存されませんでした。',
+  'roadtrip.alt.ferryNotHeld':
+    'この道はフェリーで渡ります。フェリーを交通手段の予約として追加すると、ルートがそれに沿います。',
+  'roadtrip.alt.legChanged': '確認中にこの区間が変更されたため、何も保存されませんでした。',
+  'roadtrip.alt.offline': 'ほかの道はオンラインでのみ保存できます。この道を選ぶには再接続してください。',
   'roadtrip.day': '{number} 日目',
   'roadtrip.quietDay.empty': 'まだ立ち寄り先がありません。ここにドロップ',
   'roadtrip.quietDay.one': '今のところ {name} だけです。立ち寄り先をここにドロップ',

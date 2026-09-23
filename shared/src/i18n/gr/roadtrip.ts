@@ -225,6 +225,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} πιο αργή',
   'roadtrip.alt.quicker': '{time} πιο γρήγορη',
   'roadtrip.alt.otherEngine': 'Χρόνος από τον δρομολογητή αποφυγής, όχι τον κύριο.',
+  'roadtrip.alt.notHeld': 'Ο δρομολογητής του ταξιδιού δεν ακολουθεί αυτή τη διαδρομή, οπότε δεν αποθηκεύτηκε.',
+  'roadtrip.alt.ferryNotHeld':
+    'Αυτή η διαδρομή περνά με πλοίο. Πρόσθεσε το πλοίο ως κράτηση μεταφοράς και η οδήγηση θα το ακολουθήσει.',
+  'roadtrip.alt.legChanged': 'Το σκέλος άλλαξε κατά τον έλεγχο, οπότε δεν αποθηκεύτηκε τίποτα.',
+  'roadtrip.alt.offline': 'Οι άλλες διαδρομές αποθηκεύονται μόνο online. Συνδέσου ξανά για να επιλέξεις αυτή.',
   'roadtrip.day': 'Ημέρα {number}',
   'roadtrip.quietDay.empty': 'Καμία στάση ακόμη — αφήστε μία εδώ',
   'roadtrip.quietDay.one': 'Μέχρι στιγμής μόνο {name} — αφήστε μια στάση εδώ',

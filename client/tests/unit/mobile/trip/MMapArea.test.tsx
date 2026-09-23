@@ -13,6 +13,7 @@ import type { Day, Place, Reservation } from '../../../../src/types'
 import { visibleRouteReservations, type RouteVisibilityOptions } from '../../../../src/utils/reservationRoutes'
 import type { AlternativeOverlay } from '../../../../src/components/Roadtrip/alternativeOverlays'
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
+import { openLeg } from '../../../helpers/legAlternatives'
 import { RT_ALT_BAR_LIFT } from '../../../../src/mobile/screens/trip/roadtrip/useMRtAlternatives'
 
 // FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-042
@@ -144,7 +145,7 @@ const DRAWN = ['places', 'route', 'routeColors', 'accessLines', 'focusPoints'] a
 /** A picker open on leg 0 of day 3, with or without roads back yet. */
 function withPicker(overlays: AlternativeOverlay[], over: Partial<TripPlanner> = {}): Partial<TripPlanner> {
   const base = buildPlanner()
-  const open: LegAlternatives = { dayId: 3, index: 0, routes: [], loading: overlays.length === 0, error: false }
+  const open: LegAlternatives = openLeg({ dayId: 3, index: 0, loading: overlays.length === 0 })
   return {
     routeAlternatives: { ...base.routeAlternatives, open },
     alternativeOverlays: overlays,

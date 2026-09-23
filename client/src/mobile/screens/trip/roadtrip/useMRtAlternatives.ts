@@ -1,5 +1,5 @@
 import { useEffect, useTransition } from 'react'
-import { alternativesPhase, type AlternativeOverlay, type AlternativesPhase } from '../../../../components/Roadtrip/alternativeOverlays'
+import { alternativesBusy, alternativesPhase, type AlternativeOverlay, type AlternativesPhase } from '../../../../components/Roadtrip/alternativeOverlays'
 import type { LegAlternatives } from '../../../../components/Roadtrip/useRouteAlternatives'
 import type { MTripShellApi, TripPlanner } from '../MTripShell'
 
@@ -37,7 +37,7 @@ export interface MRtAlternativesController {
   /** False offline: a choice is written as a via, and vias are online only. */
   editable: boolean
   canConfirm: boolean
-  /** True while the chosen road is being written. */
+  /** True while the chosen road is being checked against the router and written. */
   saving: boolean
   isOpenFor: (dayId: number, legIndex: number) => boolean
   ask: (dayId: number, legIndex: number) => void
@@ -68,7 +68,10 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
   const { open, close } = planner.routeAlternatives
   const overlays = planner.alternativeOverlays
   const editable = planner.roadtripVias.editable
-  const [saving, startSaving] = useTransition()
+  const [confirming, startSaving] = useTransition()
+  // The planner's own mark as well as this transition, so the bar stands still for as long
+  // as the choice is being checked, whichever surface started it.
+  const saving = confirming || alternativesBusy(open)
 
   const phase = open ? alternativesPhase(open, overlays) : null
   const highlighted = planner.highlightedAlternative
@@ -100,7 +103,7 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
       planner.refuel.close()
       // The card's day, as the desk passes it: the planner looks the stops up on that
       // card and works out the day each one is stored on by itself.
-      planner.askRouteAlternatives(dayId, legIndex)
+      planner.askRouteAlternatives(dayId, { kind: 'leg', index: legIndex })
     }
     if (shell.rtView === 'list') shell.toggleRtView()
   }
@@ -111,8 +114,9 @@ export function useMRtAlternatives(planner: TripPlanner, shell: MTripShellApi): 
     if (!canConfirm || !picked) return
     const index = picked.index
     // A transition rather than a flag of our own, so the pending state ends when the
-    // write does. The planner reports a failure itself and leaves the picker open for
-    // another go, and closes it once the via is saved.
+    // write does. The planner checks the road with the router first, reports a refusal
+    // or a failure itself and leaves the picker open for another go, and closes it once
+    // the road is saved.
     startSaving(async () => {
       await planner.chooseRouteAlternative(index)
     })

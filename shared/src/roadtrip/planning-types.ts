@@ -135,6 +135,17 @@ export interface RoadtripDay {
   legs: (RouteSegment | undefined)[];
 
   /**
+   * The road each of `legs` is drawn on, parallel to it: the very line the map shows for
+   * that leg, vias included.
+   *
+   * Kept per leg because a surface that talks about ONE leg has to show the road the rail
+   * actually drives there. `geometry` is the whole card in one line and cannot be cut back
+   * into its legs without measuring it again, which is how the picker of other ways once
+   * offered a road the rail was not on as the one it was.
+   */
+  legLines?: ([number, number][] | undefined)[];
+
+  /**
    * The drive from where the day before ended to where this one starts.
    *
    * Only when the days are connected, and only when no stop actually crossed over —
@@ -144,6 +155,9 @@ export interface RoadtripDay {
    * like it began out of nowhere.
    */
   arrivingLeg?: RouteSegment;
+
+  /** The road `arrivingLeg` is drawn on. Present exactly when `arrivingLeg` is. */
+  arrivingLine?: [number, number][];
 
   /**
    * The stop the drive at the head of this card's `geometry` sets off from, when the

@@ -116,7 +116,7 @@ function AlternativesBody({ planner, alts }: MRtAlternativesBarProps) {
   // Scrolls sideways rather than wrapping, because the row has a fixed height. The negative
   // margin lets a chip slide under the bar's own edge instead of stopping short of it.
   return (
-    <div className="-mx-[14px] flex h-full snap-x gap-2 overflow-x-auto px-[14px]">
+    <div className="-mx-[14px] flex h-full snap-x gap-2 overflow-x-auto px-[14px]" aria-busy={alts.saving}>
       {alts.overlays.map(alt => (
         <AlternativeChip
           key={alt.index}

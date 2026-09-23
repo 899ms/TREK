@@ -217,6 +217,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} slower',
   'roadtrip.alt.quicker': '{time} quicker',
   'roadtrip.alt.otherEngine': 'Timed by the avoidance router, not the main one.',
+  'roadtrip.alt.notHeld': 'The road trip’s router won’t follow this way, so it was not saved.',
+  'roadtrip.alt.ferryNotHeld':
+    'This way crosses by ferry. Add the ferry as a transport booking and the drive follows it.',
+  'roadtrip.alt.legChanged': 'This leg changed while the way was being checked, so nothing was saved.',
+  'roadtrip.alt.offline': 'Other ways are saved online only. Reconnect to take this one.',
   'roadtrip.day': 'Day {number}',
   'roadtrip.quietDay.empty': 'No stops yet — drop one here',
   'roadtrip.quietDay.one': 'Only {name} so far — drop a stop here',

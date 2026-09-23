@@ -222,6 +222,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': 'на {time} довше',
   'roadtrip.alt.quicker': 'на {time} швидше',
   'roadtrip.alt.otherEngine': 'Час порахував маршрутизатор обходів, а не основний.',
+  'roadtrip.alt.notHeld': 'Маршрутизатор подорожі не поведе цим шляхом, тому його не збережено.',
+  'roadtrip.alt.ferryNotHeld':
+    'Цей шлях проходить поромом. Додайте пором як бронювання транспорту, і маршрут піде ним.',
+  'roadtrip.alt.legChanged': 'Відрізок змінився під час перевірки, тому нічого не збережено.',
+  'roadtrip.alt.offline': 'Інші шляхи зберігаються лише онлайн. Під’єднайтеся знову, щоб вибрати цей.',
   'roadtrip.day': 'День {number}',
   'roadtrip.quietDay.empty': 'Зупинок ще немає — перетягніть сюди',
   'roadtrip.quietDay.one': 'Поки лише {name} — перетягніть сюди зупинку',

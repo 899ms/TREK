@@ -1,11 +1,11 @@
 import React from 'react'
-import { Shuffle, X, AlertTriangle, Info } from 'lucide-react'
+import { Shuffle, X, AlertTriangle, Info, Loader2 } from 'lucide-react'
 import { useTranslation } from '../../i18n/TranslationContext'
 import { Tooltip } from '../shared/Tooltip'
 import { useSettingsStore } from '../../store/settingsStore'
 import { formatDistance } from '../../utils/units'
 import type { LegAlternatives } from './useRouteAlternatives'
-import { alternativesPhase, alternativeSubline, type AlternativeOverlay } from './alternativeOverlays'
+import { alternativesBusy, alternativesPhase, alternativeSubline, type AlternativeOverlay } from './alternativeOverlays'
 
 interface RoadtripAlternativesBarProps {
   open: LegAlternatives | null
@@ -35,6 +35,9 @@ export default function RoadtripAlternativesBar({
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   if (!open) return null
   const phase = alternativesPhase(open, overlays)
+  // While a choice is checked against the router and written, the list stands still: a
+  // second click would race the first, and its answer could land on the leg after it.
+  const busy = alternativesBusy(open)
 
   return (
     <div className="pointer-events-auto flex max-w-[min(92vw,640px)] flex-col gap-2 rounded-2xl border border-edge-faint bg-surface-elevated px-3 py-2.5 shadow-modal backdrop-blur">
@@ -64,25 +67,31 @@ export default function RoadtripAlternativesBar({
         // One route back means there is genuinely only one sensible way to drive it.
         <p className="text-caption text-content-muted">{t('roadtrip.alt.onlyOne')}</p>
       ) : (
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5" aria-busy={busy}>
           {overlays.map(alt => (
             <button
               key={alt.index}
               type="button"
+              disabled={busy}
+              aria-busy={open.proving === alt.index}
               onClick={() => onChoose(alt.index)}
               onMouseEnter={() => onHighlight?.(alt.index)}
               onMouseLeave={() => onHighlight?.(null)}
               onFocus={() => onHighlight?.(alt.index)}
               onBlur={() => onHighlight?.(null)}
-              className="flex items-center gap-2 rounded-xl border border-edge bg-surface-card px-2.5 py-1.5 text-start transition-colors hover:border-content-faint"
+              className="flex items-center gap-2 rounded-xl border border-edge bg-surface-card px-2.5 py-1.5 text-start transition-colors hover:border-content-faint disabled:cursor-default disabled:opacity-60 disabled:hover:border-edge"
             >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-full"
-                // theme-lint-disable — the very colour this route is drawn in on the map;
-                // a token here would break the one link between list and picture.
-                style={{ background: alt.color }}
-                aria-hidden
-              />
+              {open.proving === alt.index ? (
+                <Loader2 size={10} className="shrink-0 animate-spin text-content-faint" aria-hidden />
+              ) : (
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-full"
+                  // theme-lint-disable: the very colour this route is drawn in on the map;
+                  // a token here would break the one link between list and picture.
+                  style={{ background: alt.color }}
+                  aria-hidden
+                />
+              )}
               <span className="flex flex-col">
                 <span className="text-caption font-medium tabular-nums text-content">
                   {formatDistance(alt.distance / 1000, distanceUnit)}

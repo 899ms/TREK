@@ -26,6 +26,7 @@ import { MAX_TRIP_DAYS, type RoadtripStopType } from '@trek/shared'
 import { isCarrierMode, type CarrierTerminal } from '@trek/shared/roadtrip'
 import type { QuietDay, RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
 import type { SpillMark } from './nightSpill'
+import type { RailDrive } from './useRouteAlternatives'
 import { dayColor } from './dayColors'
 import type { RouteVia } from '../../types'
 import { FS } from './typeScale'
@@ -51,8 +52,8 @@ interface RoadtripSidebarProps {
   onReorderStop?: (dayId: number, assignmentId: number, toIndex: number) => void
   /** Moves a stop onto a different day. Absent means moves stay inside their own day. */
   onMoveStopToDay?: (fromDayId: number, assignmentId: number, toDayId: number, toIndex: number) => void
-  /** Asks for other ways of driving one leg (#1797). */
-  onAskAlternatives?: (dayId: number, legIndex: number) => void
+  /** Asks for other ways of driving one drive on a card (#1797). */
+  onAskAlternatives?: (dayId: number, drive: RailDrive) => void
   /**
    * The one-shot search for somewhere to fill up before the tank runs out.
    *
@@ -1732,7 +1733,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
         {i < last && (!day.stops[i + 1].automaticNight || day.legs[i]?.distance !== 0) ? (
           <DriveBand
             leg={day.legs[i]}
-            onAskAlternatives={onAskAlternatives && legReroutable(day, i) ? () => onAskAlternatives(day.dayId, i) : undefined}
+            onAskAlternatives={onAskAlternatives && legReroutable(day, i) ? () => onAskAlternatives(day.dayId, { kind: 'leg', index: i }) : undefined}
             alternativesOpen={openAlternatives?.dayId === day.dayId && openAlternatives.index === i}
           />
         ) : null}

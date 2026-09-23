@@ -6,8 +6,9 @@ import { RT_ALT_BAR_HEIGHT, useMRtAlternatives } from '../../../../src/mobile/sc
 import { buildAlternativeOverlays } from '../../../../src/components/Roadtrip/alternativeOverlays'
 import type { LegAlternatives, OfferedRoute } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import type { TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
+import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTALT-001 to FE-MOB-RTALT-011
+// FE-MOB-RTALT-001 to FE-MOB-RTALT-012
 //
 // Rendered through the real controller hook, so a tap is checked all the way to what the
 // planner is asked to do, and the pending state is the transition's own.
@@ -30,7 +31,7 @@ function overlays(routes: OfferedRoute[] = ROUTES) {
 
 function planner(open: Partial<LegAlternatives> | null, over: Partial<TripPlanner> = {}): TripPlanner {
   const base = buildPlanner()
-  const leg = open ? { dayId: 2, index: 0, routes: ROUTES, loading: false, error: false, ...open } : null
+  const leg = open ? openLeg({ dayId: 2, index: 0, routes: ROUTES, ...open }) : null
   return buildPlanner({
     selectedDayId: 2,
     routeAlternatives: { ...base.routeAlternatives, open: leg },
@@ -200,5 +201,17 @@ describe('MRtAlternativesBar', () => {
     renderBar(planner(null))
     expect(screen.queryByRole('status')).toBeNull()
     expect(chips()).toHaveLength(0)
+  })
+
+  it('FE-MOB-RTALT-012: while the planner checks a road with the router, the bar is busy and takes nothing', () => {
+    // The check asks the router up to three times before anything is written, so the bar
+    // has to stand still for all of it, not only for the write at the end.
+    renderBar(planner({ proving: 2 }, { highlightedAlternative: 2 }))
+
+    for (const chip of chips()) expect(chip).toBeDisabled()
+    expect(chips()[0].parentElement).toHaveAttribute('aria-busy', 'true')
+    expect(confirmButton()).toBeDisabled()
+    expect(confirmButton()).toHaveAttribute('aria-busy', 'true')
+    expect(confirmButton().querySelector('.animate-spin')).not.toBeNull()
   })
 })

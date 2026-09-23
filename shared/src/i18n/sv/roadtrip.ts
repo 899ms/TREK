@@ -220,6 +220,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} långsammare',
   'roadtrip.alt.quicker': '{time} snabbare',
   'roadtrip.alt.otherEngine': 'Tid från undvikandemotorn, inte huvudmotorn.',
+  'roadtrip.alt.notHeld': 'Bilresans ruttserver följer inte den här vägen, så den sparades inte.',
+  'roadtrip.alt.ferryNotHeld':
+    'Den här vägen går med färja. Lägg till färjan som transportbokning så följer resan den.',
+  'roadtrip.alt.legChanged': 'Sträckan ändrades medan vägen kontrollerades, så inget sparades.',
+  'roadtrip.alt.offline': 'Andra vägar sparas bara online. Anslut igen för att välja den här.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Inga stopp än – släpp ett här',
   'roadtrip.quietDay.one': 'Hittills bara {name} – släpp ett stopp här',

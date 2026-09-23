@@ -1164,6 +1164,17 @@ describe('RoadtripSidebar with a ride (#2428)', () => {
     expect(screen.getAllByLabelText('Other ways')).toHaveLength(1)
   })
 
+  it('FE-ROADTRIP-SIDEBAR-059: asking names the drive as a leg of its card, not as a bare position', () => {
+    // A tagged drive rather than an index, so the road arriving at the head of a card can
+    // be asked about as what it is instead of under an index no stop has.
+    const onAskAlternatives = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [flightDay()], totalStops: 2 })} onOpenBooking={vi.fn()} onAskAlternatives={onAskAlternatives} />)
+
+    fireEvent.click(screen.getByLabelText('Other ways'))
+
+    expect(onAskAlternatives).toHaveBeenCalledWith(1, { kind: 'leg', index: 0 })
+  })
+
   it('FE-ROADTRIP-SIDEBAR-051: a ride landing tomorrow leaves its departure as a row of its own, with the road into it', () => {
     const stops = [stop({ assignmentId: 1, name: 'Hamburg' }), terminal('departure')]
     const overnight = day({

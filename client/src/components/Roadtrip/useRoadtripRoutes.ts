@@ -1,7 +1,7 @@
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
 import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, seatCarrierStops, standsAsDay, terminalAssignmentId, viasLeaving, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { calculateRouteWithLegs, RoutingRefusedError } from '../Map/RouteCalculator'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { avoidedClasses, calculateRouteWithLegs, routeEngineFor, RoutingRefusedError, type RouteEngine } from '../Map/RouteCalculator'
 import { resolveLegMode } from '../Planner/legMode'
 import { splitIntoRuns, parseAvoid, type DriveLimits } from './roadtripModel'
 import { spillChains } from './nightSpill'
@@ -70,6 +70,53 @@ const legKey = (from: RoadtripStop, to: RoadtripStop): string => `${stopKey(from
 const EMPTY_ACCOMMODATIONS: Accommodation[] = []
 const EMPTY_RESERVATIONS: Reservation[] = []
 
+/** One leg as the rail's own router answered it, for a surface checking a choice against it. */
+export interface RailLegRoute {
+  coordinates: [number, number][]
+  distance: number
+  duration: number
+  /** Whether the road crosses by ferry, where the engine says so. */
+  hasFerry?: boolean
+  /** True when the leg's own engine could not answer and OSRM drove it unweighted. */
+  fellBack?: boolean
+}
+
+/**
+ * How the rail drives one of its legs, and the same question put again with points pinned
+ * in between.
+ *
+ * The one place that answers "route this leg the way the rail does". The picker of other
+ * ways asked OSRM with nothing avoided while the rail drove the leg through Valhalla with
+ * the trip's avoidances, so the list offered roads the rail was not on and a choice could
+ * not be told apart from a click that did nothing. Whatever offers a leg another way, or
+ * checks that a choice holds, asks here.
+ */
+export interface RailLegRouter {
+  /** The leg's mode, resolved the way the routing round resolved it. */
+  mode: string
+  /** The classes the rail weighs away on this leg: none unless the leg is driven by Valhalla. */
+  avoid: RouteAvoidClass[]
+  /** Which engine prices this leg on the rail. */
+  engine: RouteEngine
+  /** The leg from its first stop through `pins` to its last, asked exactly as the rail asks it. */
+  route: (pins: { lat: number; lng: number }[], signal: AbortSignal) => Promise<RailLegRoute>
+}
+
+/**
+ * What the rail reads, plus what only a browser can do with it: route a leg again.
+ *
+ * Optional like `validateBoundaries`, because the same shape is assembled on the server,
+ * where no router of the browser's exists; this hook always fills it in.
+ */
+export type RoadtripRoutesView = RoadtripRoutes & {
+  /**
+   * The router for the leg between two stops, `cardDayId` being the card they are drawn
+   * on. Two stops stored on one day were asked for in that day's run; two stored on
+   * different days are a seam, asked for under the card it arrives on.
+   */
+  legRouter?: (from: RoadtripStop, to: RoadtripStop, cardDayId: number) => RailLegRouter
+}
+
 const asStop = (a: Assignment, ownerDayId: number, ownerIndex: number, accommodations: Accommodation[]): RoadtripStop | null => {
   const p = a.place
   if (!p || typeof p.lat !== 'number' || typeof p.lng !== 'number') return null
@@ -133,7 +180,7 @@ export function useRoadtripRoutes(
    * between the two is the ride, never a road.
    */
   reservations: Reservation[] = EMPTY_RESERVATIONS,
-): RoadtripRoutes {
+): RoadtripRoutesView {
   const { t } = useTranslation()
   const routeProfile = fallbackProfile || 'driving'
   // Leg text is pre-formatted in the chosen unit, so a km↔mi switch has to re-fetch.
@@ -273,6 +320,17 @@ export function useRoadtripRoutes(
     return out
   }, [storedDays, rideSeams])
 
+  /**
+   * A leg's mode, resolved the one way every request here resolves it: the stop's own,
+   * else the default of `dayId`, else the trip's. The day runs pass their own day, a seam
+   * the card it arrives on, and a leg asked for on demand whichever of the two it is.
+   */
+  const legModeOf = useCallback((from: RoadtripStop, to: RoadtripStop, dayId: number): string => resolveLegMode(
+    { isPlace: true, leg_transport_mode: from.legMode },
+    { isPlace: true, incoming_leg_transport_mode: to.incomingLegMode },
+    days.find(d => d.id === dayId)?.default_transport_mode || routeProfile,
+  ), [days, routeProfile])
+
   // Only the geometry decides whether legs have to be re-fetched: renaming a place or
   // editing its notes must not fire a routing round.
   const viaKey = useMemo(
@@ -302,9 +360,6 @@ export function useRoadtripRoutes(
     const controller = new AbortController()
     abortRef.current = controller
     setLoading(true)
-
-    const dayDefault = (dayId: number): string =>
-      days.find(d => d.id === dayId)?.default_transport_mode || routeProfile
 
     const collected: Record<number, Record<string, RoutedLeg>> = {}
     const collectedSnaps: Record<number, Record<string, SnappedWaypoint>> = {}
@@ -384,14 +439,14 @@ export function useRoadtripRoutes(
                 if (s) daySnaps[stopKey(stop)] = s
               })
             }
-            // What was asked for against what the road turned out to be. Only
-            // the second engine reports it, and only when it answered: an OSRM
-            // fallback leaves `avoidance` absent, which is the honest reading
-            // of "the weighting never happened". Collected here because the
-            // rail plans in the browser and never sees the server's own copy
-            // of this field — without it the "not honoured" badge could not
-            // appear at all, and a motorway-free drive that is not one read as
-            // if the setting had held.
+            // What was asked for against what the road turned out to be. Only a
+            // request that was asked to avoid something reports it: the second
+            // engine says what it managed, and an OSRM fallback after it failed
+            // says it managed nothing, which is the honest reading of "the
+            // weighting never happened". Collected here because the rail plans
+            // in the browser and never sees the server's own copy of this field.
+            // Without it the "not honoured" badge could not appear at all, and a
+            // motorway-free drive that is not one read as if the setting had held.
             if (r.avoidance) {
               const missed = r.avoidance.asked.filter(cls => !r.avoidance!.achieved.includes(cls))
               if (missed.length) {
@@ -427,14 +482,8 @@ export function useRoadtripRoutes(
     for (const day of plan) {
       const dayLegs: Record<string, RoutedLeg> = {}
       collected[day.dayId] = dayLegs
-      const dfMode = dayDefault(day.dayId)
 
-      const runs = splitIntoRuns(day.stops, (from, to) =>
-        resolveLegMode(
-          { isPlace: true, leg_transport_mode: from.legMode },
-          { isPlace: true, incoming_leg_transport_mode: to.incomingLegMode },
-          dfMode,
-        ))
+      const runs = splitIntoRuns(day.stops, (from, to) => legModeOf(from, to, day.dayId))
 
       for (const { stops: run, mode } of runs) enqueueRun(day, dayLegs, run, mode)
     }
@@ -548,8 +597,18 @@ export function useRoadtripRoutes(
     return out
   }, [chains, plan, quietDays, window, legsByDay, seamLegs, rideLegs, viasByDay, connectDays])
   const seamKey = seams.map(s => `${legKey(s.from, s.to)}#${seamShape(s.from, viasByDay)}`).join(';')
-  /** When the last seam request went out, across every run of the effect below. */
-  const lastSeamRequestAt = useRef(0)
+  /**
+   * When the last request outside the routing round went out, across every run of the
+   * effect below: a seam, or a leg asked for again on demand (see `legRouter`). One clock
+   * for both, so a choice being checked cannot fire into the gap a seam is keeping.
+   */
+  const lastSpacedRequestAt = useRef(0)
+  /** Waits until the gap since the last such request is kept, then claims the next slot. */
+  const spacedRequest = useCallback(async (signal: AbortSignal): Promise<void> => {
+    const since = performance.now() - lastSpacedRequestAt.current
+    if (since < REQUEST_SPACING_MS) await sleep(REQUEST_SPACING_MS - since, signal)
+    if (!signal.aborted) lastSpacedRequestAt.current = performance.now()
+  }, [])
 
   useEffect(() => {
     if (!seams.length) return
@@ -557,11 +616,7 @@ export function useRoadtripRoutes(
     void (async () => {
       for (const seam of seams) {
         if (controller.signal.aborted) return
-        const mode = resolveLegMode(
-          { isPlace: true, leg_transport_mode: seam.from.legMode },
-          { isPlace: true, incoming_leg_transport_mode: seam.to.incomingLegMode },
-          days.find(d => d.id === seam.dayId)?.default_transport_mode || routeProfile,
-        )
+        const mode = legModeOf(seam.from, seam.to, seam.dayId)
         // No router knows a ride. A booked ride's own pair has its leg in `rideLegs` and
         // never reaches here; what is left is a terminal seamed to an ordinary stop on
         // another card, which is a join of no minutes rather than a road. Filed here,
@@ -583,10 +638,8 @@ export function useRoadtripRoutes(
         // shared routing hosts answered the tail with 429, and a refused seam
         // writes no state, so nothing changed to make the effect try again: the
         // map drew the trip in pieces and the totals came back short.
-        const since = performance.now() - lastSeamRequestAt.current
-        if (since < REQUEST_SPACING_MS) await sleep(REQUEST_SPACING_MS - since, controller.signal)
+        await spacedRequest(controller.signal)
         if (controller.signal.aborted) return
-        lastSeamRequestAt.current = performance.now()
         try {
           // The via points on this seam, threaded in the same way the day runs thread
           // theirs. Without them a seam is the one stretch of the trip a via cannot
@@ -634,7 +687,35 @@ export function useRoadtripRoutes(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seamKey, routeProfile, tripId, avoidKey])
 
-  return useMemo(() => assembleRoadtrip({ plan, quietDays, window, distanceUnit, allLegs, snapByDay, missedByDay, loading, limits, vehicleKind, connectDays, boundaries,
+  const legRouter = useCallback((from: RoadtripStop, to: RoadtripStop, cardDayId: number): RailLegRouter => {
+    // The day the routing round asked this pair under: its own stored day for a pair
+    // inside one, the card it is drawn on for a seam. It decides the default mode and
+    // is what a route provider plugin is told.
+    const dayId = from.ownerDayId === to.ownerDayId ? from.ownerDayId : cardDayId
+    const mode = legModeOf(from, to, dayId)
+    return {
+      mode,
+      avoid: avoidedClasses(mode, avoid),
+      engine: routeEngineFor(mode, avoid),
+      route: async (pins, signal) => {
+        await spacedRequest(signal)
+        const r = await calculateRouteWithLegs(
+          [{ lat: from.lat, lng: from.lng }, ...pins.map(p => ({ lat: p.lat, lng: p.lng })), { lat: to.lat, lng: to.lng }],
+          { signal, profile: mode, tripId: tripId ?? null, dayId, avoid },
+        )
+        return {
+          coordinates: r.coordinates,
+          distance: r.distance,
+          duration: r.duration,
+          hasFerry: r.hasFerry,
+          fellBack: r.avoidance?.fellBack === true,
+        }
+      },
+    }
+  }, [legModeOf, avoid, spacedRequest, tripId])
+
+  const assembled = useMemo(() => assembleRoadtrip({ plan, quietDays, window, distanceUnit, allLegs, snapByDay, missedByDay, loading, limits, vehicleKind, connectDays, boundaries,
     labels: { start: t('roadtrip.window.resume'), end: t('roadtrip.window.stop') },
   }), [plan, quietDays, window, distanceUnit, t, allLegs, snapByDay, missedByDay, loading, limits, vehicleKind, connectDays, boundaries])
+  return useMemo(() => ({ ...assembled, legRouter }), [assembled, legRouter])
 }

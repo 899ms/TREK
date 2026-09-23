@@ -220,6 +220,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': 'o {time} déle',
   'roadtrip.alt.quicker': 'o {time} rychleji',
   'roadtrip.alt.otherEngine': 'Čas spočítal server pro objížďky, ne ten hlavní.',
+  'roadtrip.alt.notHeld': 'Směrovací server cesty touto trasou nepovede, proto nebyla uložena.',
+  'roadtrip.alt.ferryNotHeld':
+    'Tato trasa vede přes trajekt. Přidej trajekt jako rezervaci dopravy a jízda ho bude následovat.',
+  'roadtrip.alt.legChanged': 'Úsek se během kontroly změnil, proto se nic neuložilo.',
+  'roadtrip.alt.offline': 'Jiné trasy se ukládají jen online. Pro výběr této trasy se znovu připoj.',
   'roadtrip.day': 'Den {number}',
   'roadtrip.quietDay.empty': 'Zatím žádné zastávky — přetáhněte sem',
   'roadtrip.quietDay.one': 'Zatím jen {name} — přetáhněte sem zastávku',

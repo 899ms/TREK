@@ -7,8 +7,9 @@ import {
 import { buildAlternativeOverlays } from '../../../../src/components/Roadtrip/alternativeOverlays'
 import type { LegAlternatives, OfferedRoute } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/trip/MTripShell'
+import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTALTH-001 to FE-MOB-RTALTH-009
+// FE-MOB-RTALTH-001 to FE-MOB-RTALTH-010
 //
 // The hook holds no picker state, so every case is a planner shape and what the hook
 // reads out of it or asks of it.
@@ -25,7 +26,7 @@ const OVERLAYS = buildAlternativeOverlays(ROUTES, {
 })
 
 function leg(over: Partial<LegAlternatives> = {}): LegAlternatives {
-  return { dayId: 2, index: 1, routes: ROUTES, loading: false, error: false, ...over }
+  return openLeg({ dayId: 2, index: 1, routes: ROUTES, ...over })
 }
 
 /** A planner with the picker open on leg 1 of day 2, answered with three roads. */
@@ -101,7 +102,7 @@ describe('useMRtAlternatives', () => {
 
     expect(p.setHighlightedAlternative).toHaveBeenCalledWith(null)
     expect(p.refuel.close).toHaveBeenCalledTimes(1)
-    expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, 0)
+    expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'leg', index: 0 })
     // The pick is cleared before the new question goes out.
     const cleared = vi.mocked(p.setHighlightedAlternative).mock.invocationCallOrder[0]
     expect(cleared).toBeLessThan(vi.mocked(p.askRouteAlternatives).mock.invocationCallOrder[0])
@@ -111,7 +112,7 @@ describe('useMRtAlternatives', () => {
     const onMap = buildShell({ rtView: 'map' })
     const second = setup(planner({}, null), onMap)
     act(() => { second.result.current.ask(2, 0) })
-    expect(second.planner.askRouteAlternatives).toHaveBeenCalledWith(2, 0)
+    expect(second.planner.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'leg', index: 0 })
     expect(onMap.toggleRtView).not.toHaveBeenCalled()
   })
 
@@ -193,6 +194,18 @@ describe('useMRtAlternatives', () => {
     expect(p.can).toHaveBeenCalledWith('day_edit', p.trip)
     const viewer = setup(planner({ can: vi.fn(() => false) }))
     expect(viewer.result.current.canAsk).toBe(false)
+  })
+
+  it('FE-MOB-RTALTH-010: a check the planner is running keeps the phone busy, whoever started it', () => {
+    // The desk's map line and the phone's confirm lead to the same check. The planner marks
+    // it on the picker, and the phone reads that mark rather than only its own transition.
+    const p = planner({ highlightedAlternative: 1 }, leg({ proving: 1 }))
+    const { result } = setup(p)
+
+    expect(result.current.saving).toBe(true)
+    expect(result.current.canConfirm).toBe(false)
+    act(() => { result.current.confirm() })
+    expect(p.chooseRouteAlternative).not.toHaveBeenCalled()
   })
 
   it('FE-MOB-RTALTH-009: the map lifts its floor by the bar and the gap it keeps from the dock', () => {

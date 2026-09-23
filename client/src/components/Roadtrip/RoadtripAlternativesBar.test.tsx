@@ -5,9 +5,10 @@ import { useSettingsStore } from '../../store/settingsStore'
 import RoadtripAlternativesBar from './RoadtripAlternativesBar'
 import type { AlternativeOverlay } from './alternativeOverlays'
 import type { LegAlternatives } from './useRouteAlternatives'
+import { openLeg } from '../../../tests/helpers/legAlternatives'
 
 /**
- * FE-ALTBAR-001..009 — the ways of driving one leg, offered over the map.
+ * FE-ALTBAR-001..012: the ways of driving one leg, offered over the map.
  *
  * Every value shown comes from the same overlay the map draws. Working them out
  * here separately is what once made the list label the driven route "Fastest"
@@ -31,9 +32,7 @@ const overlay = (over: Partial<AlternativeOverlay> = {}): AlternativeOverlay => 
   ...over,
 })
 
-const leg = (over: Partial<LegAlternatives> = {}): LegAlternatives => ({
-  dayId: 4, index: 1, routes: [], loading: false, error: false, ...over,
-})
+const leg = (over: Partial<LegAlternatives> = {}): LegAlternatives => openLeg({ dayId: 4, index: 1, ...over })
 
 beforeEach(() => {
   useSettingsStore.setState({ settings: { distance_unit: 'metric' } as never })
@@ -157,5 +156,37 @@ describe('RoadtripAlternativesBar', () => {
       />,
     )
     expect(screen.getAllByLabelText(/avoidance router/i)).toHaveLength(1)
+  })
+
+  it('FE-ALTBAR-011: while a choice is checked and saved the list stands still, and the one in hand says so', () => {
+    // A second click would race the first, and the router's answer to it could land on
+    // the leg after it.
+    const onChoose = vi.fn()
+    render(
+      <RoadtripAlternativesBar
+        open={leg({ proving: 1 })}
+        overlays={[overlay({ index: 0, note: 'Current' }), overlay({ index: 1 }), overlay({ index: 2 })]}
+        onChoose={onChoose}
+        onClose={vi.fn()}
+      />,
+    )
+    const [, current, checked, other] = screen.getAllByRole('button')
+    expect([current, checked, other].every(chip => (chip as HTMLButtonElement).disabled)).toBe(true)
+    expect(checked).toHaveAttribute('aria-busy', 'true')
+    expect(other).toHaveAttribute('aria-busy', 'false')
+    expect(checked.parentElement).toHaveAttribute('aria-busy', 'true')
+    fireEvent.click(other)
+    expect(onChoose).not.toHaveBeenCalled()
+    // Closing stays available: it is how a check nobody wants to wait for is abandoned.
+    expect(screen.getByRole('button', { name: /close/i })).not.toBeDisabled()
+  })
+
+  it('FE-ALTBAR-012: with nothing being checked every offer can be taken', () => {
+    render(
+      <RoadtripAlternativesBar open={leg()} overlays={[overlay({ index: 0 }), overlay({ index: 1 })]} onChoose={vi.fn()} onClose={vi.fn()} />,
+    )
+    const chips = screen.getAllByRole('button').slice(1)
+    expect(chips.every(chip => !(chip as HTMLButtonElement).disabled)).toBe(true)
+    expect(chips[0].parentElement).toHaveAttribute('aria-busy', 'false')
   })
 })

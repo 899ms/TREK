@@ -223,6 +223,12 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} de plus',
   'roadtrip.alt.quicker': '{time} de moins',
   'roadtrip.alt.otherEngine': 'Temps du routeur de contournement, pas du principal.',
+  'roadtrip.alt.notHeld': 'Le routeur du road trip ne suit pas cet itinéraire, il n’a donc pas été enregistré.',
+  'roadtrip.alt.ferryNotHeld':
+    'Cet itinéraire traverse en ferry. Ajoutez le ferry comme réservation de transport et le trajet le suivra.',
+  'roadtrip.alt.legChanged': 'Cette étape a changé pendant la vérification, rien n’a donc été enregistré.',
+  'roadtrip.alt.offline':
+    'Les autres itinéraires ne s’enregistrent qu’en ligne. Reconnectez-vous pour choisir celui-ci.',
   'roadtrip.day': 'Jour {number}',
   'roadtrip.quietDay.empty': 'Aucun arrêt — déposez-en un ici',
   'roadtrip.quietDay.one': 'Seulement {name} pour l’instant — déposez un arrêt ici',

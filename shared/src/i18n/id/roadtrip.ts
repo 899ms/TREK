@@ -223,6 +223,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} lebih lama',
   'roadtrip.alt.quicker': '{time} lebih cepat',
   'roadtrip.alt.otherEngine': 'Waktu dihitung mesin penghindaran, bukan mesin utama.',
+  'roadtrip.alt.notHeld': 'Server rute perjalanan tidak mengikuti jalan ini, jadi jalan ini tidak disimpan.',
+  'roadtrip.alt.ferryNotHeld':
+    'Jalan ini menyeberang dengan feri. Tambahkan feri sebagai pemesanan transportasi dan perjalanan akan mengikutinya.',
+  'roadtrip.alt.legChanged': 'Ruas ini berubah saat jalannya diperiksa, jadi tidak ada yang disimpan.',
+  'roadtrip.alt.offline': 'Jalan lain hanya disimpan saat online. Sambungkan kembali untuk memilih yang ini.',
   'roadtrip.day': 'Hari {number}',
   'roadtrip.quietDay.empty': 'Belum ada perhentian — jatuhkan di sini',
   'roadtrip.quietDay.one': 'Sejauh ini hanya {name} — jatuhkan perhentian di sini',

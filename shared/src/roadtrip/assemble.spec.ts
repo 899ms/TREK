@@ -1,5 +1,5 @@
 /**
- * ROADTRIP-ASSEMBLE-001..005: what the assembler does with the model's warnings, and
+ * ROADTRIP-ASSEMBLE-001..016: what the assembler does with the model's warnings, and
  * what it tells a surface about the drive between connected days.
  *
  * The model itself is pinned by roadtripModel.spec.ts. This file pins the
@@ -256,6 +256,47 @@ describe('assembleRoadtrip connected days', () => {
     // drives its own. Only that first one of day 2's is the connection.
     expect(routes.lineDays).toEqual([1, 1, 2, 2]);
     expect(routes.lineJoins).toEqual([false, false, true, false]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-015: every leg carries the road it is drawn on, beside its figures', () => {
+    // The picker of other ways lists the rail's own road as the current one, and it can only
+    // do that with the line of THAT leg. The card's geometry is every leg in one line, and
+    // cutting it back apart would be a second measurement that can disagree with the first.
+    const routes = assembleTwoDays(false);
+    const [first, second] = routes.days;
+
+    expect(first!.legLines).toHaveLength(first!.legs.length);
+    expect(first!.legLines).toEqual([
+      [
+        [50, 10],
+        [51, 10],
+      ],
+      [
+        [51, 10],
+        [52, 10],
+      ],
+    ]);
+    expect(second!.legLines).toEqual([
+      [
+        [60, 10],
+        [61, 10],
+      ],
+    ]);
+  });
+
+  it('ROADTRIP-ASSEMBLE-016: the drive into a connected day carries its line exactly when it carries its band', () => {
+    const joined = assembleTwoDays(true).days[1]!;
+    expect(joined.arrivingLeg).toBeDefined();
+    expect(joined.arrivingLine).toEqual([
+      [52, 10],
+      [60, 10],
+    ]);
+    // It is not one of the card's own legs, so it stays out of theirs.
+    expect(joined.legLines).toHaveLength(1);
+
+    const apart = assembleTwoDays(false).days[1]!;
+    expect(apart.arrivingLeg).toBeUndefined();
+    expect(apart.arrivingLine).toBeUndefined();
   });
 });
 

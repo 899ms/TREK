@@ -223,6 +223,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} más',
   'roadtrip.alt.quicker': '{time} menos',
   'roadtrip.alt.otherEngine': 'Tiempo del enrutador de evitación, no del principal.',
+  'roadtrip.alt.notHeld': 'El enrutador del viaje no sigue esta ruta, así que no se ha guardado.',
+  'roadtrip.alt.ferryNotHeld':
+    'Esta ruta cruza en ferri. Añade el ferri como reserva de transporte y el trayecto lo seguirá.',
+  'roadtrip.alt.legChanged': 'Este tramo cambió mientras se comprobaba la ruta, así que no se ha guardado nada.',
+  'roadtrip.alt.offline': 'Las otras rutas solo se guardan con conexión. Vuelve a conectarte para elegir esta.',
   'roadtrip.day': 'Día {number}',
   'roadtrip.quietDay.empty': 'Sin paradas todavía: suelta una aquí',
   'roadtrip.quietDay.one': 'Por ahora solo {name}: suelta una parada aquí',

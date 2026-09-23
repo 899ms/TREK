@@ -224,6 +224,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} més lenta',
   'roadtrip.alt.quicker': '{time} més ràpida',
   'roadtrip.alt.otherEngine': 'Temps de l’encaminador d’evitació, no del principal.',
+  'roadtrip.alt.notHeld': 'L’encaminador del viatge no segueix aquest camí, així que no s’ha desat.',
+  'roadtrip.alt.ferryNotHeld':
+    'Aquest camí creua en transbordador. Afegeix el transbordador com a reserva de transport i el trajecte el seguirà.',
+  'roadtrip.alt.legChanged': 'Aquest tram ha canviat mentre es comprovava el camí, així que no s’ha desat res.',
+  'roadtrip.alt.offline': 'Els altres camins només es desen amb connexió. Torna a connectar-te per triar aquest.',
   'roadtrip.day': 'Dia {number}',
   'roadtrip.quietDay.empty': 'Encara sense parades: deixa’n una aquí',
   'roadtrip.quietDay.one': 'De moment només {name}: deixa una parada aquí',

@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-115
+// FE-TP-ROAD-001 to FE-TP-ROAD-127
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -91,7 +91,11 @@ const rt = vi.hoisted(() => {
   // the arguments are the only place the planner's own decisions are visible: which
   // days it is willing to route, and which assignment list it builds them from.
   const routesArgs = { current: [] as unknown[] }
+  // The leg router the rail hands out, and the call it routes a leg with. The router is
+  // what the planner asks with; the call is what a choice is proven against.
+  const legRoute = vi.fn()
   const routes = {
+    legRouter: vi.fn(),
     days: [] as Array<Record<string, unknown>>,
     quietDays: [] as unknown[],
     lines: [] as unknown[],
@@ -144,12 +148,14 @@ const rt = vi.hoisted(() => {
     open: null as null | Record<string, unknown>,
     ask: vi.fn(),
     close: vi.fn(),
+    prove: vi.fn(),
+    settle: vi.fn(),
   }
   // Hands out a fresh copy of `alt` on every render when set, the identity the real hook
   // had before it was memoised. A stable fixture runs an effect keyed on it once and never
   // again, which is exactly how a close gate that fired on every render went unseen.
   const altFresh = { current: false }
-  return { vias, routes, corridor, alt, altFresh, routesArgs }
+  return { vias, routes, corridor, alt, altFresh, routesArgs, legRoute }
 })
 
 vi.mock('../../components/Roadtrip/useRoadtripVias', () => ({ useRoadtripVias: () => rt.vias }))
@@ -306,6 +312,12 @@ beforeEach(() => {
   rt.vias.byDay = {}
   rt.vias.stale = false
   rt.vias.editable = true
+  // Reset rather than cleared: an implementation set by one case (a write that fails) would
+  // otherwise carry into the next and answer for it.
+  rt.vias.addMany.mockReset().mockResolvedValue(undefined)
+  rt.legRoute.mockReset()
+  rt.routes.legRouter.mockReset().mockImplementation(() => ({ mode: 'driving', avoid: [], engine: 'osrm', route: rt.legRoute }))
+  rt.alt.prove.mockReset().mockImplementation(() => new AbortController().signal)
   rt.routes.days = []
   rt.routesArgs.current = []
   rt.routes.lines = []
@@ -889,6 +901,10 @@ describe('useTripPlanner road trip: one stop at a time', () => {
 })
 
 describe('useTripPlanner road trip: other ways of driving a leg', () => {
+  /** The road the rail drives from Hamburg to Berlin, and a detour north of it. */
+  const RAIL_LINE: [number, number][] = [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4]]
+  const DETOUR: [number, number][] = [[53.55, 9.99], [53.4, 11.5], [53.3, 12.8], [52.52, 13.4]]
+
   const routedDay = () => {
     seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
     rt.corridor.day = { dayId: 5, dayNumber: 1 }
@@ -896,24 +912,61 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
       dayId: 5,
       dayNumber: 1,
       stops: [
-        { lat: 53.55, lng: 9.99, name: 'Hamburg' },
-        { lat: 52.52, lng: 13.4, name: 'Berlin' },
+        { assignmentId: 11, lat: 53.55, lng: 9.99, name: 'Hamburg' },
+        { assignmentId: 12, lat: 52.52, lng: 13.4, name: 'Berlin' },
       ],
-      geometry: [[53.55, 9.99], [53.0, 11.5], [52.52, 13.4]],
+      legs: [{ distance: 290_000, duration: 10_800 }],
+      legLines: [RAIL_LINE],
+      geometry: RAIL_LINE,
     }]
   }
 
-  it('FE-TP-ROAD-034: asking passes the vias of THAT leg, so the road being driven is offered too', async () => {
+  /** The picker as `useRouteAlternatives` leaves it once asked: the rail's road, then the offers. */
+  const openWith = (offers: Array<Record<string, unknown>>, over: Record<string, unknown> = {}) => {
+    rt.alt.open = {
+      dayId: 5, index: 0, loading: false, error: false, proving: null,
+      anchor: { dayId: 5, afterIndex: 0 },
+      ends: { from: 11, to: 12 },
+      engine: 'osrm',
+      route: rt.legRoute,
+      routes: [
+        { coordinates: RAIL_LINE, distance: 290_000, duration: 10_800, divergence: null, current: true },
+        ...offers,
+      ],
+      ...over,
+    }
+  }
+  const detour = (over: Record<string, unknown> = {}) =>
+    ({ coordinates: DETOUR, distance: 310_000, duration: 11_400, divergence: { lat: 53.3, lng: 12.8 }, ...over })
+  const answer = (coordinates: [number, number][], over: Record<string, unknown> = {}) =>
+    ({ coordinates, distance: 300_000, duration: 11_000, fellBack: false, ...over })
+
+  it('FE-TP-ROAD-034: asking hands over the leg the rail drives, where a choice is filed, and the router for that leg', async () => {
     routedDay()
-    rt.vias.byDay = { 5: [via(1, 5, 0, 1), via(2, 5, 0, 0), via(3, 5, 1)] }
+    // A card that opens on a stop stored on the day before: its vias are filed there.
+    rt.routes.days[0].stops = [
+      { assignmentId: 11, ownerDayId: 4, ownerIndex: 2, lat: 53.55, lng: 9.99, name: 'Hamburg' },
+      { assignmentId: 12, lat: 52.52, lng: 13.4, name: 'Berlin' },
+    ]
     const { result } = await renderRoadtrip()
 
-    act(() => { result.current.askRouteAlternatives(5, 0) })
+    act(() => { result.current.askRouteAlternatives(5, { kind: 'leg', index: 0 }) })
 
-    const [dayId, legIndex, , , profile, legVias] = rt.alt.ask.mock.calls[0] as [number, number, unknown, unknown, string, Array<{ id: number }>]
-    expect([dayId, legIndex, profile]).toEqual([5, 0, 'driving'])
-    // Only the vias on leg 0, and in the order the car passes them.
-    expect(legVias.map(v => v.id)).toEqual([2, 1])
+    const [request] = rt.alt.ask.mock.calls[0] as [Record<string, unknown>]
+    expect(request).toMatchObject({
+      dayId: 5,
+      index: 0,
+      from: { lat: 53.55, lng: 9.99 },
+      to: { lat: 52.52, lng: 13.4 },
+      // "Current" is the rail's own leg: its line, its figures, nothing asked for again.
+      driven: { coordinates: RAIL_LINE, distance: 290_000, duration: 10_800 },
+      anchor: { dayId: 4, afterIndex: 2 },
+      ends: { from: 11, to: 12 },
+    })
+    // The router of THAT leg, built for the card it is drawn on, not the trip-wide profile.
+    const [from, to, cardDayId] = rt.routes.legRouter.mock.calls[0] as [{ assignmentId: number }, { assignmentId: number }, number]
+    expect([from.assignmentId, to.assignmentId, cardDayId]).toEqual([11, 12, 5])
+    expect((request.router as { route: unknown }).route).toBe(rt.legRoute)
   })
 
   it('FE-TP-ROAD-035: asking again for the leg already open closes it instead', async () => {
@@ -921,42 +974,48 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     rt.alt.open = { dayId: 5, index: 0, routes: [], loading: false, error: false }
     const { result } = await renderRoadtrip()
 
-    act(() => { result.current.askRouteAlternatives(5, 0) })
+    act(() => { result.current.askRouteAlternatives(5, { kind: 'leg', index: 0 }) })
 
     expect(rt.alt.close).toHaveBeenCalled()
     expect(rt.alt.ask).not.toHaveBeenCalled()
   })
 
-  it('FE-TP-ROAD-036: a leg with nothing at its far end is not a leg', async () => {
+  it('FE-TP-ROAD-036: a leg with nothing at its far end, or no road yet, is not a leg', async () => {
     routedDay()
     const { result } = await renderRoadtrip()
 
-    act(() => { result.current.askRouteAlternatives(5, 1) })
+    act(() => { result.current.askRouteAlternatives(5, { kind: 'leg', index: 1 }) })
+    rt.routes.days[0].legs = []
+    act(() => { result.current.askRouteAlternatives(5, { kind: 'leg', index: 0 }) })
 
     expect(rt.alt.ask).not.toHaveBeenCalled()
   })
 
   it('FE-TP-ROAD-037: choosing the road already driven changes nothing but the picker', async () => {
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [{ current: true }], loading: false, error: false }
+    openWith([detour()])
     const { result } = await renderRoadtrip()
 
     await act(async () => { await result.current.chooseRouteAlternative(0) })
 
-    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(rt.legRoute).not.toHaveBeenCalled()
     expect(rt.vias.addMany).not.toHaveBeenCalled()
     expect(rt.alt.close).toHaveBeenCalled()
   })
 
-  it('FE-TP-ROAD-038: the router own preference clears the leg in ONE write', async () => {
+  it('FE-TP-ROAD-038: the router own preference on a bent leg is proven without pins and clears the leg in ONE write', async () => {
     // One delete per via meant a full trip re-route between each of them, so undoing a
     // detour with three vias drew three routes.
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [{ direct: true }], loading: false, error: false }
+    rt.vias.byDay = { 5: [via(1, 5, 0), via(2, 5, 0, 1)] }
+    openWith([detour({ direct: true })])
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
     const { result } = await renderRoadtrip()
 
-    await act(async () => { await result.current.chooseRouteAlternative(0) })
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
 
+    expect(rt.legRoute).toHaveBeenCalledTimes(1)
+    expect(rt.legRoute.mock.calls[0][0]).toEqual([])
     expect(rt.vias.addMany).toHaveBeenCalledWith(5, [], [0])
     expect(rt.alt.close).toHaveBeenCalled()
   })
@@ -965,48 +1024,50 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     // Swallowing it closed the picker on a leg that still carries its via and still
     // routes the old way, so the traveller believed they had undone the detour.
     routedDay()
-    rt.alt.open = { dayId: 5, index: 0, routes: [{ direct: true }], loading: false, error: false }
+    rt.vias.byDay = { 5: [via(1, 5, 0)] }
+    openWith([detour({ direct: true })])
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
     rt.vias.addMany.mockRejectedValue(new Error('offline'))
     const { result } = await renderRoadtrip()
     // The mode starts off until the addon feed answers, and that effect closes the
     // picker once on the way in. Measure from there.
     rt.alt.close.mockClear()
 
-    await act(async () => { await result.current.chooseRouteAlternative(0) })
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(toasts.some(t => t.type === 'error' && t.message === 'offline')).toBe(true)
     expect(rt.alt.close).not.toHaveBeenCalled()
+    expect(rt.alt.settle).toHaveBeenCalled()
   })
 
-  it('FE-TP-ROAD-040: another road replaces the leg it reshapes, as a via rather than a polyline', async () => {
+  it('FE-TP-ROAD-040: another road the router drives through one pin replaces the leg with that pin', async () => {
     routedDay()
-    rt.alt.open = {
-      dayId: 5, index: 0, loading: false, error: false,
-      routes: [{ divergence: { lat: 53.1, lng: 11.9 } }],
-    }
+    openWith([detour()])
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
     const { result } = await renderRoadtrip()
 
-    await act(async () => { await result.current.chooseRouteAlternative(0) })
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
 
-    // Replacing, not appending: the alternatives were computed for the two bare
-    // endpoints, so a leg that still carries its old via routes somewhere the
+    // Marked as being checked while the router is asked.
+    expect(rt.alt.prove).toHaveBeenCalledWith(1)
+    // The first pin is where the offer strays furthest from the road being driven.
+    expect(rt.legRoute.mock.calls[0][0]).toEqual([{ lat: 53.3, lng: 12.8 }])
+    // Replacing, not appending: a leg that still carries its old via routes somewhere the
     // preview never drew.
-    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 0, lat: 53.1, lng: 11.9 }], [0])
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [{ after_order_index: 0, lat: 53.3, lng: 12.8 }], [0])
     expect(rt.vias.add).not.toHaveBeenCalled()
     expect(rt.alt.close).toHaveBeenCalled()
   })
 
-  it('FE-TP-ROAD-041: a via that will not save leaves the picker open', async () => {
+  it('FE-TP-ROAD-041: pins that will not save leave the picker open', async () => {
     routedDay()
-    rt.alt.open = {
-      dayId: 5, index: 0, loading: false, error: false,
-      routes: [{ divergence: { lat: 53.1, lng: 11.9 } }],
-    }
+    openWith([detour()])
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
     rt.vias.addMany.mockRejectedValue(new Error('rejected'))
     const { result } = await renderRoadtrip()
     rt.alt.close.mockClear()
 
-    await act(async () => { await result.current.chooseRouteAlternative(0) })
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(toasts.some(t => t.type === 'error' && t.message === 'rejected')).toBe(true)
     expect(rt.alt.close).not.toHaveBeenCalled()
@@ -1019,8 +1080,209 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
     await act(async () => { await result.current.chooseRouteAlternative(3) })
 
+    expect(rt.legRoute).not.toHaveBeenCalled()
     expect(rt.vias.add).not.toHaveBeenCalled()
     expect(rt.vias.addMany).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-116: a road one pin does not hold gets a second, in the order the road drives them', async () => {
+    // The first answer passes the pin and still takes the old road for the first half.
+    routedDay()
+    openWith([detour()])
+    rt.legRoute
+      .mockResolvedValueOnce(answer([[53.55, 9.99], [53.0, 11.5], [53.3, 12.8], [52.52, 13.4]]))
+      .mockResolvedValueOnce(answer(DETOUR))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.legRoute).toHaveBeenCalledTimes(2)
+    // The new pin goes in front of the first, because the detour reaches it first.
+    const pins = [{ lat: 53.4, lng: 11.5 }, { lat: 53.3, lng: 12.8 }]
+    expect(rt.legRoute.mock.calls[1][0]).toEqual(pins)
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, pins.map(p => ({ after_order_index: 0, ...p })), [0])
+  })
+
+  it('FE-TP-ROAD-117: a road the router will not drive is not saved, and the picker stays open to say so', async () => {
+    routedDay()
+    openWith([detour()])
+    // Whatever is pinned, the router comes back on the road it was already on.
+    rt.legRoute.mockResolvedValue(answer(RAIL_LINE))
+    const { result } = await renderRoadtrip()
+    rt.alt.close.mockClear()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.alt.close).not.toHaveBeenCalled()
+    expect(rt.alt.settle).toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: 'The road trip’s router won’t follow this way, so it was not saved.', type: 'error' })
+    // Nothing about a ferry the offer never took.
+    expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('ferry') }))
+  })
+
+  it('FE-TP-ROAD-118: a ferry the router would not board says how to get it driven', async () => {
+    // #2461: the way across the North Sea, pinned on the ferry, came back through Calais.
+    routedDay()
+    openWith([detour({ hasFerry: true, avoids: 'motorway', engine: 'valhalla' })])
+    rt.legRoute.mockResolvedValue(answer(RAIL_LINE, { hasFerry: false }))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({
+      message: 'This way crosses by ferry. Add the ferry as a transport booking and the drive follows it.',
+      type: 'info',
+    })
+  })
+
+  it('FE-TP-ROAD-119: the router own road on a leg nothing bends writes nothing and closes', async () => {
+    routedDay()
+    openWith([detour({ direct: true })])
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.legRoute).toHaveBeenCalledTimes(1)
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.alt.close).toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-120: a leg that changed while the router was asked is not written to', async () => {
+    routedDay()
+    openWith([detour()])
+    let answerNow: (value: unknown) => void = () => {}
+    rt.legRoute.mockImplementation(() => new Promise(resolve => { answerNow = resolve }))
+    const { result, rerender } = await renderRoadtrip()
+
+    let choosing: Promise<void> = Promise.resolve()
+    act(() => { choosing = result.current.chooseRouteAlternative(1) })
+    // A stop dropped in between: the leg from Hamburg now ends somewhere else.
+    rt.routes.days = [{
+      ...rt.routes.days[0],
+      stops: [
+        { assignmentId: 11, ownerDayId: 5, ownerIndex: 0, lat: 53.55, lng: 9.99 },
+        { assignmentId: 13, ownerDayId: 5, ownerIndex: 1, lat: 53.1, lng: 11.9 },
+        { assignmentId: 12, ownerDayId: 5, ownerIndex: 2, lat: 52.52, lng: 13.4 },
+      ],
+    }]
+    rerender()
+    await act(async () => { answerNow(answer(DETOUR)); await choosing })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: 'This leg changed while the way was being checked, so nothing was saved.', type: 'error' })
+    expect(rt.alt.close).toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-121: offline nothing is checked and nothing is written, and it says why', async () => {
+    routedDay()
+    openWith([detour()])
+    rt.vias.editable = false
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.alt.prove).not.toHaveBeenCalled()
+    expect(rt.legRoute).not.toHaveBeenCalled()
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: 'Other ways are saved online only. Reconnect to take this one.', type: 'error' })
+  })
+
+  it('FE-TP-ROAD-122: a second choice while the first is being checked is not taken', async () => {
+    // The map line stays clickable while a chip's choice is checked.
+    routedDay()
+    openWith([detour(), detour({ coordinates: [[53.55, 9.99], [52.0, 11.5], [52.52, 13.4]] })], { proving: 1 })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(2) })
+
+    expect(rt.alt.prove).not.toHaveBeenCalled()
+    expect(rt.legRoute).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-123: an answer from the stand-in engine proves nothing, so nothing is written', async () => {
+    routedDay()
+    openWith([detour()], { engine: 'valhalla' })
+    rt.legRoute.mockResolvedValue(answer(DETOUR, { fellBack: true }))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.alt.settle).toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: 'The router is not answering right now.', type: 'error' })
+  })
+
+  it('FE-TP-ROAD-124: a router that fails while checking says so and writes nothing', async () => {
+    routedDay()
+    openWith([detour()])
+    rt.legRoute.mockRejectedValue(new Error('429'))
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.alt.settle).toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: 'The router is not answering right now.', type: 'error' })
+  })
+
+  it('FE-TP-ROAD-125: a check abandoned by closing the picker ends in silence', async () => {
+    routedDay()
+    openWith([detour()])
+    const controller = new AbortController()
+    rt.alt.prove.mockReturnValue(controller.signal)
+    rt.legRoute.mockImplementation(async () => {
+      controller.abort()
+      throw new DOMException('aborted', 'AbortError')
+    })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).not.toHaveBeenCalled()
+    expect(rt.alt.settle).not.toHaveBeenCalled()
+    expect(toasts).not.toContainEqual(expect.objectContaining({ message: 'The router is not answering right now.' }))
+  })
+
+  it('FE-TP-ROAD-127: a picker opened on another leg while the pins were written is left open', async () => {
+    // The write lands, but the traveller has moved on to the next leg in the meantime:
+    // closing now would close THAT picker. A write that fails is still said.
+    routedDay()
+    openWith([detour()])
+    const controller = new AbortController()
+    rt.alt.prove.mockReturnValue(controller.signal)
+    rt.legRoute.mockResolvedValue(answer(DETOUR))
+    rt.vias.addMany.mockImplementation(async () => { controller.abort() })
+    const { result } = await renderRoadtrip()
+    rt.alt.close.mockClear()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(rt.vias.addMany).toHaveBeenCalledTimes(1)
+    expect(rt.alt.close).not.toHaveBeenCalled()
+
+    const again = new AbortController()
+    rt.alt.prove.mockReturnValue(again.signal)
+    rt.vias.addMany.mockImplementation(async () => { again.abort(); throw new Error('rejected') })
+    rt.alt.settle.mockClear()
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(toasts).toContainEqual({ message: 'rejected', type: 'error' })
+    expect(rt.alt.settle).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-ROAD-126: offers are read against the engine the rail drives the leg with', async () => {
+    // A trip that avoids something is driven by the second engine, and so are its offers:
+    // none of them is another engine's, and the difference is printed.
+    routedDay()
+    openWith([detour({ engine: 'valhalla' })], { engine: 'valhalla' })
+    rt.alt.open!.routes = (rt.alt.open!.routes as Array<Record<string, unknown>>).map((r, i) => (i === 0 ? { ...r, engine: 'valhalla' } : r))
+    const { result } = await renderRoadtrip()
+
+    expect(result.current.alternativeOverlays.map(o => o.otherEngine)).toEqual([false, false])
+    expect(result.current.alternativeOverlays[1].slowerThanQuickest).toBe(600)
   })
 
   it('FE-TP-ROAD-043: the overlays and the frame come from the open leg, and empty when it closes', async () => {

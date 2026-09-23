@@ -223,6 +223,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} in più',
   'roadtrip.alt.quicker': '{time} in meno',
   'roadtrip.alt.otherEngine': 'Tempo dal router delle esclusioni, non dal principale.',
+  'roadtrip.alt.notHeld': 'Il router del viaggio non segue questo percorso, quindi non è stato salvato.',
+  'roadtrip.alt.ferryNotHeld':
+    'Questo percorso attraversa in traghetto. Aggiungi il traghetto come prenotazione di trasporto e il tragitto lo seguirà.',
+  'roadtrip.alt.legChanged': 'La tratta è cambiata durante la verifica, quindi non è stato salvato nulla.',
+  'roadtrip.alt.offline': 'Gli altri percorsi si salvano solo online. Riconnettiti per scegliere questo.',
   'roadtrip.day': 'Giorno {number}',
   'roadtrip.quietDay.empty': 'Ancora nessuna sosta: trascinane una qui',
   'roadtrip.quietDay.one': 'Finora solo {name}: trascina qui una sosta',

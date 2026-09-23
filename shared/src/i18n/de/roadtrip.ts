@@ -219,6 +219,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} länger',
   'roadtrip.alt.quicker': '{time} kürzer',
   'roadtrip.alt.otherEngine': 'Zeit vom Ausweich-Router, nicht vom Haupt-Router.',
+  'roadtrip.alt.notHeld': 'Der Router des Roadtrips fährt diesen Weg nicht nach, deshalb wurde er nicht gespeichert.',
+  'roadtrip.alt.ferryNotHeld':
+    'Dieser Weg führt über eine Fähre. Trag die Fähre als Transportbuchung ein, dann folgt ihr die Fahrt.',
+  'roadtrip.alt.legChanged': 'Die Etappe hat sich während der Prüfung geändert, deshalb wurde nichts gespeichert.',
+  'roadtrip.alt.offline': 'Andere Wege werden nur online gespeichert. Verbinde dich wieder, um diesen zu nehmen.',
   'roadtrip.day': 'Tag {number}',
   'roadtrip.quietDay.empty': 'Noch keine Stopps — hier ablegen',
   'roadtrip.quietDay.one': 'Bisher nur {name} — hier einen Stopp ablegen',

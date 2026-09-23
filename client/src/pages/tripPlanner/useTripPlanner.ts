@@ -31,7 +31,7 @@ import { useAutomaticDayPoints } from '../../components/Roadtrip/useAutomaticDay
 import { useDayBoundaries } from '../../components/Roadtrip/useDayBoundaries'
 import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
-import { carrierReservationIds, type CarrierTerminal } from '@trek/shared/roadtrip'
+import { carrierReservationIds, viasLeaving, type CarrierTerminal } from '@trek/shared/roadtrip'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { collapsedDayDates } from '../../components/Map/dawarichTrail'
@@ -41,8 +41,9 @@ import { useRoadtripVias } from '../../components/Roadtrip/useRoadtripVias'
 import { useRefuelSearch } from '../../components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../components/Roadtrip/refuelSuggestion'
 import { useFollowTrack } from '../../components/Roadtrip/useFollowTrack'
-import { useRouteAlternatives } from '../../components/Roadtrip/useRouteAlternatives'
-import { buildAlternativeOverlays } from '../../components/Roadtrip/alternativeOverlays'
+import { useRouteAlternatives, type RailDrive } from '../../components/Roadtrip/useRouteAlternatives'
+import { alternativesBusy, buildAlternativeOverlays } from '../../components/Roadtrip/alternativeOverlays'
+import { pinAlternative, railLegAt, type PinProof } from '../../components/Roadtrip/alternativePins'
 import { stopArrival } from '../../components/Roadtrip/stopArrival'
 import type { CorridorPoi } from '../../components/Roadtrip/useCorridorPois'
 import { projectOntoRoute, sliceAtMeters, type LatLng } from '../../components/Roadtrip/corridor'
@@ -1524,7 +1525,7 @@ export function useTripPlanner() {
       noMotorway: t('roadtrip.alt.noMotorway'),
       noToll: t('roadtrip.alt.noToll'),
       noFerry: t('roadtrip.alt.noFerry'),
-    }),
+    }, routeAlternatives.open?.engine),
     [routeAlternatives.open, t],
   )
 
@@ -1579,85 +1580,122 @@ export function useTripPlanner() {
     [refuel.offered, alternativeFocusPoints, automaticPoints.focusPoints],
   )
 
-  /** Asks the router for other ways of driving one leg of one day. */
-  const askRouteAlternatives = useCallback((dayId: number, legIndex: number) => {
+  /**
+   * The rail as it stands now, for a choice that is written several router answers after
+   * the render that started it. Checked against before anything is written.
+   */
+  const railDaysRef = useRef(roadtripRoutes.days)
+  useEffect(() => { railDaysRef.current = roadtripRoutes.days }, [roadtripRoutes.days])
+
+  /**
+   * Asks the rail's own router for other ways of one drive on a card.
+   *
+   * The picker is handed everything about the leg as the rail has it: the road it is on
+   * now, which heads the list as the current one; where a choice would be written; and
+   * the router with the leg's own mode and avoided classes, not the trip-wide profile.
+   */
+  const askRouteAlternatives = useCallback((dayId: number, drive: RailDrive) => {
     const day = roadtripRoutes.days.find(d => d.dayId === dayId)
-    const from = day?.stops[legIndex]
-    const to = day?.stops[legIndex + 1]
-    if (!from || !to || !day) return
-    if (routeAlternatives.open?.dayId === dayId && routeAlternatives.open.index === legIndex) {
+    const from = day?.stops[drive.index]
+    const to = day?.stops[drive.index + 1]
+    const leg = day?.legs[drive.index]
+    const router = from && to ? roadtripRoutes.legRouter?.(from, to, dayId) : undefined
+    if (!day || !from || !to || !leg || !router) return
+    if (routeAlternatives.open?.dayId === dayId && routeAlternatives.open.index === drive.index) {
       routeAlternatives.close()
       return
     }
-    // The vias on THIS leg, so the road currently driven is offered alongside the
-    // router's own suggestions rather than being missing from its own picker.
-    const dayIndex = from.ownerIndex
-    const legVias = (roadtripVias.byDay[from.ownerDayId] ?? [])
-      .filter(v => v.after_order_index === dayIndex)
-      .sort((a, b) => a.sequence - b.sequence)
-    routeAlternatives.ask(dayId, legIndex, from, to, routeProfile, legVias)
-  }, [roadtripRoutes.days, routeAlternatives, routeProfile, roadtripVias.byDay])
+    routeAlternatives.ask({
+      dayId,
+      index: drive.index,
+      from: { lat: from.lat, lng: from.lng },
+      to: { lat: to.lat, lng: to.lng },
+      driven: { coordinates: day.legLines?.[drive.index] ?? [], distance: leg.distance, duration: leg.duration },
+      // The vias of a leg are filed behind the stop it leaves, on the day that stop is
+      // stored on, which on a card holding a night drive is not the card's own day.
+      anchor: { dayId: from.ownerDayId, afterIndex: from.ownerIndex },
+      ends: { from: from.assignmentId, to: to.assignmentId },
+      router,
+    })
+  }, [roadtripRoutes, routeAlternatives])
 
   /**
-   * Taking one of the offered routes.
+   * Taking one of the offered routes: pinned, proven, and only then written.
    *
-   * Saved as a via at the point where that route differs most from the default, not as a
-   * stored polyline: a polyline goes stale with the next OSM update and with every stop
-   * that moves, while a via keeps forcing the router back onto this road for as long as
-   * the road exists.
+   * Saved as vias, not as a stored polyline: a polyline goes stale with the next OSM update
+   * and with every stop that moves, while a via keeps forcing the router back onto this
+   * road for as long as the road exists. But a via only holds a road the router is willing
+   * to drive through it, and nothing used to check that: a point on a ferry was pulled to
+   * the pier and the day went the long way round, and a way weighed away from motorways
+   * kept the motorway after its one pinned point. So the rail's own router is asked first
+   * (`pinAlternative`), and a way it will not follow is not saved and says why.
+   *
+   * The pins replace the leg's vias in one write rather than joining them. Appending put a
+   * new point behind the old one and routed out to each in turn, a zigzag matching neither
+   * the preview nor the distance printed on it; and one delete per via meant a full re-route
+   * between each of them. A write that fails is reported and leaves the picker open:
+   * swallowed, it closed on a leg that still carried its via, and not even the reload ran
+   * to contradict the traveller.
    */
   const chooseRouteAlternative = useCallback(async (index: number) => {
     const open = routeAlternatives.open
-    const alt = open?.routes[index]
-    if (!open || !alt) return
+    const offer = open?.routes[index]
+    if (!open || !offer) return
     // Choosing the road already being driven changes nothing.
-    if (alt.current) { routeAlternatives.close(); return }
-    // The router's own preference means no detour at all, so the vias on this leg go.
-    if (alt.direct || !alt.divergence) {
-      const day = roadtripRoutes.days.find(d => d.dayId === open.dayId)
-      const stop = day?.stops[open.index]
-      const dayIndex = stop?.ownerIndex ?? -1
-      // Clearing the leg in one write. One delete per via meant a full trip re-route
-      // between each of them, so undoing a detour with three vias drew three routes.
-      //
-      // Reported like every other write in this hook. Swallowing it closed the
-      // picker on a leg that still carries its via and still routes the old way,
-      // so the traveller believed they had undone the detour — and because the
-      // request failed, not even the reload ran to contradict them.
-      if (dayIndex >= 0) {
-        try {
-          await roadtripVias.addMany(stop!.ownerDayId, [], [dayIndex])
-        } catch (err: unknown) {
-          toast.error(err instanceof Error ? err.message : t('common.unknownError'))
-          return
-        }
-      }
+    if (offer.current) { routeAlternatives.close(); return }
+    // One choice at a time: the map line can be clicked while a chip's choice is checked.
+    if (alternativesBusy(open)) return
+    // Vias are written online only, so a choice that could not be kept is not checked.
+    if (!roadtripVias.editable) { toast.error(t('roadtrip.alt.offline')); return }
+
+    const signal = routeAlternatives.prove(index)
+    let proof: PinProof
+    try {
+      proof = await pinAlternative({ offer, current: open.routes.find(r => r.current), route: open.route, signal })
+    } catch {
+      if (signal.aborted) return
+      routeAlternatives.settle()
+      toast.error(t('roadtrip.alt.failed'))
+      return
+    }
+    if (signal.aborted) return
+    if (!proof.held) {
+      routeAlternatives.settle()
+      toast.error(t(proof.fellBack ? 'roadtrip.alt.failed' : 'roadtrip.alt.notHeld'), 6000)
+      // The one refusal with a way out: a crossing by ferry is a booking, and the drive
+      // follows a booked ferry from terminal to terminal.
+      if (!proof.fellBack && offer.hasFerry && !proof.last.hasFerry) toast.info(t('roadtrip.alt.ferryNotHeld'), 8000)
+      return
+    }
+
+    // The chain may have moved while the router was asked: a stop dragged, a collaborator's
+    // edit arriving. Pins worked out for this leg are only written where it still runs.
+    const { anchor, ends } = open
+    const leg = railLegAt(railDaysRef.current, anchor)
+    if (!leg || leg.from.assignmentId !== ends.from || leg.to.assignmentId !== ends.to) {
+      toast.error(t('roadtrip.alt.legChanged'), 6000)
       routeAlternatives.close()
       return
     }
-    const day = roadtripRoutes.days.find(d => d.dayId === open.dayId)
-    const stop = day?.stops[open.index]
-    if (!day || !stop) return
-    const ownerDayId = stop.ownerDayId ?? day.dayId
-    const legIndex = stop.ownerIndex ?? open.index
-    try {
-      // Replaces the leg rather than appending to it. The alternatives under the
-      // button were computed for the two bare endpoints — the road already being
-      // driven is offered separately as `current` — so a leg that already carries
-      // a via cannot produce the line the preview drew. Appending put the new
-      // point behind the old one and routed A, south to the old via, north to the
-      // new one, then B: a zigzag matching neither the preview nor the distance
-      // printed on it. Same write the direct branch above already uses.
-      await roadtripVias.addMany(
-        ownerDayId,
-        [{ after_order_index: legIndex, lat: alt.divergence.lat, lng: alt.divergence.lng }],
-        [legIndex],
-      )
-      routeAlternatives.close()
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : t('common.unknownError'))
+    // The router's own road on a leg nothing bends is already what is driven.
+    const bent = viasLeaving(leg.from, roadtripVias.byDay[anchor.dayId] ?? []).length > 0
+    if (proof.pins.length || bent) {
+      try {
+        await roadtripVias.addMany(
+          anchor.dayId,
+          proof.pins.map(pin => ({ after_order_index: anchor.afterIndex, lat: pin.lat, lng: pin.lng })),
+          [anchor.afterIndex],
+        )
+      } catch (err: unknown) {
+        // Said even when the picker has moved on in the meantime: the write was asked for.
+        if (!signal.aborted) routeAlternatives.settle()
+        toast.error(err instanceof Error ? err.message : t('common.unknownError'))
+        return
+      }
     }
-  }, [routeAlternatives, roadtripRoutes.days, roadtripVias, toast, t])
+    // A picker opened on another leg while this was written belongs to that leg now.
+    if (!signal.aborted) routeAlternatives.close()
+  }, [routeAlternatives, roadtripVias, toast, t])
 
   /**
    * A click on the drawn route puts a via there, and the drive is redrawn through it.

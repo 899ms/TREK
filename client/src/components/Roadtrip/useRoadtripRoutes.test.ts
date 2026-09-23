@@ -1,6 +1,7 @@
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { Assignment, AssignmentsMap, Day, Settings } from '../../types'
+import type { RoadtripStop } from './useRoadtripRoutes'
 
 // Hoisted together with the mock: the module factory runs before the file body, so a
 // class declared down there would not exist yet when the hook does its `instanceof`.
@@ -14,7 +15,13 @@ const { calculateRouteWithLegs, RoutingRefusedError } = vi.hoisted(() => {
   }
   return { calculateRouteWithLegs: vi.fn(), RoutingRefusedError }
 })
-vi.mock('../Map/RouteCalculator', () => ({ calculateRouteWithLegs, RoutingRefusedError }))
+// The rest of the module stays real: which engine a leg belongs to is decided there, and
+// the leg router has to agree with it rather than with a copy.
+vi.mock('../Map/RouteCalculator', async importOriginal => ({
+  ...(await importOriginal<typeof import('../Map/RouteCalculator')>()),
+  calculateRouteWithLegs,
+  RoutingRefusedError,
+}))
 
 import { useRoadtripRoutes } from './useRoadtripRoutes'
 import { DEFAULT_SETTINGS, useSettingsStore } from '../../store/settingsStore'
@@ -1009,5 +1016,72 @@ describe('a booking the traveller rides (#2428)', () => {
     expect(d.schedule.entries[0]).toMatchObject({ arrival: '09:00', departure: '09:00' })
     expect(result.current.totalStops).toBe(2)
     expect(result.current.lines).toHaveLength(3)
+  })
+})
+
+/**
+ * One leg asked for again, the way the rail asks for it.
+ *
+ * The picker of other ways and the check behind a choice both route a single leg on
+ * demand. Asked by anything but the rail's own rules, the offers described a drive the rail
+ * was not on: OSRM with nothing avoided beside a day Valhalla had weighed, under the trip's
+ * profile rather than the leg's own mode.
+ */
+describe('a leg asked for again on demand', () => {
+  beforeEach(() => {
+    useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })
+  })
+  afterEach(() => act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })))
+
+  const stopOn = (ownerDayId: number, ownerIndex: number, at: [number, number], over: Partial<RoadtripStop> = {}) =>
+    ({ assignmentId: ownerDayId * 10 + ownerIndex, ownerDayId, ownerIndex, lat: at[0], lng: at[1], legMode: null, incomingLegMode: null, ...over }) as RoadtripStop
+
+  it('FE-ROADTRIP-ROUTES-046: a leg inside one day is asked with that day\'s mode, the trip\'s classes and its own day', async () => {
+    act(() => { useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_avoid: 'toll' } })) })
+    const days = [day(1, 1, { default_transport_mode: 'driving' })]
+    // The trip-wide profile says walking; the day's own default is what the run used.
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, map(1, [{ id: 1, at: HAMBURG }, { id: 2, at: BERLIN }]), 'walking'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(calculateRouteWithLegs.mock.calls[0][1]).toMatchObject({ profile: 'driving', avoid: ['toll'], dayId: 1 })
+
+    const [from, to] = result.current.days[0].stops
+    const router = result.current.legRouter!(from, to, 1)
+    expect(router).toMatchObject({ mode: 'driving', avoid: ['toll'], engine: 'valhalla' })
+
+    calculateRouteWithLegs.mockClear()
+    calculateRouteWithLegs.mockResolvedValue({ ...routed(2), hasFerry: true })
+    const answer = await router.route([{ lat: 53, lng: 11 }], new AbortController().signal)
+
+    expect(calculateRouteWithLegs).toHaveBeenCalledWith(
+      [{ lat: HAMBURG[0], lng: HAMBURG[1] }, { lat: 53, lng: 11 }, { lat: BERLIN[0], lng: BERLIN[1] }],
+      expect.objectContaining({ profile: 'driving', tripId: 7, dayId: 1, avoid: ['toll'] }),
+    )
+    expect(answer).toMatchObject({ coordinates: [HAMBURG, BERLIN], distance: 100000, duration: 3600, hasFerry: true, fellBack: false })
+  })
+
+  it('FE-ROADTRIP-ROUTES-047: a seam is asked under the card it arrives on, and a leg nothing weighs is OSRM\'s', () => {
+    act(() => { useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_avoid: 'motorway' } })) })
+    const days = [day(1, 1, { default_transport_mode: 'cycling' }), day(2, 2, { default_transport_mode: 'driving' })]
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, {} as AssignmentsMap))
+
+    const lastOfDay1 = stopOn(1, 3, LUENEBURG)
+    const firstOfDay2 = stopOn(2, 0, BERLIN)
+    // Across the seam: day 2's default, so the car and the classes it avoids.
+    expect(result.current.legRouter!(lastOfDay1, firstOfDay2, 2)).toMatchObject({ mode: 'driving', avoid: ['motorway'], engine: 'valhalla' })
+    // Inside day 1: day 1's bicycle, which nothing is weighed against.
+    expect(result.current.legRouter!(stopOn(1, 2, HAMBURG), lastOfDay1, 2)).toMatchObject({ mode: 'cycling', avoid: [], engine: 'osrm' })
+    // A stop's own mode wins over any default, and a plugin prices its own leg.
+    expect(result.current.legRouter!(stopOn(2, 0, BERLIN, { legMode: 'plugin:ev/fast' }), stopOn(2, 1, HAMBURG), 2))
+      .toMatchObject({ mode: 'plugin:ev/fast', avoid: [], engine: 'plugin' })
+  })
+
+  it('FE-ROADTRIP-ROUTES-048: a day the stand-in engine drove while avoiding says the avoidance did not happen', async () => {
+    act(() => { useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_avoid: 'toll,ferry' } })) })
+    calculateRouteWithLegs.mockResolvedValue({ ...routed(1), avoidance: { asked: ['ferry', 'toll'], achieved: [], fellBack: true } })
+
+    const { result } = renderHook(() => useRoadtripRoutes(7, [day(1, 1)], map(1, [{ id: 1, at: HAMBURG }, { id: 2, at: BERLIN }])))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.days[0].avoidMissed).toEqual(['ferry', 'toll'])
   })
 })

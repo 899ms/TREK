@@ -225,6 +225,22 @@ describe('browser-independent roadtrip calculation', () => {
     expect(day.schedule.entries.map((e: { departure: string }) => e.departure)).toEqual(['07:30', '09:30', '12:00']);
     expect(day.schedule.warnings).toEqual([{ index: 1, code: 'missedLeave', minutes: 30 }]);
   });
+  it('keeps the per-leg lines the browser planner reads out of the calculate_roadtrip answer', async () => {
+    // The shared assembler now carries each leg's line beside its figures, for the picker of
+    // other ways in the browser. A tool answer carries geometry only when asked, and then
+    // once per day: the same road a second time, split by leg, is weight and nothing else.
+    const s = setup();
+    const settings = { roadtrip_day_start: '', roadtrip_day_end: '' };
+    const plan = await s.plans.calculate(10, 5, settings);
+    expect(plan.calculated.days[0].legLines).toHaveLength(plan.calculated.days[0].legs.length);
+
+    const mcp = new RoadtripPlanningMcp(s.plans, {} as never, {} as never);
+    const answer = await mcp.calculate({ tripId: 10, includeGeometry: true, settings }, ctx);
+    const [day] = JSON.parse(answer.content[0].text as string).days;
+    expect(day).toHaveProperty('geometry');
+    expect(day).not.toHaveProperty('legLines');
+    expect(day).not.toHaveProperty('arrivingLine');
+  });
   it('keeps explicit end-day visits and manual boundaries in the shared planning path', async () => {
     const s = setup();
     s.visits[0].end_day = 1;

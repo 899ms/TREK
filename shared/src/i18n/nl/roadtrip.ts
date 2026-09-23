@@ -223,6 +223,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} langzamer',
   'roadtrip.alt.quicker': '{time} sneller',
   'roadtrip.alt.otherEngine': 'Tijd van de vermijdingsrouter, niet van de hoofdrouter.',
+  'roadtrip.alt.notHeld': 'De routeserver van de roadtrip volgt deze route niet, dus die is niet opgeslagen.',
+  'roadtrip.alt.ferryNotHeld':
+    'Deze route gaat met de veerboot. Voeg de veerboot toe als vervoersboeking en de rit volgt hem.',
+  'roadtrip.alt.legChanged': 'Dit traject veranderde tijdens de controle, dus er is niets opgeslagen.',
+  'roadtrip.alt.offline': 'Andere routes worden alleen online opgeslagen. Maak opnieuw verbinding om deze te kiezen.',
   'roadtrip.day': 'Dag {number}',
   'roadtrip.quietDay.empty': 'Nog geen stops — laat er hier een vallen',
   'roadtrip.quietDay.one': 'Voorlopig alleen {name} — laat hier een stop vallen',

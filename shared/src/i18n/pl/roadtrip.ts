@@ -221,6 +221,11 @@ const roadtrip: TranslationStrings = {
   'roadtrip.alt.slower': '{time} dłużej',
   'roadtrip.alt.quicker': '{time} krócej',
   'roadtrip.alt.otherEngine': 'Czas policzony silnikiem omijania, nie głównym.',
+  'roadtrip.alt.notHeld': 'Serwer tras podróży nie poprowadzi tą drogą, więc nie została zapisana.',
+  'roadtrip.alt.ferryNotHeld':
+    'Ta droga prowadzi promem. Dodaj prom jako rezerwację transportu, a trasa za nim pójdzie.',
+  'roadtrip.alt.legChanged': 'Ten odcinek zmienił się podczas sprawdzania, więc nic nie zostało zapisane.',
+  'roadtrip.alt.offline': 'Inne drogi zapisują się tylko online. Połącz się ponownie, aby wybrać tę.',
   'roadtrip.day': 'Dzień {number}',
   'roadtrip.quietDay.empty': 'Brak przystanków — upuść tutaj',
   'roadtrip.quietDay.one': 'Na razie tylko {name} — upuść tutaj przystanek',

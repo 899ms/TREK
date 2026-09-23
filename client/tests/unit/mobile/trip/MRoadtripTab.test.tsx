@@ -8,6 +8,7 @@ import type { MTripShellApi, TripPlanner } from '../../../../src/mobile/screens/
 import type { Day, Place, Reservation } from '../../../../src/types'
 import type { CarrierTerminal, RoadtripDay, RoadtripRoutes, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
+import { openLeg } from '../../../helpers/legAlternatives'
 
 // FE-MOB-RTTAB-001 to FE-MOB-RTTAB-057
 //
@@ -624,7 +625,7 @@ describe('MRoadtripTab', () => {
     function withPicker(open: Partial<LegAlternatives>, over: Partial<TripPlanner> = {}): TripPlanner {
       const base = buildPlanner()
       return planner({
-        routeAlternatives: { ...base.routeAlternatives, open: { dayId: 2, index: 0, routes: [], loading: true, error: false, ...open } },
+        routeAlternatives: { ...base.routeAlternatives, open: openLeg({ dayId: 2, index: 0, loading: true, ...open }) },
         ...over,
       })
     }
@@ -669,7 +670,7 @@ describe('MRoadtripTab', () => {
       expect(p.refuel.close).toHaveBeenCalledTimes(1)
       // Day 2, the card: the leg's first stop is stored on day 1, and the planner works
       // that out from the card itself, the way the desk rail asks.
-      expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, 0)
+      expect(p.askRouteAlternatives).toHaveBeenCalledWith(2, { kind: 'leg', index: 0 })
       expect(p.askRouteAlternatives).not.toHaveBeenCalledWith(1, expect.anything())
       expect(shell.toggleRtView).toHaveBeenCalledTimes(1)
     })

@@ -115,6 +115,7 @@ export function assembleRoadtrip({
 
     const inboundAt = new Map<number, { seg: RouteSegment | undefined; line: [number, number][]; drawnAs: number }>();
     let arrivingLeg: RouteSegment | undefined;
+    let arrivingLine: [number, number][] | undefined;
     let arrivingFrom: RoadtripStop | undefined;
     if (connectDays && !automaticSchedule) {
       for (const spill of chain.spills) {
@@ -125,6 +126,7 @@ export function assembleRoadtrip({
       if (joined) {
         inboundAt.set(0, { seg: joined.seg, line: joined.line, drawnAs: previousDayNumber ?? chain.dayNumber });
         arrivingLeg = joined.seg;
+        arrivingLine = joined.line;
         arrivingFrom = previousStop;
       }
     }
@@ -172,6 +174,7 @@ export function assembleRoadtrip({
       geometry.push(...(routed[i]?.line ?? []));
     }
     const legs = routed.map((l) => l?.seg);
+    const legLines = routed.map((l) => l?.line);
     const inbound = [...inboundAt.values()].map((l) => l.seg);
     // The day's figures are the drive's: a ride's hours belong to the booking, not to the
     // wheel, and its distance was never measured (`carrierLeg` stores none).
@@ -282,9 +285,13 @@ export function assembleRoadtrip({
       // Only where no stop actually crossed over: a crossing already draws its own band,
       // with this same road under it, and a second one would be the drive twice.
       arrivingLeg: chain.spills.length ? undefined : arrivingLeg,
+      // Withheld with the band it belongs to, so a surface never holds a line for a leg the
+      // card does not show.
+      arrivingLine: chain.spills.length ? undefined : arrivingLine,
       arrivingFrom,
       stops,
       legs,
+      legLines,
       legVias,
       schedule,
       geometry,
