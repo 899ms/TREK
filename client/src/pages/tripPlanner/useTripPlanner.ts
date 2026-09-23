@@ -1671,7 +1671,9 @@ export function useTripPlanner() {
     } catch {
       if (signal.aborted) return
       routeAlternatives.settle(t('roadtrip.alt.failed'))
-      toast.error(t('roadtrip.alt.failed'))
+      // The desk's bar says it in its own status line; a toast on top covered that line
+      // and printed the same sentence twice. The phone's bar has no room for a sentence.
+      if (isMobile) toast.error(t('roadtrip.alt.failed'))
       return
     }
     if (signal.aborted) return
@@ -1679,8 +1681,10 @@ export function useTripPlanner() {
       const refusal = t(proof.fellBack ? 'roadtrip.alt.failed' : 'roadtrip.alt.notHeld')
       const hint = proof.fellBack ? null : refusalHint(offer, proof.last, t)
       routeAlternatives.settle(hint ? `${refusal} ${hint}` : refusal)
-      toast.error(refusal, 6000)
-      if (hint) toast.info(hint, 8000)
+      if (isMobile) {
+        toast.error(refusal, 6000)
+        if (hint) toast.info(hint, 8000)
+      }
       return
     }
 
@@ -1718,7 +1722,7 @@ export function useTripPlanner() {
     if (open.standIn) toast.info(t('roadtrip.alt.standIn'), 8000)
     // A picker opened on another leg while this was written belongs to that leg now.
     if (!signal.aborted) routeAlternatives.close()
-  }, [routeAlternatives, roadtripVias, roadtripRoutes, toast, t])
+  }, [routeAlternatives, roadtripVias, roadtripRoutes, toast, t, isMobile])
 
   /**
    * A click on the drawn route puts a via there, and the drive is redrawn through it.

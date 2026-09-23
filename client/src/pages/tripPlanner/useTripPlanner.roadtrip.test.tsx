@@ -1121,10 +1121,10 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     expect(rt.vias.addMany).not.toHaveBeenCalled()
     expect(rt.alt.close).not.toHaveBeenCalled()
     // Said to the bar as well, which keeps it beside the offers and announces it.
+    // Exactly this sentence: nothing about a ferry the offer never took.
     expect(rt.alt.settle).toHaveBeenCalledWith('The road trip’s router won’t follow this way, so it was not saved.')
-    expect(toasts).toContainEqual({ message: 'The road trip’s router won’t follow this way, so it was not saved.', type: 'error' })
-    // Nothing about a ferry the offer never took.
-    expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('ferry') }))
+    // The desk's bar says it in its own status line, and a toast on top covered that line.
+    expect(toasts.filter(x => /router|ferry|ticked/.test(x.message))).toEqual([])
   })
 
   it('FE-TP-ROAD-118: a ferry the router would not board says how to get it driven', async () => {
@@ -1138,10 +1138,9 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
     const ferryHint = 'This way crosses by ferry. Add the ferry as a transport booking and the drive follows it. If it lands the next day, put the stops across the water on that day.'
-    expect(toasts).toContainEqual({ message: ferryHint, type: 'info' })
     // The ferry is the way out here, not the motorway the offer also leaves out.
-    expect(toasts).not.toContainEqual(expect.objectContaining({ message: expect.stringContaining('ticked') }))
     expect(rt.alt.settle).toHaveBeenCalledWith(`The road trip’s router won’t follow this way, so it was not saved. ${ferryHint}`)
+    expect(toasts.filter(x => /router|ferry|ticked/.test(x.message))).toEqual([])
   })
 
   it('FE-TP-ROAD-135: a way that leaves a class out says the trip has to avoid it to be driven', async () => {
@@ -1155,10 +1154,29 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
-    expect(toasts).toContainEqual({
-      message: 'The road trip only drives this way with “Motorways” ticked under “Avoid where possible” in its settings.',
-      type: 'info',
-    })
+    expect(rt.alt.settle).toHaveBeenCalledWith(
+      'The road trip’s router won’t follow this way, so it was not saved. The road trip only drives this way with “Motorways” ticked under “Avoid where possible” in its settings.',
+    )
+    expect(toasts.filter(x => /router|ferry|ticked/.test(x.message))).toEqual([])
+  })
+
+  it('FE-TP-ROAD-139: on the phone a refused way is said as a toast too, its bar has no room for the sentence', async () => {
+    const desktopWidth = window.innerWidth
+    Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 390 })
+    try {
+      routedDay()
+      openWith([detour({ hasFerry: true, avoids: 'motorway', engine: 'valhalla' })])
+      rt.legRoute.mockResolvedValue(answer(RAIL_LINE, { hasFerry: false }))
+      const { result } = await renderRoadtrip()
+
+      await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+      expect(rt.vias.addMany).not.toHaveBeenCalled()
+      expect(toasts).toContainEqual({ message: 'The road trip’s router won’t follow this way, so it was not saved.', type: 'error' })
+      expect(toasts).toContainEqual(expect.objectContaining({ message: expect.stringContaining('crosses by ferry'), type: 'info' }))
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: desktopWidth })
+    }
   })
 
   it('FE-TP-ROAD-136: the router own road on a leg OSRM drew in its place asks the rail for the leg again, and says so', async () => {
@@ -1279,8 +1297,8 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
-    expect(rt.alt.settle).toHaveBeenCalled()
-    expect(toasts).toContainEqual({ message: 'The router is not answering right now.', type: 'error' })
+    expect(rt.alt.settle).toHaveBeenCalledWith('The router is not answering right now.')
+    expect(toasts.filter(x => /router|ferry|ticked/.test(x.message))).toEqual([])
   })
 
   it('FE-TP-ROAD-124: a router that fails while checking says so and writes nothing', async () => {
@@ -1292,8 +1310,8 @@ describe('useTripPlanner road trip: other ways of driving a leg', () => {
     await act(async () => { await result.current.chooseRouteAlternative(1) })
 
     expect(rt.vias.addMany).not.toHaveBeenCalled()
-    expect(rt.alt.settle).toHaveBeenCalled()
-    expect(toasts).toContainEqual({ message: 'The router is not answering right now.', type: 'error' })
+    expect(rt.alt.settle).toHaveBeenCalledWith('The router is not answering right now.')
+    expect(toasts.filter(x => /router|ferry|ticked/.test(x.message))).toEqual([])
   })
 
   it('FE-TP-ROAD-125: a check abandoned by closing the picker ends in silence', async () => {

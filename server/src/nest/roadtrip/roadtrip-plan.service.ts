@@ -299,7 +299,7 @@ export class RoadtripPlanService {
         });
         Object.assign(
           allLegs,
-          foldRouteRun(stops, stopAt, { coordinates: routed.leg.line, legs, vias: routed.leg.vias }, profile),
+          foldRouteRun(stops, stopAt, { coordinates: routed.leg.line, legs, vias: routed.leg.vias }, profile, distanceUnit),
         );
         missedByDay[dayId] = [...new Set([...(missedByDay[dayId] ?? []), ...routed.avoidMissed])];
         stops.forEach((stop, index) => {

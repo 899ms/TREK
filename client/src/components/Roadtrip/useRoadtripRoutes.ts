@@ -1,5 +1,5 @@
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
-import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, seatCarrierStops, standsAsDay, terminalAssignmentId, viasLeaving, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
+import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, mergeRouteSegments, seatCarrierStops, standsAsDay, terminalAssignmentId, viasLeaving, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avoidedClasses, calculateRouteWithLegs, routeEngineFor, RoutingRefusedError, type RouteEngine } from '../Map/RouteCalculator'
 import { resolveLegMode } from '../Planner/legMode'
@@ -65,10 +65,13 @@ const stopKey = (s: RoadtripStop): string =>
  * seam round and found every seam already answered, so the drive between two days kept
  * its old road and its old minutes until the page was loaded again.
  */
-const seamShape = (from: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>, mode: string, avoidKey: string): string =>
+const seamShape = (from: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>, mode: string, avoidKey: string, unit: string): string =>
   [
     mode,
     avoidKey,
+    // The seam's printed texts are in this unit, so a switch asks for it again, the way a
+    // day's own run is asked for again.
+    unit,
     viasLeaving(from, viasByDay[from.ownerDayId] ?? [])
       .map(v => `${v.lat.toFixed(5)},${v.lng.toFixed(5)}`)
       .join('|'),
@@ -492,7 +495,7 @@ export function useRoadtripRoutes(
                 collectedMisses[day.dayId] = [...new Set([...(collectedMisses[day.dayId] ?? []), ...missed])]
               }
             }
-            const folded = foldRouteRun(run, stopAt, r, mode)
+            const folded = foldRouteRun(run, stopAt, r, mode, distanceUnit)
             // Remembered per leg, so a picker opened on one of them knows the line on the
             // map is not its engine's and does not read it as the road already taken.
             if (r.avoidance?.fellBack) for (const key of Object.keys(folded)) collectedStandIns.add(key)
@@ -615,7 +618,7 @@ export function useRoadtripRoutes(
       // nothing at all: the first answer was cached under the pair, and dragging the
       // point changed the request nobody was going to send again.
       const mode = legModeOf(from, to, dayId)
-      const shape = seamShape(from, viasByDay, mode, avoidKey)
+      const shape = seamShape(from, viasByDay, mode, avoidKey, distanceUnit)
       const have = seamLegs[legKey(from, to)]
       const current = have?.shape === shape
       // What the drawn join could not avoid is flagged on the card it arrives on, the way
@@ -649,7 +652,7 @@ export function useRoadtripRoutes(
       }
     }
     return { seams: out, seamMisses: misses }
-  }, [chains, plan, quietDays, window, legsByDay, seamLegs, rideLegs, viasByDay, connectDays, legModeOf, avoidKey])
+  }, [chains, plan, quietDays, window, legsByDay, seamLegs, rideLegs, viasByDay, connectDays, legModeOf, avoidKey, distanceUnit])
   /** Each card's unavoided classes, its own run's and those of the join it is reached by. */
   const missedOnCards = useMemo(() => {
     const out: Record<number, RouteAvoidClass[]> = { ...missedByDay }
@@ -718,14 +721,10 @@ export function useRoadtripRoutes(
           )
           if (controller.signal.aborted) return
           // One leg per waypoint PAIR, so a shaped seam comes back in pieces and the rail
-          // wants the whole drive: summed here, exactly as a day run folds its via legs
+          // wants the whole drive: merged here, exactly as a day run folds its via legs
           // back onto the stop pair they belong to.
           if (!r.legs.length) continue
-          const merged = r.legs.length === 1 ? r.legs[0] : {
-            ...r.legs[0],
-            distance: r.legs.reduce((sum, l) => sum + (l.distance ?? 0), 0),
-            duration: r.legs.reduce((sum, l) => sum + (l.duration ?? 0), 0),
-          }
+          const merged = mergeRouteSegments(r.legs, distanceUnit)
           setSeamLegs(prev => ({
             ...prev,
             [legKey(seam.from, seam.to)]: {
