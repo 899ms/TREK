@@ -180,7 +180,7 @@ export function dayDeleteImpact(
   const position = new Map(ordered.map((d, i) => [d.id, i]))
   const at = position.get(day.id) ?? -1
   const remaining = ordered.filter(d => d.id !== day.id)
-  const dates = ordered.map(d => d.date).filter((d): d is string => !!d).sort()
+  const dates = ordered.map(d => d.date).filter((d): d is string => !!d).sort((a, b) => a.localeCompare(b))
 
   const moved = new Set<number>()
   let datedSpare: DatedSpare | null = null

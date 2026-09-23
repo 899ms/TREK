@@ -209,7 +209,7 @@ export class DayRemovalService {
    */
   private renumber(tripId: number, rows: DayRow[], remaining: DayRow[]): string | null {
     // ISO dates sort as plain strings.
-    const sortedDates = rows.map(r => r.date).filter((d): d is string => !!d).sort();
+    const sortedDates = rows.map(r => r.date).filter((d): d is string => !!d).sort((a, b) => a.localeCompare(b));
     const setNumber = this.db.prepare('UPDATE days SET day_number = ? WHERE id = ?');
     const setNumberAndDate = this.db.prepare('UPDATE days SET day_number = ?, date = ? WHERE id = ?');
 

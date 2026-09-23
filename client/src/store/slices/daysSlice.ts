@@ -28,7 +28,7 @@ type DayState = Pick<TripStoreState, 'days' | 'assignments' | 'dayNotes' | 'sele
  */
 export function withoutDay(state: DayState, dayId: number): DayState {
   const ordered = [...state.days].sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
-  const dates = ordered.map(d => d.date).filter((d): d is string => !!d).sort()
+  const dates = ordered.map(d => d.date).filter((d): d is string => !!d).sort((a, b) => a.localeCompare(b))
   const days = ordered
     .filter(d => d.id !== dayId)
     .map((d, i) => ({ ...d, day_number: i + 1, date: dates.length ? (dates[i] ?? null) : d.date }))
