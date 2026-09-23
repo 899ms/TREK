@@ -38,6 +38,7 @@ export * from './docsync/docsync.schema';
 export * from './day/day.schema';
 export * from './day/note-colors';
 export * from './day/chrono-order';
+export * from './day/stay-bookends';
 export * from './assignment/assignment.schema';
 export * from './place/place.schema';
 export * from './place/place-match';
