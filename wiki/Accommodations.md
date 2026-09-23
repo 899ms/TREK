@@ -87,6 +87,15 @@ you already have show their hotels on the drive without anyone re-saving anythin
 planned before 4.3.1 are seated the same way on upgrade, see
 [Upgrading to 4.3.1](Updating#upgrading-to-431).
 
+## When a check-in or check-out day goes
+
+A stay is tied to its check-in and check-out day, so it cannot outlive either of them. What happens to its booking depends on how the day goes:
+
+- **Deleting the day** in the **Reorder days** dialog cancels the stay cleanly, together with its Hotel booking and the expense of that booking. The question before the delete shows this line in red. See [Deleting a day](Day-Plans-and-Notes#deleting-a-day).
+- **Shortening the trip** removes the whole stay, also its nights that are still part of the trip, but leaves its booking under Bookings and its expense under Costs. The trip dialog shows the stay in red before it saves. See [Shortening a trip](Day-Plans-and-Notes#shortening-a-trip).
+
+A stay that only runs across a deleted day, with its check-in before and its check-out after it, is kept.
+
 ## In the day plan sidebar
 
 Accommodations appear as small colour-coded badges in the day header row of the day plan sidebar:

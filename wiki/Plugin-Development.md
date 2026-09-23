@@ -251,7 +251,7 @@ parser would ignore one if you added it.
 | `ctx.trips.update(tripId, fields)` | update trip fields (title/dates/currency/reminder_days/…) | `db:write:trips` |
 | `ctx.trips.create(input)` | create a **new trip owned by the acting user** (importers) — `title` required, plus `description?`/`start_date?`/`end_date?`/`currency?`/`reminder_days?`/`day_count?`; without `currency` the trip takes the acting user's display currency, then the instance default, then EUR | `db:create:trips` (+ `trip_create`) |
 | `ctx.places` | `create(tripId, fields)` / `update(tripId, placeId, fields)` / `delete(tripId, placeId)` | `db:write:places` |
-| `ctx.days` | `create(tripId, {date?, notes?})` / `update(tripId, dayId, {notes?, title?})` / `delete(tripId, dayId)` | `db:write:days` |
+| `ctx.days` | `create(tripId, {date?, notes?, dated?})` / `update(tripId, dayId, {notes?, title?})` / `delete(tripId, dayId)`. `dated: true` adds the calendar day after the trip's last date and extends the trip to it, on a trip with dates only and never next to `date`. `delete` works as in the planner (see [Deleting a day](Day-Plans-and-Notes#deleting-a-day)) and refuses the last day of a trip with `BAD_PARAMS` | `db:write:days` |
 | `ctx.itinerary` | `assign(tripId, dayId, placeId, notes?)` / `unassign(tripId, assignmentId)` — place↔day | `db:write:itinerary` |
 | `ctx.meta` | `get` / `set` / `list` / `delete` your **own** namespaced data on a `trip`/`place`/`day`/`reservation`/`accommodation` (enrich core entities without forking the schema) | `db:meta` |
 | `ctx.packing` | `list(tripId)` — a trip's packing items (membership-checked, respects private-item visibility) | `db:read:packing` |
