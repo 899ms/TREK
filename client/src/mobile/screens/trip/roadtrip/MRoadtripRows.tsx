@@ -4,18 +4,19 @@ import MDancingTrek from '../../../components/MDancingTrek'
 import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
 import { bookingOpens, carrierIcon, rideText, terminalLine } from '../../../../components/Roadtrip/carrierRide'
+import { BOOKEND_ICON, bookendMeta, bookendTitle } from '../../../../components/Roadtrip/nightBookend'
 import { bookingClock, bookingIcon } from '../../../../components/Roadtrip/stopBookings'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
 import { formatClockTime } from '../../../../utils/formatters'
-import type { RoadtripRow, StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
+import type { BookendReading, RoadtripRow, StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import type { RefuelSearch } from '../../../../components/Roadtrip/useRefuelSearch'
 import { REFUEL_EMPTY_KEY, REFUEL_WORDS, refuelBandState, type RefuelCandidate } from '../../../../components/Roadtrip/refuelSuggestion'
 import type { DistanceUnit, RouteSegment, ScheduleWarning } from '@trek/shared/roadtrip'
 import type { Reservation, TranslationFn } from '../../../../types'
 
 /**
- * The four row types of the mobile drive chain, plus the two bands that interrupt it.
+ * The row types of the mobile drive chain, plus the two bands that interrupt it.
  *
  * What the desktop rail does in five stacked 8px badges per stop, this does in at most
  * two 10.5px marks: on touch there is no hover, so a badge nobody can explain is worse
@@ -127,10 +128,25 @@ function warningMark(warning: ScheduleWarning, chrome: RowChrome): ReactNode {
 }
 
 /**
- * A stop of the stage. The whole row is the tap target, at least 46px tall, which is
- * why it is a div with role rather than a button: the desktop needs controls nested
- * inside its row, and a button inside a button is not markup.
+ * A row of the stage that is its own tap target, at least 46px tall, which is why it is a
+ * div with role rather than a button: the desktop needs controls nested inside its row,
+ * and a button inside a button is not markup.
  */
+function TapRow({ onOpen, children }: { onOpen: () => void; children: ReactNode }) {
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpen() } }}
+      className="grid cursor-pointer items-center gap-x-[10px] py-1" style={{ gridTemplateColumns: '34px 1fr auto' }}
+    >
+      {children}
+    </div>
+  )
+}
+
+/** A stop of the stage; see `TapRow`. */
 export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
   row: StopRow
   chrome: RowChrome
@@ -157,13 +173,7 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
   }
 
   return (
-    <div
-      role="button"
-      tabIndex={0}
-      onClick={onOpen}
-      onKeyDown={e => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOpen() } }}
-      className="grid cursor-pointer items-center gap-x-[10px] py-1" style={{ gridTemplateColumns: '34px 1fr auto' }}
-    >
+    <TapRow onOpen={onOpen}>
       <span className="flex justify-center"><Disc row={row} t={t} onPickKind={onPickKind} /></span>
       <span className="min-w-0 py-2">
         <span className={`block text-[0.875rem] leading-[1.25] ${row.service ? 'truncate font-medium text-m-muted' : 'line-clamp-2 font-semibold text-m-ink'}`}>
@@ -178,7 +188,47 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
           {formatClockTime(row.time, chrome.is12h)}
         </span>
       )}
-    </div>
+    </TapRow>
+  )
+}
+
+/**
+ * A booked night at the edge of the stage: the hotel the day sets out from, or the one it
+ * ends at. Laid out like a stop, on the bed a stay wears, with no number and no kind to
+ * pick: it is the stay's place, not a stop of the day. Under it the latest hour the room
+ * is handed back, on the morning it is, and the one finding a row has room for. The whole
+ * row opens the booking behind the night, or the stay.
+ */
+export function RtBookendRow({ row, bookend, chrome, onOpen }: {
+  row: StopRow
+  bookend: BookendReading
+  chrome: RowChrome
+  onOpen: () => void
+}) {
+  const { t } = chrome
+  const meta = bookendMeta(bookend, t, chrome.is12h)
+  return (
+    <TapRow onOpen={onOpen}>
+      <span className="flex justify-center">
+        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[color:var(--m-ic)] text-m-ink">
+          <BOOKEND_ICON size={15} strokeWidth={2.1} aria-hidden="true" />
+        </span>
+      </span>
+      <span className="min-w-0 py-2">
+        <span className="line-clamp-2 block text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{bookendTitle(bookend, t)}</span>
+        {(meta || row.warning) && (
+          <span className="mt-[4px] flex flex-wrap items-center gap-[5px]">
+            {meta && <span className="font-geist text-[0.65625rem] font-medium text-m-muted">{meta}</span>}
+            {row.warning && warningMark(row.warning, chrome)}
+          </span>
+        )}
+      </span>
+      {row.time && (
+        <span dir="ltr" className="whitespace-nowrap text-[0.8125rem] font-medium tabular-nums text-m-faint">
+          {formatClockTime(row.time, chrome.is12h)}
+        </span>
+      )}
+    </TapRow>
   )
 }
 

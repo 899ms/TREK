@@ -475,8 +475,13 @@ function terminalStop(
 }
 
 /** Whether a terminal opens a day it has no timed stop before it on: an arrival or a pick-up. */
-function opensTheDay(role: CarrierTerminal['role']): boolean {
+export function opensTheDay(role: CarrierTerminal['role'] | undefined): boolean {
   return role === 'arrival' || role === 'pickup';
+}
+
+/** Whether a terminal closes the day it stands last on: a departure or a hire car handed back. */
+export function closesTheDay(role: CarrierTerminal['role'] | undefined): boolean {
+  return role === 'departure' || role === 'return';
 }
 
 /**
@@ -653,18 +658,36 @@ export function carrierLegsFor(
 }
 
 /**
- * The via points shaping the drive that leaves a stop. None leave a terminal: a via is
- * filed by the position of a stored stop, and a terminal stands in for none, so the
- * points filed at its index belong to the stop that really has that index.
+ * The via points shaping the drive that leaves a stop. None leave a terminal or a booked
+ * night at a day's edge: a via is filed by the position of a stored stop, and neither
+ * stands in for one, so the points filed at its index belong to the stop that really has
+ * that index.
  */
 export function viasLeaving<V extends { day_id: number; after_order_index: number; sequence: number }>(
-  stop: Pick<RoadtripStop, 'carrier' | 'ownerDayId' | 'ownerIndex'>,
+  stop: Pick<RoadtripStop, 'carrier' | 'bookend' | 'ownerDayId' | 'ownerIndex'>,
   vias: readonly V[],
 ): V[] {
-  if (stop.carrier) return [];
+  if (stop.carrier || stop.bookend) return [];
   return vias
     .filter((v) => v.day_id === stop.ownerDayId && v.after_order_index === stop.ownerIndex)
     .sort((a, b) => a.sequence - b.sequence);
+}
+
+/**
+ * The via points shaping the drive from `from` to `to`.
+ *
+ * Those leaving `from`, unless the drive ends at a booked night's hotel. The points behind
+ * a day's last stored stop shape the road from it into the next day (`carriedSeam`), and
+ * with the night booked that road is no longer driven: the day ends at the hotel. Bent
+ * through them, the drive to the hotel would run out along tomorrow's road and back. They
+ * stay stored, and bend the road again once the day ends at its last stop.
+ */
+export function viasOnLeg<V extends { day_id: number; after_order_index: number; sequence: number }>(
+  from: Pick<RoadtripStop, 'carrier' | 'bookend' | 'ownerDayId' | 'ownerIndex'>,
+  to: Pick<RoadtripStop, 'bookend'>,
+  vias: readonly V[],
+): V[] {
+  return to.bookend ? [] : viasLeaving(from, vias);
 }
 
 /**

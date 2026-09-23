@@ -4,7 +4,7 @@ import type { RailLegRoute, RailLegRouter, RoadtripDay, RoadtripStop } from './u
 import type { OfferedRoute } from './useRouteAlternatives'
 
 /**
- * FE-ALTPIN-001..012: proving a choice with the rail's own router before it is saved.
+ * FE-ALTPIN-001..013: proving a choice with the rail's own router before it is saved.
  *
  * A choice used to be one via at the point where the offer strayed furthest, written
  * without asking whether the router then drove the offer. On a ferry it did not (OSRM
@@ -147,6 +147,19 @@ describe('railLegAt', () => {
     expect(railLegAt(days, { dayId: 1, afterIndex: 0 })).toMatchObject({ from: { assignmentId: 10 }, to: { assignmentId: 11 } })
     expect(railLegAt(days, { dayId: 1, afterIndex: 1 })).toBeNull()
     expect(railLegAt(days, { dayId: 3, afterIndex: 0 })).toBeNull()
+  })
+
+  it('FE-ALTPIN-013: neither is the hotel a day sets out from, so a choice on the first leg is still that leg', () => {
+    // The morning's hotel borrows the first stop's index. Answering for it, the leg read
+    // back was hotel to first stop, and every choice on leg 0 came back as changed.
+    const bookend = (id: number, ownerIndex: number, phase: 'morning' | 'evening') => stop(id, 1, ownerIndex, {
+      bookend: { phase, accommodationId: 5, reservationId: null, checkingOut: false, checkingIn: false, checkOut: null },
+    })
+    const days = [day(1, [bookend(-6_000_000_002, 0, 'morning'), stop(10, 1, 0), stop(11, 1, 1), bookend(-6_000_000_003, 2, 'evening')])]
+
+    expect(railLegAt(days, { dayId: 1, afterIndex: 0 })).toMatchObject({ from: { assignmentId: 10 }, to: { assignmentId: 11 } })
+    // Behind the last stop the rail drives to tonight's hotel, and that is what it reports.
+    expect(railLegAt(days, { dayId: 1, afterIndex: 1 })).toMatchObject({ from: { assignmentId: 11 }, to: { assignmentId: -6_000_000_003 } })
   })
 })
 

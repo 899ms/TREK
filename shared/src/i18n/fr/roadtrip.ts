@@ -292,5 +292,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'La réservation {title} n’est sur aucun jour de ce voyage, le trajet n’en tient donc pas compte.',
   'roadtrip.bookings.loose': 'Également réservé ce jour',
+  'roadtrip.bookend.checkOut': 'Départ · {name}',
+  'roadtrip.bookend.from': 'Depuis {name}',
+  'roadtrip.bookend.back': 'Retour à {name}',
+  'roadtrip.bookend.checkIn': 'Arrivée · {name}',
+  'roadtrip.bookend.noVia': 'Le trajet depuis ou vers votre hébergement garde son itinéraire.',
 };
 export default roadtrip;

@@ -1435,3 +1435,114 @@ describe('RoadtripSidebar with the drive in from the day before (#2461)', () => 
     })
   })
 })
+
+describe('RoadtripSidebar with a booked night at the edge of the day', () => {
+  const bookend = (phase: 'morning' | 'evening', over: Partial<NonNullable<RoadtripStop['bookend']>> = {}, at: Partial<RoadtripStop> = {}) =>
+    stop({
+      assignmentId: phase === 'morning' ? -6_000_000_002 : -6_000_000_003,
+      name: 'Hotel Alpenblick',
+      placeId: 900,
+      lat: 47.2,
+      lng: 11.4,
+      stopType: 'hotel',
+      dwellMinutes: 0,
+      bookend: { phase, accommodationId: 5, reservationId: 41, checkingOut: false, checkingIn: false, checkOut: null, ...over },
+      ...at,
+    })
+  /** Out of the hotel on its check-out morning, two places, and into the night's hotel. */
+  const loop = (over: Partial<RoadtripDay> = {}) => {
+    const stops = [
+      bookend('morning', { checkingOut: true, checkOut: '10:00' }, { ownerIndex: 0 }),
+      stop({ assignmentId: 1, name: 'Lookout', ownerIndex: 0 }),
+      stop({ assignmentId: 2, name: 'Falls', ownerIndex: 1 }),
+      bookend('evening', {}, { ownerIndex: 2 }),
+    ]
+    return day({
+      stops,
+      legs: [leg(), leg(), leg()],
+      schedule: {
+        entries: ['08:40', '09:40', '10:40', '11:40'].map(arrival => ({ arrival, departure: arrival, anchored: false, dayOffset: 0 })),
+        warnings: [],
+      },
+      ...over,
+    })
+  }
+
+  it('FE-ROADTRIP-SIDEBAR-064: names the hotel it sets out from and the one it ends at, and counts neither', () => {
+    wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} />)
+    expect(screen.getByText('Check-out · Hotel Alpenblick')).toBeInTheDocument()
+    expect(screen.getByText('until 10:00')).toBeInTheDocument()
+    expect(screen.getByText('Back to Hotel Alpenblick')).toBeInTheDocument()
+    expect(screen.getByText('2 stops')).toBeInTheDocument()
+    // The places are one and two; the hotel wears no number.
+    expect(screen.getByText('Lookout').closest('button')).toHaveTextContent('1')
+    expect(screen.getByText('11:40')).toBeInTheDocument()
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-065: the hotel rows are neither dragged nor dropped on, and carry no stay, kind or fill control', () => {
+    const { container } = wrap(
+      <RoadtripSidebar routes={routes({ days: [loop()] })} onReorderStop={vi.fn()} onEditStay={vi.fn()} onSetStopKind={vi.fn()} onSetStopFill={vi.fn()} />,
+    )
+    expect(container.querySelectorAll('li[draggable="true"]')).toHaveLength(2)
+    const hotelRow = screen.getByText('Back to Hotel Alpenblick').closest('li')!
+    expect(hotelRow).not.toHaveAttribute('draggable')
+    // The row is one button, with nothing inside it to press.
+    expect(within(hotelRow).getAllByRole('button')).toHaveLength(1)
+    expect(within(hotelRow).queryByText('Stay')).toBeNull()
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-066: offers other ways on the drive between the places only', () => {
+    const onAskAlternatives = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} onAskAlternatives={onAskAlternatives} />)
+    const offered = screen.getAllByLabelText('Other ways')
+    expect(offered).toHaveLength(1)
+    fireEvent.click(offered[0])
+    expect(onAskAlternatives).toHaveBeenCalledWith(1, { kind: 'leg', index: 1 })
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-067: opens the booking behind the night for an editor, the hotel for anybody else', () => {
+    const onOpenBooking = vi.fn()
+    const onSelectStop = vi.fn()
+    const editor = wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} onOpenBooking={onOpenBooking} onSelectStop={onSelectStop} canEditBookings />)
+    fireEvent.click(screen.getByText('Back to Hotel Alpenblick'))
+    expect(onOpenBooking).toHaveBeenCalledWith(41)
+    expect(onSelectStop).not.toHaveBeenCalled()
+    editor.unmount()
+
+    wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} onOpenBooking={onOpenBooking} onSelectStop={onSelectStop} />)
+    fireEvent.click(screen.getByText('Check-out · Hotel Alpenblick'))
+    // The place alone, without an assignment: the hotel is no stop of the day.
+    expect(onSelectStop).toHaveBeenCalledWith(900)
+    expect(onOpenBooking).toHaveBeenCalledTimes(1)
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-068: a place is not moved past the hotel at either end of its day', () => {
+    const onReorderStop = vi.fn()
+    wrap(<RoadtripSidebar routes={routes({ days: [loop()] })} onReorderStop={onReorderStop} />)
+    fireEvent.keyDown(screen.getByText('Lookout').closest('button')!, { key: 'ArrowUp', altKey: true })
+    fireEvent.keyDown(screen.getByText('Falls').closest('button')!, { key: 'ArrowDown', altKey: true })
+    expect(onReorderStop).not.toHaveBeenCalled()
+    fireEvent.keyDown(screen.getByText('Lookout').closest('button')!, { key: 'ArrowDown', altKey: true })
+    expect(onReorderStop).toHaveBeenCalledWith(1, 1, 1)
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-069: the morning marker at the hotel is drawn as the hotel row, not as a line of its own', () => {
+    const resume = stop({
+      assignmentId: -2_000_000_003,
+      name: 'Continue journey',
+      lat: 47.2,
+      lng: 11.4,
+      automaticNight: { phase: 'start', fromDayNumber: 1 },
+    })
+    const stops = [resume, bookend('morning', {}, { ownerIndex: 0 }), stop({ assignmentId: 1, name: 'Lookout', ownerIndex: 0 })]
+    wrap(<RoadtripSidebar routes={routes({ days: [day({ stops, legs: [leg({ distance: 0 }), leg()] })] })} />)
+    expect(screen.getByText('From Hotel Alpenblick')).toBeInTheDocument()
+    expect(screen.queryByText('Continue journey')).toBeNull()
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-070: a drive to the hotel over the limit is flagged on the hotel row', () => {
+    wrap(<RoadtripSidebar routes={routes({ days: [loop({ driveWarnings: [{ index: 3, code: 'leg', overMinutes: 30 }] })] })} />)
+    const hotelRow = screen.getByText('Back to Hotel Alpenblick').closest('li')!
+    expect(within(hotelRow).getByText('+30 min')).toBeInTheDocument()
+  })
+})

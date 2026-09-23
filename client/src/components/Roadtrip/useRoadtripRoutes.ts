@@ -1,5 +1,5 @@
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
-import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, mergeRouteSegments, seatCarrierStops, standsAsDay, terminalAssignmentId, viasLeaving, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
+import { assembleRoadtrip, carrierLegsFor, carrierSeam, foldRouteRun, isCarrierMode, isStationaryJoin, mergeRouteSegments, seatCarrierStops, standsAsDay, terminalAssignmentId, viasOnLeg, type CarrierSeam, type RoadtripStop, type RoadtripRoutes, type PlanDay, type QuietDay, type RoutedLeg } from '@trek/shared/roadtrip'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { avoidedClasses, calculateRouteWithLegs, routeEngineFor, RoutingRefusedError, type RouteEngine } from '../Map/RouteCalculator'
 import { resolveLegMode } from '../Planner/legMode'
@@ -56,7 +56,7 @@ const stopKey = (s: RoadtripStop): string =>
 /**
  * Everything a seam's answer depends on besides its two stops, as one comparable string:
  * the mode it is driven in, the classes the trip avoids, and the via points that shape
- * the drive leaving `from`.
+ * the drive from `from` to `to` (`viasOnLeg`).
  *
  * Read in two places that must agree: when deciding whether a seam still matches the
  * answer already in hand, and when recording what an answer was fetched for. One function
@@ -65,14 +65,14 @@ const stopKey = (s: RoadtripStop): string =>
  * seam round and found every seam already answered, so the drive between two days kept
  * its old road and its old minutes until the page was loaded again.
  */
-const seamShape = (from: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>, mode: string, avoidKey: string, unit: string): string =>
+const seamShape = (from: RoadtripStop, to: RoadtripStop, viasByDay: Record<number, RoadtripVia[]>, mode: string, avoidKey: string, unit: string): string =>
   [
     mode,
     avoidKey,
     // The seam's printed texts are in this unit, so a switch asks for it again, the way a
     // day's own run is asked for again.
     unit,
-    viasLeaving(from, viasByDay[from.ownerDayId] ?? [])
+    viasOnLeg(from, to, viasByDay[from.ownerDayId] ?? [])
       .map(v => `${v.lat.toFixed(5)},${v.lng.toFixed(5)}`)
       .join('|'),
   ].join('#')
@@ -459,8 +459,8 @@ export function useRoadtripRoutes(
           // `nightSpill.ts`), the lookup has to be the stop's own day and its own
           // index — this used to be the position within the chain, so on any day that
           // received a night drive every via matched nothing and quietly stopped
-          // shaping the road.
-          viasLeaving(stop, viasByDay[stop.ownerDayId ?? day.dayId] ?? [])
+          // shaping the road. None bend the drive from or to a booked night's hotel.
+          viasOnLeg(stop, run[i + 1], viasByDay[stop.ownerDayId ?? day.dayId] ?? [])
             .forEach(v => waypoints.push({ lat: v.lat, lng: v.lng }))
         })
 
@@ -610,6 +610,8 @@ export function useRoadtripRoutes(
     const want = (from: RoadtripStop, to: RoadtripStop, dayId: number): void => {
       // The two ends of one ride: the leg between them is the booking's, never a road.
       if (rideLegs[legKey(from, to)]) return
+      // A night spent at one hotel: nothing is driven, so nothing is asked.
+      if (isStationaryJoin(from, to)) return
       // Routed as part of a day's own run — that request is rebuilt whenever its vias
       // change, so there is nothing to catch up here.
       if (legsByDay[from.ownerDayId]?.[legKey(from, to)]) return
@@ -618,7 +620,7 @@ export function useRoadtripRoutes(
       // nothing at all: the first answer was cached under the pair, and dragging the
       // point changed the request nobody was going to send again.
       const mode = legModeOf(from, to, dayId)
-      const shape = seamShape(from, viasByDay, mode, avoidKey, distanceUnit)
+      const shape = seamShape(from, to, viasByDay, mode, avoidKey, distanceUnit)
       const have = seamLegs[legKey(from, to)]
       const current = have?.shape === shape
       // What the drawn join could not avoid is flagged on the card it arrives on, the way
@@ -710,7 +712,7 @@ export function useRoadtripRoutes(
           // theirs. Without them a seam is the one stretch of the trip a via cannot
           // shape: it is asked for on its own, so the points the traveller dropped on it
           // never reached the router and dragging one did visibly nothing.
-          const shaping = viasLeaving(seam.from, viasByDay[seam.from.ownerDayId] ?? [])
+          const shaping = viasOnLeg(seam.from, seam.to, viasByDay[seam.from.ownerDayId] ?? [])
           const r = await calculateRouteWithLegs(
             [
               { lat: seam.from.lat, lng: seam.from.lng },

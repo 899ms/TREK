@@ -80,3 +80,24 @@ describe('dayBookings (#2428)', () => {
     expect(bookingClock({ reservation_time: null })).toBeNull()
   })
 })
+
+describe('dayBookings and a booked night at the edge of the day', () => {
+  it('FE-STOPBOOKINGS-006: a table at the hotel hangs under the hotel stop, never under the bookend in front of it', () => {
+    const bookend = (phase: 'morning' | 'evening', assignmentId: number) => ({
+      assignmentId,
+      placeId: 900,
+      bookend: { phase, accommodationId: 5, reservationId: null, checkingOut: false, checkingIn: false, checkOut: null },
+    })
+    const withHotel = {
+      dayId: 1,
+      stops: [bookend('morning', -6_000_000_002), { assignmentId: 11, placeId: 110 }, { assignmentId: 13, placeId: 900 }],
+    }
+    const dinner = booking({ id: 9, title: 'Dinner at the hotel', place_id: 900 })
+    expect([...dayBookings(withHotel, [dinner]).atStop.keys()]).toEqual([2])
+    // With the hotel only there as the evening's bookend, the table is the day's, for no stop.
+    const backOnly = { dayId: 1, stops: [{ assignmentId: 11, placeId: 110 }, bookend('evening', -6_000_000_003)] }
+    const { atStop, loose } = dayBookings(backOnly, [dinner])
+    expect(atStop.size).toBe(0)
+    expect(loose.map(r => r.title)).toEqual(['Dinner at the hotel'])
+  })
+})

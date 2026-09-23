@@ -285,5 +285,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': '予約を開く',
   'roadtrip.ride.undated': '{title} はこの旅行のどの日にも入っていないため、走行では使われません。',
   'roadtrip.bookings.loose': 'この日のその他の予約',
+  'roadtrip.bookend.checkOut': 'チェックアウト · {name}',
+  'roadtrip.bookend.from': '{name}から',
+  'roadtrip.bookend.back': '{name}へ戻る',
+  'roadtrip.bookend.checkIn': 'チェックイン · {name}',
+  'roadtrip.bookend.noVia': '宿泊先との間の区間は、今のルートのままになります。',
 };
 export default roadtrip;

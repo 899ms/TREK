@@ -31,7 +31,7 @@ import { useAutomaticDayPoints } from '../../components/Roadtrip/useAutomaticDay
 import { useDayBoundaries } from '../../components/Roadtrip/useDayBoundaries'
 import type { DayBoundaryControls } from '../../components/Map/dayBoundaryDrag'
 import { dayWindow, roadtripInsertion } from '../../components/Roadtrip/dayWindow'
-import { carrierReservationIds, viasLeaving, type CarrierTerminal } from '@trek/shared/roadtrip'
+import { carrierReservationIds, isStoredStop, viasLeaving, type CarrierTerminal } from '@trek/shared/roadtrip'
 import { useTripRouteOverview } from '../../components/Map/useTripRouteOverview'
 import { useDawarichTrail } from '../../components/Map/useDawarichTrail'
 import { collapsedDayDates } from '../../components/Map/dawarichTrail'
@@ -1746,7 +1746,20 @@ export function useTripPlanner() {
     // (#2428). Nothing can be filed against a terminal: it stands in for no assignment,
     // so a via anchored to it would be stored at a position that belongs to the stop
     // after it and bend that stop's road instead. The callers decide what to refuse.
-    let best: { dayId: number; afterIndex: number; offRouteKm: number; terminal: CarrierTerminal['role'] | null } | null = null
+    //
+    // `bookendLeg` says the drive leaves or reaches a booked night's hotel at the day's
+    // edge, which files nothing either: the morning's hotel has no index of its own, and
+    // the evening's drive is reached from the index that shapes the road into tomorrow.
+    // `card` is where the point fell on the card it was measured on, the day and the index
+    // of the stop before it there, -1 for the drive in before the card's first stop.
+    let best: {
+      dayId: number
+      afterIndex: number
+      offRouteKm: number
+      terminal: CarrierTerminal['role'] | null
+      bookendLeg: boolean
+      card: { dayId: number; index: number }
+    } | null = null
     for (const day of roadtripRoutes.days) {
       // NOT `day.dayId !== onlyDayId`. A dragged via has to stay on the day it is stored
       // on, but that day's stops are no longer all on the card of the same name: after a
@@ -1782,7 +1795,14 @@ export function useTripPlanner() {
       if (arrivedFrom && hit.alongKm < (stopsAlong[0] ?? 0)) {
         const owner = arrivedFrom.ownerDayId ?? day.dayId
         if (onlyDayId !== undefined && owner !== onlyDayId) continue
-        best = { dayId: owner, afterIndex: arrivedFrom.ownerIndex ?? 0, offRouteKm: hit.offRouteKm, terminal: arrivedFrom.carrier?.role ?? null }
+        best = {
+          dayId: owner,
+          afterIndex: arrivedFrom.ownerIndex ?? 0,
+          offRouteKm: hit.offRouteKm,
+          terminal: arrivedFrom.carrier?.role ?? null,
+          bookendLeg: !!arrivedFrom.bookend || !!day.stops[0]?.bookend,
+          card: { dayId: day.dayId, index: -1 },
+        }
         continue
       }
       const at = insertIndexForAlong(stopsAlong, hit.alongKm) - 1
@@ -1799,7 +1819,14 @@ export function useTripPlanner() {
       const owner = anchor.ownerDayId ?? day.dayId
       // A drag stays on its own day; a fresh click may land wherever it landed.
       if (onlyDayId !== undefined && owner !== onlyDayId) continue
-      best = { dayId: owner, afterIndex: anchor.ownerIndex ?? at, offRouteKm: hit.offRouteKm, terminal: anchor.carrier?.role ?? null }
+      best = {
+        dayId: owner,
+        afterIndex: anchor.ownerIndex ?? at,
+        offRouteKm: hit.offRouteKm,
+        terminal: anchor.carrier?.role ?? null,
+        bookendLeg: !!anchor.bookend || !!day.stops[at + 1]?.bookend,
+        card: { dayId: day.dayId, index: at },
+      }
     }
     return best
   }, [roadtripRoutes.days])
@@ -1823,8 +1850,17 @@ export function useTripPlanner() {
     // Nothing is stopped at on a flight. Behind an arrival terminal or a hire car's desk
     // is a road, and a stop there is the first stop after landing or after the pick-up.
     if (!anchor || anchor.terminal === 'departure') return null
+    // Behind a terminal, and on the drive from the hotel a day sets out from or to the one
+    // it ends at, the place goes where it fell on the card. None of them is a stored stop
+    // to be found by its index, which each shares with one: after the morning's hotel is
+    // before the day's first stop, before the evening's is after its last.
+    if (anchor.bookendLeg || anchor.terminal) {
+      return { dayId: anchor.card.dayId, position: anchor.card.index + 1, offRouteKm: anchor.offRouteKm }
+    }
     for (const day of roadtripRoutes.days) {
-      const at = day.stops.findIndex(stop => stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
+      // The stored stop the anchor names, not a terminal or a hotel seated in front of it
+      // with the same index, which put the place one stop early.
+      const at = day.stops.findIndex(stop => isStoredStop(stop) && stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
       if (at >= 0) return { dayId: day.dayId, position: at + 1, offRouteKm: anchor.offRouteKm }
     }
     // No card draws that stop, which happens while the rail is between rebuilds. Its own
@@ -1911,6 +1947,9 @@ export function useTripPlanner() {
     // ride, or on the road out of a terminal: a via is filed by the position of a stored
     // stop, and a terminal is not one.
     if (!best || best.offRouteKm > 2 || best.terminal) return
+    // Nor on the drive from or to a booked night's hotel, which says so rather than
+    // ignoring the click (`legReroutable`).
+    if (best.bookendLeg) { toast.info(t('roadtrip.bookend.noVia')); return }
     try {
       await roadtripVias.add(best.dayId, best.afterIndex, lat, lng)
     } catch (err: unknown) {
@@ -1930,7 +1969,7 @@ export function useTripPlanner() {
     // just says which leg gets bent, and the router answers the rest.
     const anchor = anchorFor(lat, lng, dayId)
     try {
-      await roadtripVias.move(dayId, id, lat, lng, anchor && !anchor.terminal ? anchor.afterIndex : undefined)
+      await roadtripVias.move(dayId, id, lat, lng, anchor && !anchor.terminal && !anchor.bookendLeg ? anchor.afterIndex : undefined)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : t('common.unknownError'))
     }
@@ -2653,8 +2692,11 @@ export function useTripPlanner() {
   }
 
   const selectedPlace = selectedPlaceId ? places.find(p => p.id === selectedPlaceId) : null
+  // The stops the inspector speaks for. A booked night at a day's edge stands on the
+  // hotel's place without being a stop of the day, so it is left out: counted, the hotel's
+  // own stop lost its stay and its day end to a second match.
   const selectedRoadtripStops = roadtripRoutes.days.flatMap(day => day.stops).filter(stop =>
-    !stop.automaticNight && (selectedAssignmentId ? stop.assignmentId === selectedAssignmentId : stop.placeId === selectedPlaceId),
+    !stop.automaticNight && !stop.bookend && (selectedAssignmentId ? stop.assignmentId === selectedAssignmentId : stop.placeId === selectedPlaceId),
   )
   const endDayStop = selectedRoadtripStops.length === 1 ? selectedRoadtripStops[0] : undefined
   const roadtripEndDay = roadtripActive && dailyTimesActive && can('day_edit', trip) && endDayStop && endDayStop.assignmentId > 0

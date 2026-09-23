@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import {
   arrivingReroutable,
+  bookendReading,
   destinationCount,
   firstStopOfPlace,
   legReroutable,
+  movableWithin,
   pickWarning,
+  resumeFoldsIntoBookend,
   roadtripRows,
   stageClocks,
   stageEnd,
@@ -14,9 +17,9 @@ import {
   type StopRow,
 } from './roadtripRowModel'
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
-import type { RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
+import type { BookendPhase, NightBookend, RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-058
+// FE-RTROW-001 to FE-RTROW-066
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -698,5 +701,131 @@ describe('the drive in from the day before (#2461)', () => {
     // An automatic night at either end is a marker on the road, not a stop anybody chose.
     expect(arrivingReroutable(joined({ arrivingFrom: night() }))).toBe(false)
     expect(arrivingReroutable(joined({ stops: [night('start'), stop('Potsdam')] }))).toBe(false)
+  })
+})
+
+describe('a booked night at the edge of the day', () => {
+  const reading = (phase: BookendPhase, over: Partial<NightBookend> = {}): NightBookend => ({
+    phase,
+    accommodationId: 5,
+    reservationId: 41,
+    checkingOut: false,
+    checkingIn: false,
+    checkOut: null,
+    ...over,
+  })
+  const hotel = (phase: BookendPhase, over: Partial<NightBookend> = {}, at: Partial<RoadtripStop> = {}) =>
+    stop('Hotel Alpenblick', {
+      assignmentId: phase === 'morning' ? -6_000_000_014 : -6_000_000_015,
+      placeId: 900,
+      lat: 45,
+      lng: 7,
+      stopType: 'hotel',
+      dwellMinutes: 0,
+      bookend: reading(phase, over),
+      ...at,
+    })
+  /** From the hotel, two places, back to the hotel, each with a clock. */
+  const loop = (over: Partial<RoadtripDay> = {}) => {
+    const stops = [
+      hotel('morning'),
+      stop('Lookout', { placeId: 1 }),
+      stop('Falls', { placeId: 2, ownerIndex: 1 }),
+      hotel('evening', {}, { ownerIndex: 2 }),
+    ]
+    return day(stops, {
+      schedule: { entries: [entry('08:40'), entry('09:30'), entry('11:00'), entry('12:10')], warnings: [] },
+      ...over,
+    })
+  }
+
+  it('FE-RTROW-059: reads as a check-out, a morning, an evening back or a check-in', () => {
+    const out = day([hotel('morning', { checkingOut: true, checkOut: '10:00' }), stop('Zoo')])
+    expect(bookendReading(out, 0)).toEqual({
+      phase: 'morning',
+      variant: 'checkOut',
+      name: 'Hotel Alpenblick',
+      until: '10:00',
+      reservationId: 41,
+      accommodationId: 5,
+      placeId: 900,
+    })
+    expect(bookendReading(loop(), 0)).toMatchObject({ variant: 'from', until: null })
+    expect(bookendReading(loop(), 3)).toMatchObject({ variant: 'back', phase: 'evening' })
+    // The check-in day: back when the stay's own stop heads the card, a check-in without it.
+    const stayed = day([stop('Hotel Alpenblick', { lat: 45, lng: 7, night: true }), stop('Lookout'), hotel('evening', { checkingIn: true })])
+    expect(bookendReading(stayed, 2)?.variant).toBe('back')
+    const transfer = day([hotel('morning', { checkingOut: true }), hotel('evening', { checkingIn: true }, { name: 'Wallinga', lat: 46 })])
+    expect(bookendReading(transfer, 1)).toMatchObject({ variant: 'checkIn', name: 'Wallinga' })
+    // Nothing to read on an ordinary stop, or past the end.
+    expect(bookendReading(loop(), 1)).toBeNull()
+    expect(bookendReading(loop(), 9)).toBeNull()
+  })
+
+  it('FE-RTROW-060: a row of its own, unnumbered, that counts as no destination', () => {
+    const rows = roadtripRows(loop())
+    expect(rows.map(r => r.kind)).toEqual(['stop', 'leg', 'stop', 'leg', 'stop', 'leg', 'stop'])
+    const stops = stopRows(rows)
+    expect(stops.map(r => r.number)).toEqual([null, 1, 2, null])
+    expect(stops.map(r => r.bookend?.variant ?? null)).toEqual(['from', null, null, 'back'])
+    expect(stops[0]!.service).toBe(true)
+    expect(destinationCount(loop())).toBe(2)
+  })
+
+  it('FE-RTROW-061: offers no other ways from or to the hotel, on a leg or on the drive in', () => {
+    expect([0, 1, 2].map(i => legReroutable(loop(), i))).toEqual([false, true, false])
+    const joined = (from: RoadtripStop, first: RoadtripStop) => day([first, stop('Falls')], {
+      arrivingLeg: { ...seg(3), distance: 120_000, duration: 5_400 },
+      arrivingFrom: from,
+      arrivingLine: [[45, 7], [48, 11]],
+    })
+    expect(arrivingReroutable(joined(stop('Town', { ownerDayId: 6 }), stop('Lookout')))).toBe(true)
+    expect(arrivingReroutable(joined(hotel('evening'), stop('Lookout')))).toBe(false)
+    expect(arrivingReroutable(joined(stop('Town', { ownerDayId: 6 }), hotel('morning')))).toBe(false)
+  })
+
+  it('FE-RTROW-062: the morning marker at the hotel the day sets out from is folded into its row', () => {
+    const resume = night('start')
+    const at = { ...resume, lat: 45, lng: 7 }
+    const folded = day([at, hotel('morning'), stop('Lookout')], {
+      schedule: { entries: [entry('08:00'), entry('08:00'), entry('09:00')], warnings: [] },
+    })
+    expect(resumeFoldsIntoBookend(folded, 0)).toBe(true)
+    expect(roadtripRows(folded).map(r => r.kind)).toEqual(['stop', 'leg', 'stop'])
+    expect(stageClocks(roadtripRows(folded)).start).toBe('08:00')
+    // A marker somewhere else keeps its own row: the drive from there to the hotel is real.
+    const apart = day([resume, hotel('morning'), stop('Lookout')])
+    expect(resumeFoldsIntoBookend(apart, 0)).toBe(false)
+    expect(roadtripRows(apart)[0]).toMatchObject({ kind: 'auto', phase: 'resume' })
+    expect(resumeFoldsIntoBookend(folded, 1)).toBe(false)
+  })
+
+  it('FE-RTROW-063: the stage starts when the hotel is left and arrives when it is reached again', () => {
+    const rows = roadtripRows(loop())
+    expect(stageClocks(rows)).toEqual({ start: '08:40', arrive: '12:10' })
+    expect(stageEnd(rows)?.bookend?.variant).toBe('back')
+  })
+
+  it('FE-RTROW-064: a pin at the hotel opens the stay’s own stop, never a bookend', () => {
+    const own = stop('Hotel Alpenblick', { placeId: 900, assignmentId: 77, ownerDayId: 3 })
+    expect(firstStopOfPlace([loop(), day([own])], 900)).toBe(own)
+    expect(firstStopOfPlace([loop()], 900)).toBeNull()
+  })
+
+  it('FE-RTROW-065: a stop moves past anything but the hotel at the edge of its day', () => {
+    expect(movableWithin(loop(), 1)).toEqual({ up: false, down: true })
+    expect(movableWithin(loop(), 2)).toEqual({ up: true, down: false })
+    const plain = day([stop('A'), stop('B'), stop('C')])
+    expect([0, 1, 2].map(i => movableWithin(plain, i))).toEqual([
+      { up: false, down: true },
+      { up: true, down: true },
+      { up: true, down: false },
+    ])
+  })
+
+  it('FE-RTROW-066: up next is a place, not the hotel the day comes back to', () => {
+    // 11:30 is past both places and before the hotel: the last place is still next.
+    expect(upNextStop(loop(), 11 * 60 + 30, true)?.row.stop.name).toBe('Falls')
+    expect(upNextStop(loop(), 8 * 60 + 45, true)?.row.stop.name).toBe('Lookout')
   })
 })

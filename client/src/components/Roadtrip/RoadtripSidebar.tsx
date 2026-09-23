@@ -17,7 +17,8 @@ import { formatDistance } from '../../utils/units'
 import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
-import { arrivingReroutable, destinationCount, isHop, legReroutable } from './roadtripRowModel'
+import { arrivingReroutable, bookendReading, destinationCount, isHop, legReroutable, movableWithin, resumeFoldsIntoBookend, type BookendReading } from './roadtripRowModel'
+import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle } from './nightBookend'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -44,7 +45,11 @@ interface RoadtripSidebarProps {
   /** Legs and totals for the whole trip, computed once in the planner hook. */
   routes: RoadtripRoutes
   selectedAssignmentId?: number | null
-  onSelectStop?: (placeId: number, assignmentId: number) => void
+  /**
+   * Selects a stop, which opens its place in the inspector. Without an assignment it is
+   * the place alone: a booked night at a day's edge is the stay's place, no stop.
+   */
+  onSelectStop?: (placeId: number, assignmentId?: number) => void
   /**
    * Moves a stop within its day. Absent means the chain is read-only, which is also how
    * a viewer sees it — no handles, no drop targets.
@@ -807,13 +812,33 @@ function TerminalStop({ stop, entry, late, continues, starts, onOpen }: {
   onOpen?: () => void
 }): React.ReactElement {
   const { t } = useTranslation()
-  const Icon = carrierIcon(stop.carrier!.type)
+  return (
+    <DiscRow Icon={carrierIcon(stop.carrier!.type)} starts={starts} continues={continues} onOpen={onOpen} label={onOpen ? t('roadtrip.ride.open') : undefined}>
+      <span className="min-w-0 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
+        <RideEnd stop={stop} entry={entry} late={late} />
+      </span>
+    </DiscRow>
+  )
+}
+
+/**
+ * A row of the rail that is one button on a plain disc: a terminal, a ride, a booked night.
+ * The line runs in from above unless the chain starts here, and on below while it goes on.
+ */
+function DiscRow({ Icon, starts, continues, onOpen, label, children }: {
+  Icon: LucideIcon
+  starts?: boolean
+  continues: boolean
+  onOpen?: () => void
+  label?: string
+  children: React.ReactNode
+}): React.ReactElement {
   return (
     <button
       type="button"
       onClick={onOpen}
       disabled={!onOpen}
-      aria-label={onOpen ? t('roadtrip.ride.open') : undefined}
+      aria-label={label}
       className="group grid w-full rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-default"
       style={RAIL_GRID}
     >
@@ -824,10 +849,52 @@ function TerminalStop({ stop, entry, late, continues, starts, onOpen }: {
         </span>
         {continues ? <span className="w-[1.5px] flex-1 rounded-sm bg-edge" aria-hidden /> : null}
       </span>
-      <span className="min-w-0 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
-        <RideEnd stop={stop} entry={entry} late={late} />
-      </span>
+      {children}
     </button>
+  )
+}
+
+/**
+ * A booked night at the edge of the day: the hotel the day sets out from, or the one it
+ * ends at (`seatNightBookends`).
+ *
+ * Laid out like a terminal, with no number, stay, kind picker or drag handle: it is the
+ * stay's place and no stop of the day, so nothing about it is changed here. Under its line
+ * the latest hour the room is handed back, on the morning it is, and whatever the drive
+ * into it runs over; on the right the time the chain has the traveller there. The whole
+ * row opens the booking behind the night, or the hotel's place when there is none to open.
+ */
+function BookendStop({ reading, entry, late, driveFindings, continues, starts, onOpen }: {
+  reading: BookendReading
+  entry: ScheduleEntry | undefined
+  late: ScheduleWarning[]
+  driveFindings: ScheduleWarning[]
+  continues: boolean
+  starts?: boolean
+  onOpen?: () => void
+}): React.ReactElement {
+  const { t } = useTranslation()
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  const meta = bookendMeta(reading, t, is12h)
+  const badges = late.length + driveFindings.length > 0
+  return (
+    <DiscRow Icon={BOOKEND_ICON} starts={starts} continues={continues} onOpen={onOpen}>
+      <span className="flex min-w-0 items-start gap-2 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="min-w-0 break-words font-semibold leading-6 tracking-[-0.012em] text-content" style={{ fontSize: FS.name }}>
+            {bookendTitle(reading, t)}
+          </span>
+          {meta || badges ? (
+            <span className="flex flex-wrap items-center gap-1">
+              {meta ? <span className="text-content-muted" style={{ fontSize: FS.meta }}>{meta}</span> : null}
+              {driveFindings.map(w => <DriveFindingBadge key={w.code} warning={w} />)}
+              {late.map(w => <LateBadge key={w.code} late={w} />)}
+            </span>
+          ) : null}
+        </span>
+        {entry?.arrival ? <Arrival entry={entry} /> : null}
+      </span>
+    </DiscRow>
   )
 }
 
@@ -884,21 +951,7 @@ function RideBlock({ departure, arrival, entries, late, seg, continues, starts, 
   const carrier = departure.carrier!
   const Icon = carrierIcon(carrier.type)
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      disabled={!onOpen}
-      aria-label={onOpen ? t('roadtrip.ride.open') : undefined}
-      className="group grid w-full rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-default"
-      style={RAIL_GRID}
-    >
-      <span className="flex flex-col items-center">
-        {starts ? null : <span className="w-[1.5px] flex-1 rounded-sm bg-edge" aria-hidden />}
-        <span className={`${DISC} my-1 bg-surface-tertiary text-content-secondary`}>
-          <Icon size={13} strokeWidth={2} aria-hidden />
-        </span>
-        {continues ? <span className="w-[1.5px] flex-1 rounded-sm bg-edge" aria-hidden /> : null}
-      </span>
+    <DiscRow Icon={Icon} starts={starts} continues={continues} onOpen={onOpen} label={onOpen ? t('roadtrip.ride.open') : undefined}>
       <span className="my-0.5 flex min-w-0 flex-col gap-1 rounded-lg border border-edge-faint bg-surface-tertiary px-2 pb-1.5 pt-1 transition-colors group-hover:bg-surface-selected">
         <span className="flex min-w-0 items-center gap-1.5 text-content-muted">
           <Icon size={11} strokeWidth={1.8} className="shrink-0" aria-hidden />
@@ -909,7 +962,7 @@ function RideBlock({ departure, arrival, entries, late, seg, continues, starts, 
         <RideEnd stop={departure} entry={entries[0]} late={late[0]} />
         <RideEnd stop={arrival} entry={entries[1]} late={late[1]} />
       </span>
-    </button>
+    </DiscRow>
   )
 }
 
@@ -1516,7 +1569,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
   collapsed?: boolean
   onToggle?: () => void
   selectedAssignmentId?: number | null
-  onSelectStop?: (placeId: number, assignmentId: number) => void
+  onSelectStop?: RoadtripSidebarProps['onSelectStop']
   onReorderStop?: (dayId: number, assignmentId: number, toIndex: number) => void
   onMoveStopToDay?: RoadtripSidebarProps['onMoveStopToDay']
   /** What is being dragged right now, shared across days so a stop can leave its own. */
@@ -1594,6 +1647,8 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
         ))
       : null
   const renderStopContent = (stop: RoadtripStop, i: number): React.ReactElement | null => {
+    // The morning marker at the hotel the day sets out from is drawn as that hotel's row.
+    if (resumeFoldsIntoBookend(day, i)) return null
     if (stop.automaticNight) return (
       <li key={stop.assignmentId}>
         <AutomaticDayStop stop={stop} entry={day.schedule.entries[i]} onFocus={onFocusPoint} />
@@ -1608,6 +1663,33 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
     // overnight crossing swallow the "you arrive late" flag without a trace, and a stop
     // can be late for the time it is reached and the time it is left at both at once.
     const lateness = latenessAt(i)
+    // A booked night at the day's edge: not draggable, not numbered, no stay and no chips,
+    // and the drive into or out of it offers no other ways (`legReroutable`).
+    if (stop.bookend) {
+      const reading = bookendReading(day, i)!
+      const booking = bookendBooking(reading, !!canEditBookings)
+      let open: (() => void) | undefined
+      if (booking !== null && onOpenBooking) open = () => onOpenBooking(booking)
+      else if (onSelectStop) open = () => onSelectStop(stop.placeId)
+      return (
+        <li key={stop.assignmentId}>
+          <BookendStop
+            reading={reading}
+            entry={day.schedule.entries[i]}
+            late={lateness}
+            driveFindings={findingsFor(i)}
+            continues={i < last}
+            starts={i === 0}
+            onOpen={open}
+          />
+          {i < last && (!day.stops[i + 1].automaticNight || day.legs[i]?.distance !== 0) ? <DriveBand leg={day.legs[i]} /> : null}
+          {refuelBandsFor(i)}
+          {i < last ? (day.legVias[i] ?? []).map((via, vi) => (
+            <RouteViaStop key={`via-${vi}-${via.lat},${via.lng}`} via={via} />
+          )) : null}
+        </li>
+      )
+    }
     // A terminal or a hire car's desk: not draggable, not numbered, not a place. A ride
     // that lands on the day it left is one block from its departure to its arrival, and
     // the arrival index draws nothing of its own. A lone terminal (a ride landing
@@ -1721,7 +1803,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
             starts={i === 0}
             onSelect={onSelectStop ? () => onSelectStop(stop.placeId, stop.assignmentId) : undefined}
             onMove={onReorderStop ? delta => onReorderStop(ownDay, stop.assignmentId, ownIndex + delta) : undefined}
-            canMove={{ up: i > 0, down: i < last }}
+            canMove={movableWithin(day, i)}
             onEditStay={onEditStay ? () => onEditStay(stayDraftOf(stop, day.schedule.entries[i], missedLeaveOf(day, i))) : undefined}
             onPickKind={onSetStopKind ? anchor => setPicking({ anchor, stop }) : undefined}
             onPickFill={onSetStopFill ? anchor => setFilling({ anchor, stop }) : undefined}

@@ -287,5 +287,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Mở đặt chỗ',
   'roadtrip.ride.undated': 'Đặt chỗ {title} không thuộc ngày nào của chuyến đi này, nên hành trình không tính đến nó.',
   'roadtrip.bookings.loose': 'Cũng đã đặt trong ngày này',
+  'roadtrip.bookend.checkOut': 'Trả phòng · {name}',
+  'roadtrip.bookend.from': 'Từ {name}',
+  'roadtrip.bookend.back': 'Về lại {name}',
+  'roadtrip.bookend.checkIn': 'Nhận phòng · {name}',
+  'roadtrip.bookend.noVia': 'Chặng đi và về nơi lưu trú giữ nguyên tuyến đường.',
 };
 export default roadtrip;

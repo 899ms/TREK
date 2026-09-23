@@ -288,5 +288,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Відкрити бронювання',
   'roadtrip.ride.undated': 'Бронювання {title} не припадає на жоден день цієї подорожі, тому маршрут його не враховує.',
   'roadtrip.bookings.loose': 'Також заброньовано цього дня',
+  'roadtrip.bookend.checkOut': 'Виїзд · {name}',
+  'roadtrip.bookend.from': 'Відправлення: {name}',
+  'roadtrip.bookend.back': 'Повернення: {name}',
+  'roadtrip.bookend.checkIn': 'Заїзд · {name}',
+  'roadtrip.bookend.noVia': 'Маршрут від місця проживання й назад до нього лишається незмінним.',
 };
 export default roadtrip;

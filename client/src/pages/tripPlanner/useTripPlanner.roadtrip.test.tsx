@@ -1,5 +1,5 @@
 import { roadtripPreferencesRepo } from '../../repo/roadtripPreferencesRepo'
-// FE-TP-ROAD-001 to FE-TP-ROAD-134
+// FE-TP-ROAD-001 to FE-TP-ROAD-147
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -3089,5 +3089,176 @@ describe('useTripPlanner road trip: the drive between two days (#2461)', () => {
 
     await act(async () => { await result.current.handleRemoveAssignment(5, 13) })
     expect(rt.vias.reanchor).toHaveBeenLastCalledWith(5, { vias: [], remove: [9] })
+  })
+})
+
+describe('useTripPlanner road trip: a booked night at the edge of a day', () => {
+  const NO_VIA = 'The drive from or to your stay keeps its road.'
+  const bookend = (phase: 'morning' | 'evening', over: Record<string, unknown>) => ({
+    assignmentId: phase === 'morning' ? -6_000_000_010 : -6_000_000_011,
+    placeId: 900,
+    name: 'Hotel',
+    stopType: 'hotel',
+    bookend: { phase, accommodationId: 5, reservationId: null, checkingOut: phase === 'morning', checkingIn: phase === 'evening', checkOut: null },
+    ...over,
+  })
+  /**
+   * A transfer day west to east: out of one hotel, two places, into the next. Four points
+   * on one straight road, so every leg is a stretch of the line of its own.
+   */
+  const transferDay = () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        bookend('morning', { ownerIndex: 0, lat: 53, lng: 9 }),
+        { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 10, name: 'Lookout' },
+        { assignmentId: 12, ownerIndex: 1, lat: 53, lng: 11, name: 'Falls' },
+        bookend('evening', { ownerIndex: 2, lat: 53, lng: 12 }),
+      ],
+      geometry: [[53, 9], [53, 10], [53, 11], [53, 12]],
+    }]
+  }
+
+  it('FE-TP-ROAD-140: a click on the drive out of the morning hotel puts no via there, and says why', async () => {
+    transferDay()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53, 9.5) })
+
+    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(toasts).toContainEqual({ message: NO_VIA, type: 'info' })
+  })
+
+  it('FE-TP-ROAD-141: nor on the drive into tonight’s hotel, while the drive between the places still takes one', async () => {
+    transferDay()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.addRoadtripVia(53, 11.5) })
+    expect(rt.vias.add).not.toHaveBeenCalled()
+    expect(toasts.filter(t => t.message === NO_VIA)).toHaveLength(1)
+
+    await act(async () => { await result.current.addRoadtripVia(53, 10.5) })
+    expect(rt.vias.add).toHaveBeenCalledWith(5, 0, 53, 10.5)
+  })
+
+  it('FE-TP-ROAD-142: a via dragged onto the drive from or to a hotel keeps the leg it was on', async () => {
+    transferDay()
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.moveRoadtripVia(5, 3, 53, 9.5) })
+    await act(async () => { await result.current.moveRoadtripVia(5, 3, 53, 11.5) })
+
+    expect(rt.vias.move).toHaveBeenNthCalledWith(1, 5, 3, 53, 9.5, undefined)
+    expect(rt.vias.move).toHaveBeenNthCalledWith(2, 5, 3, 53, 11.5, undefined)
+  })
+
+  it('FE-TP-ROAD-143: a place added on the drive out of the hotel comes first, one on the drive into the next comes last', async () => {
+    transferDay()
+    const { result } = await renderRoadtrip()
+
+    // Card positions: after the morning hotel, and in front of the evening one.
+    expect(result.current.manualStopTargetFor(53, 9.5)).toMatchObject({ dayId: 5, position: 1 })
+    expect(result.current.manualStopTargetFor(53, 11.5)).toMatchObject({ dayId: 5, position: 3 })
+  })
+
+  it('FE-TP-ROAD-144: a place added between the first two places lands between them, not in front of the first', async () => {
+    // The morning hotel shares the first place's index. Found by that index, it stood in
+    // for the place, and the new one went in one stop early.
+    transferDay()
+    const { result } = await renderRoadtrip()
+
+    expect(result.current.manualStopTargetFor(53, 10.5)).toMatchObject({ dayId: 5, position: 2 })
+  })
+
+  it('FE-TP-ROAD-145: behind a terminal, and on the road after the next place, a place lands where it fell', async () => {
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    const carrier = (role: 'departure' | 'arrival') =>
+      ({ reservationId: 70, type: 'flight', role, title: 'LH 2020', code: null, at: null })
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 9, name: 'Hamburg' },
+        { assignmentId: -3000000140, placeId: -70, ownerIndex: 1, lat: 53, lng: 10, carrier: carrier('departure') },
+        { assignmentId: -3000000141, placeId: -70, ownerIndex: 1, lat: 53, lng: 11, carrier: carrier('arrival') },
+        { assignmentId: 12, ownerIndex: 1, lat: 53, lng: 12, name: 'Munich' },
+        { assignmentId: 13, ownerIndex: 2, lat: 53, lng: 13, name: 'Garmisch' },
+      ],
+      geometry: [[53, 9], [53, 10], [53, 11], [53, 12], [53, 13]],
+    }]
+    const { result } = await renderRoadtrip()
+
+    // Right behind the arrival, not between the two ends of the flight.
+    expect(result.current.manualStopTargetFor(53, 11.5)).toMatchObject({ dayId: 5, position: 3 })
+    // Behind Munich, which shares its index with the terminals seated in front of it.
+    expect(result.current.manualStopTargetFor(53, 12.5)).toMatchObject({ dayId: 5, position: 4 })
+  })
+
+  it('FE-TP-ROAD-146: the inspector speaks for the stay’s own stop, whatever bookends stand at its place', async () => {
+    seedTrip({ places: [buildPlace({ id: 900 })], days: [buildDay({ id: 5 }), buildDay({ id: 6 })] })
+    rt.routes.days = [
+      {
+        dayId: 5,
+        stops: [
+          { assignmentId: 21, placeId: 900, lat: 53, lng: 9, night: true },
+          { assignmentId: 22, placeId: 901, lat: 53, lng: 10 },
+          bookend('evening', { ownerIndex: 2, lat: 53, lng: 9 }),
+        ],
+      },
+      {
+        dayId: 6,
+        stops: [bookend('morning', { assignmentId: -6_000_000_012, ownerIndex: 0, lat: 53, lng: 9 }), { assignmentId: 23, placeId: 902, lat: 53, lng: 11 }],
+      },
+    ]
+    useSettingsStore.setState(s => ({ settings: { ...s.settings, roadtrip_day_start: '08:00', roadtrip_day_end: '18:00' } }))
+    const { result } = await renderRoadtrip()
+
+    act(() => { result.current.handlePlaceClick(900) })
+
+    // One stop answers for the place, so its day end can be set there.
+    expect(result.current.roadtripEndDay?.active).toBe(false)
+    await act(async () => result.current.roadtripEndDay?.onToggle())
+    expect(actions.setAssignmentEndDay).toHaveBeenCalledWith(42, 5, 21, true)
+  })
+
+  it('FE-TP-ROAD-147: a way chosen for the first leg after the morning hotel is still that leg', async () => {
+    const LINE: [number, number][] = [[53, 10], [53, 11]]
+    seedTrip({ days: [buildDay({ id: 5, day_number: 1 })] })
+    rt.corridor.day = { dayId: 5, dayNumber: 1 }
+    rt.routes.days = [{
+      dayId: 5,
+      dayNumber: 1,
+      stops: [
+        bookend('morning', { ownerIndex: 0, lat: 53, lng: 9 }),
+        { assignmentId: 11, ownerIndex: 0, lat: 53, lng: 10, name: 'Lookout' },
+        { assignmentId: 12, ownerIndex: 1, lat: 53, lng: 11, name: 'Falls' },
+      ],
+      legs: [{ distance: 70_000, duration: 3_600 }, { distance: 70_000, duration: 3_600 }],
+      legLines: [[[53, 9], [53, 10]], LINE],
+      geometry: [[53, 9], [53, 10], [53, 11]],
+    }]
+    rt.vias.byDay = { 5: [via(1, 5, 0, 0, 53.1, 10.5)] }
+    rt.alt.open = {
+      dayId: 5, drive: { kind: 'leg', index: 1 }, loading: false, error: false, proving: null,
+      anchor: { dayId: 5, afterIndex: 0 },
+      ends: { from: 11, to: 12 },
+      engine: 'osrm',
+      route: rt.legRoute,
+      routes: [
+        { coordinates: [[53, 10], [53.1, 10.5], [53, 11]], distance: 80_000, duration: 4_000, divergence: null, current: true },
+        { coordinates: LINE, distance: 70_000, duration: 3_600, divergence: null, direct: true },
+      ],
+    }
+    rt.legRoute.mockResolvedValue({ coordinates: LINE, distance: 70_000, duration: 3_600, fellBack: false })
+    const { result } = await renderRoadtrip()
+
+    await act(async () => { await result.current.chooseRouteAlternative(1) })
+
+    expect(toasts.filter(t => t.message.includes('changed'))).toEqual([])
+    expect(rt.vias.addMany).toHaveBeenCalledWith(5, [], [0])
   })
 })

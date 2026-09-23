@@ -289,5 +289,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     '{title} rezervasyonu bu yolculuğun hiçbir gününde değil, bu yüzden sürüş onu hesaba katmıyor.',
   'roadtrip.bookings.loose': 'Bu gün için ayrıca rezerve edildi',
+  'roadtrip.bookend.checkOut': 'Çıkış · {name}',
+  'roadtrip.bookend.from': 'Başlangıç: {name}',
+  'roadtrip.bookend.back': 'Dönüş: {name}',
+  'roadtrip.bookend.checkIn': 'Giriş · {name}',
+  'roadtrip.bookend.noVia': 'Konaklama yerinize gidiş ve dönüş yolu değişmez.',
 };
 export default roadtrip;

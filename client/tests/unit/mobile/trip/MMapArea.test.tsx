@@ -16,7 +16,7 @@ import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRou
 import { openLeg } from '../../../helpers/legAlternatives'
 import { RT_ALT_BAR_LIFT } from '../../../../src/mobile/screens/trip/roadtrip/useMRtAlternatives'
 
-// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-042
+// FE-MOB-MAPAREA-001 to FE-MOB-MAPAREA-043
 //
 // The stage's pins come out of the trip store rather than the planner's map list, so the
 // stage fixtures seed the store and leave `mapPlaces` to stand for what the plan tab shows.
@@ -887,5 +887,37 @@ describe('MMapArea booking routes on the day-scoped plan map (#2456)', () => {
     renderPlanMap(12, flight({ day_id: null, end_day_id: null }))
 
     expect(drawnBookingIds()).toEqual([7])
+  })
+})
+
+describe('MMapArea and a booked night at the edge of the stage', () => {
+  it('FE-MOB-MAPAREA-043: a pin at the hotel opens its stored stop, never the bookend in front of it, else the inspector', () => {
+    const base = drivePlanner(3)
+    const [before, loop] = base.roadtripRoutes.days
+    const hotel = (placeId: number) => ({
+      ...loop.stops[0],
+      assignmentId: -6_000_000_006,
+      placeId,
+      ownerIndex: 0,
+      stopType: 'hotel',
+      bookend: { phase: 'morning', accommodationId: 5, reservationId: null, checkingOut: false, checkingIn: false, checkOut: null },
+    })
+    const withBookend = (placeId: number) => ({
+      ...base,
+      roadtripRoutes: { ...base.roadtripRoutes, days: [before, { ...loop, stops: [hotel(placeId), ...loop.stops] }] },
+    }) as TripPlanner
+    const shell = stageShell()
+    const { unmount } = render(<MMapArea planner={withBookend(11)} shell={shell} />)
+    tapPin(11)
+    expect(shell.openSheet).toHaveBeenLastCalledWith('rtstop', { dayId: 3, assignmentId: 31 })
+    unmount()
+
+    // A hotel the drive has as its bookend only: the road trip has no stop to open.
+    const only = withBookend(99)
+    const other = stageShell()
+    render(<MMapArea planner={only} shell={other} />)
+    tapPin(99)
+    expect(other.openSheet).not.toHaveBeenCalled()
+    expect(only.handleMarkerClick).toHaveBeenCalledWith(99)
   })
 })

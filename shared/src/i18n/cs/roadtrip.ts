@@ -286,5 +286,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Otevřít rezervaci',
   'roadtrip.ride.undated': 'Rezervace {title} nepatří k žádnému dni této cesty, proto s ní jízda nepočítá.',
   'roadtrip.bookings.loose': 'Také rezervováno na tento den',
+  'roadtrip.bookend.checkOut': 'Check-out · {name}',
+  'roadtrip.bookend.from': 'Z ubytování {name}',
+  'roadtrip.bookend.back': 'Zpět do ubytování {name}',
+  'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.noVia': 'Trasa z vašeho ubytování a do něj zůstává beze změny.',
 };
 export default roadtrip;

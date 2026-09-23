@@ -286,5 +286,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Öppna bokning',
   'roadtrip.ride.undated': 'Bokningen {title} ligger inte på någon av resans dagar, så körningen tar inte med den.',
   'roadtrip.bookings.loose': 'Även bokat denna dag',
+  'roadtrip.bookend.checkOut': 'Utcheckning · {name}',
+  'roadtrip.bookend.from': 'Från {name}',
+  'roadtrip.bookend.back': 'Tillbaka till {name}',
+  'roadtrip.bookend.checkIn': 'Incheckning · {name}',
+  'roadtrip.bookend.noVia': 'Resan till och från ditt boende behåller sin väg.',
 };
 export default roadtrip;

@@ -19,6 +19,7 @@ import {
   reanchorAfterReorder,
   reanchorByStopOrder,
   seamViaIndex,
+  isStoredStop,
 } from './roadtripModel';
 
 import { describe, it, expect } from 'vitest';
@@ -1241,5 +1242,29 @@ describe('seamViaIndex', () => {
         );
       }
     }
+  });
+});
+
+describe('isStoredStop', () => {
+  it('FE-ROADTRIP-MODEL-111: a stored stop is an assignment, not a marker, a terminal or a booked night at the edge', () => {
+    expect(isStoredStop({})).toBe(true);
+    expect(isStoredStop({ automaticNight: { phase: 'end', fromDayNumber: 1 } })).toBe(false);
+    expect(
+      isStoredStop({
+        carrier: { reservationId: 1, type: 'flight', role: 'arrival', title: 'Flight', code: null, at: null },
+      }),
+    ).toBe(false);
+    expect(
+      isStoredStop({
+        bookend: {
+          phase: 'morning',
+          accommodationId: 1,
+          reservationId: null,
+          checkingOut: false,
+          checkingIn: false,
+          checkOut: null,
+        },
+      }),
+    ).toBe(false);
   });
 });

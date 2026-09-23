@@ -291,5 +291,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'Бронирование {title} не относится ни к одному дню этой поездки, поэтому маршрут его не учитывает.',
   'roadtrip.bookings.loose': 'Также забронировано в этот день',
+  'roadtrip.bookend.checkOut': 'Выезд · {name}',
+  'roadtrip.bookend.from': 'Отправление: {name}',
+  'roadtrip.bookend.back': 'Возвращение: {name}',
+  'roadtrip.bookend.checkIn': 'Заезд · {name}',
+  'roadtrip.bookend.noVia': 'Маршрут от места проживания и обратно к нему остаётся прежним.',
 };
 export default roadtrip;

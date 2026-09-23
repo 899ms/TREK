@@ -282,5 +282,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': '예약 열기',
   'roadtrip.ride.undated': '{title}은(는) 이 여행의 어느 날에도 속하지 않아 주행에 반영되지 않습니다.',
   'roadtrip.bookings.loose': '이날의 다른 예약',
+  'roadtrip.bookend.checkOut': '체크아웃 · {name}',
+  'roadtrip.bookend.from': '{name}에서 출발',
+  'roadtrip.bookend.back': '{name}(으)로 돌아가기',
+  'roadtrip.bookend.checkIn': '체크인 · {name}',
+  'roadtrip.bookend.noVia': '숙소를 오가는 구간은 지금 경로를 그대로 유지합니다.',
 };
 export default roadtrip;

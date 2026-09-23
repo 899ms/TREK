@@ -291,5 +291,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'Pemesanan {title} tidak berada di hari mana pun dalam perjalanan ini, jadi perjalanan tidak memperhitungkannya.',
   'roadtrip.bookings.loose': 'Juga dipesan hari ini',
+  'roadtrip.bookend.checkOut': 'Check-out · {name}',
+  'roadtrip.bookend.from': 'Dari {name}',
+  'roadtrip.bookend.back': 'Kembali ke {name}',
+  'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.noVia': 'Perjalanan dari dan ke penginapan Anda tetap pada jalurnya.',
 };
 export default roadtrip;

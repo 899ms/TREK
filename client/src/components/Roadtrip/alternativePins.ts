@@ -1,5 +1,5 @@
 import { furthestFrom, sameRoad, type RoadLine } from '../Map/RouteCalculator'
-import type { RouteSegment } from '@trek/shared/roadtrip'
+import { isStoredStop, type RouteSegment } from '@trek/shared/roadtrip'
 import type { RailLegRoute, RailLegRouter, RoadtripDay, RoadtripStop } from './useRoadtripRoutes'
 import type { OfferedRoute, RailDrive, ViaAnchor } from './useRouteAlternatives'
 
@@ -111,12 +111,12 @@ export function refusalHint(
  * inside one card or across to the next. The caller hands in the days with a single stop
  * too: they draw no card, but the drive into the day after one leaves from its stop. The
  * markers an automatic night puts on the chain stand on or between stops without being
- * one, and a terminal borrows the index of a stored stop to be seated by, so neither can
- * answer for the anchor.
+ * one, and a terminal or a booked night at a day's edge borrows the index of a stored stop
+ * to be seated by, so none of them can answer for the anchor.
  */
 export function railLegAt(days: readonly Pick<RoadtripDay, 'stops'>[], anchor: ViaAnchor): { from: RoadtripStop; to: RoadtripStop } | null {
   const chain = days.flatMap(day => day.stops).filter(stop => !stop.automaticNight)
-  const at = chain.findIndex(stop => !stop.carrier && stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
+  const at = chain.findIndex(stop => isStoredStop(stop) && stop.ownerDayId === anchor.dayId && stop.ownerIndex === anchor.afterIndex)
   const to = at >= 0 ? chain[at + 1] : undefined
   return to ? { from: chain[at], to } : null
 }

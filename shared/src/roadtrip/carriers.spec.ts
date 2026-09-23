@@ -1,5 +1,5 @@
 /**
- * ROADTRIP-CARRIERS-001..029: a booking the traveller rides becomes a seam in the drive,
+ * ROADTRIP-CARRIERS-001..031: a booking the traveller rides becomes a seam in the drive,
  * and a hire car puts its desks on it.
  *
  * The road ends at the terminal the ride leaves from and starts again at the one it
@@ -10,6 +10,8 @@
  * on no day is named rather than dropped, and a ride within one day is seated where it
  * adds the least road, as far as the clock leaves a choice (#2461). From 028 on: a ride
  * that lands on a later day is not seated there by the slot seeded on the day it left.
+ * From 030 on: a booked night at a day's edge takes no via, and a terminal says which
+ * edge of the day it holds.
  */
 import { assembleRoadtrip } from './assemble';
 import {
@@ -20,15 +22,18 @@ import {
   carrierReservationIds,
   carrierSeam,
   carriesTheCar,
+  closesTheDay,
   isCarrierMode,
   isPickupStop,
   isUndatedRide,
+  opensTheDay,
   rideSeatAfter,
   sameDayRide,
   seatCarrierStops,
   terminalAssignmentId,
   undatedRides,
   viasLeaving,
+  viasOnLeg,
   type CarrierBooking,
   type SeatItem,
 } from './carriers';
@@ -813,5 +818,53 @@ describe('a ride that lands on a later day (#2461)', () => {
       ],
     })!;
     expect(car.arrival!.position).toBe(1.5);
+  });
+});
+
+describe('a booked night at the edge of a day', () => {
+  const hotel = (phase: 'morning' | 'evening', ownerIndex: number) =>
+    stop({
+      ownerIndex,
+      bookend: {
+        phase,
+        accommodationId: 5,
+        reservationId: null,
+        checkingOut: false,
+        checkingIn: false,
+        checkOut: null,
+      },
+    });
+  const vias = [
+    { day_id: 1, after_order_index: 0, sequence: 0, lat: 1, lng: 1 },
+    { day_id: 1, after_order_index: 1, sequence: 0, lat: 2, lng: 2 },
+  ];
+
+  it('ROADTRIP-CARRIERS-030: no via leaves the hotel, and none bends the drive to tonight’s', () => {
+    // The morning's hotel borrows the first stop's index; the points filed there are
+    // that stop's, for the drive leaving it.
+    expect(viasLeaving(hotel('morning', 0), vias)).toEqual([]);
+    expect(viasOnLeg(hotel('morning', 0), stop({ ownerIndex: 0 }), vias)).toEqual([]);
+    expect(viasOnLeg(stop({ ownerIndex: 0 }), stop({ ownerIndex: 1 }), vias)).toEqual([vias[0]]);
+    // The points behind the day's last stop shape the road into tomorrow, which the drive
+    // to tonight's hotel is not.
+    expect(viasOnLeg(stop({ ownerIndex: 1 }), hotel('evening', 2), vias)).toEqual([]);
+    expect(viasLeaving(stop({ ownerIndex: 1 }), vias)).toEqual([vias[1]]);
+  });
+
+  it('ROADTRIP-CARRIERS-031: a landing or a pick-up opens a day, a departure or a hand-back closes it', () => {
+    expect(['arrival', 'pickup', 'departure', 'return', undefined].map((role) => opensTheDay(role as never))).toEqual([
+      true,
+      true,
+      false,
+      false,
+      false,
+    ]);
+    expect(['arrival', 'pickup', 'departure', 'return', undefined].map((role) => closesTheDay(role as never))).toEqual([
+      false,
+      false,
+      true,
+      true,
+      false,
+    ]);
   });
 });

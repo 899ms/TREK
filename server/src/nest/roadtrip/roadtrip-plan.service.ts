@@ -11,6 +11,7 @@ import {
   carrierLegsFor,
   carrierSeam,
   foldRouteRun,
+  isStationaryJoin,
   splitIntoRuns,
   spillChains,
   dayWindow,
@@ -20,7 +21,7 @@ import {
   formatDurationShort,
   seatCarrierStops,
   undatedRides,
-  viasLeaving,
+  viasOnLeg,
   type CarrierBooking,
   type CarrierSeam,
   type DistanceUnit,
@@ -269,8 +270,9 @@ export class RoadtripPlanService {
       stops.forEach((stop, index) => {
         stopAt.push(points.length);
         points.push({ lat: stop.lat, lng: stop.lng });
+        // None bend the drive from or to a booked night's hotel (`viasOnLeg`).
         if (index < stops.length - 1)
-          points.push(...viasLeaving(stop, context.vias).map((v) => ({ lat: v.lat, lng: v.lng })));
+          points.push(...viasOnLeg(stop, stops[index + 1], context.vias).map((v) => ({ lat: v.lat, lng: v.lng })));
       });
       try {
         if (points.length > 100) throw new Error('Too many waypoints');
@@ -336,7 +338,8 @@ export class RoadtripPlanService {
       const pairs = chain.stops.slice(0, -1).map((from, index) => ({ from, to: chain.stops[index + 1] }));
       if (connectDays && previous && chain.stops.length) pairs.push({ from: previous, to: chain.stops[0] });
       for (const { from, to } of pairs) {
-        if (asked.has(stopKey(from) + '>' + stopKey(to))) continue;
+        // A night spent at one hotel is no drive, and no router is asked about it.
+        if (isStationaryJoin(from, to) || asked.has(stopKey(from) + '>' + stopKey(to))) continue;
         await fetchRun(
           [from, to],
           chain.dayId,

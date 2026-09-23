@@ -377,6 +377,20 @@ export function computeSchedule(
  * at the bottom of the rail under "only X so far", which reads as the hotel missing
  * from the road trip altogether.
  */
+/**
+ * Whether a stop is one somebody stored on the day: an assignment, filed at its own
+ * index. Not an automatic night, a terminal or a booked night at a day's edge, which the
+ * plan seats between the stored stops and which borrow a stored stop's index to be seated
+ * by. A reader looking a stop up by its day and index has to pass those three over, or it
+ * finds the marker, the airport or the hotel in front of the stop it meant.
+ *
+ * Asked of the shape rather than of the id's sign: a stop added a moment ago carries a
+ * temporary negative id until the server answers, and is stored all the same.
+ */
+export function isStoredStop(stop: Pick<RoadtripStop, 'automaticNight' | 'carrier' | 'bookend'>): boolean {
+  return !stop.automaticNight && !stop.carrier && !stop.bookend;
+}
+
 export function standsAsDay(stops: readonly { night?: boolean }[]): boolean {
   return stops.length > 1 || stops.some((stop) => stop.night === true);
 }

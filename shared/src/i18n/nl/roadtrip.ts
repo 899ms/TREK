@@ -290,5 +290,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'De boeking {title} valt op geen enkele dag van deze reis, dus de rit houdt er geen rekening mee.',
   'roadtrip.bookings.loose': 'Ook geboekt op deze dag',
+  'roadtrip.bookend.checkOut': 'Uitchecken · {name}',
+  'roadtrip.bookend.from': 'Vanaf {name}',
+  'roadtrip.bookend.back': 'Terug naar {name}',
+  'roadtrip.bookend.checkIn': 'Inchecken · {name}',
+  'roadtrip.bookend.noVia': 'De rit van en naar je verblijf houdt zijn route.',
 };
 export default roadtrip;

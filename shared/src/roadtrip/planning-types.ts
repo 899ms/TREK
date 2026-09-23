@@ -28,10 +28,39 @@ export interface CarrierTerminal {
   at: string | null;
 }
 
+/** Which end of a day a booked night stands at: the stay slept in, or tonight's. */
+export type BookendPhase = 'morning' | 'evening';
+
+/**
+ * A booked night standing at one end of a day it is no stop of: in the morning the stay
+ * the traveller woke up in, in the evening the one they sleep in (`seatNightBookends`).
+ *
+ * The stay's own place, not an assignment: nothing about it can be moved, timed or given a
+ * via point, and what it opens is the booking behind the night, or the stay itself when
+ * nothing was booked for it.
+ */
+export interface NightBookend {
+  phase: BookendPhase;
+  accommodationId: number;
+  /** The booking behind the night, the one a tap opens. Null for a stay entered without one. */
+  reservationId: number | null;
+  /** A morning on the day the stay is handed back. */
+  checkingOut: boolean;
+  /** An evening on the day the stay begins. */
+  checkingIn: boolean;
+  /**
+   * The latest the room has to be handed back, on the morning it is: a label for the row,
+   * never a time the drive leaves at (#2357).
+   */
+  checkOut: string | null;
+}
+
 export interface RoadtripStop {
   automaticNight?: AutomaticNight;
   /** Set on the two ends of a carrier ride. Such a stop is no place and belongs to no assignment. */
   carrier?: CarrierTerminal;
+  /** Set on a booked night standing at the start or the end of a day. Belongs to no assignment. */
+  bookend?: NightBookend;
   assignmentId: number;
 
   ownerDayId: number;

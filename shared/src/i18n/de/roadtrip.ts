@@ -286,5 +286,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'Die Buchung {title} liegt auf keinem Tag dieser Reise, deshalb plant die Fahrt nicht mit ihr.',
   'roadtrip.bookings.loose': 'Außerdem an diesem Tag gebucht',
+  'roadtrip.bookend.checkOut': 'Check-out · {name}',
+  'roadtrip.bookend.from': 'Ab {name}',
+  'roadtrip.bookend.back': 'Zurück zu {name}',
+  'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.noVia': 'Die Fahrt von und zu deiner Unterkunft behält ihre Strecke.',
 };
 export default roadtrip;

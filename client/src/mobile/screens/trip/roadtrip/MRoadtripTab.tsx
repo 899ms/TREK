@@ -6,7 +6,7 @@ import { useMRtCorridor } from './useMRtCorridor'
 import { useMRtAlternatives } from './useMRtAlternatives'
 import MRtCorridorBar from './MRtCorridorBar'
 import MRtAlternativesBar from './MRtAlternativesBar'
-import { RtAutoRow, RtBookingChips, RtDryRow, RtLegRow, RtRideRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
+import { RtAutoRow, RtBookendRow, RtBookingChips, RtDryRow, RtLegRow, RtRideRow, RtSpillRow, RtStopRow, type RowChrome } from './MRoadtripRows'
 import MBadge from '../../../components/MBadge'
 import MDancingTrek from '../../../components/MDancingTrek'
 import { formatDurationShort } from '../../../../components/Roadtrip/roadtripModel'
@@ -19,6 +19,7 @@ import type { MTripTabPanelProps } from '../MTripShell'
 import { arrivingReroutable, legReroutable, type StopRow } from '../../../../components/Roadtrip/roadtripRowModel'
 import { ARRIVING_DRIVE, type RailDrive } from '../../../../components/Roadtrip/useRouteAlternatives'
 import { dayBookings } from '../../../../components/Roadtrip/stopBookings'
+import { bookendBooking } from '../../../../components/Roadtrip/nightBookend'
 import { getDayOrder } from '../../../../utils/dayOrder'
 import { undatedRides } from '@trek/shared/roadtrip'
 import type { Reservation, TranslationFn } from '../../../../types'
@@ -84,6 +85,7 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
   const openStop = (row: StopRow) => {
     // A terminal is the booking's, and opens it: there is no stop sheet for an airport.
     if (row.stop.carrier) shell.openSheet('transport', { reservationId: row.stop.carrier.reservationId })
+    else if (row.bookend) openBookend(row.stop.ownerDayId, row.bookend)
     else shell.openSheet('rtstop', { dayId: row.stop.ownerDayId, assignmentId: row.stop.assignmentId })
   }
 
@@ -115,6 +117,16 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
     }
     planner.setEditingReservation(res)
     planner.setShowReservationModal(true)
+  }
+  // A booked night at the edge of the stage is no stop, and has no stop sheet: it opens the
+  // booking behind the night, else the stay for somebody who may edit days, else the
+  // hotel's place, the way a stay chip in the day timeline does (#2210).
+  const openBookend = (dayId: number, reading: NonNullable<StopRow['bookend']>) => {
+    const booking = bookendBooking(reading, canEditBookings)
+    const res = booking === null ? undefined : planner.reservations.find(r => r.id === booking)
+    if (res) openBooking(res)
+    else if (planner.can('day_edit', planner.trip)) shell.openSheet('accommodation', { dayId, accId: reading.accommodationId })
+    else planner.handlePlaceClick(reading.placeId)
   }
 
   // The search bar sits in the same band on both halves, at the same offset, so the
@@ -261,6 +273,9 @@ export default function MRoadtripTab({ planner, shell }: MTripTabPanelProps) {
 
             <section className="mt-2.5 overflow-hidden rounded-[22px] border border-[color:var(--m-cbr)] bg-[color:var(--m-card)] px-3.5 pb-3 pt-1">
               {rt.rows.map((row, i) => {
+                if (row.kind === 'stop' && row.bookend) {
+                  return <RtBookendRow key={`s${i}`} row={row} bookend={row.bookend} chrome={chrome} onOpen={() => openStop(row)} />
+                }
                 if (row.kind === 'stop') {
                   const chips = bookings.atStop.get(row.stop.assignmentId)
                   return (

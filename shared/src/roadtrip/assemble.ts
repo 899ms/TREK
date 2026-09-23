@@ -3,6 +3,7 @@ import { carriesTheCar, isCarrierMode, isPickupStop } from './carriers';
 import { pointAtMeters } from './corridor';
 import type { RoadtripDayBoundary } from './day-boundary.schema';
 import { planDayWindow, type DayWindow } from './dayWindow';
+import { isStationaryJoin, withStationaryJoins } from './nightBookends';
 import { spillChains } from './nightSpill';
 import type {
   PlanDay,
@@ -63,11 +64,13 @@ export function assembleRoadtrip({
   boundaries: RoadtripDayBoundary[];
   labels: { start: string; end: string };
 }): RoadtripRoutes {
-  const chains = spillChains(plan, quietDays, (a, b) => allLegs[legKey(a, b)]);
+  // A night spent at one hotel is a leg going nowhere, whatever was fetched for the pair:
+  // the hotel in the evening and the same hotel the next morning are one spot.
+  const storedLegFor = withStationaryJoins((from, to) => allLegs[legKey(from, to)]);
+  const chains = spillChains(plan, quietDays, storedLegFor);
 
   const allSnaps: Record<string, SnappedWaypoint> = {};
   for (const day of plan) Object.assign(allSnaps, snapByDay[day.dayId] ?? {});
-  const storedLegFor = (from: RoadtripStop, to: RoadtripStop): RoutedLeg | undefined => allLegs[legKey(from, to)];
   const timed = window
     ? planDayWindow(
         [...plan, ...quietDays],
@@ -103,6 +106,8 @@ export function assembleRoadtrip({
   const lineJoins: boolean[] = [];
   const segments: RouteSegment[] = [];
   const accessLines: RoadtripRoutes['accessLines'] = [];
+  const spurKeys = new Set<string>();
+  const bookendSpots = new Set<string>();
 
   const out: RoadtripDay[] = [];
   let carryKm: number | null = 0;
@@ -122,7 +127,13 @@ export function assembleRoadtrip({
         inboundAt.set(spill.at, { seg: spill.leg, line: spill.line, drawnAs: spill.fromDayNumber });
       }
 
-      const joined = inboundAt.has(0) ? undefined : previousStop && legFor(previousStop, chain.stops[0]!);
+      // No band for a night spent at one hotel: nothing is driven between the evening and
+      // the morning, and a band would read "0 km" between a hotel and itself.
+      const first = chain.stops[0];
+      const joined =
+        inboundAt.has(0) || !previousStop || !first || isStationaryJoin(previousStop, first)
+          ? undefined
+          : legFor(previousStop, first);
       if (joined) {
         inboundAt.set(0, { seg: joined.seg, line: joined.line, drawnAs: previousDayNumber ?? chain.dayNumber });
         arrivingLeg = joined.seg;
@@ -188,9 +199,17 @@ export function assembleRoadtrip({
     const schedule = chain.schedule;
     const legVias = routed.map((l) => l?.vias ?? []);
     const stops = chain.stops.map((s) => {
-      const snap = s.automaticNight ? undefined : allSnaps[stopKey(s)];
+      const key = stopKey(s);
+      const snap = s.automaticNight ? undefined : allSnaps[key];
       const line = spurFor(snap);
-      if (line) accessLines.push({ line, meters: snap!.meters, stopKey: stopKey(s) });
+      // A hotel the days start and end at is one walk from the road, however many of its
+      // bookends and its own stop stand there: drawn once.
+      const twice = spurKeys.has(key) && (!!s.bookend || bookendSpots.has(key));
+      if (line && !twice) {
+        accessLines.push({ line, meters: snap!.meters, stopKey: key });
+        spurKeys.add(key);
+      }
+      if (s.bookend) bookendSpots.add(key);
       return { ...s, offRoadMeters: line ? snap!.meters : null };
     });
 
@@ -341,9 +360,17 @@ export function assembleRoadtrip({
       0,
     ),
 
+    // A quiet day lists what could be moved onto it, and a bookend is nothing anybody moves:
+    // it is left behind alone only when every stop after it went on past midnight.
     quietDays: out
       .filter((d) => !standsAsDay(d.stops) && !d.spills?.length && !d.stops.some((s) => s.automaticNight))
-      .map((d) => ({ dayId: d.dayId, dayNumber: d.dayNumber, date: d.date, title: d.title, stops: d.stops })),
+      .map((d) => ({
+        dayId: d.dayId,
+        dayNumber: d.dayNumber,
+        date: d.date,
+        title: d.title,
+        stops: d.stops.filter((s) => !s.bookend),
+      })),
     loading,
   };
 }

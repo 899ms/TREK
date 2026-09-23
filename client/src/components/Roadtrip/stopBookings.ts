@@ -1,5 +1,5 @@
 import { Ticket, type LucideIcon } from 'lucide-react'
-import { isCarrierType, isRentalType } from '@trek/shared/roadtrip'
+import { isCarrierType, isRentalType, isStoredStop } from '@trek/shared/roadtrip'
 import { RES_ICONS } from '../Planner/DayPlanSidebar.constants'
 import { hidesOnMiddleDay } from '../../utils/dayMerge'
 import { splitReservationDateTime } from '../../utils/formatters'
@@ -60,7 +60,7 @@ function spansDay(r: Reservation, dayId: number, dayOrder?: (dayId: number) => n
 }
 
 export function dayBookings(
-  day: { dayId: number; stops: readonly Pick<RoadtripStop, 'assignmentId' | 'placeId' | 'carrier' | 'automaticNight'>[] },
+  day: { dayId: number; stops: readonly Pick<RoadtripStop, 'assignmentId' | 'placeId' | 'carrier' | 'automaticNight' | 'bookend'>[] },
   reservations: readonly Reservation[],
   /** A day's position in the trip by its id, so a booking spanning days is on the days between too. */
   dayOrder?: (dayId: number) => number | null | undefined,
@@ -71,9 +71,11 @@ export function dayBookings(
   for (const r of reservations) {
     if (drawnElsewhere(r.type)) continue
     const stops = day.stops
-    // Only a real stop can hold a booking: a terminal has a negative place and an
-    // automatic night has no assignment anybody pinned to.
-    const real = (i: number): boolean => !stops[i]!.carrier && !stops[i]!.automaticNight
+    // Only a real stop can hold a booking: a terminal has a negative place, an automatic
+    // night has no assignment anybody pinned to, and a booked night at the day's edge is
+    // the stay's place on a row that carries no chips. A table at the hotel belongs to the
+    // hotel's own stop, or under the day.
+    const real = (i: number): boolean => isStoredStop(stops[i]!)
     let index = r.assignment_id ? stops.findIndex((s, i) => real(i) && s.assignmentId === r.assignment_id) : -1
     const onDay = spansDay(r, day.dayId, dayOrder)
     if (index < 0 && onDay && r.place_id) index = stops.findIndex((s, i) => real(i) && s.placeId === r.place_id)

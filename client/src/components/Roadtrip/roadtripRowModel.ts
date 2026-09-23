@@ -1,5 +1,5 @@
 import { isServiceStopType, type ScheduleEntry, type ScheduleWarning } from './roadtripModel'
-import { isCarrierMode, type CarrierTerminal, type RoadtripDay, type RoadtripStop, type RouteSegment } from '@trek/shared/roadtrip'
+import { isCarrierMode, isStoredStop, type BookendPhase, type CarrierTerminal, type RoadtripDay, type RoadtripStop, type RouteSegment } from '@trek/shared/roadtrip'
 import { readStay } from './stayReading'
 
 /**
@@ -54,6 +54,73 @@ export interface StopRow {
   /** How long the stop is stood at, which for one left at a set time is what that time leaves. */
   dwellMinutes: number | null
   offRoadMeters: number | null
+  /** What the row says about the booked night it stands for, when it is one; see `bookendReading`. */
+  bookend: BookendReading | null
+}
+
+/**
+ * A booked night at the edge of a day, as a row reads it (`seatNightBookends`).
+ *
+ * Four ways of saying it. The morning of the day the stay is handed back is a check-out,
+ * with the latest hour it may be; any other morning sets out from the stay. The evening
+ * of the day the stay begins is a check-in, unless the stay's own stop is already on the
+ * card before it, in which case the day comes back to it like any other evening.
+ */
+export interface BookendReading {
+  phase: BookendPhase
+  variant: 'checkOut' | 'from' | 'back' | 'checkIn'
+  name: string
+  /** The latest the room is handed back, on the check-out morning. A label, never a departure. */
+  until: string | null
+  /** The booking a tap opens, or null for a stay entered without one. */
+  reservationId: number | null
+  accommodationId: number
+  placeId: number
+}
+
+export function bookendReading(day: Pick<RoadtripDay, 'stops'>, index: number): BookendReading | null {
+  const stop = day.stops[index]
+  const bookend = stop?.bookend
+  if (!stop || !bookend) return null
+  const morning = bookend.phase === 'morning'
+  const stayStopBefore = day.stops
+    .slice(0, index)
+    .some(s => isStoredStop(s) && s.lat === stop.lat && s.lng === stop.lng)
+  const evening = bookend.checkingIn && !stayStopBefore ? 'checkIn' : 'back'
+  return {
+    phase: bookend.phase,
+    variant: morning ? (bookend.checkingOut ? 'checkOut' : 'from') : evening,
+    name: stop.name,
+    until: morning && bookend.checkingOut ? bookend.checkOut : null,
+    reservationId: bookend.reservationId,
+    accommodationId: bookend.accommodationId,
+    placeId: stop.placeId,
+  }
+}
+
+/**
+ * Whether the automatic morning marker at `index` is the same point as the hotel the day
+ * sets out from right after it. The hotel's row carries that morning, clock and all, and a
+ * "continue journey" line above it would say the same thing twice.
+ */
+export function resumeFoldsIntoBookend(day: Pick<RoadtripDay, 'stops'>, index: number): boolean {
+  const stop = day.stops[index]
+  const next = day.stops[index + 1]
+  return stop?.automaticNight?.phase === 'start'
+    && next?.bookend?.phase === 'morning'
+    && stop.lat === next.lat
+    && stop.lng === next.lng
+}
+
+/**
+ * Where the stop at `index` may be moved by one: not past a booked night at the day's
+ * edge, which is no stored stop and holds its place. Past anything else, as before.
+ */
+export function movableWithin(day: Pick<RoadtripDay, 'stops'>, index: number): { up: boolean; down: boolean } {
+  return {
+    up: index > 0 && !day.stops[index - 1]?.bookend,
+    down: index < day.stops.length - 1 && !day.stops[index + 1]?.bookend,
+  }
 }
 
 /**
@@ -86,17 +153,12 @@ export function stageOf(days: readonly RoadtripDay[], dayId: number | null): Roa
   return days.find(d => d.dayId === dayId) ?? null
 }
 
-function stopRow(
-  stop: RoadtripStop,
-  index: number,
-  number: number | null,
-  schedule: RoadtripDay['schedule'],
-  driveWarnings: readonly ScheduleWarning[],
-): StopRow {
+function stopRow(day: RoadtripDay, index: number, number: number | null): StopRow {
   // Only ever called for a real stop: an automatic night is the shell's own marker
   // for "the day ended here" and `roadtripRows` turns it into an 'auto' row instead.
-  const entry = schedule.entries[index]
-  const mine = driveWarnings.filter(w => w.index === index)
+  const stop = day.stops[index]
+  const entry = day.schedule.entries[index]
+  const mine = day.driveWarnings.filter(w => w.index === index)
   return {
     kind: 'stop',
     stop,
@@ -109,6 +171,7 @@ function stopRow(
     warning: pickWarning(mine),
     dwellMinutes: readStay(stop, entry).minutes,
     offRoadMeters: stop.offRoadMeters ?? null,
+    bookend: bookendReading(day, index),
   }
 }
 
@@ -196,6 +259,8 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
     if (stop.carrier?.role === 'arrival' && prev?.carrier?.role === 'departure' && sameRide(prev)) return
 
     const automatic = !!stop.automaticNight
+    // The morning marker at the hotel the day sets out from is that hotel's row.
+    if (resumeFoldsIntoBookend(day, i)) return
     if (automatic) {
       rows.push({
         kind: 'auto',
@@ -208,8 +273,8 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
         index: i,
         carrier: stop.carrier,
         seg: day.legs[i],
-        departure: stopRow(stop, i, null, day.schedule, day.driveWarnings),
-        arrival: stopRow(next!, i + 1, null, day.schedule, day.driveWarnings),
+        departure: stopRow(day, i, null),
+        arrival: stopRow(day, i + 1, null),
       })
       // The road out of the arrival belongs to this row too; the pass below only
       // looks at the index it is on.
@@ -220,7 +285,7 @@ export function roadtripRows(day: RoadtripDay): RoadtripRow[] {
       // place the trip is for: it carries no number, the way a service stop carries none.
       const unnumbered = isServiceStopType(stop.stopType) || !!stop.carrier
       if (!unnumbered) number += 1
-      rows.push(stopRow(stop, i, unnumbered ? null : number, day.schedule, day.driveWarnings))
+      rows.push(stopRow(day, i, unnumbered ? null : number))
     }
 
     pushLeg(i)
@@ -268,6 +333,11 @@ export function legReroutable(day: RoadtripDay, index: number): boolean {
     // index of the stop after it. The road INTO a departure terminal leaves a stored
     // stop and can be offered other ways like any other.
     && !day.stops[index].carrier
+    // The drive from the hotel a day sets out from, or to the one it ends at, takes no
+    // via: the morning's has no index to file one at, and the evening's index is the
+    // road into tomorrow's, which a choice here would bend instead.
+    && !day.stops[index].bookend
+    && !day.stops[index + 1].bookend
 }
 
 /**
@@ -291,6 +361,8 @@ export function arrivingReroutable(day: RoadtripDay): boolean {
     && !from.carrier
     && !from.automaticNight
     && !to.automaticNight
+    && !from.bookend
+    && !to.bookend
 }
 
 /** Stops that carry a number, for a count that agrees with the numbering above. */
@@ -380,12 +452,13 @@ export function stageEnd(rows: readonly RoadtripRow[]): StopRow | null {
  * traveller reading the drive from its start reaches first.
  *
  * An automatic night can sit on a place's position, but nobody chose to stop there, so it
- * never answers. Null when none of the days stops at the place, which is a pin the road
+ * never answers. Neither does a booked night at a day's edge: it is the stay's place, and
+ * no stop of the day, so the inspector answers for the hotel instead. Null when none of the days stops at the place, which is a pin the road
  * trip cannot explain and the caller hands to the plan's own place inspector instead.
  */
 export function firstStopOfPlace(days: readonly RoadtripDay[], placeId: number): RoadtripStop | null {
   for (const day of days) {
-    const stop = day.stops.find(s => !s.automaticNight && !s.carrier && s.placeId === placeId)
+    const stop = day.stops.find(s => isStoredStop(s) && s.placeId === placeId)
     if (stop) return stop
   }
   return null

@@ -283,5 +283,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'فتح الحجز',
   'roadtrip.ride.undated': 'الحجز {title} لا يقع في أي يوم من أيام هذه الرحلة، لذلك لا يستخدمه المسار.',
   'roadtrip.bookings.loose': 'محجوز أيضًا في هذا اليوم',
+  'roadtrip.bookend.checkOut': 'تسجيل المغادرة · {name}',
+  'roadtrip.bookend.from': 'من {name}',
+  'roadtrip.bookend.back': 'العودة إلى {name}',
+  'roadtrip.bookend.checkIn': 'تسجيل الوصول · {name}',
+  'roadtrip.bookend.noVia': 'يبقى الطريق من مكان إقامتك وإليه كما هو.',
 };
 export default roadtrip;

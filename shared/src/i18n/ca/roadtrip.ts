@@ -292,5 +292,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'La reserva {title} no és a cap dia d’aquest viatge, així que el trajecte no la té en compte.',
   'roadtrip.bookings.loose': 'També reservat aquest dia',
+  'roadtrip.bookend.checkOut': 'Sortida · {name}',
+  'roadtrip.bookend.from': 'Des de {name}',
+  'roadtrip.bookend.back': 'Tornada a {name}',
+  'roadtrip.bookend.checkIn': 'Entrada · {name}',
+  'roadtrip.bookend.noVia': 'El trajecte des del teu allotjament o fins a ell manté la seva ruta.',
 };
 export default roadtrip;

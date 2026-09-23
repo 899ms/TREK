@@ -1,3 +1,4 @@
+import { withStationaryJoins } from './nightBookends';
 import { spillChains } from './nightSpill';
 import type { QuietDay, RoadtripDay, RoadtripStop } from './planning-types';
 import type { RouteSegment } from './planning-types';
@@ -569,5 +570,48 @@ describe('spillChains', () => {
       expect(chains.find((c) => c.dayNumber === 2)!.schedule.entries[0]!.arrival).toBeNull();
       expect(chains.find((c) => c.dayNumber === 3)!.schedule.entries[0]!.arrival).toBe('08:11');
     });
+  });
+});
+
+describe('a booked night reached after midnight', () => {
+  const bookend = (phase: 'morning' | 'evening') => ({
+    phase,
+    accommodationId: 5,
+    reservationId: null,
+    checkingOut: false,
+    checkingIn: false,
+    checkOut: null,
+  });
+
+  it('FE-NIGHTSPILL-028: the drive back to the hotel goes on the next card, and the morning waits for it', () => {
+    // 20:00 + 1 h and four hours back to the hotel: in at 01:00. The night at the hotel
+    // is one spot, so the morning sets out no earlier than that.
+    const plan = [
+      day(1, 1, [
+        stop({ assignmentId: 1, name: 'Hamburg', time: '20:00', dwellMinutes: 60 }),
+        stop({
+          assignmentId: -6_000_000_003,
+          name: 'Back to the hotel',
+          lat: 52,
+          lng: 13,
+          bookend: bookend('evening'),
+        }),
+      ]),
+      day(2, 2, [
+        stop({ assignmentId: -6_000_000_004, name: 'From the hotel', lat: 52, lng: 13, bookend: bookend('morning') }),
+        stop({ assignmentId: 3, name: 'Dresden' }),
+      ]),
+    ];
+
+    const chains = spillChains(
+      plan,
+      [],
+      withStationaryJoins(() => ({ ...everyLeg(240)(), vias: [] })),
+    );
+
+    expect(chains[0]!.stops.map((s) => s.name)).toEqual(['Hamburg']);
+    expect(chains[1]!.stops.map((s) => s.name)).toEqual(['Back to the hotel', 'From the hotel', 'Dresden']);
+    expect(chains[1]!.spills).toEqual([expect.objectContaining({ at: 0, count: 1, fromDayNumber: 1 })]);
+    expect(chains[1]!.schedule.entries.map((e) => e.arrival)).toEqual(['01:00', '01:00', '05:00']);
   });
 });

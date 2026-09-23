@@ -283,5 +283,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Open booking',
   'roadtrip.ride.undated': '{title} is on none of this trip’s days, so the drive does not use it.',
   'roadtrip.bookings.loose': 'Also booked this day',
+  'roadtrip.bookend.checkOut': 'Check-out · {name}',
+  'roadtrip.bookend.from': 'From {name}',
+  'roadtrip.bookend.back': 'Back to {name}',
+  'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.noVia': 'The drive from or to your stay keeps its road.',
 };
 export default roadtrip;

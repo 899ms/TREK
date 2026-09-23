@@ -294,5 +294,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.undated':
     'Η κράτηση {title} δεν βρίσκεται σε καμία μέρα αυτού του ταξιδιού, οπότε η διαδρομή δεν τη λαμβάνει υπόψη.',
   'roadtrip.bookings.loose': 'Επίσης κρατημένο αυτή τη μέρα',
+  'roadtrip.bookend.checkOut': 'Check-out · {name}',
+  'roadtrip.bookend.from': 'Από {name}',
+  'roadtrip.bookend.back': 'Επιστροφή: {name}',
+  'roadtrip.bookend.checkIn': 'Check-in · {name}',
+  'roadtrip.bookend.noVia': 'Η διαδρομή προς και από το κατάλυμα διατηρεί τον δρόμο της.',
 };
 export default roadtrip;

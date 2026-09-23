@@ -288,5 +288,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': 'Foglalás megnyitása',
   'roadtrip.ride.undated': '{title}: a foglalás az utazás egyik napjára sem esik, ezért az útvonal nem számol vele.',
   'roadtrip.bookings.loose': 'Erre a napra még lefoglalva',
+  'roadtrip.bookend.checkOut': 'Kijelentkezés · {name}',
+  'roadtrip.bookend.from': 'Indulás: {name}',
+  'roadtrip.bookend.back': 'Vissza: {name}',
+  'roadtrip.bookend.checkIn': 'Bejelentkezés · {name}',
+  'roadtrip.bookend.noVia': 'A szálláshoz vezető és onnan induló út útvonala nem változik.',
 };
 export default roadtrip;

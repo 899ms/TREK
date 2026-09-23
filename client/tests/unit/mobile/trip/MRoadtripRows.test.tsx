@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '../../../helpers/render'
 import {
-  RtAutoRow, RtBookingChips, RtDryRow, RtLegRow, RtRideRow, RtSpillRow, RtStopRow, type RowChrome,
+  RtAutoRow, RtBookendRow, RtBookingChips, RtDryRow, RtLegRow, RtRideRow, RtSpillRow, RtStopRow, type RowChrome,
 } from '../../../../src/mobile/screens/trip/roadtrip/MRoadtripRows'
-import type { RoadtripRow, StopRow } from '../../../../src/components/Roadtrip/roadtripRowModel'
+import type { BookendReading, RoadtripRow, StopRow } from '../../../../src/components/Roadtrip/roadtripRowModel'
 import type { CarrierTerminal, RouteSegment, ScheduleWarning } from '@trek/shared/roadtrip'
 import type { Reservation, TranslationFn } from '../../../../src/types'
 import type { RefuelSearch } from '../../../../src/components/Roadtrip/useRefuelSearch'
 import type { RefuelCandidate } from '../../../../src/components/Roadtrip/refuelSuggestion'
 
-// FE-MOB-RTROW-001 to FE-MOB-RTROW-056
+// FE-MOB-RTROW-001 to FE-MOB-RTROW-058
 
 // Same echo strategy as tests/helpers/mobileTrip: assertions stay on keys, not copy.
 const t: TranslationFn = (key, params) =>
@@ -799,5 +799,47 @@ describe('RtSpillRow', () => {
 
     expect(screen.getByText('roadtrip.spill.departs:9:30 PM')).toBeInTheDocument()
     expect(screen.queryByText('roadtrip.spill.departs:21:30')).toBeNull()
+  })
+})
+
+describe('RtBookendRow', () => {
+  const reading = (over: Partial<BookendReading> = {}): BookendReading => ({
+    phase: 'morning',
+    variant: 'checkOut',
+    name: 'Hotel Alpenblick',
+    until: '10:00',
+    reservationId: 41,
+    accommodationId: 5,
+    placeId: 900,
+    ...over,
+  })
+  const row = (over: Partial<StopRow> = {}) =>
+    stopRow({ number: null, service: true, time: '08:40', stop: { ...stopRow().stop, name: 'Hotel Alpenblick', stopType: 'hotel' }, ...over })
+
+  it('FE-MOB-RTROW-057: says which night it is on the bed a stay wears, with no number, and opens on a tap', () => {
+    const onOpen = vi.fn()
+    const { container } = render(<RtBookendRow row={row()} bookend={reading()} chrome={chrome} onOpen={onOpen} />)
+
+    expect(screen.getByText('roadtrip.bookend.checkOut:Hotel Alpenblick')).toBeInTheDocument()
+    expect(screen.getByText('roadtrip.stay.until:10:00')).toBeInTheDocument()
+    expect(screen.getByText('08:40')).toBeInTheDocument()
+    expect(container.querySelector('.lucide-bed-double')).not.toBeNull()
+    expect(screen.queryByText('2')).toBeNull()
+    fireEvent.click(screen.getByRole('button'))
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' })
+    expect(onOpen).toHaveBeenCalledTimes(2)
+  })
+
+  it('FE-MOB-RTROW-058: an evening says nothing under its name but what the drive into it ran over', () => {
+    const warning: ScheduleWarning = { index: 3, code: 'leg', overMinutes: 30 }
+    const quiet = render(<RtBookendRow row={row({ time: null })} bookend={reading({ phase: 'evening', variant: 'back', until: null })} chrome={chrome} onOpen={vi.fn()} />)
+    expect(screen.getByText('roadtrip.bookend.back:Hotel Alpenblick')).toBeInTheDocument()
+    expect(screen.queryByText(/roadtrip\.stay\.until/)).toBeNull()
+    expect(screen.queryByText('08:40')).toBeNull()
+    quiet.unmount()
+
+    render(<RtBookendRow row={row({ warning, time: '19:10' })} bookend={reading({ phase: 'evening', variant: 'back', until: null })} chrome={{ ...chrome, is12h: true }} onOpen={vi.fn()} />)
+    expect(screen.getByText('30 min')).toBeInTheDocument()
+    expect(screen.getByText('7:10 PM')).toBeInTheDocument()
   })
 })

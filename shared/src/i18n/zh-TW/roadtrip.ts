@@ -272,5 +272,10 @@ const roadtrip: TranslationStrings = {
   'roadtrip.ride.open': '開啟預訂',
   'roadtrip.ride.undated': '{title} 不在本次旅行的任何一天，因此行程不會用到它。',
   'roadtrip.bookings.loose': '當天的其他預訂',
+  'roadtrip.bookend.checkOut': '退房 · {name}',
+  'roadtrip.bookend.from': '從 {name} 出發',
+  'roadtrip.bookend.back': '返回 {name}',
+  'roadtrip.bookend.checkIn': '入住 · {name}',
+  'roadtrip.bookend.noVia': '往返住宿地點的路段維持原本的路線。',
 };
 export default roadtrip;

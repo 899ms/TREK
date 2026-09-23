@@ -10,7 +10,7 @@ import type { CarrierTerminal, RoadtripDay, RoadtripRoutes, RoadtripStop, RouteS
 import type { LegAlternatives } from '../../../../src/components/Roadtrip/useRouteAlternatives'
 import { openLeg } from '../../../helpers/legAlternatives'
 
-// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-061
+// FE-MOB-RTTAB-001 to FE-MOB-RTTAB-064
 //
 // The stage bar pictures the place its day ends at. It reads that place out of the trip
 // store rather than the planner, the unfiltered list, so the picture tests seed the store.
@@ -936,6 +936,77 @@ describe('MRoadtripTab', () => {
 
       fireEvent.click(within(notice).getByRole('button', { name: 'roadtrip.ride.open' }))
       expect(shell.openSheet).toHaveBeenCalledWith('transport', { reservationId: 70 })
+    })
+
+    describe('a booked night at the edge of the stage', () => {
+      const bookend = (phase: 'morning' | 'evening', ownerIndex: number): RoadtripStop => ({
+        ...real(phase === 'morning' ? -6_000_000_004 : -6_000_000_005, 900, 'Hotel Alpenblick'),
+        ownerIndex,
+        lat: 47.2,
+        lng: 11.4,
+        stopType: 'hotel',
+        bookend: { phase, accommodationId: 5, reservationId: 41, checkingOut: phase === 'morning', checkingIn: false, checkOut: phase === 'morning' ? '10:00' : null },
+      })
+      /** Out of the hotel on its check-out morning, two places, and into the night's hotel. */
+      const hotelStage = (first: RoadtripStop[] = []) => stage({
+        stops: [...first, bookend('morning', 0), real(503, 103, 'Kyoto Station'), { ...real(505, 105, 'Munich'), ownerIndex: 1 }, bookend('evening', 2)],
+        legs: [...first.map((): RouteSegment => ({ ...seg('', ''), distance: 0, from: [47.2, 11.4], to: [47.2, 11.4] })), seg('12 km', '20 min'), seg('30 km', '35 min'), seg('40 km', '45 min')],
+        schedule: {
+          entries: [...first.map(() => entry('08:00')), entry('08:40'), entry('09:00', '09:30'), entry('10:05'), entry('10:50')],
+          warnings: [],
+        },
+        legVias: [[], [], [], []], driveWarnings: [], spills: [], dryPoints: [],
+      })
+      const hotelBooking = booking({ id: 41, title: 'Hotel Alpenblick', type: 'hotel', day_id: 1 })
+
+      it('FE-MOB-RTTAB-062: the stage leaves from the hotel and comes back to one, with no number and no kind on either', () => {
+        renderTab(planner({ roadtripRoutes: routes({ days: [hotelStage()] }) }))
+
+        expect(screen.getByText('roadtrip.bookend.checkOut:Hotel Alpenblick')).toBeInTheDocument()
+        expect(screen.getByText('roadtrip.stay.until:10:00')).toBeInTheDocument()
+        expect(screen.getByText('roadtrip.bookend.back:Hotel Alpenblick')).toBeInTheDocument()
+        // Only the two places offer to become a stop on the way, and the count says two.
+        expect(screen.getAllByRole('button', { name: 'roadtrip.stop.makeService' })).toHaveLength(2)
+        expect(screen.getByText('roadtrip.day.stopCount:2')).toBeInTheDocument()
+        // The stage starts when the hotel is left and ends when the next one is reached.
+        const start = screen.getByText('mobileTrip.rtStart').parentElement as HTMLElement
+        expect(within(start).getByText('08:40')).toBeInTheDocument()
+        const arrive = screen.getByText('roadtrip.stay.arrive').parentElement as HTMLElement
+        expect(within(arrive).getByText('10:50')).toBeInTheDocument()
+      })
+
+      it('FE-MOB-RTTAB-063: a tap opens the booking behind the night, or the stay for somebody who may not edit bookings', () => {
+        const editor = planner({ roadtripRoutes: routes({ days: [hotelStage()] }), reservations: [hotelBooking] })
+        const first = renderTab(editor)
+        fireEvent.click(screen.getByText('roadtrip.bookend.back:Hotel Alpenblick'))
+        expect(editor.setEditingReservation).toHaveBeenCalledWith(hotelBooking)
+        expect(editor.setShowReservationModal).toHaveBeenCalledWith(true)
+        expect(first.shell.openSheet).not.toHaveBeenCalled()
+        first.unmount()
+
+        const dayEditor = planner({
+          roadtripRoutes: routes({ days: [hotelStage()] }),
+          reservations: [hotelBooking],
+          can: (action: string) => action !== 'reservation_edit',
+        })
+        const { shell } = renderTab(dayEditor)
+        fireEvent.click(screen.getByText('roadtrip.bookend.checkOut:Hotel Alpenblick'))
+        expect(shell.openSheet).toHaveBeenCalledWith('accommodation', { dayId: 2, accId: 5 })
+        expect(dayEditor.setEditingReservation).not.toHaveBeenCalled()
+      })
+
+      it('FE-MOB-RTTAB-064: a reader gets the hotel as a place, and the morning marker there is the hotel row', () => {
+        const reader = planner({
+          roadtripRoutes: routes({ days: [hotelStage([{ ...bookend('morning', 0), assignmentId: -2_000_000_003, bookend: undefined, automaticNight: { phase: 'start', fromDayNumber: 1 } } as RoadtripStop])] }),
+          can: vi.fn(() => false),
+        })
+        const { shell } = renderTab(reader)
+
+        expect(screen.queryByText('roadtrip.window.resume')).toBeNull()
+        fireEvent.click(screen.getByText('roadtrip.bookend.checkOut:Hotel Alpenblick'))
+        expect(reader.handlePlaceClick).toHaveBeenCalledWith(900)
+        expect(shell.openSheet).not.toHaveBeenCalled()
+      })
     })
   })
 
