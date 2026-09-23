@@ -59,10 +59,6 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Mặc định',
   'collections.sort.nameAsc': 'Tên (A–Z)',
   'collections.coordinates': 'Tọa độ',
-  'collections.price': 'Giá',
-  'collections.priceHint':
-    'Chi phí ước tính, chẳng hạn vé vào cửa. Được sao chép cùng địa điểm khi bạn sao chép nó vào chuyến đi.',
-  'collections.phone': 'Điện thoại',
   'collections.showList': 'Hiện danh sách',
   'collections.expandMap': 'Mở rộng bản đồ',
   'collections.hero.mine': 'Bộ sưu tập của tôi',

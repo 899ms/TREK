@@ -1,4 +1,4 @@
-// FE-COMP-COLDETAIL-001 to FE-COMP-COLDETAIL-054
+// FE-COMP-COLDETAIL-001 to FE-COMP-COLDETAIL-048
 import React from 'react';
 import { render, screen, fireEvent, waitFor, within } from '../../../tests/helpers/render';
 import userEvent from '@testing-library/user-event';
@@ -686,82 +686,5 @@ describe('CollectionPlaceDetail: cover controls', () => {
     expect(document.querySelector('.col-detail-cover-cat')).toBeNull();
     expect(Array.from((controls.parentElement as HTMLElement).children)).toEqual([controls]);
     expect(controls).toHaveClass('ms-auto');
-  });
-});
-
-// #2471: price, website and phone travelled with a saved place but no editor
-// showed them, so a cost could be neither seen nor changed in a list.
-describe('CollectionPlaceDetail: price, website and phone', () => {
-  it('FE-COMP-COLDETAIL-049: edit mode offers price with its currency, website and phone, seeded from the place', async () => {
-    const user = userEvent.setup();
-    renderDetail({ place: { ...place, price: 4.9, currency: 'EUR', website: 'https://cafe.example', phone: '+49 30 1234' } });
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-
-    // EUR renders with its own decimal comma, the way the costs form does.
-    expect(screen.getByLabelText('Price')).toHaveValue('4,90');
-    expect(screen.getByText(/^EUR/)).toBeInTheDocument();
-    expect(screen.getByText('A rough cost, such as an entry fee. It goes along when you copy the place into a trip.')).toBeInTheDocument();
-    expect(screen.getByLabelText('Website')).toHaveValue('https://cafe.example');
-    expect(screen.getByLabelText('Phone')).toHaveValue('+49 30 1234');
-  });
-
-  it('FE-COMP-COLDETAIL-050: saving sends the typed price with the picked currency, the website and the phone', async () => {
-    const user = userEvent.setup();
-    const props = renderDetail({ place: { ...place, price: null, currency: null } });
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.type(screen.getByLabelText('Price'), '12,5');
-    await user.click(screen.getByText(/^EUR/));
-    await user.click(await screen.findByText(/^CHF/));
-    await user.type(screen.getByLabelText('Website'), 'kunsthaus.example');
-    await user.type(screen.getByLabelText('Phone'), '+41 44 253 84 84');
-    await user.click(screen.getByRole('button', { name: /Save/ }));
-
-    await waitFor(() => expect(props.onSave).toHaveBeenCalled());
-    expect(props.onSave).toHaveBeenCalledWith(expect.objectContaining({
-      price: 12.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84',
-    }));
-  });
-
-  it('FE-COMP-COLDETAIL-051: an emptied price is sent as null, and untouched fields are not sent at all', async () => {
-    const user = userEvent.setup();
-    const props = renderDetail({ place: { ...place, price: 12, currency: 'EUR', website: 'https://cafe.example', phone: '+49 30' } });
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.clear(screen.getByLabelText('Price'));
-    await user.click(screen.getByRole('button', { name: /Save/ }));
-
-    await waitFor(() => expect(props.onSave).toHaveBeenCalled());
-    const patch = vi.mocked(props.onSave).mock.calls[0][0];
-    expect(patch.price).toBeNull();
-    expect('currency' in patch).toBe(false);
-    expect('website' in patch).toBe(false);
-    expect('phone' in patch).toBe(false);
-  });
-
-  it('FE-COMP-COLDETAIL-052: read mode shows the price only above zero, the phone as a call link and the website as a chip', async () => {
-    renderDetail({ place: { ...place, price: 24.5, currency: 'CHF', website: 'https://www.kunsthaus.example/visit', phone: '+41 44 253' } });
-    const chip = await screen.findByText((_, el) => el?.classList.contains('col-detail-price') ?? false);
-    expect(chip.textContent).toMatch(/24\.50/);
-    expect(chip.textContent).toMatch(/CHF/);
-    expect(screen.getByRole('link', { name: /\+41 44 253/ })).toHaveAttribute('href', 'tel:+4144253');
-    expect(screen.getByRole('link', { name: /kunsthaus\.example/ })).toHaveAttribute('href', 'https://www.kunsthaus.example/visit');
-  });
-
-  it('FE-COMP-COLDETAIL-053: a free place shows no price chip, and a script link never becomes a website chip', async () => {
-    renderDetail({ place: { ...place, price: 0, currency: 'EUR', website: 'javascript:alert(1)', phone: null } });
-    await screen.findByRole('button', { name: 'Edit' });
-    expect(document.querySelector('.col-detail-price')).toBeNull();
-    expect(screen.queryByRole('link', { name: /alert/ })).not.toBeInTheDocument();
-    expect(document.querySelector('a[href^="tel:"]')).toBeNull();
-  });
-
-  it('FE-COMP-COLDETAIL-054: a price that is not one amount marks the field and holds the save', async () => {
-    const user = userEvent.setup();
-    const props = renderDetail();
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    await user.type(screen.getByLabelText('Price'), '1.2.3');
-
-    expect(screen.getByLabelText('Price')).toHaveAttribute('aria-invalid', 'true');
-    expect(screen.getByRole('button', { name: /Save/ })).toBeDisabled();
-    expect(props.onSave).not.toHaveBeenCalled();
   });
 });

@@ -59,10 +59,6 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Varsayılan',
   'collections.sort.nameAsc': 'Ad (A–Z)',
   'collections.coordinates': 'Koordinatlar',
-  'collections.price': 'Fiyat',
-  'collections.priceHint':
-    'Giriş ücreti gibi yaklaşık bir maliyet. Yeri bir geziye kopyaladığınızda onunla birlikte taşınır.',
-  'collections.phone': 'Telefon',
   'collections.showList': 'Listeyi göster',
   'collections.expandMap': 'Haritayı genişlet',
   'collections.hero.mine': 'Koleksiyonum',

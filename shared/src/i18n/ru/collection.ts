@@ -59,10 +59,6 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'По умолчанию',
   'collections.sort.nameAsc': 'Название (А–Я)',
   'collections.coordinates': 'Координаты',
-  'collections.price': 'Цена',
-  'collections.priceHint':
-    'Примерная стоимость, например входной билет. Переносится вместе с местом при копировании в поездку.',
-  'collections.phone': 'Телефон',
   'collections.showList': 'Показать список',
   'collections.expandMap': 'Развернуть карту',
   'collections.hero.mine': 'Моя коллекция',

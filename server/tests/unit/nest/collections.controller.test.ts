@@ -6,9 +6,7 @@ import type { CollectionsService } from '../../../src/nest/collections/collectio
 import type { StorageService } from '../../../src/nest/storage/storage.service';
 import { CollectionGpxError } from '../../../src/nest/collections/collection-gpx.helpers';
 import type { User } from '../../../src/types';
-import { collectionPlaceUpdateRequestSchema, type CollectionGpxProblem } from '@trek/shared';
-import { CollectionPlaceUpdateDto } from '../../../src/nest/collections/collections.dto';
-import { ZodValidationPipe } from '../../../src/nest/common/zod-validation.pipe';
+import type { CollectionGpxProblem } from '@trek/shared';
 
 const storageStub = { put: vi.fn().mockResolvedValue(undefined) } as unknown as StorageService;
 
@@ -110,27 +108,6 @@ describe('CollectionsController', () => {
       c.saveFromTrip(user, { collection_id: 3, source_trip_id: 5, source_place_id: 8 } as never, 'sid');
       expect(svc.saveFromTripPlace).toHaveBeenCalledWith(1, 3, 5, 8, undefined, 'sid');
       expect(c.copyToTrip(user, { trip_id: 5, place_ids: [9] } as never)).toEqual({ copied: 1, skipped: [] });
-    });
-
-    // #2471: the PATCH body stripped price, currency, website and phone before the
-    // handler ever saw them. The DTO is the same shape update_collection_place
-    // spreads, so REST and MCP take the same four fields and refuse the same values.
-    it('updatePlace keeps price, currency, website and phone through the body pipe and forwards them', () => {
-      const pipe = new ZodValidationPipe();
-      const meta = { type: 'body' as const, metatype: CollectionPlaceUpdateDto };
-      const body = pipe.transform({ price: 12.5, currency: ' chf', website: 'https://kunsthaus.example', phone: '+41 44' }, meta);
-      expect(body).toEqual({ price: 12.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44' });
-
-      const svc = makeService();
-      new CollectionsController(svc, new RuntimeEnvService(), storageStub).updatePlace(user, '9', body as never, 'sid');
-      expect(svc.updatePlace).toHaveBeenCalledWith(1, 9, { price: 12.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44' }, 'sid');
-
-      expect(thrown(() => pipe.transform({ price: -1 }, meta)).status).toBe(400);
-      expect(thrown(() => pipe.transform({ currency: 'EURO' }, meta)).status).toBe(400);
-      expect(Object.keys(collectionPlaceUpdateRequestSchema.shape)).toEqual(
-        expect.arrayContaining(['price', 'currency', 'website', 'phone']),
-      );
-      expect(CollectionPlaceUpdateDto.schema).toBe(collectionPlaceUpdateRequestSchema);
     });
 
     // The legacy 'ids must be an array of numbers' 400 is gone:

@@ -380,64 +380,6 @@ describe('Tool: update_collection_place / set_collection_place_status / rate_col
       expect(cleared.place.rating_count).toBe(0);
     });
   });
-
-  // #2471: the tool spreads the REST update contract, so the four fields the
-  // contract gained arrive here too; the strict shape still refuses the rest.
-  it('sets price, currency, website and phone, refuses a bad price and still refuses an unknown key', async () => {
-    const { user } = createUser(testDb);
-    const col = seedCollection(user.id, 'P');
-    const pid = seedPlace(col, user.id, 'Pergamon');
-    await withHarness(user.id, async (h) => {
-      const upd = parseToolResult(await h.client.callTool({
-        name: 'update_collection_place',
-        arguments: { placeId: pid, price: 14, currency: 'eur', website: 'https://pergamon.example', phone: '+49 30 266 42 42 42' },
-      })) as { place: { price: number; currency: string; website: string; phone: string } };
-      expect(upd.place).toMatchObject({ price: 14, currency: 'EUR', website: 'https://pergamon.example', phone: '+49 30 266 42 42 42' });
-
-      const negative = await h.client.callTool({ name: 'update_collection_place', arguments: { placeId: pid, price: -3 } });
-      expect(negative.isError).toBe(true);
-
-      const unknown = await h.client.callTool({ name: 'update_collection_place', arguments: { placeId: pid, entry_fee: 14 } });
-      expect(unknown.isError).toBe(true);
-      expect(errorText(unknown)).toMatch(/Unrecognized key.*entry_fee/);
-
-      const stored = testDb.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(pid);
-      expect(stored).toEqual({ price: 14, currency: 'EUR' });
-    });
-  });
-
-  // The contract takes price and currency as separate fields; the service holds
-  // them together, so an agent cannot leave a bare amount on a place without one.
-  it('refuses a price without a currency on a place that has none', async () => {
-    const { user } = createUser(testDb);
-    const col = seedCollection(user.id, 'P');
-    const pid = seedPlace(col, user.id, 'Pergamon');
-    await withHarness(user.id, async (h) => {
-      const bare = await h.client.callTool({ name: 'update_collection_place', arguments: { placeId: pid, price: 14 } });
-      expect(bare.isError).toBe(true);
-      expect(errorText(bare)).toMatch(/currency/);
-      expect(testDb.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(pid)).toEqual({ price: null, currency: null });
-
-      const paired = parseToolResult(await h.client.callTool({
-        name: 'update_collection_place', arguments: { placeId: pid, price: 14, currency: 'EUR' },
-      })) as { place: { price: number; currency: string } };
-      expect(paired.place).toMatchObject({ price: 14, currency: 'EUR' });
-    });
-  });
-
-  it('describes the price as a rough cost that needs its currency', async () => {
-    const { user } = createUser(testDb);
-    const h = await createMcpHarness({ userId: user.id, withResources: false });
-    try {
-      const tool = (await h.client.listTools()).tools.find((t) => t.name === 'update_collection_place');
-      expect(tool?.description).toMatch(/price with currency/);
-      expect(Object.keys((tool?.inputSchema as { properties: Record<string, unknown> }).properties)).toEqual(
-        expect.arrayContaining(['price', 'currency', 'website', 'phone']),
-      );
-    } finally {
-      await h.cleanup();
-    }
-  });
 });
 
 // ---------------------------------------------------------------------------

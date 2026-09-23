@@ -59,10 +59,6 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Standard',
   'collections.sort.nameAsc': 'Namn (A–Ö)',
   'collections.coordinates': 'Koordinater',
-  'collections.price': 'Pris',
-  'collections.priceHint':
-    'En ungefärlig kostnad, till exempel ett inträde. Den följer med när du kopierar platsen till en resa.',
-  'collections.phone': 'Telefon',
   'collections.showList': 'Visa lista',
   'collections.expandMap': 'Förstora karta',
   'collections.hero.mine': 'Min samling',

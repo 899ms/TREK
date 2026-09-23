@@ -184,31 +184,10 @@ export const collectionSaveFromTripManyRequestSchema = z.object({
 });
 export type CollectionSaveFromTripManyRequest = z.infer<typeof collectionSaveFromTripManyRequestSchema>;
 
-/**
- * A saved place's currency. A collection has no base currency to fall back on,
- * so a price always names its own: three letters, trimmed and upper-cased so
- * 'eur ' lands as 'EUR'.
- */
-export const collectionPlaceCurrencySchema = z
-  .string()
-  .trim()
-  .regex(/^[A-Za-z]{3}$/, { message: 'must be a three-letter ISO 4217 code' })
-  .toUpperCase();
-
 export const collectionPlaceUpdateRequestSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
-  // A rough cost such as an entry fee (#2471). The columns were always there and
-  // travelled along on save and on copy into a trip, but nothing could edit them.
-  // Stricter than the save side on purpose (no negative amount, a real currency
-  // code); the edit forms only resend a field the user changed, so an older row
-  // never blocks an unrelated edit.
-  price: z.number().nonnegative().nullable().optional(),
-  currency: collectionPlaceCurrencySchema.nullable().optional(),
-  website: placeWebsiteSchema.nullable().optional(),
-  // Capped like the file import's phone, which is where most of them come from.
-  phone: z.string().trim().max(60).nullable().optional(),
   // Editable coordinates so a place added by GPS can be corrected later (#1435).
   lat: z.number().nullable().optional(),
   lng: z.number().nullable().optional(),

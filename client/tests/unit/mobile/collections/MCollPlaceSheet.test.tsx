@@ -8,7 +8,7 @@ import type { Category } from '../../../../src/types'
 import { resetAllStores } from '../../../helpers/store'
 import { useTranslation } from '../../../../src/i18n'
 
-// FE-MOB-CPLSH-001 to FE-MOB-CPLSH-046
+// FE-MOB-CPLSH-001 to FE-MOB-CPLSH-041
 
 // react-markdown ships ESM-only chunks jsdom chokes on; the sheet only needs
 // the raw description text to reach the renderer.
@@ -477,70 +477,5 @@ describe('MCollPlaceSheet', () => {
     expect(controls).toHaveClass('ms-auto', 'flex-none')
     expect(chip).toHaveClass('min-w-0')
     expect(text).toHaveClass('truncate')
-  })
-
-  // #2471: price, website and phone travelled with a saved place but the sheet
-  // never showed them, so a cost could be neither seen nor changed on a phone.
-  it('FE-MOB-CPLSH-042: edit mode offers price with its currency, website and phone, seeded from the place', () => {
-    setup({ place: place({ price: 4.9, currency: 'EUR', website: 'https://narisawa.example', phone: '+81 3 5785' }) })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-
-    expect(screen.getByLabelText('Price')).toHaveValue('4,90')
-    expect(screen.getByText(/^EUR/)).toBeInTheDocument()
-    expect(screen.getByText('A rough cost, such as an entry fee. It goes along when you copy the place into a trip.')).toBeInTheDocument()
-    expect(screen.getByLabelText('Website')).toHaveValue('https://narisawa.example')
-    expect(screen.getByLabelText('Phone')).toHaveValue('+81 3 5785')
-  })
-
-  it('FE-MOB-CPLSH-043: saving sends the typed price with the picked currency, the website and the phone', async () => {
-    const { onSave } = setup({ place: place({ price: null, currency: null }) })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '15000' } })
-    fireEvent.click(screen.getByText(/^EUR/))
-    fireEvent.click(await screen.findByText(/^JPY/))
-    fireEvent.change(screen.getByLabelText('Website'), { target: { value: 'narisawa.example' } })
-    fireEvent.change(screen.getByLabelText('Phone'), { target: { value: ' +81 3 5785 0799 ' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
-      price: 15000, currency: 'JPY', website: 'https://narisawa.example', phone: '+81 3 5785 0799',
-    })))
-  })
-
-  it('FE-MOB-CPLSH-044: an emptied price is sent as null and untouched fields stay out of the patch', async () => {
-    const { onSave } = setup({ place: place({ price: 12, currency: 'EUR', website: 'https://narisawa.example', phone: '+81' }) })
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }))
-
-    await waitFor(() => expect(onSave).toHaveBeenCalled())
-    const patch = onSave.mock.calls[0][0]
-    expect(patch.price).toBeNull()
-    expect('currency' in patch).toBe(false)
-    expect('website' in patch).toBe(false)
-    expect('phone' in patch).toBe(false)
-  })
-
-  it('FE-MOB-CPLSH-045: read mode shows the price only above zero, the phone as a call link and the website as a chip', () => {
-    const { unmount } = setup({ place: place({ price: 24.5, currency: 'CHF', website: 'https://www.narisawa.example/menu', phone: '+81 3 5785' }) })
-    expect(screen.getByText(/24\.50/)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /\+81 3 5785/ })).toHaveAttribute('href', 'tel:+8135785')
-    expect(screen.getByRole('link', { name: /^narisawa\.example$/ })).toHaveAttribute('href', 'https://www.narisawa.example/menu')
-    unmount()
-
-    setup({ place: place({ price: 0, currency: 'CHF', website: 'javascript:alert(1)', phone: null }) })
-    expect(screen.queryByText(/0\.00/)).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /alert/ })).not.toBeInTheDocument()
-    expect(document.querySelector('a[href^="tel:"]')).toBeNull()
-  })
-
-  it('FE-MOB-CPLSH-046: a price that is not one amount marks the field and holds the save', () => {
-    const { onSave } = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }))
-    fireEvent.change(screen.getByLabelText('Price'), { target: { value: '1.2.3' } })
-
-    expect(screen.getByLabelText('Price')).toHaveAttribute('aria-invalid', 'true')
-    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled()
-    expect(onSave).not.toHaveBeenCalled()
   })
 })

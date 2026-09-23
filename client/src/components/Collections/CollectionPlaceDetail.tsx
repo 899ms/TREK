@@ -3,12 +3,11 @@ import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
 import { markdownLinkComponents } from '../shared/markdownLink'
-import { X, Pencil, Copy, Trash2, MapPin, Link2, Plus, ExternalLink, Check, Tag, Tags, Camera, Loader2, Navigation, Banknote, Globe, Phone } from 'lucide-react'
+import { X, Pencil, Copy, Trash2, MapPin, Link2, Plus, ExternalLink, Check, Tag, Tags, Camera, Loader2, Navigation } from 'lucide-react'
 import type { CollectionPlace, CollectionStatus, CollectionLink, CollectionLabel } from '@trek/shared'
 import type { Category, TranslationFn } from '../../types'
 import MarkdownToolbar from '../Journey/MarkdownToolbar'
 import { NumericInput } from '../shared/NumericInput'
-import CustomSelect from '../shared/CustomSelect'
 import { mapsApi } from '../../api/client'
 import { entityGradient } from '../../utils/gradients'
 import { getCategoryIcon } from '../shared/categoryIcons'
@@ -20,7 +19,6 @@ import { Tooltip } from '../shared/Tooltip'
 import PlaceRating from '../shared/StarRating'
 import { normalizeImageFile } from '../../utils/convertHeic'
 import { getApiErrorMessage } from '../../utils/apiError'
-import { useCollectionPlaceExtras, type CollectionPlaceExtrasPatch } from './useCollectionPlaceExtras'
 
 function linkHost(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, '') } catch { return url }
@@ -37,7 +35,7 @@ interface CollectionPlaceDetailProps {
   anchorRect?: { left: number; width: number } | null
   onClose: () => void
   onSetStatus: (status: CollectionStatus) => void
-  onSave: (patch: { name?: string; description?: string | null; links?: CollectionLink[]; category_id?: number | null; label_ids?: number[]; image_url?: string | null; lat?: number | null; lng?: number | null; address?: string | null } & CollectionPlaceExtrasPatch) => Promise<void>
+  onSave: (patch: { name?: string; description?: string | null; links?: CollectionLink[]; category_id?: number | null; label_ids?: number[]; image_url?: string | null; lat?: number | null; lng?: number | null; address?: string | null }) => Promise<void>
   /** Upload a custom cover image (#1136); enables the cover change/remove controls. */
   onUploadImage?: (file: File) => Promise<void>
   onCopyToTrip: () => void
@@ -67,8 +65,8 @@ function StatusSegment({ status, onSet, t }: { status: CollectionStatus; onSet: 
  * Bottom detail sheet for a saved place — an opaque, clearly-sectioned card
  * (cover → meta → status → description → links) docked over the list column.
  * Read mode renders the description as markdown + link chips; edit mode swaps in
- * name / category / price / website / phone / markdown description / links,
- * saving via updatePlace. Status is an always-live segmented control (auto-saves).
+ * name / category / markdown description / links, saving via updatePlace. Status
+ * is an always-live segmented control (auto-saves).
  */
 export default function CollectionPlaceDetail({
   place, canEdit, canDelete, categories, labels, anchorRect, onClose, onSetStatus, onSave, onUploadImage, onCopyToTrip, onRemove, onRate, t,
@@ -88,7 +86,6 @@ export default function CollectionPlaceDetail({
   const [address, setAddress] = useState(place.address ?? '')
   const [lat, setLat] = useState(place.lat != null ? String(place.lat) : '')
   const [lng, setLng] = useState(place.lng != null ? String(place.lng) : '')
-  const extras = useCollectionPlaceExtras(place)
   const [saving, setSaving] = useState(false)
   // A higher-res photo pulled from the maps provider when the place has none of
   // its own — the list avatar's little thumbnail is too low-res for the cover.
@@ -159,7 +156,6 @@ export default function CollectionPlaceDetail({
     if (match) { e.preventDefault(); setLat(match[1]); setLng(match[2]) }
   }
   const assignedLabels = labels.filter(l => (place.label_ids ?? []).includes(l.id))
-  const startEdit = () => { extras.reset(place); setEditing(true) }
 
   const save = async () => {
     const cleanLinks = links.map(l => ({ label: l.label?.trim() || undefined, url: normalizeLinkUrl(l.url) })).filter(l => l.url)
@@ -167,7 +163,7 @@ export default function CollectionPlaceDetail({
     const lngNum = lng.trim() ? Number(lng) : Number.NaN
     setSaving(true)
     try {
-      await onSave({ name: name.trim() || place.name, description: description.trim() || null, links: cleanLinks, category_id: categoryId, label_ids: labelIds, address: address.trim() || null, lat: Number.isFinite(latNum) ? latNum : null, lng: Number.isFinite(lngNum) ? lngNum : null, ...extras.patch() })
+      await onSave({ name: name.trim() || place.name, description: description.trim() || null, links: cleanLinks, category_id: categoryId, label_ids: labelIds, address: address.trim() || null, lat: Number.isFinite(latNum) ? latNum : null, lng: Number.isFinite(lngNum) ? lngNum : null })
       setEditing(false)
     } catch (err) {
       toast.error(getApiErrorMessage(err, t('common.error')))
@@ -232,11 +228,9 @@ export default function CollectionPlaceDetail({
 
       <div className="col-detail-body">
         {/* Meta (view only) */}
-        {!editing && (place.address || extras.priceLabel || extras.phone) && (
+        {!editing && place.address && (
           <div className="col-detail-meta">
             {place.address && <span className="col-detail-addr"><MapPin size={12} /> {place.address}</span>}
-            {extras.priceLabel && <span className="col-detail-price"><Banknote size={12} /> {extras.priceLabel}</span>}
-            {extras.phone && extras.phoneHref && <a href={extras.phoneHref} className="col-detail-addr col-detail-tel"><Phone size={12} /> {extras.phone}</a>}
             {/* Same picker as inside a trip (#1455). A saved place is somewhere
                 you intend to go, and until now the only way to get directions
                 was to add it to a trip first. */}
@@ -297,25 +291,6 @@ export default function CollectionPlaceDetail({
                 <NumericInput mode="signed" value={lng} onValueChange={setLng} placeholder={t('places.formLng')} className="col-detail-input flex-1" />
               </div>
             </div>
-            {/* Price (#2471): a rough cost such as an entry fee, always in its own currency */}
-            <div className="col-detail-field">
-              <div className="col-detail-label"><Banknote size={12} /> {t('collections.price')}</div>
-              <div className="col-detail-link-row">
-                <NumericInput {...extras.priceInput} placeholder="0" aria-label={t('collections.price')} className="col-detail-input flex-1" />
-                <div className="w-36 flex-none">
-                  <CustomSelect {...extras.currencySelect} searchable size="sm" style={{ width: '100%' }} />
-                </div>
-              </div>
-              <div className="col-detail-hint">{t('collections.priceHint')}</div>
-            </div>
-            <div className="col-detail-field">
-              <div className="col-detail-label"><Globe size={12} /> {t('places.formWebsite')}</div>
-              <input type="url" value={extras.draft.website} onChange={e => extras.set('website', e.target.value)} aria-label={t('places.formWebsite')} className="col-detail-input" />
-            </div>
-            <div className="col-detail-field">
-              <div className="col-detail-label"><Phone size={12} /> {t('collections.phone')}</div>
-              <input type="tel" value={extras.draft.phone} onChange={e => extras.set('phone', e.target.value)} maxLength={60} aria-label={t('collections.phone')} className="col-detail-input" />
-            </div>
             {/* Labels */}
             {labels.length > 0 && (
               <div className="col-detail-field">
@@ -360,14 +335,9 @@ export default function CollectionPlaceDetail({
                 <Markdown remarkPlugins={[remarkGfm, remarkBreaks]} components={markdownLinkComponents}>{place.description}</Markdown>
               </div>
             )}
-            {(extras.websiteHref || (place.links && place.links.length > 0)) && (
+            {place.links && place.links.length > 0 && (
               <div className="col-detail-links">
-                {extras.websiteHref && (
-                  <a href={extras.websiteHref} target="_blank" rel="noopener noreferrer" className="col-detail-link">
-                    <Globe size={13} /> {linkHost(extras.websiteHref)}
-                  </a>
-                )}
-                {(place.links ?? []).map((l, i) => (
+                {place.links.map((l, i) => (
                   <a key={i} href={l.url} target="_blank" rel="noopener noreferrer" className="col-detail-link">
                     <ExternalLink size={13} /> {l.label || linkHost(l.url)}
                   </a>
@@ -382,11 +352,11 @@ export default function CollectionPlaceDetail({
         {editing ? (
           <>
             <button type="button" onClick={resetForm} className="col-detail-btn">{t('common.cancel')}</button>
-            <button type="button" onClick={save} disabled={saving || !extras.priceValid} className="col-detail-btn primary"><Check size={14} /> {t('common.save')}</button>
+            <button type="button" onClick={save} disabled={saving} className="col-detail-btn primary"><Check size={14} /> {t('common.save')}</button>
           </>
         ) : (
           <>
-            {canEdit && <button type="button" onClick={startEdit} className="col-detail-btn"><Pencil size={14} /> {t('common.edit')}</button>}
+            {canEdit && <button type="button" onClick={() => setEditing(true)} className="col-detail-btn"><Pencil size={14} /> {t('common.edit')}</button>}
             <button type="button" onClick={onCopyToTrip} className="col-detail-btn"><Copy size={14} /> {t('collections.copyToTrip')}</button>
             {/* Beside the other two rather than up by the address: getting directions is
                 something you DO with the place, like editing it or copying it into a

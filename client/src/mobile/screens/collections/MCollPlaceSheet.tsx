@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import remarkBreaks from 'remark-breaks'
-import { Banknote, Camera, Check, Copy, ExternalLink, Globe, Loader2, MapPin, Pencil, Phone, Trash2, X } from 'lucide-react'
+import { Camera, Check, Copy, ExternalLink, Loader2, MapPin, Pencil, Trash2, X } from 'lucide-react'
 import type { CollectionLabel, CollectionLink, CollectionPlace, CollectionStatus } from '@trek/shared'
 import type { Category, TranslationFn } from '../../../types'
 import { mapsApi } from '../../../api/client'
@@ -12,9 +12,6 @@ import { getApiErrorMessage } from '../../../utils/apiError'
 import { normalizeLinkUrl, STATUS_ORDER } from '../../../pages/collections/collectionsModel'
 import MSheet from '../../components/MSheet'
 import PlaceRating from '../../../components/shared/StarRating'
-import CustomSelect from '../../../components/shared/CustomSelect'
-import { NumericInput } from '../../../components/shared/NumericInput'
-import { useCollectionPlaceExtras, type CollectionPlaceExtrasPatch } from '../../../components/Collections/useCollectionPlaceExtras'
 import MCollCategoryPicker from './MCollCategoryPicker'
 import MCollLinksEditor from './MCollLinksEditor'
 import { STATUS_SPEC } from './collectionsMobileModel'
@@ -30,9 +27,6 @@ const HERO_CAT_CHIP =
 // Close and the cover controls beside it.
 const HERO_BTN =
   'flex h-8 w-8 items-center justify-center rounded-full bg-[rgba(0,0,0,.28)] text-white' // theme-lint-disable
-// A saved link, and the website beside it.
-const LINK_CHIP =
-  'inline-flex items-center gap-[5px] rounded-full border border-[color:var(--m-rowbr)] bg-[color:var(--m-sheet)] px-3 py-[7px] text-[0.71875rem] font-semibold text-m-ink'
 
 interface MCollPlaceSheetProps {
   place: CollectionPlace | null
@@ -42,7 +36,7 @@ interface MCollPlaceSheetProps {
   labels: CollectionLabel[]
   onClose: () => void
   onSetStatus: (status: CollectionStatus) => void
-  onSave: (patch: { name?: string; description?: string | null; links?: CollectionLink[]; category_id?: number | null; label_ids?: number[]; image_url?: string | null; address?: string | null } & CollectionPlaceExtrasPatch) => Promise<void>
+  onSave: (patch: { name?: string; description?: string | null; links?: CollectionLink[]; category_id?: number | null; label_ids?: number[]; image_url?: string | null; address?: string | null }) => Promise<void>
   onUploadImage?: (file: File) => Promise<void>
   onCopyToTrip: () => void
   onRemove: () => void
@@ -75,7 +69,6 @@ export default function MCollPlaceSheet({
   const [links, setLinks] = useState<CollectionLink[]>([])
   const [labelIds, setLabelIds] = useState<number[]>([])
   const [saving, setSaving] = useState(false)
-  const extras = useCollectionPlaceExtras(held)
   const [fetchedPhoto, setFetchedPhoto] = useState<string | null>(null)
   const heldId = held?.id
 
@@ -107,18 +100,13 @@ export default function MCollPlaceSheet({
     const cleanLinks = links.map(l => ({ label: l.label?.trim() || undefined, url: normalizeLinkUrl(l.url) })).filter(l => l.url)
     setSaving(true)
     try {
-      await onSave({ name: name.trim() || held.name, address: address.trim() || null, description: description.trim() || null, links: cleanLinks, category_id: categoryId, label_ids: labelIds, ...extras.patch() })
+      await onSave({ name: name.trim() || held.name, address: address.trim() || null, description: description.trim() || null, links: cleanLinks, category_id: categoryId, label_ids: labelIds })
       setEditing(false)
     } catch (err) {
       toast.error(getApiErrorMessage(err, t('common.error')))
     } finally {
       setSaving(false)
     }
-  }
-
-  const startEdit = () => {
-    extras.reset(held)
-    setEditing(true)
   }
 
   const cancelEdit = () => {
@@ -224,20 +212,6 @@ export default function MCollPlaceSheet({
                 <MapPin size={13} strokeWidth={2} className="mt-[1px] flex-none" /> {held.address}
               </div>
             )}
-            {!editing && (extras.priceLabel || extras.phone) && (
-              <div className="mt-[6px] flex flex-wrap items-center gap-x-3 gap-y-1 font-geist text-[0.75rem] leading-[1.5] text-m-muted">
-                {extras.priceLabel && (
-                  <span className="inline-flex items-center gap-[5px] font-semibold text-m-ink [font-variant-numeric:tabular-nums]">
-                    <Banknote size={13} strokeWidth={2} className="flex-none" /> {extras.priceLabel}
-                  </span>
-                )}
-                {extras.phone && extras.phoneHref && (
-                  <a href={extras.phoneHref} className="inline-flex items-center gap-[5px]">
-                    <Phone size={13} strokeWidth={2} className="flex-none" /> {extras.phone}
-                  </a>
-                )}
-              </div>
-            )}
 
             {/* Status cycle */}
             <div className="mt-3 flex gap-[6px]">
@@ -277,26 +251,6 @@ export default function MCollPlaceSheet({
                 {/* Address (#1870): free text, same as the add sheet offers */}
                 <Eyebrow className="mb-[6px] mt-[14px]">{t('places.formAddress').toUpperCase()}</Eyebrow>
                 <input value={address} onChange={e => setAddress(e.target.value)} placeholder={t('places.formAddressPlaceholder')} className={INPUT_CLS} />
-                {/* Price (#2471): a rough cost such as an entry fee, always in its own currency */}
-                <Eyebrow className="mb-[6px] mt-[14px]">{t('collections.price').toUpperCase()}</Eyebrow>
-                <div className="flex items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <NumericInput
-                      {...extras.priceInput}
-                      placeholder="0"
-                      aria-label={t('collections.price')}
-                      className={`${INPUT_CLS} aria-[invalid=true]:border-[color:var(--m-st-danger)]`}
-                    />
-                  </div>
-                  <div className="w-32 flex-none">
-                    <CustomSelect {...extras.currencySelect} searchable size="sm" style={{ width: '100%' }} />
-                  </div>
-                </div>
-                <div className="mt-[6px] font-geist text-[0.6875rem] leading-[1.45] text-m-muted">{t('collections.priceHint')}</div>
-                <Eyebrow className="mb-[6px] mt-[14px]">{t('places.formWebsite').toUpperCase()}</Eyebrow>
-                <input type="url" value={extras.draft.website} onChange={e => extras.set('website', e.target.value)} aria-label={t('places.formWebsite')} className={INPUT_CLS} />
-                <Eyebrow className="mb-[6px] mt-[14px]">{t('collections.phone').toUpperCase()}</Eyebrow>
-                <input type="tel" value={extras.draft.phone} onChange={e => extras.set('phone', e.target.value)} maxLength={60} aria-label={t('collections.phone')} className={INPUT_CLS} />
                 <Eyebrow className="mb-[6px] mt-[14px]">{t('collections.category').toUpperCase()}</Eyebrow>
                 <MCollCategoryPicker categories={categories} value={categoryId} onChange={setCategoryId} t={t} />
                 {labels.length > 0 && (
@@ -331,7 +285,7 @@ export default function MCollPlaceSheet({
                 <MCollLinksEditor links={links} onChange={setLinks} t={t} />
                 <div className="mt-4 flex items-center gap-2">
                   <CancelPill className="ml-auto" onClick={cancelEdit}>{t('common.cancel')}</CancelPill>
-                  <PrimaryPill onClick={save} disabled={saving || !extras.priceValid}>
+                  <PrimaryPill onClick={save} disabled={saving}>
                     <Check size={14} strokeWidth={2.4} /> {t('common.save')}
                   </PrimaryPill>
                 </div>
@@ -360,20 +314,15 @@ export default function MCollPlaceSheet({
                     <Markdown remarkPlugins={[remarkGfm, remarkBreaks]}>{held.description}</Markdown>
                   </div>
                 )}
-                {(extras.websiteHref || (held.links && held.links.length > 0)) && (
+                {held.links && held.links.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-[6px]">
-                    {extras.websiteHref && (
-                      <a href={extras.websiteHref} target="_blank" rel="noopener noreferrer" className={LINK_CHIP}>
-                        <Globe size={13} strokeWidth={2} className="text-m-muted" /> {linkHost(extras.websiteHref)}
-                      </a>
-                    )}
-                    {(held.links ?? []).map((l, i) => (
+                    {held.links.map((l, i) => (
                       <a
                         key={i}
                         href={l.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={LINK_CHIP}
+                        className="inline-flex items-center gap-[5px] rounded-full border border-[color:var(--m-rowbr)] bg-[color:var(--m-sheet)] px-3 py-[7px] text-[0.71875rem] font-semibold text-m-ink"
                       >
                         <ExternalLink size={13} strokeWidth={2} className="text-m-muted" /> {l.label || linkHost(l.url)}
                       </a>
@@ -382,7 +331,7 @@ export default function MCollPlaceSheet({
                 )}
                 <div className="mt-[14px] flex gap-2">
                   {canEdit && (
-                    <button type="button" onClick={startEdit} className={actionBtn}>
+                    <button type="button" onClick={() => setEditing(true)} className={actionBtn}>
                       <Pencil size={13} strokeWidth={2.2} /> {t('common.edit')}
                     </button>
                   )}

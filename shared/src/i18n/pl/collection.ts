@@ -59,10 +59,6 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Domyślnie',
   'collections.sort.nameAsc': 'Nazwa (A–Z)',
   'collections.coordinates': 'Współrzędne',
-  'collections.price': 'Cena',
-  'collections.priceHint':
-    'Przybliżony koszt, na przykład bilet wstępu. Przechodzi razem z miejscem, gdy kopiujesz je do podróży.',
-  'collections.phone': 'Telefon',
   'collections.showList': 'Pokaż listę',
   'collections.expandMap': 'Powiększ mapę',
   'collections.hero.mine': 'Moja kolekcja',
