@@ -12,7 +12,7 @@ import type {
   Accommodation, Assignment, Day, DayNote, Reservation, RouteSegment, TranslationFn,
 } from '../../../../src/types'
 
-// FE-MOB-PTLM-001 to FE-MOB-PTLM-046
+// FE-MOB-PTLM-001 to FE-MOB-PTLM-047
 
 const DAYS = [
   { id: 1, trip_id: 1, day_number: 1, date: '2026-05-01', title: null },
@@ -363,6 +363,14 @@ describe('planTimelineModel — hotel chips and legs', () => {
       const located = legsOf([flight(true)])
       expect(located.top).toMatchObject({ name: 'Hotel A', seg: { from: [HOTEL_A.lat, HOTEL_A.lng], to: [MUC.lat, MUC.lng] } })
       expect(located.bottom).toMatchObject({ name: 'Hotel B', seg: { from: [HAM.lat, HAM.lng], to: [HOTEL_B.lat, HOTEL_B.lng] } })
+    })
+
+    it('FE-MOB-PTLM-047: without a flight the one drive between the two stays shows once, not above and below', () => {
+      // No stop and no booking: the day is the drive from Munich to Hamburg (#1297).
+      // That one segment leaves the morning hotel and reaches the evening one.
+      const legs = legsOf([])
+      expect(legs.top).toMatchObject({ name: 'Hotel A', seg: { from: [HOTEL_A.lat, HOTEL_A.lng], to: [HOTEL_B.lat, HOTEL_B.lng] } })
+      expect(legs.bottom).toBeNull()
     })
   })
 })

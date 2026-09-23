@@ -69,6 +69,17 @@ export function extrasPatch(initial: CollectionPlaceExtrasDraft, draft: Collecti
   return patch
 }
 
+/**
+ * The read-mode price. An older row can hold an amount without a currency (a
+ * trip place saved before it had one); it shows as a bare number rather than
+ * in the viewer's own default currency, which would name a different currency
+ * for every member of a shared list.
+ */
+export function priceLabel(price: number, currency: string | null | undefined, locale: string): string {
+  if (currency) return formatMoney(price, currency, locale)
+  return new Intl.NumberFormat(locale || undefined, { maximumFractionDigits: 2 }).format(price)
+}
+
 /** A tel: link keeps the digits and a leading plus, nothing a dialer would choke on. */
 export function phoneHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, '')}`
@@ -115,7 +126,7 @@ export function useCollectionPlaceExtras(place: ExtrasSource | null | undefined)
       options: currenciesWith(draft.currency).map(c => ({ value: c, label: SYMBOLS[c] ? `${c}  ${SYMBOLS[c]}` : c })),
     },
     // Read mode: a free place shows no price, the same rule the trip inspector follows.
-    priceLabel: price > 0 ? formatMoney(price, place?.currency || defaultCurrency || 'EUR', locale) : null,
+    priceLabel: price > 0 ? priceLabel(price, place?.currency, locale) : null,
     websiteHref: safeHttpUrl(place?.website),
     phone,
     phoneHref: phone ? phoneHref(phone) : null,

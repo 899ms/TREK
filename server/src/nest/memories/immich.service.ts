@@ -115,9 +115,10 @@ export class ImmichService {
   }
 
   /**
-   * `allowInsecureTls` left undefined keeps the stored choice, so a client that
-   * does not know the switch cannot clear it by saving. Disconnecting (no URL)
-   * always turns it off again.
+   * `allowInsecureTls` left undefined keeps the stored choice while the URL
+   * stays the same, so a client that does not know the switch cannot clear it
+   * by saving. The switch trusts one server, so a new URL without it starts
+   * off, and disconnecting (no URL) always turns it off again.
    */
   async saveImmichSettings(
     userId: number,
@@ -134,16 +135,17 @@ export class ImmichService {
       if (!ssrf.allowed) {
         return { success: false, error: `Invalid Immich URL: ${ssrf.error}` };
       }
+      const url = immichUrl.trim();
+      const insecure = allowInsecureTls === undefined ? null : Number(allowInsecureTls);
+      // SET expressions read the row as it was, so `immich_url IS ?` compares the
+      // stored URL with the new one.
       this.db
         .prepare(
-          'UPDATE users SET immich_url = ?, immich_api_key = ?, immich_allow_insecure_tls = COALESCE(?, immich_allow_insecure_tls) WHERE id = ?',
+          `UPDATE users SET immich_url = ?, immich_api_key = ?,
+             immich_allow_insecure_tls = CASE WHEN immich_url IS ? THEN COALESCE(?, immich_allow_insecure_tls) ELSE COALESCE(?, 0) END
+           WHERE id = ?`,
         )
-        .run(
-          immichUrl.trim(),
-          maybe_encrypt_api_key(immichApiKey),
-          allowInsecureTls === undefined ? null : Number(allowInsecureTls),
-          userId,
-        );
+        .run(url, maybe_encrypt_api_key(immichApiKey), url, insecure, insecure, userId);
       if (ssrf.isPrivate) {
         this.audit.writeAudit({
           userId,

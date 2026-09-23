@@ -3959,9 +3959,12 @@ describe('DayPlanSidebar', () => {
         const { unmount } = render(<DayPlanSidebar {...makeDefaultProps({
           days: movingDays, accommodations: stays, reservations: [flight(located)], selectedDayId: 11,
         })} />)
-        // The route itself can still be shown; only the hand-offs, which could only
-        // ever describe a drive from Munich to Hamburg, are gone.
-        expect(screen.getByRole('button', { name: 'Route' })).toBeInTheDocument()
+        // With its airports the route to and from them can still be shown; without
+        // them there is nothing left to draw, so the tools go as a whole instead of
+        // standing there dead. The hand-offs, which could only ever describe a drive
+        // from Munich to Hamburg, are gone either way.
+        if (located) expect(screen.getByRole('button', { name: 'Route' })).toBeInTheDocument()
+        else expect(screen.queryByRole('button', { name: 'Route' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Open in Google Maps' })).not.toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Open in CoMaps' })).not.toBeInTheDocument()
         unmount()
@@ -3977,6 +3980,27 @@ describe('DayPlanSidebar', () => {
       expect(pairs).toContainEqual([{ lat: 48.137, lng: 11.575 }, { lat: 48.353, lng: 11.786 }])
       expect(pairs).toContainEqual([{ lat: 53.63, lng: 9.988 }, { lat: 53.551, lng: 9.993 }])
       expect(pairs).not.toContainEqual([{ lat: 48.137, lng: 11.575 }, { lat: 53.551, lng: 9.993 }])
+    })
+
+    it('FE-PLANNER-DAYPLAN-224: a day with a single located stop still hands it over as a pin', async () => {
+      // Two stops, one of them without coordinates, and no stay: the route tools show,
+      // and the hand-offs open the one stop the way they always did.
+      const user = userEvent.setup()
+      const { generateGoogleMapsUrl } = await import('../Map/RouteCalculator')
+      const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+      const day = buildDay({ id: 10, date: '2026-11-03', title: 'Day 1' })
+      const assignments = {
+        '10': [
+          buildAssignment({ id: 1, day_id: 10, order_index: 0, place: buildPlace({ id: 1, name: 'Elbphilharmonie', lat: 53.541, lng: 9.984 }) }),
+          buildAssignment({ id: 2, day_id: 10, order_index: 1, place: buildPlace({ id: 2, name: 'Somewhere nice', lat: null, lng: null }) }),
+        ],
+      }
+      render(<DayPlanSidebar {...makeDefaultProps({ days: [day], assignments, selectedDayId: 10 })} />)
+
+      expect(screen.getByRole('button', { name: 'Open in CoMaps' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Open in Google Maps' }))
+      expect(vi.mocked(generateGoogleMapsUrl)).toHaveBeenCalledWith([{ lat: 53.541, lng: 9.984, name: 'Elbphilharmonie' }])
+      openSpy.mockRestore()
     })
   })
 

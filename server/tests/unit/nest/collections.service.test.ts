@@ -379,6 +379,31 @@ describe('status + updatePlace move', () => {
     expect(renamed).toMatchObject({ name: 'Kunsthaus Zürich', price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44' });
   });
 
+  // A list has no base currency, so a bare amount would be read in every
+  // viewer's own default currency. The service refuses it for REST and MCP alike.
+  it('COLLECTIONS-SVC-132: a price without a currency on a place that has none is a 400 and changes nothing', async () => {
+    const u = createUser(testDb).user;
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const p = svc.savePlace(u.id, { collection_id: col.id, name: 'Kunsthaus' }).place!;
+
+    await expect(svc.updatePlace(u.id, p.id, { price: 14 })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/currency/) });
+    await expect(svc.updatePlace(u.id, p.id, { price: 14, currency: null })).rejects.toMatchObject({ status: 400 });
+
+    expect(testDb.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(p.id)).toEqual({ price: null, currency: null });
+  });
+
+  it('COLLECTIONS-SVC-133: a price alone keeps the stored currency, a zero price needs none, and a priced place cannot lose its currency', async () => {
+    const u = createUser(testDb).user;
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const priced = svc.savePlace(u.id, { collection_id: col.id, name: 'Kunsthaus', price: 10, currency: 'CHF' }).place!;
+    const free = svc.savePlace(u.id, { collection_id: col.id, name: 'Lake shore' }).place!;
+
+    expect(await svc.updatePlace(u.id, priced.id, { price: 24.5 })).toMatchObject({ price: 24.5, currency: 'CHF' });
+    expect(await svc.updatePlace(u.id, free.id, { price: 0 })).toMatchObject({ price: 0, currency: null });
+    await expect(svc.updatePlace(u.id, priced.id, { currency: null })).rejects.toMatchObject({ status: 400 });
+    expect(await svc.updatePlace(u.id, priced.id, { price: null, currency: null })).toMatchObject({ price: null, currency: null });
+  });
+
   it('COLLECTIONS-SVC-131: copyToTrip carries the edited price, currency, website and phone into the trip place', async () => {
     const u = createUser(testDb).user;
     const trip = createTrip(testDb, u.id);

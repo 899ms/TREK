@@ -47,18 +47,18 @@ describe('dayExportStops', () => {
 
   it('FE-MOBILE-DAYROUTE-006: with a carrier on the day, the not-yet-reached check-in hotel is not prepended (#2157)', () => {
     // Arrival day: you fly in, so the hotel may end the list but must not start it.
-    const stops = dayExportStops(days[0], days, [homeNear], [hotel], true, true)
+    const stops = dayExportStops(days[0], days, [homeNear], [hotel], true, { located: true })
     expect(stops.map(s => s.name)).toEqual(['Home', 'Hotel Lutetia'])
   })
 
   it('FE-MOBILE-DAYROUTE-007: with a carrier on the day, the already-left check-out hotel is not appended (#2157)', () => {
     // Check-out day: the hotel starts the day, nothing routes back to it after the flight home.
-    const stops = dayExportStops(days[2], days, [homeNear], [hotel], true, true)
+    const stops = dayExportStops(days[2], days, [homeNear], [hotel], true, { located: true })
     expect(stops.map(s => s.name)).toEqual(['Hotel Lutetia', 'Home'])
   })
 
   it('FE-MOBILE-DAYROUTE-008: without a carrier the no-time loop still closes (#2009 preserved)', () => {
-    const stops = dayExportStops(days[0], days, [louvre], [hotel], true, false)
+    const stops = dayExportStops(days[0], days, [louvre], [hotel], true, { located: false })
     expect(stops.map(s => s.name)).toEqual(['Hotel Lutetia', 'Louvre', 'Hotel Lutetia'])
   })
 
@@ -77,16 +77,16 @@ describe('dayExportStops', () => {
   it('FE-MOBILE-DAYROUTE-010: a flight between the two stays leaves nothing to export (#2476)', () => {
     // Located or not, the flight is how the day gets from one hotel to the other; a
     // driving route between them is the stretch nobody drives.
-    expect(dayExportStops(days[1], days, [], [hotelA, hotelB], true, true, true)).toEqual([])
-    expect(dayExportStops(days[1], days, [], [hotelA, hotelB], true, false, true)).toEqual([])
-    expect(dayGoogleMapsUrl(days[1], days, [], [hotelA, hotelB], true, false, true)).toBeNull()
-    expect(dayCoMapsUrl(days[1], days, [], [hotelA, hotelB], true, 'driving', false, true)).toBeNull()
+    expect(dayExportStops(days[1], days, [], [hotelA, hotelB], true, { located: true, booked: true })).toEqual([])
+    expect(dayExportStops(days[1], days, [], [hotelA, hotelB], true, { booked: true })).toEqual([])
+    expect(dayGoogleMapsUrl(days[1], days, [], [hotelA, hotelB], true, { booked: true })).toBeNull()
+    expect(dayCoMapsUrl(days[1], days, [], [hotelA, hotelB], true, 'driving', { booked: true })).toBeNull()
   })
 
   it('FE-MOBILE-DAYROUTE-011: without a booking the move is still the drive from one stay to the next (#1297)', () => {
     expect(dayExportStops(days[1], days, [], [hotelA, hotelB], true).map(s => s.name)).toEqual(['Hotel A', 'Hotel B'])
     // A stop of its own keeps the day exportable even with the flight booked.
-    expect(dayExportStops(days[1], days, [louvre], [hotelA, hotelB], true, true, true).map(s => s.name)).toContain('Louvre')
+    expect(dayExportStops(days[1], days, [louvre], [hotelA, hotelB], true, { located: true, booked: true }).map(s => s.name)).toContain('Louvre')
   })
 })
 

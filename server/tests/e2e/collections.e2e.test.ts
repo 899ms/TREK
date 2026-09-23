@@ -214,6 +214,17 @@ describe('Collections e2e (real auth guard + real service + temp SQLite)', () =>
     expect(db.prepare('SELECT price, currency, website FROM collection_places WHERE id = ?').get(placeId)).toEqual({ price: 10, currency: 'EUR', website: null });
   });
 
+  it('COLLECTIONS-E2E-088: a price without a currency on a place that has none is a 400', async () => {
+    const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Bare prices' })).body;
+    const placeId = (await request(server).post('/api/addons/collections/places')
+      .set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, name: 'Kunsthaus' })).body.place.id;
+
+    const res = await request(server).patch(`/api/addons/collections/places/${placeId}`).set('Cookie', sessionCookie(ownerId)).send({ price: 14 });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/currency/);
+    expect(db.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(placeId)).toEqual({ price: null, currency: null });
+  });
+
   it('COLLECTIONS-E2E-087: a member who may only read cannot set a price (403)', async () => {
     const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Read only prices' })).body;
     await request(server).post('/api/addons/collections/invite').set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, user_id: otherId, role: 'viewer' });

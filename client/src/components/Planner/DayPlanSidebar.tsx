@@ -1628,15 +1628,19 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
           // distinct bookend hotels you actually slept in / sleep in tonight — so the route
           // tools appear when you click the day (#1297). A same-hotel rest day or a plain
           // arrival/departure day has morning === evening and stays excluded. With a flight
-          // or train booked on it the map drops that leg and keeps only the drives to and
-          // from located stations, and the exports below have nothing to hand over (#2476).
+          // or train booked on it the map drops that leg (#2476): it keeps only the drives
+          // to and from the booking's located stations, and a booking without any leaves
+          // nothing to draw, so the tools stay away instead of sitting there dead.
           const transferMorning = routeBookends?.morning
           const transferEvening = routeBookends?.evening
+          const dayCarriers = (mergedItemsMap[day.id] || []).filter(i => i.type === 'transport' && isCarrierTransport(i.data))
+          const dayHasLocatedCarrier = dayCarriers.some(i => hasCarrierEndpointOnDay(i.data, day.id))
           const hasHotelTransfer = !!(
             routeBookends?.morningIsSleptHere && routeBookends?.eveningIsOvernight &&
             transferMorning?.place_lat != null && transferMorning?.place_lng != null &&
             transferEvening?.place_lat != null && transferEvening?.place_lng != null &&
-            (transferMorning.place_lat !== transferEvening.place_lat || transferMorning.place_lng !== transferEvening.place_lng)
+            (transferMorning.place_lat !== transferEvening.place_lat || transferMorning.place_lng !== transferEvening.place_lng) &&
+            (dayCarriers.length === 0 || dayHasLocatedCarrier)
           )
           const routeToolsRoutable = da.length >= 2 || (loc != null && hasRouteBookend) || hasHotelTransfer
           /**
@@ -1652,16 +1656,15 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
             // A flight, train, ferry or coach on a day without stops is the move itself,
             // located or not: the hotels at either end are joined by it, not by a road
             // worth handing to a map app (#2476).
-            if (dayStops.length === 0 && (mergedItemsMap[day.id] || []).some(i => i.type === 'transport' && isCarrierTransport(i.data))) return []
+            if (dayStops.length === 0 && dayCarriers.length > 0) return []
             const stops = dayStops.map(a => ({ lat: a.place!.lat!, lng: a.place!.lng!, name: a.place!.name }))
             const first = dayStops[0] ? { isPlace: true, time: dayStops[0].place?.place_time ?? null, lat: dayStops[0].place!.lat!, lng: dayStops[0].place!.lng! } : undefined
             const lastAssignment = dayStops[dayStops.length - 1]
             const last = lastAssignment ? { isPlace: true, time: lastAssignment.place?.place_time ?? null, lat: lastAssignment.place!.lat!, lng: lastAssignment.place!.lng! } : undefined
             // Same carrier gate as the drawn route (#2157): the exported link must not
             // start at a hotel you only reach tonight or lead back to one you left.
-            const dayHasCarrier = (mergedItemsMap[day.id] || []).some(i => i.type === 'transport' && hasCarrierEndpointOnDay(i.data, day.id))
-            const drawMorning = !!routeBookends && shouldDrawMorningLeg(routeBookends, day, first, dayHasCarrier)
-            const drawEvening = !!routeBookends && shouldDrawEveningLeg(routeBookends, day, last, dayHasCarrier)
+            const drawMorning = !!routeBookends && shouldDrawMorningLeg(routeBookends, day, first, dayHasLocatedCarrier)
+            const drawEvening = !!routeBookends && shouldDrawEveningLeg(routeBookends, day, last, dayHasLocatedCarrier)
             const morning = drawMorning && routeBookends?.morning?.place_lat != null && routeBookends?.morning?.place_lng != null
               ? { lat: routeBookends.morning.place_lat, lng: routeBookends.morning.place_lng, name: routeBookends.morning.place_name } : null
             const evening = drawEvening && routeBookends?.evening?.place_lat != null && routeBookends?.evening?.place_lng != null
@@ -1669,8 +1672,9 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
             return [...(morning ? [morning] : []), ...stops, ...(evening ? [evening] : [])]
           }
           const showRouteTools = (isSelected || (showRouteToolsWhenExpanded && isExpanded)) && routeToolsRoutable
-          // Built once, for the day the tools show on. A route needs two ends: with
-          // fewer the hand-offs would open a lone pin or nothing at all (#2476).
+          // Built once, for the day the tools show on. With no stop to hand over the
+          // hand-offs would open nothing, so they are left out; a single stop still
+          // opens as a pin (#2476).
           const exportStops = showRouteTools ? dayExportStops() : []
           // Is this day's inline route currently on? Mobile toggles it per day (its
           // own expandedRouteDayIds entry); desktop uses the global Route toggle on
@@ -2875,7 +2879,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                           {!narrowPanel && t('dayplan.route')}
                         </button>
                         {/* Open the day's stops as a route in Google Maps (planned order). #1255 */}
-                        {exportStops.length >= 2 && <Tooltip label={t('planner.openGoogleMaps')} placement="top">
+                        {exportStops.length > 0 && <Tooltip label={t('planner.openGoogleMaps')} placement="top">
                           <button type="button"
                             onClick={() => {
                               const url = generateGoogleMapsUrl(exportStops)
@@ -2895,7 +2899,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
                         {/* The same day, handed to CoMaps for offline navigation (#1904). The
                             day's own travel mode rides along, so the route it builds walks
                             when the plan walks. */}
-                        {exportStops.length >= 2 && <Tooltip label={t('planner.openCoMaps')} placement="top">
+                        {exportStops.length > 0 && <Tooltip label={t('planner.openCoMaps')} placement="top">
                           <button type="button"
                             onClick={() => {
                               const url = generateCoMapsUrl(exportStops, day.default_transport_mode ?? routeProfile)

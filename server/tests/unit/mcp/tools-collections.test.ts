@@ -406,6 +406,25 @@ describe('Tool: update_collection_place / set_collection_place_status / rate_col
     });
   });
 
+  // The contract takes price and currency as separate fields; the service holds
+  // them together, so an agent cannot leave a bare amount on a place without one.
+  it('refuses a price without a currency on a place that has none', async () => {
+    const { user } = createUser(testDb);
+    const col = seedCollection(user.id, 'P');
+    const pid = seedPlace(col, user.id, 'Pergamon');
+    await withHarness(user.id, async (h) => {
+      const bare = await h.client.callTool({ name: 'update_collection_place', arguments: { placeId: pid, price: 14 } });
+      expect(bare.isError).toBe(true);
+      expect(errorText(bare)).toMatch(/currency/);
+      expect(testDb.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(pid)).toEqual({ price: null, currency: null });
+
+      const paired = parseToolResult(await h.client.callTool({
+        name: 'update_collection_place', arguments: { placeId: pid, price: 14, currency: 'EUR' },
+      })) as { place: { price: number; currency: string } };
+      expect(paired.place).toMatchObject({ price: 14, currency: 'EUR' });
+    });
+  });
+
   it('describes the price as a rough cost that needs its currency', async () => {
     const { user } = createUser(testDb);
     const h = await createMcpHarness({ userId: user.id, withResources: false });

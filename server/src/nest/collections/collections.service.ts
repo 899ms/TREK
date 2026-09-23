@@ -995,6 +995,7 @@ export class CollectionsService {
   async updatePlace(userId: number, placeId: number, body: CollectionPlaceUpdateRequest, socketId?: string): Promise<CollectionPlace> {
     const currentCollection = this.collectionIdOfPlace(placeId);
     this.assertCanEdit(userId, currentCollection);
+    if (body.price !== undefined || body.currency !== undefined) this.assertPriceHasCurrency(placeId, body);
 
     // Capture the previous thumbnail so a replaced/cleared custom upload (#1136)
     // can be reclaimed once nothing references it any more.
@@ -1054,6 +1055,23 @@ export class CollectionsService {
     this.notifyCollectionUsers(currentCollection, socketId, 'collections:updated');
     if (movedTo) this.notifyCollectionUsers(movedTo, socketId, 'collections:updated');
     return this.getPlaceById(placeId);
+  }
+
+  /**
+   * A list has no base currency, so a price that names none would be read in
+   * each viewer's own default currency and carried into a trip as the trip's
+   * (#2471). Checked here rather than in the contract so REST and the MCP tool,
+   * which spreads the contract's shape, refuse it alike. Only the row as it
+   * would look after this update counts, so a zero price or clearing both
+   * fields still goes through.
+   */
+  private assertPriceHasCurrency(placeId: number, body: Pick<CollectionPlaceUpdateRequest, 'price' | 'currency'>): void {
+    const stored = this.db.get<{ price: number | null; currency: string | null }>(
+      'SELECT price, currency FROM collection_places WHERE id = ?', placeId,
+    );
+    const price = body.price === undefined ? stored?.price ?? null : body.price;
+    const currency = body.currency === undefined ? stored?.currency ?? null : body.currency;
+    if (price != null && price > 0 && !currency) httpError(400, 'A price needs a currency: send its three-letter code along');
   }
 
   setStatus(userId: number, placeId: number, status: CollectionStatus, socketId?: string): CollectionPlace {

@@ -208,7 +208,12 @@ export function hotelLegsForDay(
       : [...routeSegments].reverse().find(s => sameCoord(s.to, coord))
     return seg ? { seg, name: accommodationName(a) } : null
   }
-  return { top: legAt(morning, 'from'), bottom: legAt(evening, 'to') }
+  const top = legAt(morning, 'from')
+  const bottom = legAt(evening, 'to')
+  // A moving day without stops is one drive from one hotel to the next (#1297): it
+  // both leaves the morning hotel and reaches the evening one, so it shows once, at
+  // the top, instead of again at the bottom (#2476).
+  return { top, bottom: top && bottom && bottom.seg === top.seg ? null : bottom }
 }
 
 /** The day headline as city pills — a "Tokyo → Kyoto" title becomes two pills with an arrow. */

@@ -1,4 +1,4 @@
-// FE-COMP-COLEXTRAS-001 to FE-COMP-COLEXTRAS-012: price, website and phone of a saved place (#2471).
+// FE-COMP-COLEXTRAS-001 to FE-COMP-COLEXTRAS-013: price, website and phone of a saved place (#2471).
 import { act, renderHook } from '@testing-library/react'
 import { useSettingsStore } from '../../store/settingsStore'
 import { resetAllStores } from '../../../tests/helpers/store'
@@ -8,6 +8,7 @@ import {
   extrasPatch,
   parsePriceInput,
   phoneHref,
+  priceLabel,
   useCollectionPlaceExtras,
   type CollectionPlaceExtrasDraft,
 } from './useCollectionPlaceExtras'
@@ -87,6 +88,15 @@ describe('phoneHref', () => {
   })
 })
 
+describe('priceLabel', () => {
+  it('FE-COMP-COLEXTRAS-013: names the stored currency, and without one shows the bare amount whatever the viewer uses', () => {
+    expect(priceLabel(2000, 'JPY', 'en-US')).toBe(formatMoney(2000, 'JPY', 'en-US'))
+    expect(priceLabel(2000, null, 'en-US')).toBe('2,000')
+    expect(priceLabel(12.5, '', 'de-DE')).toBe('12,5')
+    expect(priceLabel(12.5, undefined, 'de-DE')).not.toMatch(/€|\$|EUR|USD/)
+  })
+})
+
 describe('useCollectionPlaceExtras', () => {
   it('FE-COMP-COLEXTRAS-011: formats the stored price for read mode, only above zero, and guards the website', () => {
     withDefaultCurrency('CHF')
@@ -96,9 +106,9 @@ describe('useCollectionPlaceExtras', () => {
     expect(paid.result.current.phone).toBe('+41 44')
     expect(paid.result.current.phoneHref).toBe('tel:+4144')
 
-    // No currency stored: the user's own default names it.
+    // No currency stored: a bare amount, not the viewer's own default currency.
     const bare = renderHook(() => useCollectionPlaceExtras({ price: 8, currency: null }))
-    expect(bare.result.current.priceLabel).toBe(formatMoney(8, 'CHF', 'en-US'))
+    expect(bare.result.current.priceLabel).toBe('8')
 
     const free = renderHook(() => useCollectionPlaceExtras({ price: 0, currency: 'EUR', website: 'javascript:alert(1)', phone: '  ' }))
     expect(free.result.current.priceLabel).toBeNull()

@@ -200,7 +200,7 @@ export default function MDaySheet({ planner, shell }: MTripSheetsProps) {
     if (!day) return
     const url = dayGoogleMapsUrl(
       day, planner.days, dayAssignments, planner.tripAccommodations, optimizeFromAccommodation !== false,
-      dayHasCarrier,
+      { located: dayHasCarrier },
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }
@@ -210,7 +210,7 @@ export default function MDaySheet({ planner, shell }: MTripSheetsProps) {
     if (!day) return
     const url = dayCoMapsUrl(
       day, planner.days, dayAssignments, planner.tripAccommodations, optimizeFromAccommodation !== false,
-      day.default_transport_mode ?? planner.routeProfile, dayHasCarrier,
+      day.default_transport_mode ?? planner.routeProfile, { located: dayHasCarrier },
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
   }

@@ -844,6 +844,23 @@ describe('self-signed certificates', () => {
     expect(row).toEqual({ immich_url: null, immich_allow_insecure_tls: 0 });
   });
 
+  it('IMMICH-TLS-010: the switch trusts one server, so a new URL saved without it starts off', async () => {
+    seedUser(USER, 'https://nas.local', 'key-1', 0, 1);
+
+    // Same server with a trailing slash: still the same connection, the switch stays.
+    await svc.saveImmichSettings(USER, 'https://nas.local/', 'key-1', null);
+    expect(svc.getConnectionSettings(USER).allow_insecure_tls).toBe(true);
+
+    await svc.saveImmichSettings(USER, 'https://photos.example.com', 'key-2', null);
+    expect(testDb.prepare('SELECT immich_url, immich_allow_insecure_tls FROM users WHERE id = ?').get(USER)).toEqual({
+      immich_url: 'https://photos.example.com', immich_allow_insecure_tls: 0,
+    });
+
+    // Sent along with the new URL, it holds for that server.
+    await svc.saveImmichSettings(USER, 'https://other.example.com', 'key-3', null, true);
+    expect(svc.getConnectionSettings(USER).allow_insecure_tls).toBe(true);
+  });
+
   it('IMMICH-TLS-006: a URL the guard refuses leaves the stored switch alone', async () => {
     seedUser(USER, 'https://immich.test', 'key-1', 0, 1);
     checkSsrf.mockResolvedValue({ allowed: false, error: 'blocked host' });

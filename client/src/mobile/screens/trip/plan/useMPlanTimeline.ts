@@ -5,7 +5,7 @@ import { assignmentsApi, reservationsApi, weatherApi } from '../../../../api/cli
 import { usePluginStore } from '../../../../store/pluginStore'
 import { getDayBookendHotels } from '../../../../utils/dayOrder'
 import { getDisplayTimeForDay, getMergedItems, getTransportForDay, hasCarrierEndpointOnDay, isCarrierTransport } from '../../../../utils/dayMerge'
-import { dayCoMapsUrl, dayExportStops, dayGoogleMapsUrl, optimizeDayOrder } from '../lib/dayRoute'
+import { dayCoMapsUrl, dayExportStops, dayGoogleMapsUrl, optimizeDayOrder, type DayCarrier } from '../lib/dayRoute'
 import { buildTransitLeg, buildTransitNameIndex, type TransitLeg } from '../../../../components/Planner/transitLeg'
 import {
   buildPlanRows, breaksChronology, findUpNext, hotelChipsForDay, hotelLegsForDay, itemHasTime,
@@ -60,11 +60,11 @@ export function useMPlanTimeline(planner: TripPlanner) {
     () => !!day && merged.some(it => it.type === 'transport' && hasCarrierEndpointOnDay(it.data, day.id)),
     [day, merged],
   )
-  // Any carrier booked today, located or not. On a day without stops it is the move
-  // itself, so the exports have no road to hand over (#2476).
-  const dayHasCarrierBooking = useMemo(
-    () => merged.some(it => it.type === 'transport' && isCarrierTransport(it.data)),
-    [merged],
+  // Plus any carrier booked today, located or not. On a day without stops it is the
+  // move itself, so the exports have no road to hand over (#2476).
+  const dayCarrier = useMemo<DayCarrier>(
+    () => ({ located: dayHasCarrier, booked: merged.some(it => it.type === 'transport' && isCarrierTransport(it.data)) }),
+    [dayHasCarrier, merged],
   )
 
   // Travel-time connectors (walk · distance · drive between consecutive places)
@@ -324,14 +324,14 @@ export function useMPlanTimeline(planner: TripPlanner) {
     }
   }, [day, dayAssignments, days, tripAccommodations, settings, dayHasCarrier, tripActions, tripId, pushUndo, updateRouteForDay, toast, t])
 
-  // A route needs two ends. With fewer the map hand-offs would open a lone pin or
-  // nothing at all, so the plan does not offer them (#2476).
+  // With no stop left to hand over, such as a moving day that only holds its flight,
+  // the map hand-offs would open nothing, so the plan does not offer them. A single
+  // stop still opens as a pin (#2476).
   const canExportRoute = useMemo(
     () => !!day && dayExportStops(
-      day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
-      dayHasCarrier, dayHasCarrierBooking,
-    ).length >= 2,
-    [day, days, dayAssignments, tripAccommodations, settings, dayHasCarrier, dayHasCarrierBooking],
+      day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false, dayCarrier,
+    ).length > 0,
+    [day, days, dayAssignments, tripAccommodations, settings, dayCarrier],
   )
 
   const exportGoogleMaps = useCallback(() => {
@@ -339,20 +339,19 @@ export function useMPlanTimeline(planner: TripPlanner) {
     // Bookend the exported route with the day's accommodation the same way the
     // drawn route does — only when the leg is real (#1372, #1465).
     const url = dayGoogleMapsUrl(
-      day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
-      dayHasCarrier, dayHasCarrierBooking,
+      day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false, dayCarrier,
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
-  }, [day, dayAssignments, days, tripAccommodations, settings, dayHasCarrier, dayHasCarrierBooking])
+  }, [day, dayAssignments, days, tripAccommodations, settings, dayCarrier])
 
   const exportCoMaps = useCallback(() => {
     if (!day) return
     const url = dayCoMapsUrl(
       day, days, dayAssignments, tripAccommodations, settings.optimize_from_accommodation !== false,
-      day.default_transport_mode ?? routeProfile, dayHasCarrier, dayHasCarrierBooking,
+      day.default_transport_mode ?? routeProfile, dayCarrier,
     )
     if (url) window.open(url, '_blank', 'noopener,noreferrer')
-  }, [day, dayAssignments, days, tripAccommodations, settings, routeProfile, dayHasCarrier, dayHasCarrierBooking])
+  }, [day, dayAssignments, days, tripAccommodations, settings, routeProfile, dayCarrier])
 
   const renameDay = useCallback((title: string) => {
     if (!day) return

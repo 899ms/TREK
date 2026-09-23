@@ -12,7 +12,7 @@ import { buildPlanner, buildTripActions } from '../../../helpers/mobileTrip'
 import { resetAllStores, seedStore } from '../../../helpers/store'
 import { act, renderHook, waitFor } from '../../../helpers/render'
 
-// FE-MOB-PLTL-001 to FE-MOB-PLTL-050
+// FE-MOB-PLTL-001 to FE-MOB-PLTL-051
 
 // The connector calculation is its own hook with real OSRM calls — stubbed here so
 // the timeline sees exactly the legs a test wants to match against.
@@ -625,6 +625,24 @@ describe('useMPlanTimeline', () => {
     expect(window.open).toHaveBeenCalledWith(
       'https://www.google.com/maps/dir/48,16.05/53.55,9.99', '_blank', 'noopener,noreferrer',
     )
+  })
+
+  it('FE-MOB-PLTL-051: a day with a single stop still offers the hand-offs, which open that stop as a pin', async () => {
+    // No stay in TREK: one sight is the whole export. The #2476 gate only drops a day
+    // with nothing to hand over, not one that opens a pin to navigate to.
+    const { result } = await renderTimeline(makePlanner({ assignments: { '2': [A_MUSEUM] } }))
+    expect(result.current.canExportRoute).toBe(true)
+    act(() => { result.current.exportGoogleMaps() })
+    expect(window.open).toHaveBeenCalledWith(
+      'https://www.google.com/maps/search/?api=1&query=48,16.1', '_blank', 'noopener,noreferrer',
+    )
+
+    const vague = buildAssignment({
+      id: 15, day_id: 2, order_index: 0, place_id: 105,
+      place: buildPlace({ id: 105, name: 'Idea', lat: null, lng: null }),
+    })
+    const nothing = await renderTimeline(makePlanner({ assignments: { '2': [vague] } }))
+    expect(nothing.result.current.canExportRoute).toBe(false)
   })
 
   it('FE-MOB-PLTL-039: renames the day with a trimmed title', async () => {

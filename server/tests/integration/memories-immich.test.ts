@@ -1164,7 +1164,7 @@ describe('Immich self-signed certificate switch (#2475)', () => {
     expect(get.body.allow_insecure_tls).toBe(true);
   });
 
-  it('IMMICH-103: a save without the switch keeps it, and disconnecting clears it', async () => {
+  it('IMMICH-103: a save without the switch keeps it for the same server, a new server or disconnecting clears it', async () => {
     const { user } = createUser(testDb);
     const put = (body: Record<string, unknown>) =>
       request(app).put(`${IMMICH}/settings`).set('Cookie', authCookie(user.id)).send(body);
@@ -1174,6 +1174,12 @@ describe('Immich self-signed certificate switch (#2475)', () => {
 
     // What a client that predates the switch sends.
     await put({ immich_url: 'https://immich.example.com', immich_api_key: 'k' });
+    expect(allowInsecureTls(user.id)).toBe(1);
+
+    // A different server is a different trust decision: without the switch it starts off.
+    await put({ immich_url: 'https://photos.example.com', immich_api_key: 'k' });
+    expect(allowInsecureTls(user.id)).toBe(0);
+    await put({ immich_url: 'https://photos.example.com', immich_api_key: 'k', allow_insecure_tls: true });
     expect(allowInsecureTls(user.id)).toBe(1);
 
     await put({ immich_url: '', immich_api_key: 'k', allow_insecure_tls: true });

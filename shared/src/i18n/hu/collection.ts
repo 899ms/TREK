@@ -61,7 +61,7 @@ const collection: TranslationStrings = {
   'collections.coordinates': 'Koordináták',
   'collections.price': 'Ár',
   'collections.priceHint':
-    'Hozzávetőleges költség, például belépődíj. A hellyel együtt átkerül, amikor utazásba másolja.',
+    'Hozzávetőleges költség, például belépődíj. A hellyel együtt átkerül, amikor utazásba másolod.',
   'collections.phone': 'Telefon',
   'collections.showList': 'Lista megjelenítése',
   'collections.expandMap': 'Térkép nagyítása',
@@ -161,7 +161,8 @@ const collection: TranslationStrings = {
   'collections.file.targetExisting': 'Hozzáadás listához',
   'collections.file.targetExistingHint': 'Egy meglévő listához',
   'collections.file.searchLists': 'Listák keresése',
-  'collections.file.intoHint': 'A listában már meglévő helyek változatlanok maradnak, ahogy a neve és a színe is. A fájl címkéi bekerülnek.',
+  'collections.file.intoHint':
+    'A listában már meglévő helyek változatlanok maradnak, ahogy a neve és a színe is. A fájl címkéi bekerülnek.',
   'collections.file.confirmInto': 'Hozzáadás a listához',
   'collections.file.doneInto': '{count} hely hozzáadva ehhez: {name}',
   'collections.file.doneIntoDuplicates': '{count} hozzáadva ehhez: {name}, {duplicates} már benne volt',
