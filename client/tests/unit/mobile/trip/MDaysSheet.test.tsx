@@ -153,8 +153,8 @@ describe('MDaysSheet', () => {
 
     it('FE-MOB-DAYSS-016: two buttons, the next date and a day without one, under a line saying what the dated one does', () => {
       const { planner } = renderSheet({ dayAdd: dayAdd() })
-      // formatDate adds the year once the date lies outside the current year.
-      expect(screen.getByText(/^Extends the trip by one day, until .*Oct 13(, \d{4})?\.$/)).toBeInTheDocument()
+      // The date reads as in the day list: weekday, day and month, no year.
+      expect(screen.getByText(/^Adds .*Oct 13 and extends the trip by one day\.$/)).toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Add day' })).not.toBeInTheDocument()
 
       fireEvent.click(datedButton())
@@ -182,7 +182,7 @@ describe('MDaysSheet', () => {
       expect(undatedButton()).toBeDisabled()
       expect(screen.getAllByText(offline)).toHaveLength(1)
       // The offline sentence stands in for the dated line, not beside it.
-      expect(screen.queryByText(/^Extends the trip/)).not.toBeInTheDocument()
+      expect(screen.queryByText(/and extends the trip by one day/)).not.toBeInTheDocument()
     })
 
     it('FE-MOB-DAYSS-019: a trip at the day limit keeps the undated button and says why the dated one is off', () => {

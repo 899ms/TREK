@@ -115,7 +115,7 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayShrink': 'Resan slutar nu {date}',
   'dayplan.deleteDayShrinkHint': 'Det finns ingen dag utan datum som kan ta över det sista datumet.',
   'dayplan.impactStayShorter': 'Boende på {name}: en natt kortare',
-  'dayplan.deleteDayStayShorterHint': 'Det sträcker sig över den här dagen och utcheckningen är nu {date}.',
+  'dayplan.deleteDayStayShorterHint': 'Utcheckningen är nu {date}, eftersom det sträcker sig över den här dagen.',
   'dayplan.deleteDayStayShorterUndatedHint': 'Det sträcker sig över den här dagen och slutar nu en dag tidigare.',
   'dayplan.deleteDaySpareDated': '{day} får datumet {date}',
   'dayplan.deleteDaySpareDatedHint': 'Det är den första dagen utan datum, och den tar över resans sista datum.',
@@ -126,7 +126,7 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDay': 'Utan datum',
   'dayplan.addUndatedDayHint': 'Lägger till en dag utan datum i slutet. Resans datum förblir desamma.',
   'dayplan.addDatedDay': 'Lägg till {date}',
-  'dayplan.addDatedDayHint': 'Förlänger resan med en dag, till {date}.',
-  'dayplan.tripExtended': 'Dag tillagd. Resan slutar nu {date}.',
+  'dayplan.addDatedDayHint': 'Lägger till {date} och förlänger resan med en dag.',
+  'dayplan.tripExtended': 'Dag tillagd. Resan slutar nu {date}, en dag senare.',
 };
 export default dayplan;

@@ -130,6 +130,6 @@ const dayplan: TranslationStrings = {
     'Προσθέτει στο τέλος μια ημέρα χωρίς ημερομηνία. Οι ημερομηνίες του ταξιδιού μένουν ίδιες.',
   'dayplan.addDatedDay': 'Προσθήκη {date}',
   'dayplan.addDatedDayHint': 'Επεκτείνει το ταξίδι κατά μία ημέρα, έως {date}.',
-  'dayplan.tripExtended': 'Η ημέρα προστέθηκε. Το ταξίδι τελειώνει πλέον στις {date}.',
+  'dayplan.tripExtended': 'Η ημέρα προστέθηκε. Το ταξίδι τελειώνει πλέον στις {date}, μία ημέρα αργότερα.',
 };
 export default dayplan;

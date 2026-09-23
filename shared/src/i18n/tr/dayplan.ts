@@ -126,6 +126,6 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDayHint': 'Sona tarihsiz bir gün ekler. Seyahat tarihleri aynı kalır.',
   'dayplan.addDatedDay': '{date} ekle',
   'dayplan.addDatedDayHint': 'Seyahati bir gün uzatır. Yeni son gün: {date}.',
-  'dayplan.tripExtended': 'Gün eklendi. Seyahatin yeni son günü: {date}.',
+  'dayplan.tripExtended': 'Gün eklendi. Seyahat bir gün uzadı, yeni son gün: {date}.',
 };
 export default dayplan;

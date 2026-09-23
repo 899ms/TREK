@@ -3,7 +3,7 @@ import { GripVertical, ArrowUp, ArrowDown, Trash2, AlertTriangle } from 'lucide-
 import Modal from '../shared/Modal'
 import Tooltip from '../shared/Tooltip'
 import DayImpactList from '../shared/DayImpactList'
-import { DayAddFooter, FOOTER_BTN } from './DayAddFooter'
+import { DayAddFooter, FOOTER_BTN, SECONDARY_BTN } from './DayAddFooter'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { dayLabel } from '../../utils/dayLabel'
 import { deleteDayBlockedReason } from '../../utils/dayDeleteImpact'
@@ -35,7 +35,6 @@ interface ListSpot {
   dayId: number
   index: number
   scrollTop: number
-  panelHeight: number
 }
 
 const ICON_BTN =
@@ -50,8 +49,10 @@ const DELETE_BTN =
  * so the list reflects each move immediately.
  *
  * A delete only asks, and it asks right here: the dialog swaps its list for the
- * question, what goes with the day and the two ways out, at the same size and in
- * the same place. Cancel and Escape bring the list back where it was.
+ * question, what goes with the day and the two ways out, at the same width. The
+ * dialog hangs from a fixed top edge, so the swap only moves its bottom edge,
+ * and the question takes the height it needs. Cancel and Escape bring the list
+ * back where it was.
  */
 export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, dayAdd, onDeleteDay, deleteQuestion, onClose }: DayReorderPopupProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
@@ -77,13 +78,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
   }
 
   const ask = (dayId: number, index: number) => {
-    const body = bodyRef.current
-    spot.current = {
-      dayId,
-      index,
-      scrollTop: body?.parentElement?.scrollTop ?? 0,
-      panelHeight: body?.closest<HTMLElement>('[role="presentation"]')?.offsetHeight ?? 0,
-    }
+    spot.current = { dayId, index, scrollTop: bodyRef.current?.parentElement?.scrollTop ?? 0 }
     onDeleteDay?.(dayId)
   }
 
@@ -108,43 +103,35 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
     return () => document.removeEventListener('keydown', onKey, true)
   }, [asking])
 
-  // The question keeps the dialog at the height the list had, so nothing moves
-  // under the pointer; a longer one grows it and scrolls inside. Back at the
-  // list, the scroll position and the focus return to the row asked about.
+  // The question opens at its top with the focus on Cancel. Back at the list,
+  // the scroll position and the focus return to the row asked about.
   const askedDayId = asking?.dayId ?? null
-  const lineCount = asking?.lines.length ?? 0
   const shownDayId = useRef<number | null>(null)
   useLayoutEffect(() => {
     const body = bodyRef.current
-    if (!body) return
-    const scroller = body.parentElement
-    const turned = shownDayId.current !== askedDayId
+    // Closed with the question open: the next opening starts at the list, fresh.
+    if (!body) { shownDayId.current = null; spot.current = null; return }
+    if (shownDayId.current === askedDayId) return
     shownDayId.current = askedDayId
-    body.style.minHeight = ''
+    const scroller = body.parentElement
     if (askedDayId != null) {
-      const target = spot.current?.panelHeight ?? 0
-      const panel = body.closest<HTMLElement>('[role="presentation"]')
-      const short = target - (panel?.offsetHeight ?? target)
-      if (short > 0) body.style.minHeight = `${body.offsetHeight + short}px`
-      if (turned) {
-        if (scroller) scroller.scrollTop = 0
-        cancelRef.current?.focus()
-      }
+      if (scroller) scroller.scrollTop = 0
+      cancelRef.current?.focus()
       return
     }
     const from = spot.current
-    if (!from || !turned) return
+    if (!from) return
     spot.current = null
     if (scroller) scroller.scrollTop = from.scrollTop
     const buttons = body.querySelectorAll<HTMLButtonElement>('[data-delete-day]')
     const again = body.querySelector<HTMLButtonElement>(`[data-delete-day="${from.dayId}"]`)
       ?? buttons[Math.min(from.index, buttons.length - 1)]
     again?.focus()
-  }, [askedDayId, lineCount])
+  }, [askedDayId])
 
   const footer = asking ? (
     <div className="flex items-center justify-end gap-2">
-      <button ref={cancelRef} type="button" onClick={asking.onCancel} className={`${FOOTER_BTN} border border-edge text-content-secondary hover:bg-surface-hover`}>
+      <button ref={cancelRef} type="button" onClick={asking.onCancel} className={SECONDARY_BTN}>
         {t('common.cancel')}
       </button>
       <button type="button" onClick={asking.onConfirm} className={`${FOOTER_BTN} bg-danger font-semibold text-white hover:opacity-90`}>
@@ -157,7 +144,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
   )
 
   return (
-    <Modal isOpen={isOpen} onClose={close} title={t('dayplan.reorderTitle')} size="lg" footer={footer}>
+    <Modal isOpen={isOpen} onClose={close} title={t('dayplan.reorderTitle')} size="lg" align="top" footer={footer}>
       <div ref={bodyRef}>
         {asking ? (
           <section aria-labelledby={titleId} aria-describedby={bodyId} className="trek-page-enter">
@@ -166,7 +153,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
                 <AlertTriangle size={16} strokeWidth={2} aria-hidden="true" />
               </span>
               <div className="min-w-0 flex-1">
-                <h3 id={titleId} className="text-body font-semibold leading-snug text-content">{asking.title}</h3>
+                <h3 id={titleId} className="text-subtitle font-semibold leading-snug text-content">{asking.title}</h3>
                 <p id={bodyId} className="mt-0.5 text-caption text-content-muted">{t('dayplan.deleteDayBody')}</p>
               </div>
             </div>
@@ -174,7 +161,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
           </section>
         ) : (
           <>
-            <p className="mb-3 text-caption text-content-faint">{t('dayplan.reorderHint')}</p>
+            <p className="mb-3 text-caption text-content-muted">{t('dayplan.reorderHint')}</p>
 
             {/* The popup is a modal, so it portals out of the planner and has to opt
                 into the long-press drag itself (#1616). Without this a finger only

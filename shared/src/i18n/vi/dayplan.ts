@@ -126,6 +126,6 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDayHint': 'Thêm một ngày không có ngày tháng vào cuối. Ngày của chuyến đi giữ nguyên.',
   'dayplan.addDatedDay': 'Thêm {date}',
   'dayplan.addDatedDayHint': 'Kéo dài chuyến đi thêm một ngày, đến {date}.',
-  'dayplan.tripExtended': 'Đã thêm ngày. Chuyến đi giờ kết thúc vào {date}.',
+  'dayplan.tripExtended': 'Đã thêm ngày. Chuyến đi giờ kết thúc vào {date}, muộn hơn một ngày.',
 };
 export default dayplan;

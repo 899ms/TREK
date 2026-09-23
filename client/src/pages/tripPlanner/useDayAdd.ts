@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react'
 import { useTripStore } from '../../store/tripStore'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { datedDayOption, type DayAddControls } from '../../utils/dayAdd'
-import { formatDate } from '../../utils/formatters'
+import { dayDate } from '../../utils/dayLabel'
 import type { Day, Trip } from '../../types'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
@@ -65,7 +65,7 @@ export function useDayAdd(options: DayAddOptions): DayAdd {
   const onAddDated = useCallback(() => {
     if (!canEditDays || blocked || datedBlocked || !nextDate) return
     runOnce(() => useTripStore.getState().appendDatedDay(tripId).then(
-      day => { toast.success(t('dayplan.tripExtended', { date: formatDate(day.date ?? nextDate, locale) ?? nextDate })) },
+      day => { toast.success(t('dayplan.tripExtended', { date: dayDate(day.date ?? nextDate, locale) ?? nextDate })) },
       (err: unknown) => {
         // The server's sentences are English, and the button already keeps a trip
         // without dates or at the day limit from asking, so a refusal here is a

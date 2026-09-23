@@ -115,7 +115,7 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayShrink': 'Тепер подорож закінчується {date}',
   'dayplan.deleteDayShrinkHint': 'Немає дня без дати, який міг би зайняти останню дату.',
   'dayplan.impactStayShorter': 'Проживання в {name}: на одну ніч менше',
-  'dayplan.deleteDayStayShorterHint': 'Воно проходить через цей день, і виїзд тепер {date}.',
+  'dayplan.deleteDayStayShorterHint': 'Виїзд тепер {date}, бо воно проходить через цей день.',
   'dayplan.deleteDayStayShorterUndatedHint': 'Воно проходить через цей день і тепер закінчується на день раніше.',
   'dayplan.deleteDaySpareDated': '{day} отримує дату {date}',
   'dayplan.deleteDaySpareDatedHint': 'Це перший день без дати, і він отримує останню дату подорожі.',
@@ -126,7 +126,7 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDay': 'Без дати',
   'dayplan.addUndatedDayHint': 'Додає в кінець день без дати. Дати подорожі не змінюються.',
   'dayplan.addDatedDay': 'Додати {date}',
-  'dayplan.addDatedDayHint': 'Подовжує подорож на один день, до {date}.',
-  'dayplan.tripExtended': 'День додано. Тепер подорож закінчується {date}.',
+  'dayplan.addDatedDayHint': 'Додає {date} і подовжує подорож на один день.',
+  'dayplan.tripExtended': 'День додано. Тепер подорож закінчується {date}, на день пізніше.',
 };
 export default dayplan;

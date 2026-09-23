@@ -127,6 +127,6 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDayHint': 'Egy dátum nélküli napot ad a végéhez. Az utazás dátumai nem változnak.',
   'dayplan.addDatedDay': '{date} hozzáadása',
   'dayplan.addDatedDayHint': 'Egy nappal meghosszabbítja az utazást. Új utolsó nap: {date}.',
-  'dayplan.tripExtended': 'Nap hozzáadva. Az utazás utolsó napja most: {date}.',
+  'dayplan.tripExtended': 'Nap hozzáadva. Az utazás egy nappal tovább tart, utolsó napja most: {date}.',
 };
 export default dayplan;

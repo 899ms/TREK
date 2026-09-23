@@ -14,7 +14,7 @@ import { getApiErrorMessage, type Trip } from '../../types'
 import { MAX_TRIP_DAYS, tripSpanDays, type TripCreateRequest } from '@trek/shared'
 import { NumericInput } from '../shared/NumericInput'
 import { currenciesWith, SYMBOLS } from '../Budget/BudgetPanel.constants'
-import TripDateReview from './TripDateReview'
+import TripDateReview, { dateReviewIsWide } from './TripDateReview'
 import { useTripRangeGuard, type RangeCheck } from '../../hooks/useTripRangeGuard'
 import type { ShiftMode } from '../../utils/dayImpactLines'
 
@@ -410,9 +410,10 @@ export default function TripFormModal({ isOpen, onClose, onSave, trip, onCoverUp
       title={pendingReview
         ? t(pendingReview.askShift ? 'dashboard.dateShiftTitle' : 'dashboard.shrinkTitle')
         : isEditing ? t('dashboard.editTrip') : t('dashboard.createTrip')}
-      /* The review step is a few radio buttons and a short list; it would look
-         lost across the width the form itself needs. */
-      size={pendingReview ? 'md' : '2xl'}
+      /* The review step is a few radio buttons and a short list; alone, either
+         takes the width of the day dialog, where the same list stands. With both,
+         they stand side by side at the form's own width. */
+      size={pendingReview && !dateReviewIsWide(pendingReview.askShift, pendingReview.removal) ? 'lg' : '2xl'}
       footer={
         <div className="flex gap-3 justify-end">
           {pendingReview ? (

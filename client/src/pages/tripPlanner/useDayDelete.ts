@@ -3,8 +3,7 @@ import { useTripStore } from '../../store/tripStore'
 import { useNetworkMode } from '../../hooks/useNetworkMode'
 import { dayDeleteImpact, deleteDayBlockedReason } from '../../utils/dayDeleteImpact'
 import { deleteDayLines as buildDeleteDayLines, type DayDeleteQuestion, type ImpactLine } from '../../utils/dayImpactLines'
-import { dayLabel } from '../../utils/dayLabel'
-import { formatDate } from '../../utils/formatters'
+import { dayDate, dayLabel } from '../../utils/dayLabel'
 import type { Accommodation, Day, Place, Reservation, Trip } from '../../types'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
@@ -77,7 +76,7 @@ export function useDayDelete(options: DayDeleteOptions): DayDelete {
     if (!target) return []
     const budget = { items: budgetItems, currency: trip?.currency, locale }
     const impact = dayDeleteImpact(target, days, { assignments, dayNotes, reservations, accommodations, places, budget }, trip)
-    return buildDeleteDayLines(impact, t, iso => formatDate(iso, locale) ?? iso, (day, i) => dayLabel(day, i, t, locale))
+    return buildDeleteDayLines(impact, t, iso => dayDate(iso, locale) ?? iso, (day, i) => dayLabel(day, i, t, locale))
   }, [target, days, assignments, dayNotes, reservations, accommodations, places, budgetItems, trip, t, locale])
 
   const handleDeleteDay = useCallback((dayId: number) => {

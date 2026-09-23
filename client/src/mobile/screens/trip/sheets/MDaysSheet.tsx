@@ -3,8 +3,7 @@ import MSheet from '../../../components/MSheet'
 import { ReorderStack } from '../plan/MPlanTimelineRows'
 import { INNER_CLS, TileHeader } from './MTripSheetUi'
 import { useTranslation } from '../../../../i18n'
-import { dayLabel } from '../../../../utils/dayLabel'
-import { formatDate } from '../../../../utils/formatters'
+import { dayDate, dayLabel } from '../../../../utils/dayLabel'
 import type { MTripSheetsProps } from '../MTripShell'
 
 /** A 44px pill, the tap size of the sheet's other actions; the label never wraps, the row does. */
@@ -21,7 +20,9 @@ const PILL_QUIET = `${PILL} border border-[color:var(--m-rowbr)] bg-[color:var(-
  *
  * Adding sits under the list and stays in reach while the list scrolls: on a
  * trip with dates the next date, which extends the trip, and a day without a
- * date, with one line above them saying what the dated one does.
+ * date, with one line above them saying what the dated one does. The dated
+ * pill shows only its date beside the calendar icon, so both pills stand side
+ * by side in every language; its accessible name keeps the whole action.
  */
 export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
   const { t, locale } = useTranslation()
@@ -31,7 +32,7 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
   const deleteBlocked = planner.deleteDayBlocked
   const { dayAdd } = planner
   const addOff = dayAdd.busy || !!dayAdd.blocked
-  const date = dayAdd.nextDate ? formatDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate : null
+  const date = dayAdd.nextDate ? dayDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate : null
   // The lines above the buttons: why a day cannot be deleted, and what the
   // dated button does or why adding is off. Offline both say the same
   // sentence; it is shown once.
@@ -83,7 +84,8 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
                   disabled={!!deleteBlocked}
                   aria-label={t('dayplan.deleteDay')}
                   title={deleteBlocked ?? undefined}
-                  className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] text-m-muted active:text-[color:var(--m-st-danger)] disabled:opacity-30"
+                  // 30px to the eye, 44px to the finger: the pseudo-element widens the hit area to the row's height.
+                  className="relative flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] text-m-muted after:absolute after:-inset-[7px] active:text-[color:var(--m-st-danger)] disabled:opacity-30"
                 >
                   <Trash2 size={13} strokeWidth={2.2} />
                 </button>
@@ -101,9 +103,15 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
           <div className="flex flex-wrap gap-[8px]">
             {date ? (
               <>
-                <button type="button" onClick={dayAdd.onAddDated} disabled={addOff || !!dayAdd.datedBlocked} className={PILL_MAIN}>
-                  <CalendarPlus size={15} strokeWidth={2.2} />
-                  {t('dayplan.addDatedDay', { date })}
+                <button
+                  type="button"
+                  onClick={dayAdd.onAddDated}
+                  disabled={addOff || !!dayAdd.datedBlocked}
+                  aria-label={t('dayplan.addDatedDay', { date })}
+                  className={PILL_MAIN}
+                >
+                  <CalendarPlus size={15} strokeWidth={2.2} aria-hidden="true" />
+                  {date}
                 </button>
                 <button type="button" onClick={() => planner.handleAddDay()} disabled={addOff} className={PILL_QUIET}>
                   <Plus size={15} strokeWidth={2.2} />

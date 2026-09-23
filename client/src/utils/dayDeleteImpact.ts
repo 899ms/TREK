@@ -86,6 +86,16 @@ const byNumber = (a: Day, b: Day): number => (a.day_number ?? 0) - (b.day_number
 /** A reservation's link to a stay, which the wire carries as a number or a string. */
 const stayOf = (r: Reservation): number | null => (r.accommodation_id == null ? null : Number(r.accommodation_id))
 
+/**
+ * Each stay once. The stays list joins in the bookings, so a stay with two of
+ * them comes over the wire twice; the warning names it once all the same, and
+ * counts its bookings through describeStay.
+ */
+function distinctStays(stays: Accommodation[]): Accommodation[] {
+  const seen = new Set<number>()
+  return stays.filter(stay => !seen.has(stay.id) && seen.add(stay.id))
+}
+
 /** The bookings linked to a stay, its first booking title, and the name the list gives it. */
 function describeStay(stay: Accommodation, data: DayContentData) {
   const linked = data.reservations.filter(r => stayOf(r) === stay.id)
@@ -121,7 +131,7 @@ function stayExpense(linked: Reservation[], budget: DayContentBudget | undefined
  */
 export function contentOnDays(days: Pick<Day, 'id' | 'title' | 'notes'>[], data: DayContentData): DayContent {
   const ids = new Set(days.map(d => d.id))
-  const stays = data.accommodations.filter(stay => ids.has(stay.start_day_id) || ids.has(stay.end_day_id))
+  const stays = distinctStays(data.accommodations).filter(stay => ids.has(stay.start_day_id) || ids.has(stay.end_day_id))
   const stayIds = new Set(stays.map(stay => stay.id))
 
   const placeIds = new Set<number>()
@@ -188,7 +198,7 @@ export function dayDeleteImpact(
     return start || end
   }).length
 
-  const shortenedStays = data.accommodations.flatMap((stay): ShortenedStay[] => {
+  const shortenedStays = distinctStays(data.accommodations).flatMap((stay): ShortenedStay[] => {
     const from = position.get(stay.start_day_id)
     const to = position.get(stay.end_day_id)
     if (cancelled.has(stay.id) || from === undefined || to === undefined || from >= at || to <= at) return []

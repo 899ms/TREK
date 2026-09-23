@@ -114,7 +114,7 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayShrink': 'Ara el viatge acaba el {date}',
   'dayplan.deleteDayShrinkHint': "No queda cap dia sense data que pugui agafar l'última data.",
   'dayplan.impactStayShorter': 'Estada a {name}: una nit menys',
-  'dayplan.deleteDayStayShorterHint': 'Travessa aquest dia i ara la sortida és el {date}.',
+  'dayplan.deleteDayStayShorterHint': 'Ara la sortida és el {date}, perquè travessa aquest dia.',
   'dayplan.deleteDayStayShorterUndatedHint': 'Travessa aquest dia i ara acaba un dia abans.',
   'dayplan.deleteDaySpareDated': '{day} pren la data {date}',
   'dayplan.deleteDaySpareDatedHint': "És el primer dia sense data i passa a tenir l'última data del viatge.",
@@ -125,7 +125,7 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDay': 'Sense data',
   'dayplan.addUndatedDayHint': 'Afegeix un dia sense data al final. Les dates del viatge no canvien.',
   'dayplan.addDatedDay': 'Afegeix {date}',
-  'dayplan.addDatedDayHint': 'Allarga el viatge un dia, fins al {date}.',
-  'dayplan.tripExtended': "S'ha afegit el dia. Ara el viatge acaba el {date}.",
+  'dayplan.addDatedDayHint': 'Afegeix el {date} i allarga el viatge un dia.',
+  'dayplan.tripExtended': "S'ha afegit el dia. Ara el viatge acaba el {date}, un dia més tard.",
 };
 export default dayplan;

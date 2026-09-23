@@ -115,7 +115,7 @@ const dayplan: TranslationStrings = {
   'dayplan.deleteDayShrink': 'Cesta nyní končí {date}',
   'dayplan.deleteDayShrinkHint': 'Nezbývá žádný den bez data, který by převzal poslední datum.',
   'dayplan.impactStayShorter': 'Ubytování v {name}: o noc kratší',
-  'dayplan.deleteDayStayShorterHint': 'Zasahuje přes tento den, odjezd je teď {date}.',
+  'dayplan.deleteDayStayShorterHint': 'Odjezd je teď {date}, protože zasahuje přes tento den.',
   'dayplan.deleteDayStayShorterUndatedHint': 'Zasahuje přes tento den, teď končí o den dříve.',
   'dayplan.deleteDaySpareDated': '{day} dostane datum {date}',
   'dayplan.deleteDaySpareDatedHint': 'Je to první den bez data a převezme poslední datum cesty.',
@@ -126,7 +126,7 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDay': 'Bez data',
   'dayplan.addUndatedDayHint': 'Přidá na konec den bez data. Termín cesty zůstane stejný.',
   'dayplan.addDatedDay': 'Přidat {date}',
-  'dayplan.addDatedDayHint': 'Prodlouží cestu o jeden den, do {date}.',
-  'dayplan.tripExtended': 'Den přidán. Cesta teď končí {date}.',
+  'dayplan.addDatedDayHint': 'Přidá {date} a prodlouží cestu o jeden den.',
+  'dayplan.tripExtended': 'Den přidán. Cesta teď končí {date}, o den později.',
 };
 export default dayplan;

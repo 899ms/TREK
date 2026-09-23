@@ -1,6 +1,6 @@
 import { useId, useState } from 'react'
 import { CalendarPlus, Plus } from 'lucide-react'
-import { formatDate } from '../../utils/formatters'
+import { dayDate } from '../../utils/dayLabel'
 import type { DayAddControls } from '../../utils/dayAdd'
 
 interface DayAddFooterProps {
@@ -15,10 +15,11 @@ interface DayAddFooterProps {
 /** One button size for the whole foot of the reorder dialog, the delete question's included. */
 export const FOOTER_BTN =
   'inline-flex min-h-9 flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-body font-medium transition-colors disabled:cursor-default disabled:opacity-40'
-const SECONDARY_BTN = `${FOOTER_BTN} border border-edge text-content-secondary hover:bg-surface-hover disabled:hover:bg-transparent`
-const CLOSE_BTN = `${FOOTER_BTN} ml-auto border border-edge text-content-muted hover:bg-surface-hover hover:text-content`
-/** The add that matters most, tinted from the accent instead of filled with it. */
-const MAIN_BTN = `${FOOTER_BTN} border border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--accent)_10%,transparent)] font-semibold text-accent-on hover:bg-[color:color-mix(in_srgb,var(--accent)_16%,transparent)] disabled:hover:bg-[color:color-mix(in_srgb,var(--accent)_10%,transparent)]`
+/** Cancel, Close and the quiet add: one outline, one text colour, so none of them looks switched off beside another. */
+export const SECONDARY_BTN = `${FOOTER_BTN} border border-edge text-content-secondary hover:bg-surface-hover hover:text-content disabled:hover:bg-transparent`
+const CLOSE_BTN = `${SECONDARY_BTN} ml-auto`
+/** The add that matters most: drawn in the accent, not filled with it, so it leads without weighing on the row. */
+const MAIN_BTN = `${FOOTER_BTN} border border-accent-on bg-transparent font-semibold text-accent-on hover:bg-accent-subtle disabled:hover:bg-transparent`
 
 /**
  * The foot of the reorder dialog: close it, or add a day.
@@ -45,7 +46,7 @@ export function DayAddFooter({ dayAdd, onAddDay, onClose, t, locale }: DayAddFoo
   if (!dayAdd?.nextDate) {
     return (
       <div className="flex flex-col gap-2.5">
-        {blocked && <p className="m-0 text-caption text-content-faint">{blocked}</p>}
+        {blocked && <p className="m-0 text-caption text-content-muted">{blocked}</p>}
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={onAddDay} disabled={addOff} className={MAIN_BTN}>
             <Plus size={15} strokeWidth={2} aria-hidden="true" />
@@ -57,7 +58,7 @@ export function DayAddFooter({ dayAdd, onAddDay, onClose, t, locale }: DayAddFoo
     )
   }
 
-  const date = formatDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate
+  const date = dayDate(dayAdd.nextDate, locale) ?? dayAdd.nextDate
   const hint = blocked
     ?? (aboutUndated ? t('dayplan.addUndatedDayHint') : dayAdd.datedBlocked ?? t('dayplan.addDatedDayHint', { date }))
   const pointAtUndated = {
@@ -69,7 +70,7 @@ export function DayAddFooter({ dayAdd, onAddDay, onClose, t, locale }: DayAddFoo
 
   return (
     <div className="flex flex-col gap-2.5">
-      <p id={hintId} aria-live="polite" className="m-0 text-caption text-content-faint">
+      <p id={hintId} aria-live="polite" className="m-0 text-caption text-content-muted">
         {hint}
       </p>
       {/* Should a language run long, the row wraps between buttons, never inside one. */}

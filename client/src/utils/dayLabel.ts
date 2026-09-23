@@ -13,11 +13,18 @@ type Translate = (key: string, params?: Record<string, string | number>) => stri
  */
 export function dayLabel(day: Pick<Day, 'title' | 'date'>, index: number, t: Translate, locale: string): string {
   if (day.title) return day.title
-  if (day.date) {
-    const date = new Date(`${day.date.slice(0, 10)}T00:00:00`)
-    if (!Number.isNaN(date.getTime())) {
-      return date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
-    }
-  }
-  return t('dayplan.dayN', { n: index + 1 })
+  return (day.date && dayDate(day.date, locale)) || t('dayplan.dayN', { n: index + 1 })
+}
+
+/**
+ * A calendar date the way the day list writes it: short weekday, day, month,
+ * and no year, which the trip around it already says. Anything that talks
+ * about the days in that list (the next day to add, a moved check-out, the new
+ * end of the trip) writes its dates this way too, so a date reads the same in
+ * the button as in the row it becomes. Null when the value does not parse.
+ */
+export function dayDate(iso: string, locale: string): string | null {
+  const date = new Date(`${iso.slice(0, 10)}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return null
+  return date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
 }

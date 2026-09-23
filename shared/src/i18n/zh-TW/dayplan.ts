@@ -123,6 +123,6 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDayHint': '在最後新增一天沒有日期的行程。旅程日期不變。',
   'dayplan.addDatedDay': '新增 {date}',
   'dayplan.addDatedDayHint': '旅程延長一天，到 {date} 為止。',
-  'dayplan.tripExtended': '已新增一天。旅程現在於 {date} 結束。',
+  'dayplan.tripExtended': '已新增一天。旅程延長一天，現在於 {date} 結束。',
 };
 export default dayplan;

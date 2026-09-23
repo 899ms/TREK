@@ -128,6 +128,6 @@ const dayplan: TranslationStrings = {
   'dayplan.addUndatedDayHint': 'Dodaje na końcu dzień bez daty. Daty podróży się nie zmieniają.',
   'dayplan.addDatedDay': 'Dodaj {date}',
   'dayplan.addDatedDayHint': 'Wydłuża podróż o jeden dzień, do {date}.',
-  'dayplan.tripExtended': 'Dodano dzień. Podróż kończy się teraz {date}.',
+  'dayplan.tripExtended': 'Dodano dzień. Podróż kończy się teraz {date}, dzień później.',
 };
 export default dayplan;

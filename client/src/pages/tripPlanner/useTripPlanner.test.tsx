@@ -2509,7 +2509,7 @@ describe('useTripPlanner: deleting a day', () => {
     expect(lines[0].hint).toContain('together with the booking “Alma, 1 night” and its expense of')
     expect(lines[0].hint).toContain('95')
     expect(lines[1].text).toBe('Stay at Harbour Hotel: one night less')
-    expect(lines[1].hint).toMatch(/^It runs across this day and now checks out on .*Jun 2/)
+    expect(lines[1].hint).toMatch(/^Check-out is now on .*Jun 2, as it runs across this day\.$/)
     expect(lines[4].text).toMatch(/^Day 4 takes the date .*Jun 3/)
   })
 })
