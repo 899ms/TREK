@@ -337,6 +337,61 @@ describe('status + updatePlace move', () => {
 
     expect((await svc.updatePlace(u.id, p.id, { name: 'Trattoria da Enzo' })).address).toBe('Via Vechia 1');
   });
+
+  // #2471: price, currency, website and phone were stored on save and carried into
+  // a trip on copy, but the UPDATE set never named them, so none could be edited.
+  it('COLLECTIONS-SVC-128: updatePlace writes price, currency, website and phone', async () => {
+    const u = createUser(testDb).user;
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const p = svc.savePlace(u.id, { collection_id: col.id, name: 'Kunsthaus' }).place!;
+
+    const updated = await svc.updatePlace(u.id, p.id, {
+      price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84',
+    });
+
+    expect(updated).toMatchObject({ price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84' });
+    expect(testDb.prepare('SELECT price, currency, website, phone FROM collection_places WHERE id = ?').get(p.id)).toEqual({
+      price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84',
+    });
+  });
+
+  it('COLLECTIONS-SVC-129: null clears each of the four', async () => {
+    const u = createUser(testDb).user;
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const p = svc.savePlace(u.id, {
+      collection_id: col.id, name: 'Kunsthaus', price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44',
+    }).place!;
+
+    const cleared = await svc.updatePlace(u.id, p.id, { price: null, currency: null, website: null, phone: null });
+
+    expect(cleared).toMatchObject({ price: null, currency: null, website: null, phone: null });
+  });
+
+  it('COLLECTIONS-SVC-130: an update that leaves them out keeps the stored values', async () => {
+    const u = createUser(testDb).user;
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const p = svc.savePlace(u.id, {
+      collection_id: col.id, name: 'Kunsthaus', price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44',
+    }).place!;
+
+    const renamed = await svc.updatePlace(u.id, p.id, { name: 'Kunsthaus Zürich' });
+
+    expect(renamed).toMatchObject({ name: 'Kunsthaus Zürich', price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44' });
+  });
+
+  it('COLLECTIONS-SVC-131: copyToTrip carries the edited price, currency, website and phone into the trip place', async () => {
+    const u = createUser(testDb).user;
+    const trip = createTrip(testDb, u.id);
+    const col = svc.createCollection(u.id, { name: 'Zurich' });
+    const p = svc.savePlace(u.id, { collection_id: col.id, name: 'Kunsthaus', price: 10, currency: 'EUR' }).place!;
+    await svc.updatePlace(u.id, p.id, { price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44' });
+
+    expect(svc.copyToTrip(u.id, { trip_id: trip.id, place_ids: [p.id] }).copied).toBe(1);
+
+    expect(testDb.prepare("SELECT price, currency, website, phone FROM places WHERE trip_id = ? AND name = 'Kunsthaus'").get(trip.id)).toEqual({
+      price: 24.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44',
+    });
+  });
 });
 
 // ── copy to trip ─────────────────────────────────────────────────────────────

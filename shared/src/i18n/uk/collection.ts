@@ -59,6 +59,10 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'За замовчуванням',
   'collections.sort.nameAsc': 'Назва (А–Я)',
   'collections.coordinates': 'Координати',
+  'collections.price': 'Ціна',
+  'collections.priceHint':
+    'Приблизна вартість, наприклад вхідний квиток. Переноситься разом із місцем під час копіювання в подорож.',
+  'collections.phone': 'Телефон',
   'collections.showList': 'Показати список',
   'collections.expandMap': 'Розгорнути карту',
   'collections.hero.mine': 'Моя колекція',

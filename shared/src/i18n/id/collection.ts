@@ -59,6 +59,10 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Bawaan',
   'collections.sort.nameAsc': 'Nama (A–Z)',
   'collections.coordinates': 'Koordinat',
+  'collections.price': 'Harga',
+  'collections.priceHint':
+    'Perkiraan biaya, misalnya tiket masuk. Ikut tersalin saat tempat ini disalin ke perjalanan.',
+  'collections.phone': 'Telepon',
   'collections.showList': 'Tampilkan daftar',
   'collections.expandMap': 'Perbesar peta',
   'collections.hero.mine': 'Koleksi saya',

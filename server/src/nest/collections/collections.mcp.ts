@@ -229,7 +229,7 @@ export class CollectionsMcp {
 
   @Tool({
     name: 'update_collection_place',
-    description: 'Update a saved place\'s name, address, coordinates (lat/lng), description, notes, status, category, links, tags, labels, image, or move it to another collection (set collection_id).',
+    description: 'Update a saved place\'s name, address, coordinates (lat/lng), description, notes, price with currency (a rough cost such as an entry fee; always send the three-letter currency with a price, since a collection has no base currency, and it travels into a trip when the place is copied there), website, phone, status, category, links, tags, labels, image, or move it to another collection (set collection_id).',
     inputSchema: { placeId: z.number().int().positive(), ...collectionPlaceUpdateRequestSchema.shape, links: linksInput },
     annotations: TOOL_ANNOTATIONS_WRITE,
     when: collectionsAddonOn,

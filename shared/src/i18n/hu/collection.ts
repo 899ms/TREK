@@ -59,6 +59,10 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Alapértelmezett',
   'collections.sort.nameAsc': 'Név (A–Z)',
   'collections.coordinates': 'Koordináták',
+  'collections.price': 'Ár',
+  'collections.priceHint':
+    'Hozzávetőleges költség, például belépődíj. A hellyel együtt átkerül, amikor utazásba másolja.',
+  'collections.phone': 'Telefon',
   'collections.showList': 'Lista megjelenítése',
   'collections.expandMap': 'Térkép nagyítása',
   'collections.hero.mine': 'Saját gyűjtemény',

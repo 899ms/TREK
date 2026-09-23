@@ -449,6 +449,10 @@
 .trek-dash .col-detail-catchip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 11px 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--cat, var(--accent)); background: color-mix(in oklch, var(--cat, var(--accent)) 15%, transparent); }
 .trek-dash .col-detail-addr { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; color: var(--ink-3); min-width: 0; }
 .trek-dash .col-detail-addr svg { flex-shrink: 0; }
+/* Price (#2471): a quiet pill beside the address, the figure the place costs to get in. */
+.trek-dash .col-detail-price { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ink-2); background: var(--surface-2); font-variant-numeric: tabular-nums; }
+.trek-dash .col-detail-price svg { flex-shrink: 0; }
+.trek-dash .col-detail-tel:hover { color: var(--ink); }
 /* Directions (#1455): sits on the meta line beside the address, quieter than
    the link chips below — it is an action on the place, not a piece of it. */
 
@@ -483,6 +487,8 @@
 .trek-dash .col-detail-link-row { display: flex; align-items: center; gap: 8px; }
 .trek-dash .col-detail-input { padding: 7px 10px; border-radius: 9px; border: 1px solid var(--line-2); background: var(--surface-2); color: var(--ink); font-size: 12.5px; outline: none; min-width: 0; }
 .trek-dash .col-detail-input:focus { border-color: var(--accent); background: var(--surface); }
+.trek-dash .col-detail-input[aria-invalid="true"] { border-color: var(--danger); }
+.trek-dash .col-detail-hint { font-size: 11.5px; line-height: 1.45; color: var(--ink-3); }
 .trek-dash .col-detail-icon-btn { padding: 7px; border-radius: 8px; color: var(--ink-3); }
 .trek-dash .col-detail-icon-btn:hover { color: oklch(0.6 0.2 25); background: var(--surface-2); }
 .trek-dash .col-detail-add-link { display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; padding: 7px 11px; border-radius: 9px; border: 1px dashed var(--line-2); color: var(--ink-2); font-size: 12.5px; font-weight: 500; }

@@ -59,6 +59,10 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Προεπιλογή',
   'collections.sort.nameAsc': 'Όνομα (Α–Ω)',
   'collections.coordinates': 'Συντεταγμένες',
+  'collections.price': 'Τιμή',
+  'collections.priceHint':
+    'Ένα κατά προσέγγιση κόστος, όπως ένα εισιτήριο εισόδου. Μεταφέρεται μαζί με το μέρος κατά την αντιγραφή σε ταξίδι.',
+  'collections.phone': 'Τηλέφωνο',
   'collections.showList': 'Εμφάνιση λίστας',
   'collections.expandMap': 'Μεγέθυνση χάρτη',
   'collections.hero.mine': 'Η συλλογή μου',

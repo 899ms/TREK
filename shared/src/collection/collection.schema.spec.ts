@@ -1,5 +1,6 @@
 import {
   collectionDeleteManyRequestSchema,
+  collectionPlaceCurrencySchema,
   collectionPlaceUpdateRequestSchema,
   collectionReorderRequestSchema,
   collectionSavePlaceRequestSchema,
@@ -44,6 +45,65 @@ describe('collectionPlaceUpdateRequestSchema', () => {
     const long = 'x'.repeat(5000);
     expect(collectionPlaceUpdateRequestSchema.parse({ address: long }).address).toBe(long);
     expect(collectionSavePlaceRequestSchema.parse({ collection_id: 1, name: 'X', address: long }).address).toBe(long);
+  });
+});
+
+// #2471: price, currency, website and phone were columns the update contract did
+// not know, so the validation pipe stripped them and a saved place's cost could
+// never be edited.
+describe('collectionPlaceUpdateRequestSchema price, currency, website and phone', () => {
+  it('passes all four through', () => {
+    const parsed = collectionPlaceUpdateRequestSchema.parse({
+      price: 12.5,
+      currency: 'CHF',
+      website: 'https://museum.example',
+      phone: '+41 44 123 45 67',
+    });
+    expect(parsed).toEqual({
+      price: 12.5,
+      currency: 'CHF',
+      website: 'https://museum.example',
+      phone: '+41 44 123 45 67',
+    });
+  });
+
+  it('accepts null on each to clear it, and zero as a price', () => {
+    const none = { price: null, currency: null, website: null, phone: null };
+    expect(collectionPlaceUpdateRequestSchema.parse(none)).toEqual(none);
+    expect(collectionPlaceUpdateRequestSchema.parse({ price: 0 }).price).toBe(0);
+  });
+
+  it('leaves all four absent when an unrelated field changes', () => {
+    const parsed = collectionPlaceUpdateRequestSchema.parse({ name: 'Kunsthaus' });
+    for (const key of ['price', 'currency', 'website', 'phone']) expect(key in parsed).toBe(false);
+  });
+
+  it('refuses a negative or non-finite price', () => {
+    for (const price of [-1, -0.01, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(collectionPlaceUpdateRequestSchema.safeParse({ price }).success).toBe(false);
+    }
+  });
+
+  it('normalises the currency to a trimmed upper-case code', () => {
+    expect(collectionPlaceUpdateRequestSchema.parse({ currency: ' usd ' }).currency).toBe('USD');
+    expect(collectionPlaceCurrencySchema.parse('jpy')).toBe('JPY');
+  });
+
+  it('refuses a currency that is not three letters', () => {
+    for (const currency of ['EU', 'EURO', '€', '12A', '']) {
+      expect(collectionPlaceUpdateRequestSchema.safeParse({ currency }).success).toBe(false);
+    }
+  });
+
+  it('holds the website to http or https, like the save side', () => {
+    expect(collectionPlaceUpdateRequestSchema.safeParse({ website: 'javascript:alert(1)' }).success).toBe(false);
+    expect(collectionPlaceUpdateRequestSchema.safeParse({ website: 'http://museum.example' }).success).toBe(true);
+  });
+
+  it('trims the phone and caps it at 60 characters', () => {
+    expect(collectionPlaceUpdateRequestSchema.parse({ phone: '  +49 30 1234  ' }).phone).toBe('+49 30 1234');
+    expect(collectionPlaceUpdateRequestSchema.safeParse({ phone: '1'.repeat(60) }).success).toBe(true);
+    expect(collectionPlaceUpdateRequestSchema.safeParse({ phone: '1'.repeat(61) }).success).toBe(false);
   });
 });
 

@@ -183,6 +183,50 @@ describe('Collections e2e (real auth guard + real service + temp SQLite)', () =>
     expect(db.prepare('SELECT address FROM collection_places WHERE id = ?').get(placeId)).toEqual({ address: null });
   });
 
+  // #2471: price, currency, website and phone were stripped by the pipe the same way.
+  it('COLLECTIONS-E2E-085: PATCH price, currency, website and phone is stored and survives a rename', async () => {
+    const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Prices' })).body;
+    const placeId = (await request(server).post('/api/addons/collections/places')
+      .set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, name: 'Kunsthaus' })).body.place.id;
+
+    const patched = await request(server).patch(`/api/addons/collections/places/${placeId}`)
+      .set('Cookie', sessionCookie(ownerId)).send({ price: 12.5, currency: 'chf', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84' });
+    expect(patched.status).toBe(200);
+    expect(patched.body).toMatchObject({ price: 12.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84' });
+
+    const renamed = await request(server).patch(`/api/addons/collections/places/${placeId}`)
+      .set('Cookie', sessionCookie(ownerId)).send({ name: 'Kunsthaus Zürich' });
+    expect(renamed.status).toBe(200);
+    expect(db.prepare('SELECT price, currency, website, phone FROM collection_places WHERE id = ?').get(placeId)).toEqual({
+      price: 12.5, currency: 'CHF', website: 'https://kunsthaus.example', phone: '+41 44 253 84 84',
+    });
+  });
+
+  it('COLLECTIONS-E2E-086: a negative price, a made-up currency or a script link is a 400 and changes nothing', async () => {
+    const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Bad prices' })).body;
+    const placeId = (await request(server).post('/api/addons/collections/places')
+      .set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, name: 'Kunsthaus', price: 10, currency: 'EUR' })).body.place.id;
+
+    for (const body of [{ price: -1 }, { currency: 'EURO' }, { website: 'javascript:alert(1)' }]) {
+      const res = await request(server).patch(`/api/addons/collections/places/${placeId}`).set('Cookie', sessionCookie(ownerId)).send(body);
+      expect(res.status).toBe(400);
+    }
+    expect(db.prepare('SELECT price, currency, website FROM collection_places WHERE id = ?').get(placeId)).toEqual({ price: 10, currency: 'EUR', website: null });
+  });
+
+  it('COLLECTIONS-E2E-087: a member who may only read cannot set a price (403)', async () => {
+    const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Read only prices' })).body;
+    await request(server).post('/api/addons/collections/invite').set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, user_id: otherId, role: 'viewer' });
+    await request(server).post('/api/addons/collections/invite/accept').set('Cookie', sessionCookie(otherId)).send({ collection_id: col.id });
+    const placeId = (await request(server).post('/api/addons/collections/places')
+      .set('Cookie', sessionCookie(ownerId)).send({ collection_id: col.id, name: 'Kunsthaus' })).body.place.id;
+
+    const res = await request(server).patch(`/api/addons/collections/places/${placeId}`)
+      .set('Cookie', sessionCookie(otherId)).send({ price: 12, currency: 'CHF' });
+    expect(res.status).toBe(403);
+    expect(db.prepare('SELECT price, currency FROM collection_places WHERE id = ?').get(placeId)).toEqual({ price: null, currency: null });
+  });
+
   // ── Cross-user isolation ─────────────────────────────────────────────────
   it('COLLECTIONS-E2E-020: a stranger gets 404 on someone else’s collection', async () => {
     const col = (await request(server).post('/api/addons/collections').set('Cookie', sessionCookie(ownerId)).send({ name: 'Private' })).body;

@@ -59,6 +59,10 @@ const collection: TranslationStrings = {
   'collections.sort.default': 'Standaard',
   'collections.sort.nameAsc': 'Naam (A–Z)',
   'collections.coordinates': 'Coördinaten',
+  'collections.price': 'Prijs',
+  'collections.priceHint':
+    'Een globale prijs, zoals een entreeprijs. Gaat mee wanneer je de plek naar een reis kopieert.',
+  'collections.phone': 'Telefoon',
   'collections.showList': 'Lijst tonen',
   'collections.expandMap': 'Kaart vergroten',
   'collections.hero.mine': 'Mijn collectie',

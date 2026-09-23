@@ -1010,6 +1010,10 @@ export class CollectionsService {
     if (body.lat !== undefined) { updates.push('lat = ?'); params.push(body.lat ?? null); }
     if (body.lng !== undefined) { updates.push('lng = ?'); params.push(body.lng ?? null); }
     if (body.address !== undefined) { updates.push('address = ?'); params.push(body.address ?? null); }
+    if (body.price !== undefined) { updates.push('price = ?'); params.push(body.price ?? null); }
+    if (body.currency !== undefined) { updates.push('currency = ?'); params.push(body.currency ?? null); }
+    if (body.website !== undefined) { updates.push('website = ?'); params.push(body.website ?? null); }
+    if (body.phone !== undefined) { updates.push('phone = ?'); params.push(body.phone ?? null); }
     if (body.status !== undefined) { updates.push('status = ?'); params.push(body.status); }
     if (body.category_id !== undefined) { updates.push('category_id = ?'); params.push(body.category_id ?? null); }
     if (body.image_url !== undefined) { updates.push('image_url = ?'); params.push(body.image_url ?? null); }
