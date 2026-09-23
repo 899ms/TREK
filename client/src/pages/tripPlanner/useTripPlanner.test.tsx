@@ -1,4 +1,4 @@
-// FE-TP-HOOK-001 to FE-TP-HOOK-119
+// FE-TP-HOOK-001 to FE-TP-HOOK-125
 import React from 'react'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n/TranslationContext'
@@ -102,6 +102,7 @@ interface PlannerActions {
   reorderAssignments: ReturnType<typeof vi.fn>
   reorderDays: ReturnType<typeof vi.fn>
   insertDay: ReturnType<typeof vi.fn>
+  deleteDay: ReturnType<typeof vi.fn>
   updateDayTitle: ReturnType<typeof vi.fn>
   addReservation: ReturnType<typeof vi.fn>
   updateReservation: ReturnType<typeof vi.fn>
@@ -129,6 +130,7 @@ function makeActions(): PlannerActions {
     reorderAssignments: vi.fn(async () => undefined),
     reorderDays: vi.fn(async () => undefined),
     insertDay: vi.fn(async () => undefined),
+    deleteDay: vi.fn(async () => undefined),
     updateDayTitle: vi.fn(async () => undefined),
     addReservation: vi.fn(async () => ({ id: 77 })),
     updateReservation: vi.fn(async () => ({ id: 77 })),
@@ -2268,5 +2270,109 @@ describe('useTripPlanner — dropping a hit on the drive', () => {
     act(() => { result.current.dropPoiOnRoute('node:does-not-exist', 53.5, 9.9) })
 
     expect(result.current.stopDraft).toBeNull()
+  })
+})
+
+describe('useTripPlanner: deleting a day', () => {
+  // Dated 1 to 3 June on a trip running 1 to 3 June, with a place on the middle day.
+  function seedDays(extra: Partial<TripStoreState> = {}) {
+    const place = buildPlace({ id: 70 })
+    return seedTrip({
+      trip: buildTrip({ id: 42, title: 'Kyoto', start_date: '2026-06-01', end_date: '2026-06-03' }),
+      days: [
+        buildDay({ id: 1, day_number: 1, date: '2026-06-01', title: null }),
+        buildDay({ id: 2, day_number: 2, date: '2026-06-02', title: 'Harbour day' }),
+        buildDay({ id: 3, day_number: 3, date: '2026-06-03', title: null }),
+      ],
+      assignments: { '1': [], '2': [buildAssignment({ id: 20, day_id: 2, place })], '3': [] },
+      dayNotes: { '1': [], '2': [], '3': [] },
+      ...extra,
+    } as Partial<TripStoreState>)
+  }
+
+  it('FE-TP-HOOK-122: asking needs day_edit; with it the question names the day and lists what goes with it', async () => {
+    seedStore(useAuthStore, { user: buildUser({ id: 2, role: 'user' }) })
+    usePermissionsStore.setState({ permissions: { day_edit: 'admin' } })
+    seedDays()
+    const denied = await renderPlanner()
+    act(() => { denied.result.current.handleDeleteDay(2) })
+    expect(denied.result.current.deleteDayId).toBeNull()
+    denied.unmount()
+
+    seedStore(useAuthStore, { user: buildUser({ id: 1 }) })
+    usePermissionsStore.setState({ permissions: {} })
+    const { result } = await renderPlanner()
+    act(() => { result.current.handleDeleteDay(2) })
+
+    expect(result.current.deleteDayId).toBe(2)
+    expect(result.current.deleteDayTitle).toBe('Delete Harbour day?')
+    expect(result.current.deleteDayLines.map(l => l.key)).toEqual(['places', 'texts', 'shift', 'shrink'])
+    expect(result.current.deleteDayLines.find(l => l.key === 'places')?.text).toBe('Planned places: 1')
+  })
+
+  it('FE-TP-HOOK-123: confirming deletes through the store, closes the question and reloads the stays', async () => {
+    seedDays()
+    const { result } = await renderPlanner()
+    act(() => { result.current.handleDeleteDay(2) })
+    vi.mocked(accommodationRepo.list).mockClear()
+
+    await act(async () => { await result.current.confirmDeleteDay() })
+
+    expect(actions.deleteDay).toHaveBeenCalledWith(42, 2)
+    expect(result.current.deleteDayId).toBeNull()
+    expect(accommodationRepo.list).toHaveBeenCalledWith(42)
+    expect(updateRouteForDay).toHaveBeenCalled()
+    expect(toasts).toContainEqual(expect.objectContaining({ type: 'success', message: 'Day deleted' }))
+
+    // A refusal is said in the traveller's language, and nothing is reloaded.
+    actions.deleteDay.mockRejectedValueOnce(new Error('A trip needs at least one day.'))
+    vi.mocked(accommodationRepo.list).mockClear()
+    act(() => { result.current.handleDeleteDay(3) })
+    await act(async () => { await result.current.confirmDeleteDay() })
+    expect(toasts).toContainEqual(expect.objectContaining({ type: 'error', message: 'Failed to delete day' }))
+    expect(accommodationRepo.list).not.toHaveBeenCalled()
+
+    // Without an open question there is nothing to confirm.
+    actions.deleteDay.mockClear()
+    await act(async () => { await result.current.confirmDeleteDay() })
+    expect(actions.deleteDay).not.toHaveBeenCalled()
+  })
+
+  it('FE-TP-HOOK-124: the last day and a missing connection block the question, and say why', async () => {
+    seedDays({ days: [buildDay({ id: 1, day_number: 1, date: '2026-06-01' })] } as Partial<TripStoreState>)
+    const single = await renderPlanner()
+    expect(single.result.current.deleteDayBlocked).toBe('A trip needs at least one day')
+    act(() => { single.result.current.handleDeleteDay(1) })
+    expect(single.result.current.deleteDayId).toBeNull()
+    single.unmount()
+
+    env.forcedOffline = true
+    seedDays()
+    const { result } = await renderPlanner()
+    expect(result.current.deleteDayBlocked).toBe('Changing days needs a connection')
+    act(() => { result.current.handleDeleteDay(2) })
+    expect(result.current.deleteDayId).toBeNull()
+  })
+
+  it('FE-TP-HOOK-125: undoing a day reorder skips the days deleted since, and steps aside once a day was added', async () => {
+    seedDays()
+    const { result } = await renderPlanner()
+    await act(async () => { result.current.handleReorderDays([3, 1, 2]) })
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+
+    // Day 2 went in the meantime: the old order without it is still one the server takes.
+    useTripStore.setState({ days: [buildDay({ id: 3, day_number: 1 }), buildDay({ id: 1, day_number: 2 })] })
+    await act(async () => { await result.current.undo() })
+    expect(actions.reorderDays).toHaveBeenLastCalledWith(42, [1, 3])
+
+    // A day added since leaves the old order short of one, so the undo does nothing.
+    await act(async () => { result.current.handleReorderDays([1, 3]) })
+    await waitFor(() => expect(result.current.canUndo).toBe(true))
+    useTripStore.setState({
+      days: [buildDay({ id: 1, day_number: 1 }), buildDay({ id: 3, day_number: 2 }), buildDay({ id: 9, day_number: 3 })],
+    })
+    actions.reorderDays.mockClear()
+    await act(async () => { await result.current.undo() })
+    expect(actions.reorderDays).not.toHaveBeenCalled()
   })
 })

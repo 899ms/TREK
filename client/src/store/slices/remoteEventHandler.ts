@@ -5,6 +5,7 @@ import type { Assignment, Place, Day, DayNote, PackingItem, TodoItem, BudgetItem
 import { offlineDb } from '../../db/offlineDb'
 import { useAuthStore } from '../authStore'
 import { mergeAssignmentPlace } from './placesSlice'
+import { withoutDay } from './daysSlice'
 
 type SetState = StoreApi<TripStoreState>['setState']
 type GetState = StoreApi<TripStoreState>['getState']
@@ -330,18 +331,9 @@ export const STATE_APPLIERS: Partial<Record<TrekWsTripEventName, StateApplier>> 
   'day:updated': (payload, state) => ({
     days: state.days.map(d => d.id === (payload.day as Day).id ? payload.day as Day : d),
   }),
-  'day:deleted': (payload, state) => {
-    const removedDayId = String(payload.dayId)
-    const newAssignments = { ...state.assignments }
-    delete newAssignments[removedDayId]
-    const newDayNotes = { ...state.dayNotes }
-    delete newDayNotes[removedDayId]
-    return {
-      days: state.days.filter(d => d.id !== payload.dayId),
-      assignments: newAssignments,
-      dayNotes: newDayNotes,
-    }
-  },
+  // The same reducer the deleting tab ran optimistically: the later days move up
+  // one place, the dates stay on their positions, a selection on the day clears.
+  'day:deleted': (payload, state) => withoutDay(state, Number(payload.dayId)),
   'day:reordered': (payload, state) => {
     // Apply the new order instantly when we know all ids; the authoritative
     // dates + re-stamped booking times are pulled by the refresh below.
@@ -563,6 +555,10 @@ export function handleRemoteEvent(set: SetState, get: GetState, event: WebSocket
     const tripId = get().trip?.id
     if (tripId) get().loadReservations(tripId)
   }
+
+  // A deleted day cancels a stay that checked in or out on it, and the stays
+  // live in page-local planner state rather than this store.
+  if (type === 'day:deleted') window.dispatchEvent(new CustomEvent('accommodations:refresh'))
 
   // A reorder/insert re-pins dates and re-stamps booking times server-side, so
   // pull the authoritative days + reservations for collaborators.

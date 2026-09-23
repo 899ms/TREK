@@ -76,6 +76,7 @@ import {
   type StoredConnections,
 } from '../../utils/connectionsVisibility'
 import { plannedPlaceIds, plannedPlaceIdsForDay } from '../../utils/plannedPlaces'
+import { useDayDelete } from './useDayDelete'
 
 /** Stable empty list so the road trip hook stays inert while its mode is off. */
 const EMPTY_DAYS: Day[] = []
@@ -2508,7 +2509,13 @@ export function useTripPlanner() {
     tripActions.reorderDays(tripId, orderedIds)
       .then(() => {
         pushUndo(t('dayplan.reorderUndo'), async () => {
-          await tripActions.reorderDays(tripId, prevIds)
+          // A day deleted since then drops out of the old order. When the list no
+          // longer matches the days there are (one was added), the old order is
+          // not one the server could take, so the undo steps aside.
+          const live = new Set(useTripStore.getState().days.map(d => d.id))
+          const restorable = prevIds.filter(id => live.has(id))
+          if (restorable.length !== live.size) return
+          await tripActions.reorderDays(tripId, restorable)
         })
       })
       .catch(err => toast.error(err instanceof Error ? err.message : t('dayplan.reorderError')))
@@ -2518,6 +2525,17 @@ export function useTripPlanner() {
     tripActions.insertDay(tripId, position)
       .catch(err => toast.error(err instanceof Error ? err.message : t('dayplan.addDayError')))
   }, [tripId, toast])
+
+  // A deleted day can take a stay along, and the selected day's route may have
+  // lost its day or its stops.
+  const afterDayDeleted = useCallback(() => {
+    loadAccommodations()
+    updateRouteForDay(useTripStore.getState().selectedDayId)
+  }, [loadAccommodations, updateRouteForDay])
+  const dayDelete = useDayDelete({
+    tripId, trip, days, places: allPlaces, reservations, accommodations: tripAccommodations,
+    canEditDays: can('day_edit', trip), t, locale, toast, onDeleted: afterDayDeleted,
+  })
 
   const handleSaveReservation = async (data: Record<string, string | number | null> & { title: string }) => {
     try {
@@ -2844,6 +2862,7 @@ export function useTripPlanner() {
     handleSelectDay, handlePlaceClick, handleMarkerClick, handleMapClick, handleMapContextMenu, openAddPlaceFromPoi, handlePoiClick,
     handleSavePlace, openPlaceEditor, handleDeletePlace, confirmDeletePlace, confirmDeletePlaces, confirmChangeCategory,
     handleAssignToDay, handleMoveToDay, handleRemoveAssignment, handleReorder, handleReorderDays, handleAddDay, handleUpdateDayTitle,
+    ...dayDelete,
     handleSaveReservation, handleSaveTransport, handleDeleteReservation,
     selectedPlace, dayOrderMap, dayPlaces,
     mapTileUrl, fontStyle, splashDone,

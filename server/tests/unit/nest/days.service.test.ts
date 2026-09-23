@@ -247,13 +247,22 @@ describe('update', () => {
   });
 });
 
-describe('remove', () => {
-  it('DAY-SVC-015 — deletes the day', () => {
+// DAY-SVC-015 pinned the bare delete this class used to own. Deleting a day moved
+// to DayRemovalService with the renumbering and the stay cancellation around it;
+// its cases are DAY-DEL-001 to DAY-DEL-018 in day-removal.service.test.ts.
+
+describe('getTripForViewer', () => {
+  it('DAY-SVC-098: reads the trip in list shape, ownership from the viewer, without the feed token', () => {
     const { user } = createUser(testDb);
-    const trip = createTrip(testDb, user.id);
-    const day = createDay(testDb, trip.id) as any;
-    svc.remove(day.id);
-    expect(svc.getDay(day.id, trip.id)).toBeUndefined();
+    const { user: member } = createUser(testDb);
+    const trip = createTrip(testDb, user.id, { start_date: '2026-06-01', end_date: '2026-06-02' });
+    testDb.prepare('UPDATE trips SET feed_token = ? WHERE id = ?').run('secret-feed', trip.id);
+
+    expect(svc.getTripForViewer(trip.id, user.id)).toMatchObject({
+      id: trip.id, end_date: '2026-06-02', day_count: 2, place_count: 0, is_owner: 1, feed_token: null,
+    });
+    expect(svc.getTripForViewer(trip.id, member.id)).toMatchObject({ id: trip.id, is_owner: 0 });
+    expect(svc.getTripForViewer(99999, user.id)).toBeUndefined();
   });
 });
 

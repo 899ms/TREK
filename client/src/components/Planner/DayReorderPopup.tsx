@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { GripVertical, ArrowUp, ArrowDown, Plus } from 'lucide-react'
+import { GripVertical, ArrowUp, ArrowDown, Plus, Trash2 } from 'lucide-react'
 import Modal from '../shared/Modal'
+import Tooltip from '../shared/Tooltip'
+import { useNetworkMode } from '../../hooks/useNetworkMode'
+import { dayLabel } from '../../utils/dayLabel'
+import { deleteDayBlockedReason } from '../../utils/dayDeleteImpact'
 import type { Day } from '../../types'
 
 interface DayReorderPopupProps {
@@ -10,29 +14,25 @@ interface DayReorderPopupProps {
   locale: string
   onReorder: (orderedIds: number[]) => void
   onAddDay: () => void
+  /** Asks to delete a day; the planner opens the question. Without it rows have no delete button. */
+  onDeleteDay?: (dayId: number) => void
   onClose: () => void
 }
 
 /**
  * Modal for moving whole days around: drag a row by its grip or use the up/down
- * arrows, and add a day at the end. Day headers stay untouched — this is the
- * single surface for ordering. Reorders are applied optimistically by the store,
- * so the list reflects each move immediately.
+ * arrows, add a day at the end, or delete one. Day headers stay untouched, so
+ * this is the single surface for ordering. Reorders are applied optimistically
+ * by the store, so the list reflects each move immediately. A delete only asks:
+ * the planner shows what goes with the day before anything happens.
  */
-export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, onClose }: DayReorderPopupProps) {
+export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, onDeleteDay, onClose }: DayReorderPopupProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null)
   const [overIndex, setOverIndex] = useState<number | null>(null)
+  const { offline } = useNetworkMode()
 
   const ordered = [...days].sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
-
-  const label = (day: Day, index: number) => {
-    if (day.title) return day.title
-    if (day.date) {
-      const d = new Date(day.date + 'T00:00:00')
-      return d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
-    }
-    return t('dayplan.dayN', { n: index + 1 })
-  }
+  const deleteBlocked = deleteDayBlockedReason(ordered.length, offline, t)
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ordered.length || from === to) return
@@ -120,7 +120,7 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
               {index + 1}
             </span>
             <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {label(day, index)}
+              {dayLabel(day, index, t, locale)}
             </span>
             <button
               type="button"
@@ -140,6 +140,24 @@ export function DayReorderPopup({ isOpen, days, t, locale, onReorder, onAddDay, 
             >
               <ArrowDown size={14} strokeWidth={2} />
             </button>
+            {onDeleteDay && (
+              <>
+                <span aria-hidden="true" className="mx-0.5 h-5 w-px flex-shrink-0 bg-edge-faint" />
+                <Tooltip label={deleteBlocked ?? t('dayplan.deleteDay')} placement="left">
+                  <span className="inline-flex flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onDeleteDay(day.id)}
+                      disabled={!!deleteBlocked}
+                      aria-label={t('dayplan.deleteDay')}
+                      className="grid h-7 w-7 place-items-center rounded-[7px] border border-edge-faint text-content-muted transition-colors hover:bg-danger-soft hover:text-danger focus-visible:bg-danger-soft focus-visible:text-danger disabled:cursor-default disabled:opacity-35 disabled:hover:bg-transparent disabled:hover:text-content-muted"
+                    >
+                      <Trash2 size={14} strokeWidth={2} />
+                    </button>
+                  </span>
+                </Tooltip>
+              </>
+            )}
           </div>
         ))}
       </div>

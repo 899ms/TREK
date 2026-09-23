@@ -77,7 +77,7 @@ At the top of the Day Plan sidebar:
 - **Export** — opens the export dialog, which holds every format in three groups: **Document** (a PDF of the full trip plan, see [PDF-Export](PDF-Export)), **Calendar** (a `.ics` file for import into calendar apps, plus a subscribable calendar feed for members who can manage share links) and **Maps & GPS** (GPX — whole trip, places only, or days as routes).
 - **Expand / Collapse all** — toggles all day sections open or closed at once.
 - **Undo** — reverses the last drag, reorder, or assign action.
-- **Reorder days** — reorder the days of the trip or insert a new one. A day's places, notes and bookings move with it. Shown to members who can edit days.
+- **Reorder days**: reorder the days of the trip, add a day, or delete one. A day's places, notes and bookings move with it. Shown to members who can edit days. See [Deleting a day](#deleting-a-day).
 - **Show all booking routes** — draws the connection of every routable booking on the map at once. Shown once the trip has at least one routable booking.
 
 Route controls appear at the bottom of a day section, after the place list, and only for the day you have selected — click a day header to select it. The row only appears on a day that can actually be routed: two or more places on the day, a single located place that accommodation optimization can bookend with a hotel, or a transfer day where you check out of one hotel and into another. On a phone the same controls sit in the **Daily Overview** sheet instead, opened from the pill above the plan timeline, and appear there when the day has two located places, or one located place plus a hotel to start from.
@@ -87,5 +87,17 @@ Route controls appear at the bottom of a day section, after the place list, and 
 - **Open in CoMaps** — the same day handed to CoMaps for offline navigation, carrying the day's travel mode.
 - **Optimize** — reorders the day's places into the shortest route. See [Route-Optimization](Route-Optimization).
 - **Travel mode** — Driving or Walking for that day, plus any travel mode a plugin adds.
+
+## Deleting a day
+
+Each row of the **Reorder days** dialog has a delete button; on a phone it sits next to the arrows in the day sheet. Before anything is deleted, TREK asks and lists what goes with the day:
+
+- **Planned places** stay in the place list of the trip. Only their spot on this day goes.
+- **Notes**, the day title and the day description are deleted.
+- **Bookings** on the day stay under Bookings, without a day, and keep their date.
+- **A stay that checks in or out on the day** is cancelled, together with its booking and the expense of that booking. The list shows it in red. A stay that only runs across the day is kept.
+- **The days after it** move up one place. On a trip with dates the dates stay where they are, so every later day, and the bookings on it, takes the date one slot earlier. A day without a date at the end takes over the last date; when there is none, the trip ends one day earlier.
+
+A trip always keeps at least one day, and deleting needs a connection. There is no undo, which is why the dialog spells out the consequences first.
 
 **See also:** [Places-and-Search](Places-and-Search) · [Map-Features](Map-Features) · [Route-Optimization](Route-Optimization) · [Weather-Forecasts](Weather-Forecasts) · [Reservations-and-Bookings](Reservations-and-Bookings)

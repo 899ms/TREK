@@ -1,33 +1,24 @@
-import { CalendarRange, Plus } from 'lucide-react'
+import { CalendarRange, Plus, Trash2 } from 'lucide-react'
 import MSheet from '../../../components/MSheet'
 import { ReorderStack } from '../plan/MPlanTimelineRows'
 import { INNER_CLS, TileHeader } from './MTripSheetUi'
 import { useTranslation } from '../../../../i18n'
+import { dayLabel } from '../../../../utils/dayLabel'
 import type { MTripSheetsProps } from '../MTripShell'
-import type { Day } from '../../../../types'
 
 /**
- * Day management sheet ('days'): move whole days up/down and append a new day —
- * the mobile counterpart of the desktop DayReorderPopup, button-based like the
- * rest of the touch reordering (#1432). A day's places, notes and bookings
- * move with it (store handles that optimistically).
+ * Day management sheet ('days'): move whole days up/down, append a new day or
+ * delete one, the mobile counterpart of the desktop DayReorderPopup and
+ * button-based like the rest of the touch reordering (#1432). A day's places,
+ * notes and bookings move with it (store handles that optimistically). Delete
+ * only asks; the confirm sheet with what goes with the day is MTripSheets'.
  */
 export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
   const { t, locale } = useTranslation()
   const open = shell.sheet?.id === 'days'
   const canEditDays = planner.can('day_edit', planner.trip)
   const ordered = [...planner.days].sort((a, b) => (a.day_number ?? 0) - (b.day_number ?? 0))
-
-  const label = (day: Day, index: number): string => {
-    if (day.title) return day.title
-    if (day.date) {
-      const d = new Date(`${day.date.slice(0, 10)}T00:00:00`)
-      if (!Number.isNaN(d.getTime())) {
-        return d.toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })
-      }
-    }
-    return t('planner.dayN', { n: day.day_number ?? index + 1 })
-  }
+  const deleteBlocked = planner.deleteDayBlocked
 
   const move = (from: number, to: number) => {
     if (to < 0 || to >= ordered.length || from === to) return
@@ -57,7 +48,7 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
               <span className="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] font-geist text-[0.65625rem] font-bold text-m-muted">
                 {i + 1}
               </span>
-              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold">{label(day, i)}</span>
+              <span className="min-w-0 flex-1 truncate text-[0.8125rem] font-semibold">{dayLabel(day, i, t, locale)}</span>
               {canEditDays && (
                 <ReorderStack
                   onUp={() => move(i, i - 1)}
@@ -66,6 +57,18 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
                   canDown={i < ordered.length - 1}
                   t={t}
                 />
+              )}
+              {canEditDays && (
+                <button
+                  type="button"
+                  onClick={() => planner.handleDeleteDay(day.id)}
+                  disabled={!!deleteBlocked}
+                  aria-label={t('dayplan.deleteDay')}
+                  title={deleteBlocked ?? undefined}
+                  className="flex h-[30px] w-[30px] flex-none items-center justify-center rounded-full bg-[color:var(--m-ic)] text-[color:var(--m-st-danger)] disabled:text-m-faint disabled:opacity-40"
+                >
+                  <Trash2 size={13} strokeWidth={2.2} />
+                </button>
               )}
             </div>
           ))}
@@ -79,6 +82,9 @@ export default function MDaysSheet({ planner, shell }: MTripSheetsProps) {
             <Plus size={13} strokeWidth={2.2} />
             {t('dayplan.addDay')}
           </button>
+        )}
+        {canEditDays && deleteBlocked && (
+          <p className="mt-[10px] text-center text-[0.6875rem] text-m-muted">{deleteBlocked}</p>
         )}
       </div>
     </MSheet>

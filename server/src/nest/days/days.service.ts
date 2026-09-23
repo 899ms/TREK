@@ -6,6 +6,7 @@ import { PermissionsService } from '../permissions/permissions.service';
 import { QueryHelpersService } from '../query-helpers/query-helpers.service';
 import { carryVias, locatedStopIds, reseatOwnStop } from '../accommodations/night-seat';
 import { formatAssignmentWithPlace } from '../common/rowShape';
+import { TRIP_SELECT } from '../trips/trip-select';
 import type { AssignmentRow, Day, DayNote, User } from '../../types';
 
 type Trip = TripAccess;
@@ -259,8 +260,13 @@ export class DaysService {
     return { ...updatedDay, assignments: this.getAssignmentsForDay(id) };
   }
 
-  remove(id: string | number): void {
-    this.db.run('DELETE FROM days WHERE id = ?', id);
+  /**
+   * The trip in list shape, as the trip routes answer it, for a day write that
+   * changed the trip itself (its end date, its day count). Read through the leaf
+   * query rather than TripsService, which imports this class.
+   */
+  getTripForViewer(tripId: string | number, userId: number): unknown {
+    return this.db.prepare(`${TRIP_SELECT} WHERE t.id = :tripId`).get({ userId, tripId });
   }
 
   // -------------------------------------------------------------------------

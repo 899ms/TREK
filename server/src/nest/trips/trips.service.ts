@@ -13,6 +13,7 @@ import { UnsplashService } from '../unsplash/unsplash.service';
 import { StorageService } from '../storage/storage.service';
 import { SettingsService } from '../settings/settings.service';
 import { NotFoundError, ValidationError } from '../common/domain-errors';
+import { TRIP_SELECT } from './trip-select';
 
 export const MS_PER_DAY = 86400000;
 
@@ -29,35 +30,10 @@ function assertTripSpan(startDate: string, endDate: string) {
   if (span > MAX_TRIP_DAYS) throw new ValidationError(`A trip can span at most ${MAX_TRIP_DAYS} days`);
 }
 
-/**
- * Strips `feed_token` from a trip row on its way out.
- *
- * The column is the sole credential for the anonymous /api/feed/trip/:token.ics
- * route, and `SELECT t.*` hands it to every reader of the trip. Gating the
- * token endpoint on `share_manage` means nothing while any member can read the
- * same value out of the trip payload, so the two go together. No TREK client
- * reads the field (it is absent from client/ and shared/ entirely).
- */
-export function withoutFeedToken<T>(row: T): T {
-  if (row && typeof row === 'object') delete (row as Record<string, unknown>).feed_token;
-  return row;
-}
-
-// `NULL AS feed_token` after `t.*` rather than an explicit column list: the
-// duplicate name wins in the row object, so the credential is blanked once here
-// instead of at each of the nine call sites, and the next migration that adds a
-// column does not have to remember to extend a hand-maintained list.
-export const TRIP_SELECT = `
-  SELECT t.*,
-    NULL AS feed_token,
-    (SELECT COUNT(*) FROM days d WHERE d.trip_id = t.id) as day_count,
-    (SELECT COUNT(*) FROM places p WHERE p.trip_id = t.id) as place_count,
-    CASE WHEN t.user_id = :userId THEN 1 ELSE 0 END as is_owner,
-    u.username as owner_username,
-    (SELECT COUNT(*) FROM trip_members tm WHERE tm.trip_id = t.id) as shared_count
-  FROM trips t
-  JOIN users u ON u.id = t.user_id
-`;
+// The list-shape query and the feed-token scrub live in a leaf file so the days
+// domain can read the same trip row without importing this module (which
+// imports DaysService). Re-exported here so every existing importer is unchanged.
+export { TRIP_SELECT, withoutFeedToken } from './trip-select';
 
 interface CreateTripData {
   title: string;

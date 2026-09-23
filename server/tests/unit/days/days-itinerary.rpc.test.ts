@@ -15,6 +15,7 @@ import { DaysModule } from '../../../src/nest/days/days.module';
 import { ItineraryRpc } from '../../../src/nest/assignments/itinerary.rpc';
 import { AssignmentsModule } from '../../../src/nest/assignments/assignments.module';
 import type { DaysService } from '../../../src/nest/days/days.service';
+import { DayDeleteError, type DayRemoval, type DayRemovalService } from '../../../src/nest/days/day-removal.service';
 import type { AssignmentsService } from '../../../src/nest/assignments/assignments.service';
 import type { RealtimeService } from '../../../src/nest/realtime/realtime.service';
 import type { DatabaseService } from '../../../src/nest/database/database.service';
@@ -31,8 +32,20 @@ function build(opts: { canEdit?: boolean } = {}) {
     create: vi.fn((tripId: number, date?: string) => ({ id: 20, trip_id: tripId, date })),
     getDay: vi.fn((dayId: number, tripId: number) => (dayId === 3 && tripId === 1 ? { id: 3 } : undefined)),
     update: vi.fn((id: number) => ({ id })),
-    remove: vi.fn(),
   } as unknown as DaysService & Record<string, ReturnType<typeof vi.fn>>;
+  const removed: DayRemoval = {
+    dayId: 3, orderedIds: [4], stayIds: [], reservationIds: [], budgetItemIds: [], mirrors: [],
+    boundaries: null, endDate: null, trip: { id: 1 },
+  };
+  // announce() is the removal service's own fan-out (DAY-DEL-014); the stub sends
+  // one event through each sender so the case can see where they lead.
+  const removal = {
+    remove: vi.fn(() => removed),
+    announce: vi.fn((_tripId: number, r: DayRemoval, senders: Parameters<DayRemovalService['announce']>[2]) => {
+      senders.others('day:deleted', { dayId: r.dayId });
+      senders.all('day:reordered', { orderedIds: r.orderedIds });
+    }),
+  } as unknown as DayRemovalService;
   const assignments = {
     dayExists: vi.fn((dayId: number, tripId: number) => dayId === 3 && tripId === 1),
     placeExists: vi.fn((placeId: number, tripId: number) => placeId === 7 && tripId === 1),
@@ -50,9 +63,9 @@ function build(opts: { canEdit?: boolean } = {}) {
     { checkPermission: vi.fn(() => opts.canEdit ?? true) } as unknown as PermissionsService,
     { isAddonEnabled: vi.fn(() => true) } as unknown as AddonsService,
   );
-  const registry = createTestPluginRegistry([new DaysRpc(days, realtime, guards), new ItineraryRpc(assignments, realtime, guards)]);
+  const registry = createTestPluginRegistry([new DaysRpc(days, realtime, guards, removal), new ItineraryRpc(assignments, realtime, guards)]);
   const host = (...grants: string[]) => new PluginRpcHost('p', new Set(grants), makeDeps(), registry);
-  return { days, assignments, realtime, host };
+  return { days, assignments, realtime, host, removal, removed };
 }
 
 describe('DaysRpc', () => {
@@ -72,7 +85,7 @@ describe('DaysRpc', () => {
       .toBe('no day 404 on trip 1');
     expect(((await host.dispatch(req('days.delete', { tripId: 1, dayId: 404 }), 42)) as RpcError).error.message)
       .toBe('no day 404 on trip 1');
-    expect(f.days.remove).not.toHaveBeenCalled();
+    expect(f.removal.remove).not.toHaveBeenCalled();
   });
 
   it('DAYS-RPC-003 every write broadcasts its event', async () => {
@@ -81,11 +94,41 @@ describe('DaysRpc', () => {
     await host.dispatch(req('days.create', { tripId: 1, input: {} }), 42);
     await host.dispatch(req('days.update', { tripId: 1, dayId: 3, input: { notes: 'x' } }), 42);
     await host.dispatch(req('days.delete', { tripId: 1, dayId: 3 }), 42);
-    expect(f.realtime.broadcast.mock.calls.map((c) => c[1])).toEqual(['day:created', 'day:updated', 'day:deleted']);
+    expect(f.realtime.broadcast.mock.calls.map((c) => c[1])).toEqual(['day:created', 'day:updated', 'day:deleted', 'day:reordered']);
   });
 
   it('DAYS-RPC-004 the class is listed in its module providers', () => {
     expectRegisteredProvider(DaysModule, DaysRpc);
+  });
+
+  it('DAYS-RPC-005 the last day of a trip is BAD_PARAMS with the sentence REST and MCP give, and nothing is announced', async () => {
+    const f = build();
+    vi.mocked(f.removal.remove).mockImplementation(() => { throw new DayDeleteError('A trip needs at least one day.'); });
+    const res = (await f.host('db:write:days').dispatch(req('days.delete', { tripId: 1, dayId: 3 }), 42)) as RpcError;
+    expect(res.error).toMatchObject({ code: 'BAD_PARAMS', message: 'A trip needs at least one day.' });
+    expect(f.removal.announce).not.toHaveBeenCalled();
+    expect(f.realtime.broadcast).not.toHaveBeenCalled();
+  });
+
+  it('DAYS-RPC-006 a delete runs as the bound user and fans out through the shared announce, to every socket', async () => {
+    const f = build();
+    const res = await f.host('db:write:days').dispatch(req('days.delete', { tripId: 1, dayId: 3 }), 42);
+    expect(res).toMatchObject({ ok: true, result: { deleted: true } });
+    expect(f.removal.remove).toHaveBeenCalledWith(1, 3, { userId: 42 });
+    const senders = vi.mocked(f.removal.announce).mock.calls[0][2];
+    // A plugin has no socket of its own, so nobody is left out.
+    expect(senders.all).toBe(senders.others);
+    expect(f.realtime.broadcast.mock.calls).toEqual([
+      [1, 'day:deleted', { dayId: 3 }],
+      [1, 'day:reordered', { orderedIds: [4] }],
+    ]);
+  });
+
+  it('DAYS-RPC-006b anything but the last-day refusal is not dressed up as bad params', async () => {
+    const f = build();
+    vi.mocked(f.removal.remove).mockImplementation(() => { throw new Error('db is down'); });
+    const res = (await f.host('db:write:days').dispatch(req('days.delete', { tripId: 1, dayId: 3 }), 42)) as RpcError;
+    expect(res.error.code).not.toBe('BAD_PARAMS');
   });
 });
 

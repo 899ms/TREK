@@ -1,4 +1,4 @@
-// FE-PLANNER-DPTOOLBAR-001 to FE-PLANNER-DPTOOLBAR-023
+// FE-PLANNER-DPTOOLBAR-001 to FE-PLANNER-DPTOOLBAR-024
 import { render, screen, waitFor, fireEvent } from '../../../tests/helpers/render'
 import userEvent from '@testing-library/user-event'
 import { downloadTripPDF } from '../PDF/TripPDF'
@@ -231,6 +231,16 @@ describe('DayPlanSidebarToolbar', () => {
     await user.click(screen.getByRole('button', { name: 'dayplan.reorderDays' }))
     await user.click(screen.getByText('dayplan.addDay'))
     expect(onAddDay).toHaveBeenCalledWith()
+  })
+
+  it('FE-PLANNER-DPTOOLBAR-024: the popup hands a delete request for its day to the planner', async () => {
+    const user = userEvent.setup()
+    const days = [buildDay({ id: 10, title: 'Day 1', day_number: 1 }), buildDay({ id: 11, title: 'Day 2', day_number: 2 })]
+    const onDeleteDay = vi.fn((_id: number) => {})
+    render(<DayPlanSidebarToolbar {...makeProps({ days, canEditDays: true, onReorderDays: vi.fn(), onAddDay: vi.fn(), onDeleteDay })} />)
+    await user.click(screen.getByRole('button', { name: 'dayplan.reorderDays' }))
+    await user.click(screen.getAllByRole('button', { name: 'dayplan.deleteDay' })[1])
+    expect(onDeleteDay).toHaveBeenCalledWith(11)
   })
 
   it('FE-PLANNER-DPTOOLBAR-021: the reorder button is hidden without edit rights or without days', () => {

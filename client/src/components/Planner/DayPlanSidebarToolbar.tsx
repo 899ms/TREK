@@ -37,6 +37,8 @@ interface DayPlanSidebarToolbarProps {
   canManageShare?: boolean
   onReorderDays?: (orderedIds: number[]) => void
   onAddDay?: (position?: number) => void
+  /** Asks to delete a day from the reorder dialog; without it the dialog has no delete buttons. */
+  onDeleteDay?: (dayId: number) => void
 }
 
 export function DayPlanSidebarToolbar({
@@ -44,7 +46,7 @@ export function DayPlanSidebarToolbar({
   allConnectionsShown = false, onToggleAllConnections,
   t, locale, toast,
   expandedDays, setExpandedDays, onUndo, canUndo, undoHover, setUndoHover, lastActionLabel,
-  canEditDays, canManageShare = true, onReorderDays, onAddDay,
+  canEditDays, canManageShare = true, onReorderDays, onAddDay, onDeleteDay,
 }: DayPlanSidebarToolbarProps) {
   const [reorderOpen, setReorderOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
@@ -197,6 +199,7 @@ export function DayPlanSidebarToolbar({
               locale={locale}
               onReorder={onReorderDays}
               onAddDay={() => onAddDay()}
+              onDeleteDay={onDeleteDay}
               onClose={() => setReorderOpen(false)}
             />
           </div>

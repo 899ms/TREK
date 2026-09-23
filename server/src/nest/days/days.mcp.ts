@@ -12,6 +12,8 @@ import {
 } from '@trek/shared';
 import type { DayCreateRequest, DayReorderRequest, DayUpdateRequest } from '@trek/shared';
 import { DaysService, DayReorderError } from './days.service';
+import { DayRemovalService, DayDeleteError, type DayRemoval } from './day-removal.service';
+import type { MirrorSender } from '../accommodations/accommodations.service';
 
 function parseId(value: string | string[]): number | null {
   const n = Number(Array.isArray(value) ? value[0] : value);
@@ -41,6 +43,7 @@ export class DaysMcp {
     private readonly days: DaysService,
     private readonly auth: AuthService,
     private readonly guards: McpToolGuardsService,
+    private readonly removal: DayRemovalService,
   ) {}
 
   @Tool({
@@ -144,7 +147,7 @@ export class DaysMcp {
 
   @Tool({
     name: 'delete_day',
-    description: 'Delete a day from a trip.',
+    description: 'Delete a day from a trip. The places planned on it stay in the place list of the trip; its notes, title and description are deleted; bookings on it stay on the trip without a day. A stay that checks in or out on the day is cancelled together with its booking and the expense of that booking, while a stay that only runs across the day is kept. The later days move up one place. On a dated trip the dates stay on their positions, so every later day and the bookings on it move one date earlier; a day without a date then takes the last date, and when there is none the trip ends one day earlier. The last day of a trip cannot be deleted.',
     inputSchema: {
       tripId: z.number().int().positive(),
       dayId: z.number().int().positive(),
@@ -157,10 +160,18 @@ export class DaysMcp {
     if (!this.days.verifyTripAccess(tripId, ctx.userId)) return noAccess();
     if (!this.guards.hasTripPermission('day_edit', tripId, ctx.userId)) return permissionDenied();
     if (!this.days.getDay(dayId, tripId)) return errorResult('Day not found.');
-    this.days.remove(dayId);
-    // REST parity shape ({ dayId }) — the client reads payload.dayId, so the { id }
-    // variant never removed the day from collaborator screens.
-    this.guards.safeBroadcast(tripId, 'day:deleted', { dayId });
+    let removal: DayRemoval;
+    try {
+      removal = this.removal.remove(tripId, dayId, { userId: ctx.userId });
+    } catch (err) {
+      // The last day stays, and the caller can act on the sentence.
+      if (err instanceof DayDeleteError) return errorResult(err.message);
+      throw err;
+    }
+    // The same fan-out as REST, day:deleted ({ dayId }, the shape the client reads)
+    // first. A tool has no socket of its own, so every screen hears all of it.
+    const send: MirrorSender = (event, payload) => this.guards.safeBroadcast(tripId, event, payload as Record<string, unknown>);
+    this.removal.announce(tripId, removal, { all: send, others: send });
     return ok({ success: true });
   }
 

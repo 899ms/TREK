@@ -76,6 +76,8 @@ interface DayPlanSidebarProps {
   onReorder: (dayId: number, orderedIds: number[]) => void
   onReorderDays?: (orderedIds: number[]) => void
   onAddDay?: (position?: number) => void
+  /** Asks to delete a day from the reorder dialog; the planner owns the question. */
+  onDeleteDay?: (dayId: number) => void
   /** Renaming lives in the day-detail panel (#1065); the sidebar only forwards the prop. */
   onUpdateDayTitle: (dayId: number, title: string) => void
   /** The day route is computed by the planner page itself; kept for the existing call sites. */
@@ -146,7 +148,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
   trip, days, places, categories, assignments,
   selectedDayId, selectedPlaceId, selectedAssignmentId,
   onSelectDay, onPlaceClick, onDayDetail, accommodations = [],
-  onReorder, onReorderDays, onAddDay,
+  onReorder, onReorderDays, onAddDay, onDeleteDay,
   onAssignToDay, onMoveToDay, onRemoveAssignment, onEditPlace, onDeletePlace,
   reservations = [],
   visibleConnectionIds = [],
@@ -1129,6 +1131,7 @@ function useDayPlanSidebar(props: DayPlanSidebarProps) {
     onReorder,
     onReorderDays,
     onAddDay,
+    onDeleteDay,
     onAssignToDay,
     onRemoveAssignment,
     onEditPlace,
@@ -1331,6 +1334,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
     onReorder,
     onReorderDays,
     onAddDay,
+    onDeleteDay,
     onAssignToDay,
     onRemoveAssignment,
     onEditPlace,
@@ -1590,6 +1594,7 @@ const DayPlanSidebar = React.memo(function DayPlanSidebar(props: DayPlanSidebarP
         canManageShare={canManageShare}
         onReorderDays={onReorderDays}
         onAddDay={onAddDay}
+        onDeleteDay={onDeleteDay}
       />
 
       {/* Tagesliste */}

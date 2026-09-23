@@ -1,11 +1,11 @@
-// FE-REPO-DAY-001 to FE-REPO-DAY-004
+// FE-REPO-DAY-001 to FE-REPO-DAY-006
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import 'fake-indexeddb/auto'
 import { http, HttpResponse } from 'msw'
 import { server } from '../../tests/helpers/msw/server'
 import { dayRepo } from './dayRepo'
 import { offlineDb, clearAll } from '../db/offlineDb'
-import { buildDay } from '../../tests/helpers/factories'
+import { buildDay, buildTrip } from '../../tests/helpers/factories'
 
 function setOnline(v: boolean): void {
   Object.defineProperty(navigator, 'onLine', { value: v, writable: true, configurable: true })
@@ -55,5 +55,36 @@ describe('dayRepo.list', () => {
     server.use(http.get('/api/trips/5/days', () => HttpResponse.json({ error: 'nope' }, { status: 500 })))
 
     await expect(dayRepo.list(5)).rejects.toThrow()
+  })
+})
+
+describe('dayRepo.remove', () => {
+  it('FE-REPO-DAY-005: online, deletes through the API, drops the cached row and caches the trip it answers with', async () => {
+    await offlineDb.days.bulkPut([buildDay({ id: 41, trip_id: 5 }), buildDay({ id: 42, trip_id: 5 })])
+    const trip = buildTrip({ id: 5, end_date: '2026-06-02' })
+    let deleted = ''
+    server.use(http.delete('/api/trips/5/days/41', ({ request }) => {
+      deleted = new URL(request.url).pathname
+      return HttpResponse.json({ success: true, trip })
+    }))
+
+    const result = await dayRepo.remove(5, 41)
+
+    expect(deleted).toBe('/api/trips/5/days/41')
+    expect(result.trip).toMatchObject({ id: 5, end_date: '2026-06-02' })
+    expect(await offlineDb.days.get(41)).toBeUndefined()
+    expect(await offlineDb.days.get(42)).toBeDefined()
+    expect(await offlineDb.trips.get(5)).toMatchObject({ end_date: '2026-06-02' })
+  })
+
+  it('FE-REPO-DAY-006: offline, refuses without a request and keeps the cached row', async () => {
+    await offlineDb.days.put(buildDay({ id: 51, trip_id: 5 }))
+    const hit = vi.fn()
+    server.use(http.delete('/api/trips/5/days/51', () => { hit(); return HttpResponse.json({ success: true }) }))
+    setOnline(false)
+
+    await expect(dayRepo.remove(5, 51)).rejects.toThrow('Deleting a day needs a connection')
+    expect(hit).not.toHaveBeenCalled()
+    expect(await offlineDb.days.get(51)).toBeDefined()
   })
 })

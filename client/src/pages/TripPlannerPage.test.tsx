@@ -150,10 +150,21 @@ vi.mock('../components/Planner/ReservationModal', () => ({
 }));
 
 const capturedConfirmDialogProps: { current: Record<string, any> } = { current: {} };
+// Every dialog the page renders, by title: the page holds several, and the last
+// one rendered is not always the one a case is about. An open one draws its
+// extra content, so a case can read the list it carries.
+interface ConfirmDialogStub {
+  isOpen?: boolean
+  message?: string
+  confirmLabel?: string
+  onConfirm?: () => unknown
+}
+const capturedConfirmDialogsByTitle: { current: Record<string, ConfirmDialogStub> } = { current: {} };
 vi.mock('../components/shared/ConfirmDialog', () => ({
   default: (props: Record<string, any>) => {
     capturedConfirmDialogProps.current = props;
-    return null;
+    capturedConfirmDialogsByTitle.current[String(props.title)] = props as ConfirmDialogStub;
+    return props.isOpen ? React.createElement('div', { 'data-testid': 'confirm-dialog' }, props.children) : null;
   },
 }));
 
@@ -276,6 +287,7 @@ beforeEach(() => {
   capturedPlaceFormModalProps.current = {};
   capturedReservationModalProps.current = {};
   capturedConfirmDialogProps.current = {};
+  capturedConfirmDialogsByTitle.current = {};
   capturedDayDetailPanelProps.current = {};
   capturedTripFormModalProps.current = {};
   capturedTripMembersModalProps.current = {};
@@ -1736,6 +1748,47 @@ describe('TripPlannerPage', () => {
       // Then include the actual day → place is un-hidden
       await act(async () => {
         capturedDayPlanSidebarProps.current.onExpandedDaysChange?.(new Set([day.id]));
+      });
+    });
+  });
+
+  describe('FE-PAGE-PLANNER-053: Deleting a day from the reorder dialog', () => {
+    it('asks with the list of what goes with the day, then deletes through the store', async () => {
+      vi.useFakeTimers();
+      seedTripStore({ id: 42 });
+      const deleteDay = vi.fn().mockResolvedValue(undefined);
+      const harbour = buildDay({ id: 902, trip_id: 42, day_number: 2, date: null, title: 'Harbour day' });
+      useTripStore.setState({
+        days: [buildDay({ id: 901, trip_id: 42, day_number: 1, date: null }), harbour],
+        dayNotes: {},
+        deleteDay,
+      });
+
+      renderPlannerPage(42);
+      act(() => { vi.runAllTimers(); });
+      vi.useRealTimers();
+      await waitFor(() => {
+        expect(screen.getByTestId('day-plan-sidebar')).toBeInTheDocument();
+      });
+
+      // The sidebar hands the reorder dialog its delete action; nothing opens until it is used.
+      expect(typeof capturedDayPlanSidebarProps.current.onDeleteDay).toBe('function');
+      expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
+
+      await act(async () => { capturedDayPlanSidebarProps.current.onDeleteDay(harbour.id); });
+
+      await waitFor(() => {
+        expect(capturedConfirmDialogsByTitle.current['Delete Harbour day?']?.isOpen).toBe(true);
+      });
+      const dialog = capturedConfirmDialogsByTitle.current['Delete Harbour day?'];
+      expect(dialog.message).toBe('The day is removed from the trip. This cannot be undone.');
+      expect(dialog.confirmLabel).toBe('Delete day');
+      expect(screen.getByRole('list', { name: 'Delete Harbour day?' })).toHaveTextContent('Day titles and descriptions: 1');
+
+      await act(async () => { await dialog.onConfirm?.(); });
+      expect(deleteDay).toHaveBeenCalledWith(42, harbour.id);
+      await waitFor(() => {
+        expect(screen.queryByTestId('confirm-dialog')).not.toBeInTheDocument();
       });
     });
   });

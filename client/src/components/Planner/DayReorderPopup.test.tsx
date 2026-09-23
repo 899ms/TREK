@@ -1,8 +1,9 @@
-// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-012
+// FE-PLANNER-DAYREORDER-001 to FE-PLANNER-DAYREORDER-016
 import { render, screen, fireEvent } from '../../../tests/helpers/render'
 import userEvent from '@testing-library/user-event'
 import { buildDay } from '../../../tests/helpers/factories'
 import { DayReorderPopup } from './DayReorderPopup'
+import { setForcedOffline } from '../../sync/networkMode'
 import type { Day } from '../../types'
 
 // The component takes `t` as a prop, so returning the key keeps assertions exact.
@@ -136,5 +137,48 @@ describe('DayReorderPopup', () => {
     expect(onAddDay).toHaveBeenCalled()
     await user.click(screen.getByText('common.close'))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  describe('deleting a day', () => {
+    afterEach(() => setForcedOffline(false))
+
+    it('FE-PLANNER-DAYREORDER-013: each row asks to delete its own day, and only asks', async () => {
+      const user = userEvent.setup()
+      const onDeleteDay = vi.fn()
+      const onReorder = vi.fn()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay, onReorder })} />)
+      const buttons = screen.getAllByRole('button', { name: 'dayplan.deleteDay' })
+      expect(buttons).toHaveLength(3)
+      await user.click(buttons[1])
+      expect(onDeleteDay).toHaveBeenCalledWith(7)
+      expect(onReorder).not.toHaveBeenCalled()
+    })
+
+    it('FE-PLANNER-DAYREORDER-014: without a delete handler the rows carry no delete button', () => {
+      render(<DayReorderPopup {...makeProps({ days: threeDays() })} />)
+      expect(screen.queryByRole('button', { name: 'dayplan.deleteDay' })).not.toBeInTheDocument()
+      // The label is still the row's second span, next to its position badge.
+      expect(rows()[0].querySelectorAll('span')[1].textContent).toBe('Paris')
+    })
+
+    it('FE-PLANNER-DAYREORDER-015: the only day of a trip cannot be deleted', async () => {
+      const user = userEvent.setup()
+      const onDeleteDay = vi.fn()
+      render(<DayReorderPopup {...makeProps({ days: [buildDay({ id: 3, title: 'Paris', day_number: 1 })], onDeleteDay })} />)
+      const button = screen.getByRole('button', { name: 'dayplan.deleteDay' })
+      expect(button).toBeDisabled()
+      await user.click(button)
+      expect(onDeleteDay).not.toHaveBeenCalled()
+    })
+
+    it('FE-PLANNER-DAYREORDER-016: offline every delete button is off, and hovering says why', async () => {
+      setForcedOffline(true)
+      const user = userEvent.setup()
+      render(<DayReorderPopup {...makeProps({ days: threeDays(), onDeleteDay: vi.fn() })} />)
+      const buttons = screen.getAllByRole('button', { name: 'dayplan.deleteDay' })
+      expect(buttons.every(b => (b as HTMLButtonElement).disabled)).toBe(true)
+      await user.hover(buttons[0].parentElement as HTMLElement)
+      expect(await screen.findByText('dayplan.daysOffline')).toBeInTheDocument()
+    })
   })
 })

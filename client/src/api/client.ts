@@ -1,7 +1,7 @@
 import { isEffectivelyOffline } from '../sync/networkMode'
 import axios, { AxiosInstance } from 'axios'
 import type { z } from 'zod'
-import type { Place } from '../types'
+import type { Place, Trip } from '../types'
 import type { TransitProvider } from '@trek/shared'
 import { randomId } from '../utils/randomId'
 import {
@@ -438,7 +438,10 @@ export const daysApi = {
   update: (tripId: number | string, dayId: number | string, data: DayUpdateRequest) => apiClient.put(`/trips/${tripId}/days/${dayId}`, data).then(r => r.data),
   // Whole-day default route mode (#1281); per-segment leg modes override it.
   updateTransport: (tripId: number | string, dayId: number | string, mode: string | null) => apiClient.put(`/trips/${tripId}/days/${dayId}/transport`, { transport_mode: mode }).then(r => r.data),
-  delete: (tripId: number | string, dayId: number | string) => apiClient.delete(`/trips/${tripId}/days/${dayId}`).then(r => r.data),
+  // Answers with the trip in list shape: its day count changed, and its end
+  // date when the day took the last date along.
+  delete: (tripId: number | string, dayId: number | string): Promise<{ success: boolean; trip?: Trip }> =>
+    apiClient.delete(`/trips/${tripId}/days/${dayId}`).then(r => r.data),
   reorder: (tripId: number | string, orderedIds: number[]) => apiClient.put(`/trips/${tripId}/days/reorder`, { orderedIds } satisfies DayReorderRequest).then(r => r.data),
 }
 
