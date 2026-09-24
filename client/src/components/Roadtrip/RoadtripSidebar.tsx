@@ -1,5 +1,6 @@
 import ChargingInfo from './ChargingInfo'
 import { useRoadtripSettings } from '../../hooks/useRoadtripSettings'
+import { useElementSize } from '../../hooks/useElementSize'
 import React, { useMemo, useState } from 'react'
 import {
   CarFront, Footprints, Bike, Zap, AlertTriangle,
@@ -174,6 +175,12 @@ const DISC = 'grid h-6 w-6 shrink-0 place-items-center rounded-full'
 const STAT_LABEL = 'font-geist font-semibold uppercase tracking-[0.15em] text-content-faint'
 
 /**
+ * Below this width the rail stops counting stops: the trip head drops its third figure and
+ * the day headers their count, rather than squeezing every badge onto a line too short.
+ */
+const RAIL_NARROW_PX = 330
+
+/**
  * A day-header badge: the date, the drive, the count.
  *
  * Medium weight in the quiet ink, not semibold in the strong one. Three uppercase badges
@@ -340,8 +347,11 @@ function splitValue(value: string): React.ReactNode {
  * Three equal centred columns with hairlines between them, rather than three labelled
  * rows: the labels are the quiet part and the numbers are what the head exists for, so
  * the numbers get the size and the labels get the letter-spacing.
+ *
+ * Pulled narrow, the stops go first, with their hairline: they are the figure the rail
+ * itself shows best, one row per stop, while distance and time are only summed up here.
  */
-function TripSummary({ routes }: { routes: RoadtripRoutes }): React.ReactElement {
+function TripSummary({ routes, narrow }: { routes: RoadtripRoutes; narrow: boolean }): React.ReactElement {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   const cells: [string, string][] = [
@@ -349,7 +359,7 @@ function TripSummary({ routes }: { routes: RoadtripRoutes }): React.ReactElement
     // below count the same thing without either of them recounting the other's stops.
     [t('roadtrip.summary.distance'), formatDistance(routes.totalDistance / 1000, distanceUnit)],
     [t('roadtrip.summary.driving'), formatDurationShort(routes.totalDuration)],
-    [t('roadtrip.summary.stops'), String(routes.totalStops)],
+    ...(narrow ? [] : [[t('roadtrip.summary.stops'), String(routes.totalStops)] as [string, string]]),
   ]
   return (
     <header className="mx-3.5 rounded-2xl border border-edge-faint bg-surface-card px-3 pb-3 pt-3.5">
@@ -1550,8 +1560,10 @@ function SpillBlock({ spill, children }: {
  * move, a stay edit or a refuel offer still names the day the server knows it by. See
  * `nightSpill.ts`.
  */
-function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, canEditBookings, reservations, dayOrder, onReorderStop, onMoveStopToDay, drag, onAskAlternatives, openAlternatives, onEditStay, onSetStopKind, onSetStopFill, onFollowTrack, viaCount, trackName, refuel, onAskRefuel, onAcceptRefuel, loading, collapsed, onToggle, onFocusPoint }: {
+function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, canEditBookings, reservations, dayOrder, onReorderStop, onMoveStopToDay, drag, onAskAlternatives, openAlternatives, onEditStay, onSetStopKind, onSetStopFill, onFollowTrack, viaCount, trackName, refuel, onAskRefuel, onAcceptRefuel, loading, collapsed, onToggle, onFocusPoint, narrow }: {
   onFocusPoint?: RoadtripSidebarProps['onFocusPoint']
+  /** The rail is pulled too narrow for every badge; the stop count gives way. */
+  narrow?: boolean
   day: RoadtripDay
   /** Folded down to the header, and off the map with it. */
   collapsed?: boolean
@@ -1955,7 +1967,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
           ) : null}
           {/* Nor does a day whose drive runs from one hotel to the next with no stop of its
               own: "0 stops" beside the drive reads as the stops having gone missing. */}
-          {day.legs.length > 0 && destinationCount(day) > 0 ? (
+          {day.legs.length > 0 && destinationCount(day) > 0 && !narrow ? (
             <span className={`${DAY_BADGE} bg-surface-card`} style={{ fontSize: FS.label }}>
               {t('roadtrip.day.stopCount', { count: destinationCount(day) })}
             </span>
@@ -2183,6 +2195,8 @@ export default function RoadtripSidebar({
   collapsedDayIds, onToggleDay, onFocusPoint,
 }: RoadtripSidebarProps): React.ReactElement {
   const { t } = useTranslation()
+  const rail = useElementSize<HTMLDivElement>()
+  const narrow = rail.width > 0 && rail.width < RAIL_NARROW_PX
   // One drag state for the whole rail rather than one per day: a stop that cannot leave
   // its own day is exactly the move a road trip needs when a leg turns out too long.
   const [from, setFrom] = React.useState<DragState['from']>(null)
@@ -2222,9 +2236,9 @@ export default function RoadtripSidebar({
   return (
     // The totals hold still while the days move under them: they are the answer to "how
     // long is this trip", and an answer that scrolls away is one you have to go back for.
-    <div className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
+    <div ref={rail.ref} className="flex min-h-0 flex-1 flex-col gap-3 pt-1">
       <div className="shrink-0">
-        <TripSummary routes={routes} />
+        <TripSummary routes={routes} narrow={narrow} />
         {routes.dayWindowIssue ? (
           <p role="status" className="mx-3.5 mt-2 rounded-xl bg-warning-soft p-3 text-caption text-content">
             {t(`roadtrip.window.${routes.dayWindowIssue}`, { days: MAX_TRIP_DAYS })}
@@ -2237,6 +2251,7 @@ export default function RoadtripSidebar({
           <DaySection
             key={day.dayId}
             day={day}
+            narrow={narrow}
             onFocusPoint={onFocusPoint}
             selectedAssignmentId={selectedAssignmentId}
             onSelectStop={onSelectStop}

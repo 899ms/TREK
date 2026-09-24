@@ -1,7 +1,15 @@
 import React from 'react'
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { act, render, screen, within, fireEvent } from '@testing-library/react'
 import { TranslationProvider } from '../../i18n'
+// The rail measures itself to drop the stop counts when pulled narrow. Zero reads as "not
+// measured yet", which keeps every figure, and is the default here.
+const { railWidth } = vi.hoisted(() => ({ railWidth: { value: 0 } }))
+vi.mock('../../hooks/useElementSize', () => ({
+  useElementSize: () => ({ ref: () => {}, width: railWidth.value, height: 0 }),
+}))
+afterEach(() => { railWidth.value = 0 })
+
 import RoadtripSidebar from './RoadtripSidebar'
 import RoadtripModeSwitch from './RoadtripModeSwitch'
 import type { RoadtripDay, RoadtripRoutes, RoadtripStop } from './useRoadtripRoutes'
@@ -125,6 +133,22 @@ describe('RoadtripSidebar', () => {
     expect(total('Distance')).toBe('250 km')
     expect(total('Driving time')).toBe('2 h 30 min')
     expect(total('Stops')).toBe('5')
+  })
+
+  it('FE-ROADTRIP-SIDEBAR-083: pulled narrow, the rail stops counting stops, in its head and on every day', () => {
+    const wide = wrap(<RoadtripSidebar routes={routes({ totalDistance: 250000, totalDuration: 9000, totalStops: 5 })} />)
+    expect(screen.getByText('2 stops')).toBeInTheDocument()
+    wide.unmount()
+
+    railWidth.value = 300
+    wrap(<RoadtripSidebar routes={routes({ totalDistance: 250000, totalDuration: 9000, totalStops: 5 })} />)
+    expect(total('Distance')).toBe('250 km')
+    expect(total('Driving time')).toBe('2 h 30 min')
+    const head = screen.getByText('Distance').closest('header')!
+    // The figure goes with its hairline, so the two left share the width.
+    expect(within(head).queryByText('Stops')).toBeNull()
+    expect(head.querySelectorAll('span.w-px')).toHaveLength(1)
+    expect(screen.queryByText('2 stops')).toBeNull()
   })
 
   it('FE-ROADTRIP-SIDEBAR-002: chains the stops with the drive between them', () => {
