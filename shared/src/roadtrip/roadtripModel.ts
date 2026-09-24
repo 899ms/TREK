@@ -85,6 +85,11 @@ export interface ScheduleStop {
   /** A time somebody fixed this stop to. The chain restarts from it, and arriving
    *  after it is being late. A booked night's check-in is one of these. */
   anchor: string | null;
+  /**
+   * The anchor is a timetable's, on this stop's own day: a ride's departure terminal. Any
+   * other anchor is a time of day and counts at its passing nearest the drive.
+   */
+  dated?: boolean;
 
   dwellMinutes: number | null;
 }
@@ -161,12 +166,15 @@ function resolveArrival(
   anchor: number | null,
   cursor: number | null,
   dayOffset: number,
+  dated = false,
 ): { arrival: number | null; lateBy: number | null } {
   if (anchor === null) return { arrival: cursor, lateBy: null };
 
   if (cursor === null) return { arrival: anchor + dayOffset * DAY_MINUTES, lateBy: null };
 
-  const k = Math.round((cursor - anchor) / DAY_MINUTES);
+  // A dated anchor stays on its day: a flight is not caught by reaching the airport a day
+  // late, and one reached at dawn for the afternoon is waited for, not read as yesterday's.
+  const k = dated ? 0 : Math.round((cursor - anchor) / DAY_MINUTES);
   const anchorAt = anchor + k * DAY_MINUTES;
   return {
     arrival: anchorAt,
@@ -225,15 +233,20 @@ export function leaveAfter(
  * A visit's end time is when the drive leaves it. It is the traveller's own statement
  * about this visit, unlike the check-out that used to feed `departureAt` (the LATEST a
  * room has to be handed back, which is why #2357 took it out of the drive).
+ *
+ * A ride's departure terminal is pinned on the day its timetable names (`dated`). The
+ * arrival terminal is not: the chain reaches it from the departure, on the ride's own
+ * minutes, and a landing booked on the day it left but past midnight is the next morning.
  */
 export function scheduleStopOf(
-  stop: Pick<RoadtripStop, 'time' | 'checkInTime' | 'dwellMinutes' | 'leaveAt'>,
+  stop: Pick<RoadtripStop, 'time' | 'checkInTime' | 'dwellMinutes' | 'leaveAt' | 'carrier'>,
 ): ScheduleStop {
   const leave = parseClock(stop.leaveAt);
   return {
     anchor: stop.time ?? stop.checkInTime ?? null,
     dwellMinutes: stop.dwellMinutes,
     ...(leave === null ? {} : { departureAt: leave }),
+    ...(stop.carrier?.role === 'departure' ? { dated: true } : {}),
   };
 }
 
@@ -266,7 +279,7 @@ export function computeSchedule(
   for (let i = 0; i < stops.length; i++) {
     const stop = stops[i]!;
     const anchor = parseClock(stop.anchor);
-    const { arrival, lateBy } = resolveArrival(anchor, cursor, dayOffset);
+    const { arrival, lateBy } = resolveArrival(anchor, cursor, dayOffset, stop.dated);
     if (lateBy !== null) warnings.push({ index: i, code: 'late', minutes: lateBy });
 
     if (arrival === null) {

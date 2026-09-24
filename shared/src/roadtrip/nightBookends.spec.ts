@@ -1,13 +1,17 @@
 /**
- * ROADTRIP-BOOKENDS-001..028: a booked night stands at both ends of the days around it.
+ * ROADTRIP-BOOKENDS-001..032: a booked night stands at both ends of the days around it.
  *
  * Pinned here: which hotel a day wakes up in and which it sleeps in, where the two are
  * seated and where they are not (the hotel already there, a landing, a departure, a hire
  * car's desk, a day with nothing of its own), what a bookend carries and what it never
  * does (a clock), that the choice does not depend on the order the stays come in, and
- * that a night spent at one hotel is a leg going nowhere.
+ * that a night spent at one hotel is a leg going nowhere. From 029 on: a day moved by a
+ * ride the road does not see, a terminal out of a drive's reach, and the flight day of
+ * the report read from the stored day to its nights.
  */
-import { terminalAssignmentId } from './carriers';
+import { assembleRoadtrip } from './assemble';
+import { carrierLegsFor, carrierSeam, seatCarrierStops, terminalAssignmentId, type CarrierBooking } from './carriers';
+import { haversineKm } from './corridor';
 import {
   bookendAssignmentId,
   bookendStaysOf,
@@ -19,6 +23,7 @@ import {
 } from './nightBookends';
 import type { CarrierTerminal, PlanDay, RoadtripStop, RoutedLeg } from './planning-types';
 import { splitIntoRuns, standsAsDay } from './roadtripModel';
+import { roadtripLegKey } from './routeRun';
 
 import { describe, expect, it } from 'vitest';
 
@@ -136,6 +141,15 @@ describe('a check-in with places, then a transfer day with nothing of its own', 
     expect(out.ownerIndex).toBe(0);
     // Tonight's stay is already the day's last stop, so no evening is seated behind it.
     expect(seated[1]!.stops).toHaveLength(2);
+  });
+
+  it('ROADTRIP-BOOKENDS-032: the check-in evening carries the hour the room is ready as a label, and nothing else does', () => {
+    const ready = seatNightBookends(plan, days, [{ ...getaway, check_in: '15:00' }, wallinga]);
+    const back = ready[0]!.stops[3]!;
+    expect(back.bookend).toMatchObject({ checkingIn: true, checkIn: '15:00' });
+    // A label: the row may say it, the chain never waits for it.
+    expect(back).toMatchObject({ time: null, checkInTime: null });
+    expect(ready[1]!.stops[0]!.bookend).not.toHaveProperty('checkIn');
   });
 
   it('ROADTRIP-BOOKENDS-003: a day that is only a check-out gets no drive, and keeps its object', () => {
@@ -535,5 +549,214 @@ describe('the drive out of the morning hotel', () => {
     // A first stop reached no particular way leaves the drive to the day's own mode.
     const [plain] = seatNightBookends([planDay(D3, [visit(D3, 0), visit(D3, 1)])], days, [hotel]);
     expect(plain!.stops[0]!.legMode).toBeNull();
+  });
+});
+
+describe('a transfer day moved by a ride the road does not see', () => {
+  const a = stay(1, D1, D2, GETAWAY);
+  const b = stay(2, D2, D3, WALLINGA);
+  const ride = (over: Partial<CarrierBooking> = {}) => ({ type: 'flight', day_id: D2, end_day_id: D2, ...over });
+  const next = () => stayStop(D2, 0, WALLINGA, { name: 'Wallinga', checkInTime: '15:00' });
+
+  it('ROADTRIP-BOOKENDS-029: a flight, train, ferry, cruise or bus on the day joins the two stays, not a road (#2476)', () => {
+    // Saved without both stations, the booking seats no terminal and the day was the drive
+    // from one stay to the next, across the sea if need be. The day plan draws no line
+    // for it, and neither does this: the day is the check-in it was with the switch off.
+    const plan = [planDay(D2, [next()])];
+    const seated = seatNightBookends(plan, days, [a, b], [ride()]);
+    expect(shape(seated[0])).toEqual(['Wallinga']);
+    expect(seated).toBe(plan);
+    // With the stay's own stop gone, and with the booking spanning the day on either side.
+    const spanning = ride({ type: 'train', day_id: D1, end_day_id: D3 });
+    const [empty] = seatNightBookends([planDay(D2, [])], days, [a, b], [spanning]);
+    expect(empty!.stops).toEqual([]);
+    // A booking on another day, a hire car, a taxi, or a place of the day's own leave the drive.
+    for (const other of [ride({ day_id: D3, end_day_id: D3 }), ride({ type: 'car' }), ride({ type: 'taxi' })])
+      expect(shape(seatNightBookends(plan, days, [a, b], [other])[0])).toEqual(['morning:1', 'Wallinga']);
+    const withPlace = [planDay(D2, [visit(D2, 0, { name: 'P' }), next()])];
+    expect(shape(seatNightBookends(withPlace, days, [a, b], [ride()])[0])).toEqual(['morning:1', 'P', 'Wallinga']);
+  });
+});
+
+describe('a terminal beyond a drive from the hotel', () => {
+  const PARIS: [number, number] = [48.8566, 2.3522];
+  const CDG = { lat: 49.0097, lng: 2.5479 };
+  const JFK = { lat: 40.6413, lng: -73.7781 };
+  const paris = stay(7, D1, D4, PARIS);
+  const at = (role: CarrierTerminal['role'], where: { lat: number; lng: number }) => ({
+    ...terminal(D2, 0, role),
+    ...where,
+  });
+
+  it('ROADTRIP-BOOKENDS-030: is not joined to the hotel by road, the way the day plan draws no leg to it (#2133)', () => {
+    // A one-way flight to New York while the Paris stay still runs: the evening drove back
+    // from JFK to Paris.
+    const [away] = seatNightBookends([planDay(D2, [at('departure', CDG), at('arrival', JFK)])], days, [paris]);
+    expect(shape(away)).toEqual(['morning:7', 'departure', 'arrival']);
+    // And the morning drove from Paris to JFK for the flight back.
+    const [home] = seatNightBookends([planDay(D2, [at('departure', JFK), at('arrival', CDG)])], days, [paris]);
+    expect(shape(home)).toEqual(['departure', 'arrival', 'evening:7']);
+  });
+});
+
+/**
+ * Trip 45 on the dev instance, day 3, the flight day behind the report, with the rows the
+ * API returned: the Munich hotel's own stop (order 0, checked into from 15:00), and LH 2078
+ * leaving Hamburg at 15:15 with the slot the day plan seeded behind the hotel. Read the way
+ * both planners read it, from the stored day through the seated terminals to the nights at
+ * its edges, and timed the way the rail times it.
+ */
+describe('the flight from Hamburg to the Munich hotel (trip 45, day 3)', () => {
+  const tripDays = [1070, 1071, 1072, 1073, 1074].map((id, i) => ({ id, day_number: i + 1 }));
+  const ATLANTIC = { lat: 53.5573, lng: 10.0056 };
+  const BAYERISCHER_HOF = { lat: 48.1403, lng: 11.5732 };
+  const trip45Stays = bookendStaysOf(
+    [
+      {
+        id: 33,
+        place_id: 238,
+        start_day_id: 1070,
+        end_day_id: 1072,
+        place_lat: ATLANTIC.lat,
+        place_lng: ATLANTIC.lng,
+        place_name: 'Hotel Atlantic Hamburg',
+        check_out: '11:00',
+      },
+      {
+        id: 34,
+        place_id: 239,
+        start_day_id: 1072,
+        end_day_id: 1074,
+        place_lat: BAYERISCHER_HOF.lat,
+        place_lng: BAYERISCHER_HOF.lng,
+        place_name: 'Hotel Bayerischer Hof',
+        check_out: '11:00',
+      },
+    ],
+    [
+      { id: 75, accommodation_id: 33 },
+      { id: 76, accommodation_id: 34 },
+    ],
+  );
+  const lh2078: CarrierBooking = {
+    id: 77,
+    type: 'flight',
+    title: 'LH 2078 HAM-MUC',
+    day_id: 1072,
+    end_day_id: 1072,
+    reservation_time: '2026-11-04T15:15',
+    reservation_end_time: '2026-11-04T17:20',
+    metadata:
+      '{"departure_airport":"HAM","departure_timezone":"Europe/Berlin","arrival_airport":"MUC","arrival_timezone":"Europe/Berlin"}',
+    day_plan_position: 0.5,
+    day_positions: null,
+    endpoints: [
+      { role: 'from', sequence: 0, name: 'Hamburg (HAM)', code: 'HAM', lat: 53.630402, lng: 9.98823 },
+      { role: 'to', sequence: 1, name: 'Munich (MUC)', code: 'MUC', lat: 48.353802, lng: 11.7861 },
+    ],
+  };
+  // Assignment 221.
+  const hotelStop: RoadtripStop = {
+    assignmentId: 221,
+    ownerDayId: 1072,
+    ownerIndex: 0,
+    placeId: 239,
+    name: 'Hotel Bayerischer Hof',
+    ...BAYERISCHER_HOF,
+    time: null,
+    leaveAt: null,
+    checkInTime: '15:00',
+    night: true,
+    dwellMinutes: 60,
+    endDay: false,
+    legMode: null,
+    incomingLegMode: null,
+    stopType: 'hotel',
+    fillPercent: null,
+  };
+  const stored: PlanDay = {
+    dayId: 1072,
+    dayNumber: 3,
+    date: '2026-11-04',
+    title: null,
+    stops: seatCarrierStops(1072, [hotelStop], [0], [carrierSeam(lh2078)!]),
+  };
+  const read = (day: PlanDay | undefined) =>
+    (day?.stops ?? []).map((s) => (s.bookend ? `${s.bookend.phase}:${s.name}` : (s.carrier?.code ?? s.name)));
+  /** Each road half an hour, the ride its timetable, and the day timed the way the rail times it. */
+  const timed = (day: PlanDay) => {
+    const legs: Record<string, RoutedLeg> = {};
+    day.stops.slice(0, -1).forEach((from, i) => {
+      const to = day.stops[i + 1]!;
+      const ride = carrierLegsFor([from, to], from.legMode ?? 'driving', () => 0, roadtripLegKey);
+      Object.assign(
+        legs,
+        ride ?? {
+          [roadtripLegKey(from, to)]: {
+            seg: {
+              from: [from.lat, from.lng],
+              to: [to.lat, to.lng],
+              mid: [from.lat, from.lng],
+              distance: 20_000,
+              duration: 30 * 60,
+              mode: 'driving',
+              distanceText: '',
+              drivingText: '',
+              walkingText: '',
+            },
+            line: [
+              [from.lat, from.lng],
+              [to.lat, to.lng],
+            ],
+            vias: [],
+          },
+        },
+      );
+    });
+    return assembleRoadtrip({
+      plan: [day],
+      quietDays: [],
+      window: null,
+      distanceUnit: 'metric',
+      allLegs: legs,
+      snapByDay: {},
+      missedByDay: {},
+      loading: false,
+      limits: { legMinutes: null, dayMinutes: null, rangeKm: null },
+      vehicleKind: null,
+      connectDays: false,
+      boundaries: [],
+      labels: { start: 'go', end: 'stop' },
+    }).days[0]!;
+  };
+  /** Every pair of neighbours joined by road, as the straight line between them. */
+  const roadKm = (day: PlanDay) =>
+    day.stops
+      .slice(0, -1)
+      .map((from, i) => [from, day.stops[i + 1]!] as const)
+      .filter(([from, to]) => !(from.carrier?.role === 'departure' && to.carrier?.role === 'arrival'))
+      .map(([from, to]) => haversineKm(from, to));
+
+  it('ROADTRIP-BOOKENDS-031: flies from Hamburg and ends at the Munich hotel, with no road between the cities, switch on or off', () => {
+    // Off: the stored day with the flight seated. Read by its check-in, the hotel sat ahead
+    // of the flight and the day drove 490 miles from Munich to Hamburg airport.
+    expect(read(stored)).toEqual(['HAM', 'MUC', 'Hotel Bayerischer Hof']);
+    // On: out of the Hamburg hotel that morning, and nothing seated behind the Munich one.
+    const [seated] = seatNightBookends([stored], tripDays, trip45Stays, [lh2078]);
+    expect(read(seated)).toEqual(['morning:Hotel Atlantic Hamburg', 'HAM', 'MUC', 'Hotel Bayerischer Hof']);
+
+    for (const day of [stored, seated!]) {
+      expect(Math.max(...roadKm(day))).toBeLessThan(50);
+      const { schedule } = timed(day);
+      // At the airport by the check-in, off on the timetable, and at the hotel from the
+      // landing: nothing is late, and the hotel is not held to a check-in long past.
+      expect(schedule.warnings).toEqual([]);
+      expect(schedule.entries.slice(-3).map((e) => [e.arrival, e.departure, e.anchored])).toEqual([
+        ['14:15', '15:15', true],
+        ['17:20', '17:20', true],
+        ['17:50', '18:50', false],
+      ]);
+    }
+    expect(timed(seated!).schedule.entries[0]).toMatchObject({ arrival: '13:45', departure: '13:45' });
   });
 });

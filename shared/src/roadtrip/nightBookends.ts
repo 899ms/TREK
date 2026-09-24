@@ -1,5 +1,12 @@
-import { getDayBookendHotels, getDayOrder, hotelIsTheStop, type DayRef } from '../day/stay-bookends';
-import { closesTheDay, opensTheDay } from './carriers';
+import {
+  getDayBookendHotels,
+  getDayOrder,
+  hotelIsTheStop,
+  isDayInAccommodationRange,
+  type DayRef,
+} from '../day/stay-bookends';
+import { closesTheDay, isCarrierType, opensTheDay, type CarrierBooking } from './carriers';
+import { withinDriveRange } from './corridor';
 import { stationary } from './dayWindow';
 import type { BookendPhase, PlanDay, RoadtripStop, RoutedLeg } from './planning-types';
 
@@ -30,6 +37,7 @@ export interface BookendStay {
   place_lat?: number | null;
   place_lng?: number | null;
   place_name?: string | null;
+  check_in?: string | null;
   check_out?: string | null;
   reservation_id?: number | null;
 }
@@ -118,14 +126,16 @@ function bookendStop(
   legMode: string | null,
 ): RoadtripStop {
   const checkingOut = phase === 'morning' && stay.end_day_id === day.dayId;
+  const checkingIn = phase === 'evening' && stay.start_day_id === day.dayId;
   return {
     bookend: {
       phase,
       accommodationId: stay.id,
       reservationId: stay.reservation_id ?? null,
       checkingOut,
-      checkingIn: phase === 'evening' && stay.start_day_id === day.dayId,
+      checkingIn,
       checkOut: checkingOut ? (stay.check_out ?? null) : null,
+      ...(checkingIn && stay.check_in ? { checkIn: stay.check_in } : {}),
     },
     assignmentId: bookendAssignmentId(day.dayId, phase),
     ownerDayId: day.dayId,
@@ -154,6 +164,14 @@ const sameSpot = (a: BookendStay | undefined, b: BookendStay | undefined): boole
   !!a && !!b && a.place_lat === b.place_lat && a.place_lng === b.place_lng;
 
 /**
+ * Whether the hotel is joined by road to the stop beside it. Not to a terminal more than a
+ * drive away: the traveller flew there, and the router answers the pair with no route. The
+ * day plan draws no hotel leg to such a terminal either (#2133).
+ */
+const withinReach = (hotel: BookendStay, stop: RoadtripStop | undefined): boolean =>
+  !stop?.carrier || withinDriveRange({ lat: hotel.place_lat!, lng: hotel.place_lng! }, stop);
+
+/**
  * The plan's days with the night before and the night after seated at their edges.
  *
  * Which stay a day wakes up in and which one it sleeps in is the day plan's own choice
@@ -168,11 +186,23 @@ const sameSpot = (a: BookendStay | undefined, b: BookendStay | undefined): boole
  * morning at one hotel and an evening at another is the drive between them, while a day
  * between two nights in one hotel, or a day that is only its check-out, is not driven.
  *
+ * Neither is seated beside a terminal more than a drive away (`withinReach`). And a day
+ * with nothing of its own but tonight's stay gets neither when a flight, train, ferry,
+ * cruise or bus is booked across it: that booking is the move from one stay to the other.
+ * It seats no terminal on the day, most often because it was saved without both of them,
+ * so the road from one hotel to the next is the stretch nobody drove, and the day plan
+ * draws no line for it either (#2476). `bookings` are the trip's, read for those rides.
+ *
  * So a day with a bookend always has two stops or more, and stands as a day for that
  * reason and no other. Days that change nothing come back as they were, and so does the
  * plan when no day changes.
  */
-export function seatNightBookends(plan: PlanDay[], days: readonly DayRef[], stays: readonly BookendStay[]): PlanDay[] {
+export function seatNightBookends(
+  plan: PlanDay[],
+  days: readonly DayRef[],
+  stays: readonly BookendStay[],
+  bookings: readonly Pick<CarrierBooking, 'type' | 'day_id' | 'end_day_id'>[] = [],
+): PlanDay[] {
   const dayOf = (id: number): DayRef | undefined => days.find((d) => d.id === id);
   const realNight = (stay: BookendStay): boolean => {
     const start = dayOf(stay.start_day_id);
@@ -181,23 +211,29 @@ export function seatNightBookends(plan: PlanDay[], days: readonly DayRef[], stay
   };
   const nights = stays.filter((stay) => stay.place_id != null && realNight(stay)).sort((a, b) => a.id - b.id);
   if (!nights.length) return plan;
+  const rides = bookings.filter((booking) => isCarrierType(booking.type) && booking.day_id != null);
+  const ridden = (day: DayRef): boolean =>
+    rides.some((ride) => isDayInAccommodationRange(day, ride.day_id!, ride.end_day_id ?? ride.day_id!, days));
 
   let changed = false;
   const out = plan.map((day) => {
     const ref = dayOf(day.dayId);
     if (!ref) return day;
-    const hotels = getDayBookendHotels(ref, days, nights);
     const stops = day.stops;
+    if (stops.every((stop) => stop.night) && ridden(ref)) return day;
+    const hotels = getDayBookendHotels(ref, days, nights);
     const first = stops[0];
     const last = stops[stops.length - 1];
     let head =
       !!hotels.morning &&
       !!hotels.morningIsSleptHere &&
-      !(first && (hotelIsTheStop(hotels.morning, first) || opensTheDay(first.carrier?.role)));
+      !(first && (hotelIsTheStop(hotels.morning, first) || opensTheDay(first.carrier?.role))) &&
+      withinReach(hotels.morning, first);
     let tail =
       !!hotels.evening &&
       !!hotels.eveningIsOvernight &&
-      !(last && (hotelIsTheStop(hotels.evening, last) || closesTheDay(last.carrier?.role)));
+      !(last && (hotelIsTheStop(hotels.evening, last) || closesTheDay(last.carrier?.role))) &&
+      withinReach(hotels.evening, last);
     if (!stops.length) head = tail = head && tail && !sameSpot(hotels.morning, hotels.evening);
     if (!head && !tail) return day;
     changed = true;

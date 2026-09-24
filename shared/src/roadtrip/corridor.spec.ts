@@ -5,12 +5,14 @@ import {
   drivenPieces,
   haversineKm,
   inRiddenRange,
+  MAX_DRIVE_KM,
   pointAtMeters,
   projectOntoRoute,
   rideGaps,
   riddenRanges,
   sliceAtMeters,
   simplifyLine,
+  withinDriveRange,
   type LatLng,
 } from './corridor';
 import type { RoadtripStop } from './planning-types';
@@ -30,6 +32,18 @@ describe('haversineKm', () => {
 
   it('is zero for the same point', () => {
     expect(haversineKm(BERLIN, BERLIN)).toBe(0);
+  });
+});
+
+describe('withinDriveRange', () => {
+  it('joins by road what lies up to MAX_DRIVE_KM apart as the crow flies, and nothing further', () => {
+    expect(MAX_DRIVE_KM).toBe(2000);
+    expect(withinDriveRange(BERLIN, PRAGUE)).toBe(true);
+    // Paris to New York is a flight, not a leg of anybody's day.
+    expect(withinDriveRange({ lat: 48.8566, lng: 2.3522 }, { lat: 40.6413, lng: -73.7781 })).toBe(false);
+    // A degree of latitude is about 111 km: 17.9 of them fall short of the limit, 18.1 pass it.
+    expect(withinDriveRange(BERLIN, { lat: BERLIN.lat + 17.9, lng: BERLIN.lng })).toBe(true);
+    expect(withinDriveRange(BERLIN, { lat: BERLIN.lat + 18.1, lng: BERLIN.lng })).toBe(false);
   });
 });
 

@@ -26,6 +26,22 @@ export function haversineKm(a: LatLng, b: LatLng): number {
   return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
 }
 
+/**
+ * Beyond this straight-line distance a leg is not a drive anyone makes between two stops:
+ * it is a booking's terminal that landed next to a local stop or a hotel, and the road
+ * router answers such a pair with NoRoute (#2133).
+ *
+ * Only ever applied to a leg that touches a booking's terminal. Two real places 2000 km
+ * apart are a long drive somebody planned; an airport 2000 km from the stop before it
+ * never is. The day plan and the road trip both read it from here.
+ */
+export const MAX_DRIVE_KM = 2000;
+
+/** Whether two points are close enough to be joined by a road leg at all. */
+export function withinDriveRange(a: LatLng, b: LatLng): boolean {
+  return haversineKm(a, b) <= MAX_DRIVE_KM;
+}
+
 export function distanceToSegmentKm(p: LatLng, a: LatLng, b: LatLng): number {
   return projectOnSegment(p, a, b).distanceKm;
 }

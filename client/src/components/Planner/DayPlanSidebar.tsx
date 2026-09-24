@@ -38,7 +38,7 @@ import {
   getAssignmentReservations, timedSlot, storedRideSlot,
   type MergedItem,
 } from '../../utils/dayMerge'
-import { withinDriveRange } from '../../utils/geo'
+import { withinDriveRange } from '@trek/shared/roadtrip'
 import { formatDate, formatTime, dayTotalCost, formatMoneySum, splitReservationDateTime } from '../../utils/formatters'
 import { useDayNotes } from '../../hooks/useDayNotes'
 import { useExchangeRates } from '../../hooks/useExchangeRates'

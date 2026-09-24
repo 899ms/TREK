@@ -53,6 +53,8 @@ export interface NightBookend {
    * never a time the drive leaves at (#2357).
    */
   checkOut: string | null;
+  /** From when the room is ready, on the evening the stay begins. A label like `checkOut`. */
+  checkIn?: string | null;
 }
 
 export interface RoadtripStop {

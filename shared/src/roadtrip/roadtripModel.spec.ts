@@ -1268,3 +1268,86 @@ describe('isStoredStop', () => {
     ).toBe(false);
   });
 });
+
+/**
+ * A ride's departure terminal is pinned a check-in ahead of a dated timetable. Read as a
+ * time of day like any other pin, a drive more than half a day behind it caught the same
+ * flight a day later without a word, and one that got there half a day early read the
+ * pin as yesterday's and came out late.
+ */
+describe('a departure terminal on its timetable’s day', () => {
+  const terminal = (role: 'departure' | 'arrival' | 'pickup', time: string, leaveAt: string | null = null) => ({
+    time,
+    leaveAt,
+    checkInTime: null,
+    dwellMinutes: role === 'departure' ? 60 : 0,
+    carrier: {
+      reservationId: 77,
+      type: role === 'pickup' ? 'car' : 'flight',
+      role,
+      title: 'LH 2078',
+      code: null,
+      at: null,
+    },
+  });
+  const minutes = (m: number): number => m * 60;
+
+  it('FE-ROADTRIP-MODEL-112: only a ride’s departure terminal is held to its day', () => {
+    expect(scheduleStopOf(terminal('departure', '14:15', '15:15'))).toEqual({
+      anchor: '14:15',
+      dwellMinutes: 60,
+      departureAt: 915,
+      dated: true,
+    });
+    expect(scheduleStopOf(terminal('arrival', '17:20'))).not.toHaveProperty('dated');
+    expect(scheduleStopOf(terminal('pickup', '09:00'))).not.toHaveProperty('dated');
+    expect(scheduleStopOf({ time: '14:15', dwellMinutes: 0 })).not.toHaveProperty('dated');
+  });
+
+  it('FE-ROADTRIP-MODEL-113: reached more than half a day after its check-in, it is late by all of it, and the ride still flies that day', () => {
+    // Left at eight with eighteen and a half hours of road ahead: at the airport at half past
+    // two the next morning for a check-in at 14:15. Read as a clock, that was the next
+    // day's 14:15 and nothing was said.
+    const { entries, warnings } = computeSchedule(
+      [
+        { anchor: '08:00', dwellMinutes: 0 },
+        scheduleStopOf(terminal('departure', '14:15', '15:15')),
+        scheduleStopOf(terminal('arrival', '17:20')),
+        { anchor: null, dwellMinutes: 0 },
+      ],
+      [minutes(18 * 60 + 30), minutes(125), minutes(30)],
+    );
+    expect(warnings).toEqual([{ index: 1, code: 'late', minutes: 735 }]);
+    // The drive after the landing runs on from the timetable, as it always has.
+    expect(entries.map((e) => [e.arrival, e.departure, e.dayOffset])).toEqual([
+      ['08:00', '08:00', 0],
+      ['14:15', '15:15', 0],
+      ['17:20', '17:20', 0],
+      ['17:50', '17:50', 0],
+    ]);
+  });
+
+  it('FE-ROADTRIP-MODEL-114: reached long before its check-in, it is waited for on its day, not read as the day before', () => {
+    const { entries, warnings } = computeSchedule(
+      [{ anchor: '00:30', dwellMinutes: 0 }, scheduleStopOf(terminal('departure', '14:15', '15:15'))],
+      [minutes(10)],
+    );
+    expect(warnings).toEqual([]);
+    expect(entries.map((e) => [e.arrival, e.departure, e.dayOffset])).toEqual([
+      ['00:30', '00:30', 0],
+      ['14:15', '15:15', 0],
+    ]);
+    // An arrival terminal keeps the reading nearest the drive: a flight booked on one day
+    // that lands after midnight is on time the next morning.
+    const lateLanding = computeSchedule(
+      [
+        { anchor: '21:00', dwellMinutes: 0 },
+        scheduleStopOf(terminal('departure', '22:00', '23:00')),
+        scheduleStopOf(terminal('arrival', '01:00')),
+      ],
+      [minutes(30), minutes(120)],
+    );
+    expect(lateLanding.warnings.filter((w) => w.code === 'late')).toEqual([]);
+    expect(lateLanding.entries[2]).toMatchObject({ arrival: '01:00', dayOffset: 1 });
+  });
+});

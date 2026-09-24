@@ -458,6 +458,7 @@ describe('a booked night at both ends of its days', () => {
       checkingOut: false,
       checkingIn: true,
       checkOut: null,
+      checkIn: '14:00',
     });
     expect(back).toMatchObject({ name: 'Getaway', lat: GETAWAY.lat, lng: GETAWAY.lng, stopType: 'hotel', time: null });
     expect(back.assignmentId).toBe(bookendAssignmentId(days[0].id, 'evening'));
@@ -590,5 +591,76 @@ describe('a booked night at both ends of its days', () => {
       reason: 'More than 100 waypoints in this run.',
     });
     expect(seated.failures[99].toAssignmentId).toBeLessThan(-6_000_000_000);
+  });
+
+  /**
+   * Trip 45 on the dev instance: a night in Hamburg, then LH 2078 to Munich at 15:15 on the
+   * day the Munich hotel is checked into from 15:00, the booking's slot seeded behind it.
+   */
+  function trip45(settings?: RoadtripPreferences) {
+    const t = trip(settings);
+    const days = [1, 2, 3, 4, 5].map(() => createDay(db, t.trip.id));
+    const atlantic = visit(t.trip.id, days[0].id, 'Hotel Atlantic Hamburg', { lat: 53.5573, lng: 10.0056 });
+    const munich = visit(t.trip.id, days[2].id, 'Hotel Bayerischer Hof', { lat: 48.1403, lng: 11.5732 });
+    const stays = { check_in: '15:00', check_out: '11:00' };
+    const hamburgStay = createDayAccommodation(db, t.trip.id, atlantic.place.id, days[0].id, days[2].id, stays);
+    createDayAccommodation(db, t.trip.id, munich.place.id, days[2].id, days[4].id, stays);
+    const flight = Number(
+      db
+        .prepare(
+          `INSERT INTO reservations (trip_id, title, type, day_id, end_day_id, reservation_time, reservation_end_time, day_plan_position)
+           VALUES (?, 'LH 2078 HAM-MUC', 'flight', ?, ?, '2026-11-04T15:15', '2026-11-04T17:20', 0.5)`,
+        )
+        .run(t.trip.id, days[2].id, days[2].id).lastInsertRowid,
+    );
+    const endpoint = db.prepare(
+      'INSERT INTO reservation_endpoints (reservation_id, role, sequence, name, code, lat, lng) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    );
+    endpoint.run(flight, 'from', 0, 'Hamburg (HAM)', 'HAM', 53.630402, 9.98823);
+    endpoint.run(flight, 'to', 1, 'Munich (MUC)', 'MUC', 48.353802, 11.7861);
+    return { ...t, flightDay: days[2], hamburgStay };
+  }
+
+  it('flies the day of the Munich check-in out of Hamburg and ends it at the Munich hotel, with no road between the cities (trip 45)', async () => {
+    // Every run the router is asked for lies north of 53 or south of 49.
+    const oneCity = (router: ReturnType<typeof hourlyRouter>) =>
+      lats(router).every((run) => run.every((lat: number) => lat > 53) || run.every((lat: number) => lat < 49));
+
+    const off = trip45({});
+    const stored = await off.plans.calculate(off.trip.id, off.user.id);
+    const offDay = stored.calculated.days.find((d) => d.dayId === off.flightDay.id)!;
+    expect(shape(offDay.stops)).toEqual(['Hamburg (HAM)', 'Munich (MUC)', 'Hotel Bayerischer Hof']);
+    // At the airport by the check-in, at the hotel an hour after landing, and late for nothing.
+    expect(offDay.schedule.entries.map((e) => e.arrival)).toEqual(['14:15', '17:20', '18:20']);
+    expect(offDay.schedule.warnings).toEqual([]);
+    expect(oneCity(off.router)).toBe(true);
+
+    const on = trip45();
+    const seated = await on.plans.calculate(on.trip.id, on.user.id);
+    const onDay = seated.calculated.days.find((d) => d.dayId === on.flightDay.id)!;
+    expect(shape(onDay.stops)).toEqual([
+      `morning:${on.hamburgStay.id}`,
+      'Hamburg (HAM)',
+      'Munich (MUC)',
+      'Hotel Bayerischer Hof',
+    ]);
+    expect(oneCity(on.router)).toBe(true);
+    expect(seated.failures).toEqual([]);
+  });
+
+  it('drives no road between two stays on a day a flight saved without its airports moves the traveller (#2476)', async () => {
+    const { user, trip: created, router, plans, days, stayA } = cam();
+    db.prepare(
+      "INSERT INTO reservations (trip_id, title, type, day_id, end_day_id, reservation_time) VALUES (?, 'Flight', 'flight', ?, ?, '12:00')",
+    ).run(created.id, days[1].id, days[1].id);
+
+    const { calculated, failures } = await plans.calculate(created.id, user.id);
+
+    expect(calculated.days.map((d) => shape(d.stops))).toEqual([
+      ['Getaway', 'Lookout', 'Falls', `evening:${stayA.id}`],
+      ['Wallinga'],
+    ]);
+    expect(lats(router)).toEqual([[GETAWAY.lat, -33.73, -33.65, GETAWAY.lat]]);
+    expect(failures).toEqual([]);
   });
 });

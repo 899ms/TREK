@@ -474,6 +474,40 @@ function terminalStop(
   };
 }
 
+/**
+ * Tonight's stays that wait behind a ride of their check-in day, by their index among the
+ * day's stops, each with the rides that land nearer it than they leave.
+ *
+ * A booked night's stop carries its check-in as its clock, and the clock seats every stop
+ * ahead of a ride that leaves after it. But the check-in is the earliest the room is
+ * ready, not an hour anybody keeps: a hotel in Munich checked into from three sat ahead of
+ * a flight out of Hamburg at a quarter past, and the drive went from the hotel to Hamburg
+ * airport to fly back to Munich. The day plan never met this, because it does not list the
+ * stay's stop at all. So a stay nearer where a ride of the day lands than where it leaves
+ * goes behind the landing, whatever its check-in or the booking's slot says. A stop with a
+ * time of its own keeps the seat that time gives it: that hour somebody chose.
+ */
+function staysBehindRides(stops: readonly RoadtripStop[], rides: readonly CarrierSeam[]): Map<number, CarrierSeam[]> {
+  const behind = new Map<number, CarrierSeam[]>();
+  stops.forEach((stop, index) => {
+    if (!stop.night || parseClock(stop.time) !== null) return;
+    const landing = rides.filter((ride) => haversineKm(stop, ride.arrival!) < haversineKm(stop, ride.departure));
+    if (landing.length) behind.set(index, landing);
+  });
+  return behind;
+}
+
+/**
+ * The stay as the ride it waits behind reaches it. Its check-in still holds it when the
+ * ride lands before the room is ready. One that opened while the traveller was on the way
+ * pins nothing: held, it read the hotel at 15:00 behind a landing at 17:20, and late.
+ */
+function reachedFrom(stay: RoadtripStop, ride: CarrierSeam): RoadtripStop {
+  const lands = parseClock(ride.arrival?.clock);
+  const checkIn = parseClock(stay.checkInTime);
+  return lands !== null && checkIn !== null && checkIn < lands ? { ...stay, checkInTime: null } : stay;
+}
+
 /** Whether a terminal opens a day it has no timed stop before it on: an arrival or a pick-up. */
 export function opensTheDay(role: CarrierTerminal['role'] | undefined): boolean {
   return role === 'arrival' || role === 'pickup';
@@ -496,6 +530,8 @@ export function closesTheDay(role: CarrierTerminal['role'] | undefined): boolean
  * (`rideSeatAfter`). Only the terminal moves, though. The stops keep the order they are
  * stored in, which is the order the road trip has always driven them in, and the
  * terminal is slotted in behind the stop that precedes it in the day plan's reading.
+ * The one stop that moves is tonight's stay at the far end of such a ride, which waits
+ * behind the landing (`staysBehindRides`).
  *
  * A ride that leaves and lands on the same day seats its arrival right behind its
  * departure: nothing is visited in between. One that lands on a later day seats the
@@ -521,16 +557,29 @@ export function seatCarrierStops(
     (s) => s.arrival?.dayId === dayId && (s.departure.dayId !== dayId || s.kind === 'rental'),
   );
   if (!departing.length && !arriving.length) return stops;
+  // Tonight's stays that wait behind a ride are left out of the reading, so neither a
+  // check-in nor the booking's slot puts them back ahead of it, and the ride is seated
+  // among the other stops alone.
+  const behind = staysBehindRides(
+    stops,
+    departing.filter((s) => s.kind === 'ride' && s.arrival?.dayId === dayId),
+  );
 
   type Item =
     | { kind: 'stop'; index: number; key: number; minutes: number | null }
     | { kind: 'end'; seam: CarrierSeam; role: CarrierTerminal['role']; key: number; minutes: number | null };
-  const base: Item[] = stops.map((stop, index) => ({
-    kind: 'stop',
-    index,
-    key: orderIndex[index] ?? index,
-    minutes: parseClock(stop.time ?? stop.checkInTime ?? null),
-  }));
+  const base: Item[] = stops.flatMap((stop, index): Item[] =>
+    behind.has(index)
+      ? []
+      : [
+          {
+            kind: 'stop',
+            index,
+            key: orderIndex[index] ?? index,
+            minutes: parseClock(stop.time ?? stop.checkInTime ?? null),
+          },
+        ],
+  );
   const ends: { seam: CarrierSeam; role: CarrierTerminal['role']; end: CarrierEnd }[] = [
     ...departing.map((seam) => ({ seam, role: rolesOf(seam).start, end: seam.departure })),
     ...arriving.map((seam) => ({ seam, role: rolesOf(seam).end, end: seam.arrival! })),
@@ -589,17 +638,25 @@ export function seatCarrierStops(
     if (item.kind === 'stop') lastStop = item.index;
     else slots.push({ seam: item.seam, role: item.role, after: lastStop });
   }
+  // A stay waits behind the last of its rides to leave, on a day out and back the one home.
+  const waiting = new Map<CarrierSeam, number[]>();
+  for (const [index, rides] of behind) {
+    const ride = slots.filter((s) => s.role === 'departure' && rides.includes(s.seam)).pop()!.seam;
+    waiting.set(ride, [...(waiting.get(ride) ?? []), index]);
+  }
   const out: RoadtripStop[] = [];
   const emit = (slot: (typeof slots)[number]): void => {
-    const insertAt = out.filter((s) => !s.carrier).length;
+    // The index of the stored stop that follows the one the terminal is seated behind.
+    const insertAt = slot.after + 1;
     out.push(terminalStop(slot.seam, slot.role, dayId, insertAt));
     if (slot.role === 'departure' && slot.seam.arrival?.dayId === dayId) {
       out.push(terminalStop(slot.seam, 'arrival', dayId, insertAt));
+      for (const index of waiting.get(slot.seam) ?? []) out.push(reachedFrom(stops[index]!, slot.seam));
     }
   };
   for (const slot of slots.filter((s) => s.after < 0)) emit(slot);
   stops.forEach((stop, index) => {
-    out.push(stop);
+    if (!behind.has(index)) out.push(stop);
     for (const slot of slots.filter((s) => s.after === index)) emit(slot);
   });
   return out;

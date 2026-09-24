@@ -1405,3 +1405,98 @@ describe('a booked night at both ends of its days', () => {
     expect(runs).toContainEqual(['driving', [HOTEL[0], P[4][0], P[5][0], HOTEL[0]]])
   })
 })
+
+/**
+ * FE-ROADTRIP-ROUTES-062..063: a flight on the day the next stay begins.
+ *
+ * Trip 45 on the dev instance: a night in Hamburg, then LH 2078 to Munich at 15:15 on the day
+ * the Munich hotel is checked into from 15:00. And a move between two stays by a flight saved
+ * without its airports. What is pinned is the day the rail reads and what goes to the router.
+ */
+describe('a flight on the day the next stay begins', () => {
+  const ATLANTIC: [number, number] = [53.5573, 10.0056]
+  const BAYERISCHER_HOF: [number, number] = [48.1403, 11.5732]
+  const HAM: [number, number] = [53.630402, 9.98823]
+  const MUC: [number, number] = [48.353802, 11.7861]
+  const GETAWAY: [number, number] = [-33.71, 150.31]
+  const LOOKOUT: [number, number] = [-33.73, 150.35]
+  const WALLINGA: [number, number] = [-34.1, 150.9]
+
+  const stayOf = (id: number, stopId: number, start: number, end: number, at: [number, number]) =>
+    ({
+      id, trip_id: 7, place_id: stopId * 10, start_day_id: start, end_day_id: end,
+      check_in: '15:00', check_out: '11:00', place_name: `Stay ${id}`, place_lat: at[0], place_lng: at[1],
+    }) as unknown as Accommodation
+  const lh2078 = (over: Record<string, unknown> = {}) => ({
+    id: 77,
+    trip_id: 7,
+    title: 'LH 2078 HAM-MUC',
+    type: 'flight',
+    status: 'pending',
+    day_id: 3,
+    end_day_id: 3,
+    reservation_time: '2026-11-04T15:15',
+    reservation_end_time: '2026-11-04T17:20',
+    day_plan_position: 0.5,
+    endpoints: [
+      { role: 'from', sequence: 0, name: 'Hamburg (HAM)', code: 'HAM', lat: HAM[0], lng: HAM[1], timezone: 'Europe/Berlin', local_time: '15:15', local_date: '2026-11-04' },
+      { role: 'to', sequence: 1, name: 'Munich (MUC)', code: 'MUC', lat: MUC[0], lng: MUC[1], timezone: 'Europe/Berlin', local_time: '17:20', local_date: '2026-11-04' },
+    ],
+    ...over,
+  }) as unknown as Reservation
+
+  const hourly = (points: { lat: number; lng: number }[]) => ({
+    coordinates: points.map(p => [p.lat, p.lng] as [number, number]),
+    distance: 100000 * (points.length - 1),
+    duration: 3600 * (points.length - 1),
+    legs: points.slice(1).map(() => ({ distance: 100000, duration: 3600, text: '' })),
+  })
+  const asked = () => calculateRouteWithLegs.mock.calls.map(c => c[0].map((p: { lat: number }) => p.lat))
+  const shape = (stops: RoadtripStop[]) =>
+    stops.map(s => (s.bookend ? `${s.bookend.phase}:${s.bookend.accommodationId}` : s.carrier ? s.carrier.role : s.name))
+  const switchTo = (on: boolean) =>
+    act(() => { useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS, roadtrip_hotel_bookends: on } as never }) })
+
+  beforeEach(() => {
+    calculateRouteWithLegs.mockImplementation(async (points: { lat: number; lng: number }[]) => hourly(points))
+  })
+  afterEach(() => act(() => useSettingsStore.setState({ settings: { ...DEFAULT_SETTINGS } })))
+
+  it('FE-ROADTRIP-ROUTES-062: the Munich hotel waits behind the landing, and no road runs between the two cities, switch on or off', async () => {
+    const days = [day(1, 1), day(2, 2), day(3, 3), day(4, 4), day(5, 5)]
+    const assignments = { ...map(1, [{ id: 1, at: ATLANTIC, dwell: 60 }]), ...map(3, [{ id: 2, at: BAYERISCHER_HOF, dwell: 60 }]) } as AssignmentsMap
+    const stays = [stayOf(33, 1, 1, 3, ATLANTIC), stayOf(34, 2, 3, 5, BAYERISCHER_HOF)]
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays, [lh2078()]))
+    const flightDay = () => result.current.days.find(d => d.dayId === 3)!
+    // Only ever a road inside one city: every run asked for lies north of 53 or south of 49.
+    const oneCity = () => asked().every(run => run.every(lat => lat > 53) || run.every(lat => lat < 49))
+
+    switchTo(false)
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(shape(flightDay().stops)).toEqual(['departure', 'arrival', 'Stop 2'])
+    expect(oneCity()).toBe(true)
+    // At the airport by the check-in, and at the hotel from the landing, not late for 15:00.
+    expect(flightDay().schedule.entries.map(e => e.arrival)).toEqual(['14:15', '17:20', '18:20'])
+    expect(flightDay().schedule.warnings).toEqual([])
+
+    switchTo(true)
+    await waitFor(() => expect(flightDay()?.stops[0]?.bookend?.phase).toBe('morning'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(shape(flightDay().stops)).toEqual(['morning:33', 'departure', 'arrival', 'Stop 2'])
+    expect(asked()).toContainEqual([ATLANTIC[0], HAM[0]])
+    expect(oneCity()).toBe(true)
+  })
+
+  it('FE-ROADTRIP-ROUTES-063: a flight saved without its airports is the move between two stays, and no road is asked for it', async () => {
+    switchTo(true)
+    const days = [day(1, 1), day(2, 2), day(3, 3)]
+    const assignments = { ...map(1, [{ id: 1, at: GETAWAY }, { id: 3, at: LOOKOUT }]), ...map(2, [{ id: 4, at: WALLINGA }]) } as AssignmentsMap
+    const stays = [stayOf(1, 1, 1, 2, GETAWAY), stayOf(2, 4, 2, 3, WALLINGA)]
+    const unlocated = lh2078({ day_id: 2, end_day_id: 2, endpoints: [] })
+    const { result } = renderHook(() => useRoadtripRoutes(7, days, assignments, 'driving', {}, [], stays, [unlocated]))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.days.find(d => d.dayId === 2)!.stops.map(s => s.name)).toEqual(['Stop 4'])
+    expect(asked().flat()).not.toContain(WALLINGA[0])
+  })
+})

@@ -348,10 +348,11 @@ export function useRoadtripRoutes(
   // The stored days with the night before and the night after seated at their edges, by
   // the rule the server's calculate_roadtrip runs too. Before a day is asked whether it
   // stands as one: a day with a bookend always has two stops. A linked booking changes a
-  // bookend's reservation and nothing `planKey` reads, so it asks the router nothing.
+  // bookend's reservation and nothing `planKey` reads, so it asks the router nothing. The
+  // bookings go in whole: a ride saved without its stations still moves its day.
   const seatedDays = useMemo<PlanDay[]>(
-    () => (bookendsOn ? seatNightBookends(storedDays, days, stays) : storedDays),
-    [bookendsOn, storedDays, days, stays],
+    () => (bookendsOn ? seatNightBookends(storedDays, days, stays, reservations) : storedDays),
+    [bookendsOn, storedDays, days, stays, reservations],
   )
 
   const plan = useMemo<PlanDay[]>(() => seatedDays.filter(d => standsAsDay(d.stops)), [seatedDays])

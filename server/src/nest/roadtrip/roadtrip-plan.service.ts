@@ -263,8 +263,11 @@ export class RoadtripPlanService {
     });
     // A day after a booked night starts at the stay and a day before one ends there, by
     // the rule the planner runs in the browser, and only while the trip (or the preview's
-    // own settings) has it switched on. Everything below reads the seated days.
-    const plan = hotelBookendsOn(preferences) ? seatNightBookends(stored, context.days, context.stays) : stored;
+    // own settings) has it switched on. The rides go in with or without their stations,
+    // the way the browser hands over its bookings. Everything below reads the seated days.
+    const plan = hotelBookendsOn(preferences)
+      ? seatNightBookends(stored, context.days, context.stays, context.carriers)
+      : stored;
     const allLegs: Record<string, RoutedLeg> = {};
     const snapByDay: Record<number, Record<string, SnappedWaypoint>> = {};
     const missedByDay: Record<number, RouteAvoidClass[]> = {};
