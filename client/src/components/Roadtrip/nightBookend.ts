@@ -1,6 +1,7 @@
+import type { CSSProperties } from 'react'
 import { BedDouble, type LucideIcon } from 'lucide-react'
 import { formatClockTime } from '../../utils/formatters'
-import { parseClock, type ScheduleEntry } from './roadtripModel'
+import { parseClock, serviceColor, type ScheduleEntry } from './roadtripModel'
 import type { TranslationFn } from '../../types'
 import type { BookendReading } from './roadtripRowModel'
 
@@ -17,17 +18,44 @@ import type { BookendReading } from './roadtripRowModel'
 /** The bed the day plan's stay chips wear, so the hotel looks like itself here too. */
 export const BOOKEND_ICON: LucideIcon = BedDouble
 
-/** "Check-out · the stay", "From …", "Back to …" or "Check-in · …". */
-export function bookendTitle(reading: BookendReading, t: TranslationFn): string {
-  return t(`roadtrip.bookend.${reading.variant}`, { name: reading.name })
-}
+/**
+ * The disc the bed sits on: the hotel stop's own, in the road-signage colour its map pin
+ * wears. On a plain grey disc the night at the day's edge read as a terminal, and the same
+ * hotel wore two faces on one card, one where the day checks in and another where it
+ * comes back to it.
+ */
+export const BOOKEND_DISC: CSSProperties = { background: serviceColor('hotel'), color: '#fff' } // theme-lint-disable: road-signage palette
 
 /**
- * The line under it: on a check-out morning the latest the room is handed back, in the
- * reader's own clock format. A label, never the time the drive leaves at (#2357).
+ * The badge under the hotel's name: which edge of the stay the day stands at, and the hour
+ * that edge names, the latest the room is handed back or the earliest it is ready. Both are
+ * labels, never the time the drive leaves or arrives at (#2357). A plan that sets out after
+ * the check-out turns the badge itself to a warning rather than adding a line to the row.
  */
-export function bookendMeta(reading: BookendReading, t: TranslationFn, is12h: boolean): string | null {
-  return reading.until ? t('roadtrip.stay.until', { time: formatClockTime(reading.until, is12h) }) : null
+export interface BookendBadge {
+  lead: string
+  value: string | null
+  warning: boolean
+  hint: string | null
+}
+
+export function bookendBadge(
+  reading: BookendReading,
+  entry: Pick<ScheduleEntry, 'arrival' | 'dayOffset'> | undefined,
+  t: TranslationFn,
+  is12h: boolean,
+): BookendBadge {
+  const clock = reading.until ?? reading.from
+  const value = clock ? formatClockTime(clock, is12h) : null
+  const warning = leavesAfterCheckOut(reading, entry)
+  return {
+    lead: t(`roadtrip.bookend.${reading.variant}`),
+    value,
+    warning,
+    hint: warning
+      ? t('roadtrip.bookend.afterCheckOut')
+      : reading.until && value ? t('roadtrip.stay.until', { time: value }) : null,
+  }
 }
 
 /**

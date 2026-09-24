@@ -312,6 +312,24 @@ describe('RoadtripLimitsCard', () => {
       fireEvent.click(toggle)
       expect(onSave).toHaveBeenCalledWith('roadtrip_hotel_bookends', false)
     })
+
+    it('FE-ROADTRIP-LIMITS-021: switched on, the button says so with the bed, instead of saying nothing is set', () => {
+      const off = render(<RoadtripLimitsCard onSave={vi.fn()} />)
+      expect(screen.getByText('None set')).toBeInTheDocument()
+      expect(off.container.querySelector('svg.lucide-bed-double')).toBeNull()
+      off.unmount()
+
+      useSettingsStore.setState({
+        settings: { roadtrip_hotel_bookends: true, distance_unit: 'metric' } as never,
+      })
+      const { container } = render(<RoadtripLimitsCard onSave={vi.fn()} />)
+      expect(screen.queryByText('None set')).toBeNull()
+      const bed = container.querySelector('svg.lucide-bed-double')!
+      expect(bed).toHaveAttribute('aria-label', 'Start and end each day at your stay')
+      // A sign alone: the switch has no figure to put beside it.
+      expect(bed.parentElement!.nextElementSibling).toBeNull()
+      expect(screen.getByRole('button')).toHaveAccessibleName(expect.stringContaining('Start and end each day at your stay'))
+    })
   })
 
   /**

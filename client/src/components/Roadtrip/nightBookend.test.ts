@@ -1,15 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { BedDouble } from 'lucide-react'
-import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, leavesAfterCheckOut, staysAtTheirPlaces } from './nightBookend'
+import { BOOKEND_DISC, BOOKEND_ICON, bookendBadge, bookendBooking, leavesAfterCheckOut, staysAtTheirPlaces } from './nightBookend'
 import type { BookendReading } from './roadtripRowModel'
+import { serviceColor } from './roadtripModel'
 
-// FE-BOOKEND-001 to FE-BOOKEND-008
+// FE-BOOKEND-001 to FE-BOOKEND-010
 
 const reading = (over: Partial<BookendReading> = {}): BookendReading => ({
   phase: 'morning',
   variant: 'from',
   name: 'Hotel Alpenblick',
   until: null,
+  from: null,
   reservationId: 41,
   accommodationId: 5,
   placeId: 900,
@@ -21,21 +23,29 @@ const t = (key: string, params?: Record<string, string | number | null>) =>
   params ? `${key}(${Object.entries(params).map(([k, v]) => `${k}=${v}`).join(',')})` : key
 
 describe('a booked night as the rail and the phone say it', () => {
-  it('FE-BOOKEND-001: each of the four readings is its own sentence, with the stay named in it', () => {
-    expect(bookendTitle(reading({ variant: 'checkOut' }), t)).toBe('roadtrip.bookend.checkOut(name=Hotel Alpenblick)')
-    expect(bookendTitle(reading({ variant: 'from' }), t)).toBe('roadtrip.bookend.from(name=Hotel Alpenblick)')
-    expect(bookendTitle(reading({ phase: 'evening', variant: 'back' }), t)).toBe('roadtrip.bookend.back(name=Hotel Alpenblick)')
-    expect(bookendTitle(reading({ phase: 'evening', variant: 'checkIn' }), t)).toBe('roadtrip.bookend.checkIn(name=Hotel Alpenblick)')
+  it('FE-BOOKEND-001: the badge names the edge of the stay the day stands at, the row names the hotel', () => {
+    expect(bookendBadge(reading({ variant: 'checkOut' }), undefined, t, false).lead).toBe('roadtrip.bookend.checkOut')
+    expect(bookendBadge(reading({ variant: 'from' }), undefined, t, false).lead).toBe('roadtrip.bookend.from')
+    expect(bookendBadge(reading({ phase: 'evening', variant: 'back' }), undefined, t, false).lead).toBe('roadtrip.bookend.back')
+    expect(bookendBadge(reading({ phase: 'evening', variant: 'checkIn' }), undefined, t, false).lead).toBe('roadtrip.bookend.checkIn')
   })
 
-  it('FE-BOOKEND-002: the check-out hour is a label in the reader\'s clock', () => {
-    expect(bookendMeta(reading({ variant: 'checkOut', until: '10:00' }), t, false)).toBe('roadtrip.stay.until(time=10:00)')
-    expect(bookendMeta(reading({ variant: 'checkOut', until: '14:30' }), t, true)).toBe('roadtrip.stay.until(time=2:30 PM)')
+  it('FE-BOOKEND-002: the check-out hour is the figure of the badge, in the clock of the reader', () => {
+    expect(bookendBadge(reading({ variant: 'checkOut', until: '10:00' }), undefined, t, false))
+      .toEqual({ lead: 'roadtrip.bookend.checkOut', value: '10:00', warning: false, hint: 'roadtrip.stay.until(time=10:00)' })
+    expect(bookendBadge(reading({ variant: 'checkOut', until: '14:30' }), undefined, t, true).value).toBe('2:30 PM')
   })
 
-  it('FE-BOOKEND-003: nothing under the line when the morning hands no room back', () => {
-    expect(bookendMeta(reading(), t, false)).toBeNull()
-    expect(bookendMeta(reading({ phase: 'evening', variant: 'back' }), t, false)).toBeNull()
+  it('FE-BOOKEND-003: a morning that hands no room back, or an evening back at the stay, is the word alone', () => {
+    expect(bookendBadge(reading(), undefined, t, false)).toEqual({ lead: 'roadtrip.bookend.from', value: null, warning: false, hint: null })
+    expect(bookendBadge(reading({ phase: 'evening', variant: 'back' }), undefined, t, false).value).toBeNull()
+  })
+
+  it('FE-BOOKEND-010: a check-in evening carries the hour the room is ready, and leaving late turns the check-out badge', () => {
+    expect(bookendBadge(reading({ phase: 'evening', variant: 'checkIn', from: '15:00' }), undefined, t, false))
+      .toEqual({ lead: 'roadtrip.bookend.checkIn', value: '15:00', warning: false, hint: null })
+    expect(bookendBadge(reading({ variant: 'checkOut', until: '10:00' }), { arrival: '12:27', dayOffset: 0 }, t, false))
+      .toEqual({ lead: 'roadtrip.bookend.checkOut', value: '10:00', warning: true, hint: 'roadtrip.bookend.afterCheckOut' })
   })
 
   it('FE-BOOKEND-007: a day that sets out after the room is handed back says so', () => {
@@ -64,6 +74,11 @@ describe('a booked night as the rail and the phone say it', () => {
 
   it('FE-BOOKEND-005: the hotel wears the bed the stay chips wear', () => {
     expect(BOOKEND_ICON).toBe(BedDouble)
+  })
+
+  it('FE-BOOKEND-009: on the disc the hotel stop wears, in its signage colour with the bed in white', () => {
+    expect(BOOKEND_DISC.background).toBe(serviceColor('hotel'))
+    expect(BOOKEND_DISC.color).toBe('#fff')
   })
 })
 

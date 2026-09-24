@@ -16,7 +16,7 @@ import { formatDate, splitReservationDateTime, resolveDayId } from '../../utils/
 import { openFile } from '../../utils/fileDownload'
 import apiClient from '../../api/client'
 import type { Day, Place, Accommodation, Reservation, ReservationEndpoint, TripFile, BudgetItem, AssignmentsMap } from '../../types'
-import { parseReservationMetadata, orderedEndpoints } from '../../utils/flightLegs'
+import { parseReservationMetadata, orderedEndpoints, stripAirportCode } from '../../utils/flightLegs'
 import { BookingCostsSection } from './BookingCostsSection'
 import { TravelerPicker } from './TravelerPicker'
 import type { TripMember } from '../Budget/BudgetPanelMemberChips'
@@ -55,14 +55,6 @@ function endpointFromLocation(l: LocationPoint, role: 'from' | 'to' | 'stop', se
     local_date: date,
     local_time: time,
   }
-}
-
-// "Paris Charles de Gaulle (CDG)" → "Paris Charles de Gaulle". Done as a trim
-// plus an anchored test instead of /\s*\([A-Z]{3}\)\s*$/, because the leading
-// \s* backtracks over every space in a long name for a quadratic worst case.
-function stripAirportCode(name: string): string {
-  const trimmed = name.trimEnd()
-  return /\([A-Z]{3}\)$/.test(trimmed) ? trimmed.slice(0, -5).trimEnd() : name
 }
 
 function airportFromEndpoint(e: ReservationEndpoint | undefined): Airport | null {

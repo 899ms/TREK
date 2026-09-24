@@ -18,7 +18,7 @@ import { formatDate, formatClockTime } from '../../utils/formatters'
 import { formatDurationShort, isServiceStopType, serviceColor, type ScheduleEntry, type ScheduleWarning, refuelsRange } from './roadtripModel'
 import { STOP_KIND_BY_KEY } from './stopKinds'
 import { arrivingReroutable, bookendReading, destinationCount, isHop, legReroutable, movableWithin, resumeFoldsIntoBookend, type BookendReading } from './roadtripRowModel'
-import { BOOKEND_ICON, bookendBooking, bookendMeta, bookendTitle, leavesAfterCheckOut } from './nightBookend'
+import { BOOKEND_DISC, BOOKEND_ICON, bookendBadge, bookendBooking } from './nightBookend'
 import { spurWorthLabelling } from './accessSpur'
 import StopKindPicker from './StopKindPicker'
 import StopFillPicker from './StopFillPicker'
@@ -34,7 +34,8 @@ import { FS } from './typeScale'
 import type { RouteSegment } from '../../types'
 import EmptyState from '../shared/EmptyState'
 import AutomaticDayStop from './AutomaticDayStop'
-import { bookingOpens, carrierIcon, rideText, terminalLine } from './carrierRide'
+import { bookingOpens, carrierIcon, missedRide, rideDuration, rideReading, terminalReading, type CheckInReading, type RideEnd } from './carrierRide'
+import FigureBadge from './FigureBadge'
 import { bookingClock, bookingIcon, dayBookings } from './stopBookings'
 import type { Reservation } from '../../types'
 import type { StayDraft } from './RoadtripStayModal'
@@ -154,14 +155,11 @@ const RAIL_DASH: React.CSSProperties = {
   backgroundImage: 'repeating-linear-gradient(var(--border-primary) 0 4px, transparent 4px 8px)',
 }
 
-/**
- * A figure in the two-part shell the rail uses everywhere: what it is on the left, the
- * number on the right, one hairline between them.
- *
- * Named because more than one place builds it now — the walk from the road, and the two
- * figures on a refuel offer — and a second copy is how the two drift apart.
- */
-const FIGURE_BADGE = 'inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-edge'
+/** The rail's dash laid on its side: the ride between two terminals, drawn like a leg. */
+const RIDE_DASH: React.CSSProperties = {
+  height: 1.5,
+  backgroundImage: 'repeating-linear-gradient(90deg, var(--border-primary) 0 4px, transparent 4px 8px)',
+}
 
 /** A 24px disc — a stop's number, or a service stop's icon. */
 const DISC = 'grid h-6 w-6 shrink-0 place-items-center rounded-full'
@@ -207,22 +205,11 @@ function OffRoadBadge({ meters }: { meters: number }): React.ReactElement {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   return (
-    <Tooltip label={t('roadtrip.stop.offRoad', { distance: formatDistance(meters / 1000, distanceUnit) })}>
-      <span className="inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-edge">
-        <span
-          className="flex items-center bg-surface-tertiary px-1 text-content-faint"
-          style={{ fontSize: FS.micro }}
-        >
-          <Footprints size={9} aria-hidden />
-        </span>
-        <span
-          className="flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums text-content-secondary"
-          style={{ fontSize: FS.label }}
-        >
-          {formatDistance(meters / 1000, distanceUnit)}
-        </span>
-      </span>
-    </Tooltip>
+    <FigureBadge
+      lead={<Footprints size={9} aria-hidden />}
+      value={formatDistance(meters / 1000, distanceUnit)}
+      tooltip={t('roadtrip.stop.offRoad', { distance: formatDistance(meters / 1000, distanceUnit) })}
+    />
   )
 }
 
@@ -261,50 +248,15 @@ function FillBadge({ percent, own, onEdit }: {
 }): React.ReactElement | null {
   const { t } = useTranslation()
   if (percent === null && !onEdit) return null
-
-  const shell = 'inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-edge'
-  const icon = (
-    <span
-      className="flex items-center bg-surface-tertiary px-1 text-content-faint"
-      style={{ fontSize: FS.micro }}
-    >
-      <BatteryCharging size={9} aria-hidden />
-    </span>
-  )
-  const value = (
-    <span
-      className={`flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums ${
-        percent === null ? 'text-content-faint' : own ? 'text-content-secondary' : 'text-content-faint'
-      }`}
-      style={{ fontSize: FS.micro }}
-    >
-      {percent === null ? '+' : `${percent} %`}
-    </span>
-  )
-
-  if (!onEdit) return <span className={shell}>{icon}{value}</span>
-  // A span carrying the button role, not a <button>: the whole stop row is already one,
-  // and a button inside a button is invalid HTML that React warns about and that browsers
-  // resolve by dropping the inner element.
   return (
-    <Tooltip label={percent === null ? t('roadtrip.stop.fillSet') : t('roadtrip.limit.fillBadge', { percent })}>
-      <span
-        role="button"
-        tabIndex={0}
-        // Stops the click reaching the row, which would select the stop and move the map
-        // out from under the panel that is about to open.
-        onClick={e => { e.stopPropagation(); onEdit(e.currentTarget as HTMLElement) }}
-        onKeyDown={e => {
-          if (e.key !== 'Enter' && e.key !== ' ') return
-          e.preventDefault()
-          e.stopPropagation()
-          onEdit(e.currentTarget as HTMLElement)
-        }}
-        className={`${shell} cursor-pointer transition-colors hover:border-content-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent`}
-      >
-        {icon}{value}
-      </span>
-    </Tooltip>
+    <FigureBadge
+      lead={<BatteryCharging size={9} aria-hidden />}
+      value={percent === null ? '+' : `${percent} %`}
+      faint={percent === null || !own}
+      valueSize="micro"
+      tooltip={onEdit ? (percent === null ? t('roadtrip.stop.fillSet') : t('roadtrip.limit.fillBadge', { percent })) : undefined}
+      onActivate={onEdit}
+    />
   )
 }
 
@@ -312,6 +264,18 @@ function FillBadge({ percent, own, onEdit }: {
  * How long the stop takes. A stop the traveller leaves at a set time is stood at until
  * then, so it reads the stay the schedule made of that and says until when.
  */
+/**
+ * The check-in of the night a stay's own stop begins, on the day it does: the hour the
+ * room is ready, which is also what holds the arrival clock beside it when the drive gets
+ * there first.
+ */
+function NightCheckIn({ stop }: { stop: RoadtripStop }): React.ReactElement | null {
+  const { t } = useTranslation()
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  if (!stop.night || !stop.checkInTime) return null
+  return <FigureBadge caption lead={t('roadtrip.bookend.checkIn')} value={formatClockTime(stop.checkInTime, is12h)} />
+}
+
 function StayBadge({ stay, onEdit }: { stay: StayReading; onEdit?: () => void }): React.ReactElement | null {
   const { t } = useTranslation()
   const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
@@ -319,52 +283,23 @@ function StayBadge({ stay, onEdit }: { stay: StayReading; onEdit?: () => void })
   const text = shown === null ? null : formatDurationShort(shown * 60)
   const until = stay.until ? t('roadtrip.stay.until', { time: formatClockTime(stay.until, is12h) }) : null
   if (!text && !until && !onEdit) return null
-
-  const shell = 'inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-edge'
-  const label = (
-    <span
-      className="flex items-center bg-surface-tertiary px-1 font-geist font-semibold uppercase tracking-[0.12em] text-content-faint"
-      style={{ fontSize: FS.micro }}
-    >
-      {t('roadtrip.stop.stayShort')}
-    </span>
-  )
-  const value = (
-    <span
-      className={`flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums ${
-        text ? 'text-content-secondary' : 'text-content-faint'
-      }`}
-      style={{ fontSize: FS.label }}
-    >
-      {text ?? (until ? null : '+')}
-      {until ? <span className={`font-medium text-content-faint ${text ? 'ms-1' : ''}`}>{until}</span> : null}
-    </span>
-  )
-
-  if (!onEdit) return <span className={shell}>{label}{value}</span>
-  // A span carrying the button role, not a <button>: the whole stop row is already one,
-  // and a button inside a button is invalid HTML that React warns about and that browsers
-  // resolve by dropping the inner element.
   return (
-    <Tooltip label={t('roadtrip.stop.stay')}>
-      <span
-        role="button"
-        tabIndex={0}
-        // Stops the click reaching the row, which would select the stop and move the map
-        // out from under the dialog that is about to open.
-        onClick={e => { e.stopPropagation(); onEdit() }}
-        onKeyDown={e => {
-          if (e.key !== 'Enter' && e.key !== ' ') return
-          e.preventDefault()
-          e.stopPropagation()
-          onEdit()
-        }}
-        aria-label={text || until ? `${t('roadtrip.stop.stay')}: ${[text, until].filter(Boolean).join(' ')}` : t('roadtrip.stay.add')}
-        className={`${shell} cursor-pointer transition-colors hover:border-content-faint`}
-      >
-        {label}{value}
-      </span>
-    </Tooltip>
+    <FigureBadge
+      caption
+      lead={t('roadtrip.stop.stayShort')}
+      value={(
+        <>
+          {text ?? (until ? null : '+')}
+          {until ? <span className={`font-medium text-content-faint ${text ? 'ms-1' : ''}`}>{until}</span> : null}
+        </>
+      )}
+      faint={!text}
+      tooltip={onEdit ? t('roadtrip.stop.stay') : undefined}
+      onActivate={onEdit}
+      ariaLabel={onEdit
+        ? text || until ? `${t('roadtrip.stop.stay')}: ${[text, until].filter(Boolean).join(' ')}` : t('roadtrip.stay.add')
+        : undefined}
+    />
   )
 }
 
@@ -636,32 +571,16 @@ function RefuelBand({ dry, refuel, dayId, onAsk, onAccept }: {
                               tooltip says which one it is, which is how two numbers stay
                               legible in a column this narrow. */}
                           <span className="mt-0.5 flex items-center gap-1">
-                            <Tooltip label={t('roadtrip.poi.offRoute', { distance: formatDistance(poi.offRouteKm, distanceUnit) })}>
-                              <span className={FIGURE_BADGE}>
-                                <span className="flex items-center bg-surface-tertiary px-1 text-content-faint">
-                                  <Milestone size={9} aria-hidden />
-                                </span>
-                                <span
-                                  className="flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums text-content-secondary"
-                                  style={{ fontSize: FS.label }}
-                                >
-                                  {formatDistance(poi.offRouteKm, distanceUnit)}
-                                </span>
-                              </span>
-                            </Tooltip>
-                            <Tooltip label={t('roadtrip.refuel.spare', { distance: formatDistance(Math.round(poi.spareKm), distanceUnit) })}>
-                              <span className={FIGURE_BADGE}>
-                                <span className="flex items-center bg-surface-tertiary px-1 text-content-faint">
-                                  <DryIcon size={9} aria-hidden />
-                                </span>
-                                <span
-                                  className="flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums text-content-secondary"
-                                  style={{ fontSize: FS.label }}
-                                >
-                                  {formatDistance(Math.round(poi.spareKm), distanceUnit)}
-                                </span>
-                              </span>
-                            </Tooltip>
+                            <FigureBadge
+                              lead={<Milestone size={9} aria-hidden />}
+                              value={formatDistance(poi.offRouteKm, distanceUnit)}
+                              tooltip={t('roadtrip.poi.offRoute', { distance: formatDistance(poi.offRouteKm, distanceUnit) })}
+                            />
+                            <FigureBadge
+                              lead={<DryIcon size={9} aria-hidden />}
+                              value={formatDistance(Math.round(poi.spareKm), distanceUnit)}
+                              tooltip={t('roadtrip.refuel.spare', { distance: formatDistance(Math.round(poi.spareKm), distanceUnit) })}
+                            />
                           </span>
                         </span>
                         {onAccept ? (
@@ -707,10 +626,11 @@ function DriveBand({ leg, carrier, onAskAlternatives, alternativesOpen }: {
   const { t } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
   const mode = leg?.mode ?? 'driving'
-  // A ride reads as the ride block's pill does: the booking and its minutes under the
+  // A ride reads as the ride block's head does: the booking and its minutes under the
   // booking's icon. Through the road branches it was a car driving no distance for nine
   // hours, and a ride without a timetable was short enough to pass for a hop.
   const ride = isCarrierMode(mode)
+  const duration = ride ? rideDuration(leg) : null
   const Icon = ride ? carrierIcon(mode) : mode.startsWith('plugin:') ? Zap : MODE_ICON[mode] ?? CarFront
   // A hop (the hire desk beside the terminal) keeps the line and drops the pill: there is
   // nothing to say about it and no other way to drive it.
@@ -726,19 +646,26 @@ function DriveBand({ leg, carrier, onAskAlternatives, alternativesOpen }: {
   }
   // The band's contents, shared by the clickable and the read-only shape so the two can
   // never drift apart in what they say.
+  // A ride's minutes stand apart from its title and never truncate: a long booking title
+  // would otherwise cut off the one figure the band exists for.
   const band = (
     <>
       <Icon size={12} strokeWidth={1.7} className="shrink-0" aria-hidden />
-      <span className="min-w-0 truncate font-medium tabular-nums" style={{ fontSize: FS.meta }}>
-        {!leg
-          ? t('roadtrip.leg.pending')
-          : ride
-            ? rideText(carrier, leg)
+      {leg && ride ? (
+        <>
+          {carrier ? <span className="min-w-0 truncate font-medium" style={{ fontSize: FS.meta }}>{carrier.title}</span> : null}
+          {duration ? <span className="shrink-0 font-medium tabular-nums" style={{ fontSize: FS.meta }}>{duration}</span> : null}
+        </>
+      ) : (
+        <span className="min-w-0 truncate font-medium tabular-nums" style={{ fontSize: FS.meta }}>
+          {!leg
+            ? t('roadtrip.leg.pending')
             : t('roadtrip.leg.driveText', {
               distance: formatDistance(leg.distance / 1000, distanceUnit),
               time: formatDurationShort(leg.duration),
             })}
-      </span>
+        </span>
+      )}
     </>
   )
   return (
@@ -795,13 +722,14 @@ function DriveBand({ leg, carrier, onAskAlternatives, alternativesOpen }: {
 }
 
 /**
- * One end of a ride: the airport, station or port the drive stops at or resumes from.
+ * One end of a ride on a row of its own: a terminal whose ride lands on another day, or a
+ * hire car's desk.
  *
  * No number, no stay, no kind picker and no drag handle: it is not a stop anybody chose
  * and cannot be moved or turned into anything, it is where the booking puts the
- * traveller. What it shows is the booking's own clock under its name, and on the right
- * the time the chain wants the traveller there, which for a departure is a check-in ahead
- * of the timetable. The whole row opens the booking.
+ * traveller. Built from the ride block's pieces: the code, the place, the timetable's clock
+ * on the right, and on a departure the check-in with whatever the drive makes of it. A desk
+ * has no other end beside it, so it says which one it is. The whole row opens the booking.
  */
 function TerminalStop({ stop, entry, late, continues, starts, onOpen }: {
   stop: RoadtripStop
@@ -812,25 +740,46 @@ function TerminalStop({ stop, entry, late, continues, starts, onOpen }: {
   onOpen?: () => void
 }): React.ReactElement {
   const { t } = useTranslation()
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  const { end, desk, checkIn } = terminalReading(stop, entry, late, t, is12h)
+  const place = <span className="min-w-0 truncate font-semibold text-content" style={{ fontSize: FS.name }}>{end.place}</span>
   return (
-    <DiscRow Icon={carrierIcon(stop.carrier!.type)} starts={starts} continues={continues} onOpen={onOpen} label={onOpen ? t('roadtrip.ride.open') : undefined}>
-      <span className="min-w-0 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
-        <RideEnd stop={stop} entry={entry} late={late} />
+    <DiscRow Icon={carrierIcon(stop.carrier!.type)} starts={starts} continues={continues} onOpen={onOpen} opens={onOpen ? t('roadtrip.ride.open') : undefined}>
+      <span className="flex min-w-0 items-start gap-2 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="flex min-w-0 items-center gap-1.5 leading-6">
+            {end.code ? <CodeChip text={end.code} /> : null}
+            {onOpen ? <Tooltip label={t('roadtrip.ride.open')}>{place}</Tooltip> : place}
+          </span>
+          {desk || checkIn ? (
+            <span className="flex flex-wrap items-center gap-1">
+              {desk ? <span className="text-content-muted" style={{ fontSize: FS.meta }}>{desk}</span> : null}
+              {checkIn ? <CheckInBadge checkIn={checkIn} /> : null}
+            </span>
+          ) : null}
+        </span>
+        {end.clock ? <TimetableClock end={end} className="leading-6" /> : entry?.arrival ? <Arrival entry={entry} /> : null}
       </span>
     </DiscRow>
   )
 }
 
 /**
- * A row of the rail that is one button on a plain disc: a terminal, a ride, a booked night.
+ * A row of the rail that is one button on a disc: a terminal, a ride, a booked night.
  * The line runs in from above unless the chain starts here, and on below while it goes on.
+ *
+ * What pressing it does is said after the row's own content rather than instead of it: an
+ * aria-label on the button would be all a screen reader heard, and a ride block holds the
+ * clocks and the warning somebody needs to hear first.
  */
-function DiscRow({ Icon, starts, continues, onOpen, label, children }: {
+function DiscRow({ Icon, face, starts, continues, onOpen, opens, children }: {
   Icon: LucideIcon
+  /** The disc's own colours, for a row that stands for something with a face of its own. */
+  face?: React.CSSProperties
   starts?: boolean
   continues: boolean
   onOpen?: () => void
-  label?: string
+  opens?: string
   children: React.ReactNode
 }): React.ReactElement {
   return (
@@ -838,18 +787,18 @@ function DiscRow({ Icon, starts, continues, onOpen, label, children }: {
       type="button"
       onClick={onOpen}
       disabled={!onOpen}
-      aria-label={label}
       className="group grid w-full rounded-lg text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent disabled:cursor-default"
       style={RAIL_GRID}
     >
       <span className="flex flex-col items-center">
         {starts ? null : <span className="w-[1.5px] flex-1 rounded-sm bg-edge" aria-hidden />}
-        <span className={`${DISC} my-1 bg-surface-tertiary text-content-secondary`}>
+        <span className={`${DISC} my-1 ${face ? '' : 'bg-surface-tertiary text-content-secondary'}`} style={face}>
           <Icon size={13} strokeWidth={2} aria-hidden />
         </span>
         {continues ? <span className="w-[1.5px] flex-1 rounded-sm bg-edge" aria-hidden /> : null}
       </span>
       {children}
+      {opens ? <span className="sr-only">{opens}</span> : null}
     </button>
   )
 }
@@ -858,11 +807,13 @@ function DiscRow({ Icon, starts, continues, onOpen, label, children }: {
  * A booked night at the edge of the day: the hotel the day sets out from, or the one it
  * ends at (`seatNightBookends`).
  *
- * Laid out like a terminal, with no number, stay, kind picker or drag handle: it is the
- * stay's place and no stop of the day, so nothing about it is changed here. Under its line
- * the latest hour the room is handed back, on the morning it is, and whatever the drive
- * into it runs over; on the right the time the chain has the traveller there. The whole
- * row opens the booking behind the night, or the hotel's place when there is none to open.
+ * On the hotel stop's own disc, so the same hotel wears one face whether the day checks
+ * in, sets out from it or comes back to it. Otherwise flat, with no number, stay, kind
+ * picker or drag handle: it is the stay's place and no stop of the day, so nothing about it
+ * is changed here. Under its line the latest hour the room is handed back, on the morning
+ * it is, and whatever the drive into it runs over; on the right the time the chain has the
+ * traveller there. The whole row opens the booking behind the night, or the hotel's place
+ * when there is none to open.
  */
 function BookendStop({ reading, entry, late, driveFindings, continues, starts, onOpen }: {
   reading: BookendReading
@@ -875,29 +826,25 @@ function BookendStop({ reading, entry, late, driveFindings, continues, starts, o
 }): React.ReactElement {
   const { t } = useTranslation()
   const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
-  const meta = bookendMeta(reading, t, is12h)
-  const afterCheckOut = leavesAfterCheckOut(reading, entry)
-  const badges = afterCheckOut || late.length + driveFindings.length > 0
+  const badge = bookendBadge(reading, entry, t, is12h)
   return (
-    <DiscRow Icon={BOOKEND_ICON} starts={starts} continues={continues} onOpen={onOpen}>
+    <DiscRow Icon={BOOKEND_ICON} face={BOOKEND_DISC} starts={starts} continues={continues} onOpen={onOpen}>
       <span className="flex min-w-0 items-start gap-2 rounded-lg px-1.5 pb-1 pt-0.5 transition-colors group-hover:bg-surface-hover">
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="min-w-0 break-words font-semibold leading-6 tracking-[-0.012em] text-content" style={{ fontSize: FS.name }}>
-            {bookendTitle(reading, t)}
+            {reading.name}
           </span>
-          {meta || badges ? (
-            <span className="flex flex-wrap items-center gap-1">
-              {meta ? <span className="text-content-muted" style={{ fontSize: FS.meta }}>{meta}</span> : null}
-              {afterCheckOut ? (
-                <span className="inline-flex items-center gap-1 font-medium text-warning" style={{ fontSize: FS.meta }}>
-                  <AlertTriangle size={10} aria-hidden="true" />
-                  {t('roadtrip.bookend.afterCheckOut')}
-                </span>
-              ) : null}
-              {driveFindings.map(w => <DriveFindingBadge key={w.code} warning={w} />)}
-              {late.map(w => <LateBadge key={w.code} late={w} />)}
-            </span>
-          ) : null}
+          <span className="flex flex-wrap items-center gap-1">
+            <FigureBadge
+              tone={badge.warning ? 'warning' : 'neutral'}
+              caption
+              lead={badge.warning ? <><AlertTriangle size={9} aria-hidden />{badge.lead}</> : badge.lead}
+              value={badge.value ?? undefined}
+              tooltip={badge.hint ?? undefined}
+            />
+            {driveFindings.map(w => <DriveFindingBadge key={w.code} warning={w} />)}
+            {late.map(w => <LateBadge key={w.code} late={w} />)}
+          </span>
         </span>
         {entry?.arrival ? <Arrival entry={entry} /> : null}
       </span>
@@ -905,69 +852,114 @@ function BookendStop({ reading, entry, late, driveFindings, continues, starts, o
   )
 }
 
-/**
- * One end of a ride: the terminal's name and code, the timetable's clock under it, and
- * on the right the time the chain has the traveller there. Inside the ride's block for
- * a same-day ride, and the whole of a lone terminal's row.
- */
-function RideEnd({ stop, entry, late }: {
-  stop: RoadtripStop
-  entry: ScheduleEntry | undefined
-  late: ScheduleWarning[]
-}): React.ReactElement {
-  const { t } = useTranslation()
-  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
-  const line = terminalLine(stop.carrier!, t, is12h)
+/** A terminal's code, or the name of one without it, in the chip the ride's ends stand in. */
+function CodeChip({ text }: { text: string }): React.ReactElement {
   return (
-    <span className="flex min-w-0 items-start gap-2">
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 items-center gap-2 font-semibold leading-6 tracking-[-0.012em] text-content" style={{ fontSize: FS.name }}>
-          <span className="min-w-0 break-words">{stop.name}</span>
-          {stop.carrier!.code ? (
-            <span className="shrink-0 font-geist font-medium text-content-faint" style={{ fontSize: FS.meta }}>{stop.carrier!.code}</span>
-          ) : null}
-        </span>
-        <span className="flex flex-wrap items-center gap-1">
-          {line ? <span className="text-content-muted" style={{ fontSize: FS.meta }}>{line}</span> : null}
-          {late.map(w => <LateBadge key={w.code} late={w} />)}
-        </span>
-      </span>
-      {entry?.arrival ? <Arrival entry={entry} /> : null}
+    <span
+      className="block h-[16px] min-w-0 max-w-[9rem] shrink-0 truncate rounded border border-edge bg-surface-card px-1 font-geist font-semibold leading-[14px] text-content"
+      style={{ fontSize: FS.label }}
+    >
+      {text}
     </span>
   )
 }
 
 /**
- * A ride that leaves and lands on the same day, as one thing in the chain: the booking
- * at the top, the terminal it leaves from, the minutes in the air, the terminal it lands
- * at. One block on one disc rather than three rows, because it IS one thing, a flight,
- * and three rows read as three places the day went to. The whole block opens the
+ * The timetable's clock at one end of a ride. Weighted like a pinned arrival because the
+ * booking fixes it, and named for what it is: the time a clock in this column otherwise
+ * means is when the drive arrives.
+ */
+function TimetableClock({ end, className = '' }: { end: RideEnd; className?: string }): React.ReactElement {
+  return (
+    <Tooltip label={end.label ?? ''}>
+      <span
+        dir="ltr"
+        className={`shrink-0 whitespace-nowrap font-semibold tabular-nums text-content-secondary ${className}`}
+        style={{ fontSize: FS.time }}
+      >
+        <span aria-hidden>{end.clock}</span>
+        <DayCarry days={end.dayOffset} />
+        <span className="sr-only">{end.label}</span>
+      </span>
+    </Tooltip>
+  )
+}
+
+/**
+ * The check-in, as one badge that carries its own finding: on time it reads the hour, late
+ * it reads by how much, and too late to catch the ride it says so and when the drive gets
+ * there. Measured against the pin and set beside the departure's timetable clock, the old
+ * "+9 h 39 min" read as a delay to that clock and never said the ride was gone.
+ */
+function CheckInBadge({ checkIn }: { checkIn: CheckInReading }): React.ReactElement {
+  const warning = checkIn.state !== 'ok'
+  return (
+    <FigureBadge
+      tone={warning ? 'warning' : 'neutral'}
+      caption
+      lead={warning ? <><AlertTriangle size={9} aria-hidden />{checkIn.lead}</> : checkIn.lead}
+      value={checkIn.value}
+      tooltip={checkIn.hint}
+    />
+  )
+}
+
+/**
+ * A ride that leaves and lands on the same day, as one thing in the chain. One block on
+ * one disc rather than three rows, because it IS one thing, a flight, and three rows read
+ * as three places the day went to.
+ *
+ * Four lines, each fact once: the booking; the two codes with their timetable clocks and
+ * the ride drawn between them as a leg; the places; and the check-in, which carries the
+ * finding when the drive gets there late, beside the minutes the ride takes. A ride the
+ * drive cannot catch edges the block in the warning colour. The whole block opens the
  * booking; the road resumes below it as usual.
  */
 function RideBlock({ departure, arrival, entries, late, seg, continues, starts, onOpen }: {
   departure: RoadtripStop
   arrival: RoadtripStop
   entries: [ScheduleEntry | undefined, ScheduleEntry | undefined]
-  late: [ScheduleWarning[], ScheduleWarning[]]
+  late: ScheduleWarning[]
   seg: RouteSegment | undefined
   continues: boolean
   starts?: boolean
   onOpen?: () => void
 }): React.ReactElement {
   const { t } = useTranslation()
-  const carrier = departure.carrier!
-  const Icon = carrierIcon(carrier.type)
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  const ride = rideReading({ departure, arrival, entries, warnings: late, seg }, t, is12h)
+  const title = <span className="min-w-0 flex-1 truncate font-medium text-content-secondary" style={{ fontSize: FS.meta }}>{ride.title}</span>
   return (
-    <DiscRow Icon={Icon} starts={starts} continues={continues} onOpen={onOpen} label={onOpen ? t('roadtrip.ride.open') : undefined}>
-      <span className="my-0.5 flex min-w-0 flex-col gap-1 rounded-lg border border-edge-faint bg-surface-tertiary px-2 pb-1.5 pt-1 transition-colors group-hover:bg-surface-selected">
-        <span className="flex min-w-0 items-center gap-1.5 text-content-muted">
-          <Icon size={11} strokeWidth={1.8} className="shrink-0" aria-hidden />
-          <span className="min-w-0 truncate font-geist font-medium uppercase tracking-[0.09em]" style={{ fontSize: FS.label }}>
-            {rideText(carrier, seg)}
-          </span>
+    <DiscRow Icon={carrierIcon(departure.carrier!.type)} starts={starts} continues={continues} onOpen={onOpen} opens={onOpen ? t('roadtrip.ride.open') : undefined}>
+      <span
+        className={`my-0.5 flex min-w-0 flex-col gap-1 rounded-lg border bg-surface-tertiary px-2 pb-1.5 pt-1 transition-colors group-hover:bg-surface-selected ${
+          ride.checkIn?.state === 'missed' ? 'border-warning' : 'border-edge-faint'
+        }`}
+      >
+        <span className="flex min-w-0 items-center">
+          {onOpen ? <Tooltip label={t('roadtrip.ride.open')}>{title}</Tooltip> : title}
         </span>
-        <RideEnd stop={departure} entry={entries[0]} late={late[0]} />
-        <RideEnd stop={arrival} entry={entries[1]} late={late[1]} />
+        <span className="grid min-w-0 items-center gap-1.5" style={{ gridTemplateColumns: 'auto auto minmax(12px, 1fr) auto auto' }}>
+          <CodeChip text={ride.from.chip} />
+          {ride.from.clock ? <TimetableClock end={ride.from} /> : <span />}
+          <span style={RIDE_DASH} aria-hidden />
+          {ride.to.clock ? <TimetableClock end={ride.to} /> : <span />}
+          <CodeChip text={ride.to.chip} />
+        </span>
+        {ride.from.placeLine || ride.to.placeLine ? (
+          <span className="flex min-w-0 justify-between gap-2 text-content-muted" style={{ fontSize: FS.meta }}>
+            <span className="min-w-0 truncate">{ride.from.placeLine}</span>
+            <span className="min-w-0 truncate text-end">{ride.to.placeLine}</span>
+          </span>
+        ) : null}
+        {ride.checkIn || ride.duration ? (
+          <span className="flex flex-wrap items-center gap-1">
+            {ride.checkIn ? <CheckInBadge checkIn={ride.checkIn} /> : null}
+            {ride.duration ? (
+              <FigureBadge lead={<Clock size={9} aria-hidden />} value={ride.duration} tooltip={t('roadtrip.ride.duration')} />
+            ) : null}
+          </span>
+        ) : null}
       </span>
     </DiscRow>
   )
@@ -1125,6 +1117,7 @@ function ServiceStop({ stop, entry, late, driveFindings, selected, onSelect, onE
             <span className="min-w-0 truncate">{stop.name}</span>{stop.stopType === 'charging' && <ChargingInfo placeId={stop.placeId} compact />}
           </span>
           <span className="flex flex-wrap items-center gap-1">
+            <NightCheckIn stop={stop} />
             <StayBadge stay={readStay(stop, entry)} onEdit={onEditStay} />
             {refuelsRange(stop.stopType, vehicleKind) ? (
               <FillBadge
@@ -1214,25 +1207,29 @@ function DriveFindingBadge({ warning }: { warning: ScheduleWarning }): React.Rea
   if (!text) return null
   const Icon = warning.code === 'range' ? Fuel : Clock
   return (
-    <Tooltip label={text}>
-    <span
-      // The border is the warning colour itself, not its soft tint: at this size a tinted
-      // edge disappears into the card and the badge loses the shell the other two wear.
-      className="inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-warning"
-    >
-      <span className="flex items-center bg-warning-soft px-1 text-warning" style={{ fontSize: FS.micro }}>
-        <Icon size={9} aria-hidden />
-      </span>
-      <span
-        className="flex items-center border-s border-warning bg-surface-card px-1.5 font-semibold tabular-nums text-warning"
-        style={{ fontSize: FS.label }}
-      >
-        {warning.code === 'range'
-          ? formatDistance(warning.sinceKm ?? 0, distanceUnit)
-          : `+${formatDurationShort((warning.overMinutes ?? 0) * 60)}`}
-      </span>
+    <FigureBadge
+      tone="warning"
+      lead={<Icon size={9} aria-hidden />}
+      value={warning.code === 'range'
+        ? formatDistance(warning.sinceKm ?? 0, distanceUnit)
+        : `+${formatDurationShort((warning.overMinutes ?? 0) * 60)}`}
+      tooltip={text}
+    />
+  )
+}
+
+/**
+ * The timetable convention: past midnight the clock keeps reading small numbers, so the
+ * day it belongs to travels with it instead of sitting a line away as a separate note.
+ */
+function DayCarry({ days }: { days: number }): React.ReactElement | null {
+  const { t } = useTranslation()
+  if (days <= 0) return null
+  return (
+    <span className="ms-0.5">
+      {`+${days}`}
+      <span className="sr-only">{` ${t('roadtrip.warn.overnight')}`}</span>
     </span>
-    </Tooltip>
   )
 }
 
@@ -1240,14 +1237,7 @@ function Arrival({ entry }: { entry: ScheduleEntry }): React.ReactElement {
   const { t } = useTranslation()
   const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
   const text = formatClockTime(entry.arrival, is12h)
-  // The timetable convention: past midnight the clock keeps reading small numbers, so the
-  // day it belongs to travels with it instead of sitting a line away as a separate note.
-  const carry = entry.dayOffset > 0 ? (
-    <span className="ms-0.5">
-      {`+${entry.dayOffset}`}
-      <span className="sr-only">{` ${t('roadtrip.warn.overnight')}`}</span>
-    </span>
-  ) : null
+  const carry = <DayCarry days={entry.dayOffset} />
 
   // Every arrival is plain text at the row's right edge, pinned or not. The pinned one
   // used to be a filled pill with a clock, which made a column of quiet clock readings
@@ -1381,6 +1371,7 @@ function Stop({ stop, number, entry, late, driveFindings, selected, continues, s
               enough to change the plan. The dashed line on the map already says there is
               one; the number is for luggage, a gate, a track a hire car should not be on. */}
           <span className="flex flex-wrap items-center gap-1">
+            <NightCheckIn stop={stop} />
             <StayBadge stay={readStay(stop, entry)} onEdit={onEditStay} />
             {refuelsRange(stop.stopType, vehicleKind) ? (
               <FillBadge
@@ -1413,26 +1404,16 @@ function Stop({ stop, number, entry, late, driveFindings, selected, continues, s
 function LateBadge({ late }: { late: ScheduleWarning }): React.ReactElement {
   const { t } = useTranslation()
   const label = t(late.code === 'missedLeave' ? 'roadtrip.warn.missedLeave' : 'roadtrip.warn.late', { minutes: late.minutes ?? 0 })
+  // The same two-part shell the stay and the drive findings wear, so a row of badges reads
+  // as one set instead of a pill among boxes.
   return (
-    <Tooltip label={label}>
-      <span
-        dir="ltr"
-        // The same two-part shell the stay and the drive findings wear, so a row of badges
-        // reads as one set instead of a pill among boxes. Warning-coloured edge like the
-        // drive finding: at this size a tinted edge disappears into the card.
-        className="inline-flex h-[16px] items-stretch self-start overflow-hidden rounded border border-warning"
-      >
-        <span className="flex items-center bg-warning-soft px-1 text-warning" style={{ fontSize: FS.micro }}>
-          <AlertTriangle size={9} aria-label={label} />
-        </span>
-        <span
-          className="flex items-center border-s border-warning bg-surface-card px-1.5 font-semibold tabular-nums text-warning"
-          style={{ fontSize: FS.label }}
-        >
-          {`+${formatDurationShort((late.minutes ?? 0) * 60)}`}
-        </span>
-      </span>
-    </Tooltip>
+    <FigureBadge
+      tone="warning"
+      dir="ltr"
+      lead={<AlertTriangle size={9} aria-label={label} />}
+      value={`+${formatDurationShort((late.minutes ?? 0) * 60)}`}
+      tooltip={label}
+    />
   )
 }
 
@@ -1608,6 +1589,9 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
   const [filling, setFilling] = useState<{ anchor: HTMLElement; stop: RoadtripStop } | null>(null)
   const { t, language } = useTranslation()
   const distanceUnit = useSettingsStore(s => s.settings.distance_unit)
+  const is12h = useSettingsStore(s => s.settings.time_format) === '12h'
+  // A ride the drive gets to too late is said in the header too, where a folded day still shows it.
+  const missed = missedRide(day, t, is12h)
   // The colour the map draws this day in, or none at all while the map is drawing one
   // blue line for the whole trip.
   const dayColorsOn = useRoadtripSettings(s => !!s.roadtrip_day_colors)
@@ -1738,7 +1722,7 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
               departure={stop}
               arrival={next!}
               entries={[day.schedule.entries[i], day.schedule.entries[i + 1]]}
-              late={[lateness, latenessAt(i + 1)]}
+              late={lateness}
               seg={day.legs[i]}
               continues={tail < last}
               starts={i === 0}
@@ -1958,6 +1942,14 @@ function DaySection({ day, selectedAssignmentId, onSelectStop, onOpenBooking, ca
                 {t('roadtrip.limit.dayOver', {
                   time: formatDurationShort((day.dayWarning.minutes - day.dayWarning.limitMinutes) * 60),
                 })}
+              </span>
+            </Tooltip>
+          ) : null}
+          {missed ? (
+            <Tooltip label={missed.hint}>
+              <span className={`${DAY_BADGE} gap-1 bg-warning-soft text-warning`} style={{ fontSize: FS.label }}>
+                <AlertTriangle size={10} className="shrink-0" aria-hidden />
+                {missed.label}
               </span>
             </Tooltip>
           ) : null}

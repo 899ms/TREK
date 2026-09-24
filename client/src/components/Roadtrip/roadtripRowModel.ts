@@ -72,6 +72,8 @@ export interface BookendReading {
   name: string
   /** The latest the room is handed back, on the check-out morning. A label, never a departure. */
   until: string | null
+  /** From when the room is ready, on a check-in evening. A label, never an arrival. */
+  from: string | null
   /** The booking a tap opens, or null for a stay entered without one. */
   reservationId: number | null
   accommodationId: number
@@ -92,6 +94,7 @@ export function bookendReading(day: Pick<RoadtripDay, 'stops'>, index: number): 
     variant: morning ? (bookend.checkingOut ? 'checkOut' : 'from') : evening,
     name: stop.name,
     until: morning && bookend.checkingOut ? bookend.checkOut : null,
+    from: evening === 'checkIn' ? (bookend.checkIn ?? null) : null,
     reservationId: bookend.reservationId,
     accommodationId: bookend.accommodationId,
     placeId: stop.placeId,
@@ -158,7 +161,13 @@ function stopRow(day: RoadtripDay, index: number, number: number | null): StopRo
   // for "the day ended here" and `roadtripRows` turns it into an 'auto' row instead.
   const stop = day.stops[index]
   const entry = day.schedule.entries[index]
-  const mine = day.driveWarnings.filter(w => w.index === index)
+  // Being late comes from the schedule and the drive's own findings from the limits: two
+  // lists, and a row reading only the second never showed a stop reached late, or a ride
+  // the drive gets to after it has left.
+  const mine = [
+    ...day.driveWarnings,
+    ...day.schedule.warnings.filter(w => w.code === 'late' || w.code === 'missedLeave'),
+  ].filter(w => w.index === index)
   return {
     kind: 'stop',
     stop,

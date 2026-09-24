@@ -4,7 +4,7 @@ import MSheet from '../../../components/MSheet'
 import { useAddonStore } from '../../../../store/addonStore'
 import { useTranslation } from '../../../../i18n'
 import { formatDate, resolveDayId, splitReservationDateTime } from '../../../../utils/formatters'
-import { orderedEndpoints, parseReservationMetadata } from '../../../../utils/flightLegs'
+import { orderedEndpoints, parseReservationMetadata, stripAirportCode } from '../../../../utils/flightLegs'
 import { typeToCostCategory } from '@trek/shared'
 import CustomSelect from '../../../../components/shared/CustomSelect'
 import CustomTimePicker from '../../../../components/shared/CustomTimePicker'
@@ -55,13 +55,6 @@ function endpointFromAirport(a: Airport, role: 'from' | 'to' | 'stop', sequence:
 }
 function endpointFromLocation(l: LocationPoint, role: 'from' | 'to' | 'stop', sequence: number, date: string | null, time: string | null): Omit<ReservationEndpoint, 'id' | 'reservation_id'> {
   return { role, sequence, name: l.name, code: null, lat: l.lat, lng: l.lng, timezone: null, local_date: date, local_time: time }
-}
-// "Paris Charles de Gaulle (CDG)" → "Paris Charles de Gaulle", the same trim-plus-
-// anchored-test the desktop TransportModal uses instead of /\s*\([A-Z]{3}\)\s*$/,
-// because that leading \s* backtracks over every space in a long name.
-function stripAirportCode(name: string): string {
-  const trimmed = name.trimEnd()
-  return /\([A-Z]{3}\)$/.test(trimmed) ? trimmed.slice(0, -5).trimEnd() : name
 }
 function airportFromEndpoint(e: ReservationEndpoint | undefined): Airport | null {
   if (!e || !e.code) return null

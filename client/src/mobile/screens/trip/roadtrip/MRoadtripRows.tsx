@@ -1,10 +1,10 @@
-import { AlertTriangle, Bike, CarFront, Footprints, Fuel, Hourglass, Moon, Pin, Plus, RotateCcw, Shuffle, Sunrise, X, Zap } from 'lucide-react'
+import { AlertTriangle, Bike, CarFront, Clock, Footprints, Fuel, Hourglass, Moon, Pin, Plus, RotateCcw, Shuffle, Sunrise, X, Zap } from 'lucide-react'
 import type { CSSProperties, ReactNode } from 'react'
 import MDancingTrek from '../../../components/MDancingTrek'
 import MIconBtn from '../../../components/MIconBtn'
 import { formatDurationShort, serviceColor } from '../../../../components/Roadtrip/roadtripModel'
-import { bookingOpens, carrierIcon, rideText, terminalLine } from '../../../../components/Roadtrip/carrierRide'
-import { BOOKEND_ICON, bookendMeta, bookendTitle, leavesAfterCheckOut } from '../../../../components/Roadtrip/nightBookend'
+import { bookingOpens, carrierIcon, rideReading, terminalReading, type CheckInReading, type RideEnd } from '../../../../components/Roadtrip/carrierRide'
+import { BOOKEND_DISC, BOOKEND_ICON, bookendBadge } from '../../../../components/Roadtrip/nightBookend'
 import { bookingClock, bookingIcon } from '../../../../components/Roadtrip/stopBookings'
 import { STOP_KIND_BY_KEY } from '../../../../components/Roadtrip/stopKinds'
 import { formatDistance } from '../../../../utils/units'
@@ -98,9 +98,23 @@ function Disc({ row, t, onPickKind }: { row: StopRow; t: TranslationFn; onPickKi
   )
 }
 
-function Mark({ icon, children, tone }: { icon: ReactNode; children: ReactNode; tone?: 'warn' }) {
+/**
+ * A small pill: an icon and a word or figure. With `value` the figure sits in a pill of its
+ * own inside it, the phone's badge in a badge, and `label` is the sentence a screen reader
+ * hears in place of the two, since a row that opens a booking sheet has no other place to
+ * say it.
+ */
+function Mark({ icon, children, tone, value, label }: {
+  icon: ReactNode
+  children: ReactNode
+  tone?: 'warn'
+  value?: ReactNode
+  label?: string
+}) {
   return (
     <span
+      role={label ? 'img' : undefined}
+      aria-label={label}
       className="inline-flex h-[22px] items-center gap-[4px] rounded-full px-[8px] font-geist text-[0.65625rem] font-semibold"
       style={tone === 'warn'
         ? { background: 'color-mix(in srgb, var(--m-st-pending) 14%, transparent)', color: 'var(--m-st-pending)' }
@@ -108,6 +122,7 @@ function Mark({ icon, children, tone }: { icon: ReactNode; children: ReactNode; 
     >
       {icon}
       {children}
+      {value !== undefined && <span className="ms-[2px] rounded-full bg-[color:var(--m-card)] px-[6px] tabular-nums">{value}</span>}
     </span>
   )
 }
@@ -115,8 +130,8 @@ function Mark({ icon, children, tone }: { icon: ReactNode; children: ReactNode; 
 /** The short form of a finding: the number only, the sentence waits in the sheet. */
 function warningMark(warning: ScheduleWarning, chrome: RowChrome): ReactNode {
   const { t, unit } = chrome
-  if (warning.code === 'late') {
-    return <Mark tone="warn" icon={<AlertTriangle size={10} strokeWidth={2} />}>{`+${warning.minutes ?? 0} min`}</Mark>
+  if (warning.code === 'late' || warning.code === 'missedLeave') {
+    return <Mark tone="warn" icon={<AlertTriangle size={10} strokeWidth={2} />}>{`+${formatDurationShort((warning.minutes ?? 0) * 60)}`}</Mark>
   }
   if (warning.code === 'range') {
     return <Mark tone="warn" icon={<Fuel size={10} strokeWidth={2} />}>{formatDistance(warning.sinceKm ?? 0, unit)}</Mark>
@@ -155,15 +170,19 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
   onPickKind?: () => void
 }) {
   const { t, unit } = chrome
+  if (row.stop.carrier) return <RtTerminalRow row={row} chrome={chrome} onOpen={onOpen} />
   const marks: ReactNode[] = []
+  if (row.stop.night && row.stop.checkInTime) {
+    marks.push(
+      <Mark key="checkin" icon={null} value={formatClockTime(row.stop.checkInTime, chrome.is12h)}>{t('roadtrip.bookend.checkIn')}</Mark>,
+    )
+  }
   if (row.dwellMinutes) {
     marks.push(
       <Mark key="dwell" icon={<Hourglass size={10} strokeWidth={2} />}>{formatDurationShort(row.dwellMinutes * 60)}</Mark>,
     )
   }
   if (row.warning) marks.push(<span key="warn">{warningMark(row.warning, chrome)}</span>)
-  const terminal = row.stop.carrier ? terminalLine(row.stop.carrier, t, chrome.is12h) : null
-  if (terminal) marks.push(<span key="terminal" className="font-geist text-[0.65625rem] font-medium text-m-muted">{terminal}</span>)
   if (!marks.length && row.offRoadMeters) {
     marks.push(
       <Mark key="off" icon={<Footprints size={10} strokeWidth={2} />}>
@@ -194,10 +213,10 @@ export function RtStopRow({ row, chrome, onOpen, onPickKind }: {
 
 /**
  * A booked night at the edge of the stage: the hotel the day sets out from, or the one it
- * ends at. Laid out like a stop, on the bed a stay wears, with no number and no kind to
- * pick: it is the stay's place, not a stop of the day. Under it the latest hour the room
- * is handed back, on the morning it is, and the one finding a row has room for. The whole
- * row opens the booking behind the night, or the stay.
+ * ends at. Laid out like a stop, on the hotel stop's own disc with the bed a stay wears,
+ * with no number and no kind to pick: it is the stay's place, not a stop of the day. Under
+ * it the latest hour the room is handed back, on the morning it is, and the one finding a
+ * row has room for. The whole row opens the booking behind the night, or the stay.
  */
 export function RtBookendRow({ row, bookend, chrome, onOpen }: {
   row: StopRow
@@ -205,25 +224,27 @@ export function RtBookendRow({ row, bookend, chrome, onOpen }: {
   chrome: RowChrome
   onOpen: () => void
 }) {
-  const { t } = chrome
-  const meta = bookendMeta(bookend, t, chrome.is12h)
-  const afterCheckOut = leavesAfterCheckOut(bookend, row.entry)
+  const badge = bookendBadge(bookend, row.entry, chrome.t, chrome.is12h)
   return (
     <TapRow onOpen={onOpen}>
       <span className="flex justify-center">
-        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full bg-[color:var(--m-ic)] text-m-ink">
+        <span className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-full" style={BOOKEND_DISC}>
           <BOOKEND_ICON size={15} strokeWidth={2.1} aria-hidden="true" />
         </span>
       </span>
       <span className="min-w-0 py-2">
-        <span className="line-clamp-2 block text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{bookendTitle(bookend, t)}</span>
-        {(meta || afterCheckOut || row.warning) && (
-          <span className="mt-[4px] flex flex-wrap items-center gap-[5px]">
-            {meta && <span className="font-geist text-[0.65625rem] font-medium text-m-muted">{meta}</span>}
-            {afterCheckOut && <Mark tone="warn" icon={<AlertTriangle size={10} strokeWidth={2} />}>{t('roadtrip.bookend.afterCheckOut')}</Mark>}
-            {row.warning && warningMark(row.warning, chrome)}
-          </span>
-        )}
+        <span className="line-clamp-2 block text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{bookend.name}</span>
+        <span className="mt-[4px] flex flex-wrap items-center gap-[5px]">
+          <Mark
+            tone={badge.warning ? 'warn' : undefined}
+            icon={badge.warning ? <AlertTriangle size={10} strokeWidth={2} /> : null}
+            value={badge.value ?? undefined}
+            label={badge.warning ? [badge.lead, badge.value, badge.hint].filter(Boolean).join(' ') : undefined}
+          >
+            {badge.lead}
+          </Mark>
+          {row.warning && warningMark(row.warning, chrome)}
+        </span>
       </span>
       {row.time && (
         <span dir="ltr" className="whitespace-nowrap text-[0.8125rem] font-medium tabular-nums text-m-faint">
@@ -239,34 +260,95 @@ const LEG_ICONS: Record<string, typeof CarFront> = {
   cycling: Bike,
 }
 
-/** One end of a ride inside its block: name, code, the timetable line, the clock. */
-function RideEnd({ row, chrome }: { row: StopRow; chrome: RowChrome }) {
-  const carrier = row.stop.carrier!
-  const line = terminalLine(carrier, chrome.t, chrome.is12h)
+/** The ride between two terminals, drawn in the dash the chain's legs wear, laid on its side. */
+const RIDE_CONN: CSSProperties = {
+  backgroundImage: 'repeating-linear-gradient(90deg, var(--m-conn) 0 4px, transparent 4px 8px)',
+}
+
+/** A terminal's code, or the name of one without it. On the card it takes the chain's own ground. */
+function RtChip({ text, onCard }: { text: string; onCard?: boolean }) {
   return (
-    <span className="flex items-center gap-[8px]">
-      <span className="min-w-0 flex-1">
-        <span className="flex min-w-0 items-center gap-[6px]">
-          <span className="line-clamp-2 text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{row.stop.name}</span>
-          {carrier.code && <span className="flex-none font-geist text-[0.65625rem] font-medium text-m-faint">{carrier.code}</span>}
-        </span>
-        {line && <span className="mt-[2px] block font-geist text-[0.65625rem] font-medium text-m-muted">{line}</span>}
-      </span>
-      {row.time && (
-        <span dir="ltr" className={`whitespace-nowrap text-[0.8125rem] tabular-nums ${row.pinned ? 'font-semibold text-m-ink' : 'font-medium text-m-faint'}`}>
-          {formatClockTime(row.time, chrome.is12h)}
-        </span>
-      )}
+    <span className={`block max-w-[7.5rem] flex-none truncate rounded-full px-[7px] py-px font-geist text-[0.6875rem] font-semibold text-m-ink ${
+      onCard ? 'bg-[color:var(--m-ic)]' : 'bg-[color:var(--m-card)]'
+    }`}
+    >
+      {text}
     </span>
   )
 }
 
+/** The timetable's clock at one end, with the day it falls on and its role said to a screen reader. */
+function RtClock({ end, t }: { end: RideEnd; t: TranslationFn }) {
+  if (!end.clock) return null
+  return (
+    <span dir="ltr" className="flex-none whitespace-nowrap text-[0.8125rem] font-semibold tabular-nums text-m-ink">
+      <span aria-hidden="true">
+        {end.clock}
+        {end.dayOffset > 0 && <span className="ms-px text-[0.6875rem]">{`+${end.dayOffset}`}</span>}
+      </span>
+      <span className="sr-only">{end.dayOffset > 0 ? `${end.label} ${t('roadtrip.warn.overnight')}` : end.label}</span>
+    </span>
+  )
+}
+
+/** The check-in as one mark with the hour, or the lateness, in a pill inside it; see `carrierRide`. */
+function CheckInMark({ checkIn }: { checkIn: CheckInReading }) {
+  const warning = checkIn.state !== 'ok'
+  return (
+    <Mark
+      tone={warning ? 'warn' : undefined}
+      icon={warning ? <AlertTriangle size={10} strokeWidth={2} /> : null}
+      value={checkIn.value}
+      label={checkIn.hint}
+    >
+      {checkIn.lead}
+    </Mark>
+  )
+}
+
 /**
- * A ride that leaves and lands on the day, as one block in the chain (#2428): the
- * booking and its minutes at the top, the terminal it leaves from, the terminal it lands
- * at. One block on one disc, because it is one thing, and three rows read as three
- * places the day went to. The block is the tap target and opens the booking, the same
- * sheet the map's endpoint badge opens.
+ * A terminal whose ride lands on another day, or a hire car's desk: the code and the place,
+ * the timetable's clock, and on a departure the check-in, which carries the lateness the
+ * row's own mark would otherwise repeat. A desk says which one it is. The tap opens the
+ * booking, as the rail's row does.
+ */
+function RtTerminalRow({ row, chrome, onOpen }: { row: StopRow; chrome: RowChrome; onOpen: () => void }) {
+  const { t, is12h } = chrome
+  const { end, desk, checkIn } = terminalReading(row.stop, row.entry, row.warning ? [row.warning] : [], t, is12h)
+  const warning = checkIn && row.warning?.code === 'late' ? null : row.warning
+  return (
+    <TapRow onOpen={onOpen}>
+      <span className="flex justify-center"><Disc row={row} t={t} /></span>
+      <span className="min-w-0 py-2">
+        <span className="flex min-w-0 items-center gap-[6px]">
+          {end.code && <RtChip text={end.code} onCard />}
+          <span className="line-clamp-2 min-w-0 text-[0.875rem] font-semibold leading-[1.25] text-m-ink">{end.place}</span>
+        </span>
+        {(desk || checkIn || warning) && (
+          <span className="mt-[4px] flex flex-wrap items-center gap-[5px]">
+            {desk && <span className="font-geist text-[0.65625rem] font-medium text-m-muted">{desk}</span>}
+            {checkIn && <CheckInMark checkIn={checkIn} />}
+            {warning && warningMark(warning, chrome)}
+          </span>
+        )}
+      </span>
+      {end.clock ? <RtClock end={end} t={t} /> : row.time && (
+        <span dir="ltr" className="whitespace-nowrap text-[0.8125rem] font-medium tabular-nums text-m-faint">
+          {formatClockTime(row.time, is12h)}
+        </span>
+      )}
+    </TapRow>
+  )
+}
+
+/**
+ * A ride that leaves and lands on the day, as one block in the chain (#2428), in the same
+ * four lines the rail draws: the booking with its minutes, the two codes with their
+ * timetable clocks and the ride between them, the places, and the check-in carrying
+ * whatever the drive makes of it. One block on one disc, because it is one thing, and
+ * three rows read as three places the day went to. A ride the drive cannot catch is
+ * edged in the warning colour. The block is the tap target and opens the booking, the
+ * same sheet the map's endpoint badge opens.
  */
 export function RtRideRow({ row, chrome, onOpen }: {
   row: Extract<RoadtripRow, { kind: 'ride' }>
@@ -274,17 +356,40 @@ export function RtRideRow({ row, chrome, onOpen }: {
   onOpen?: () => void
 }) {
   const Icon = carrierIcon(row.carrier.type)
+  const ride = rideReading({
+    departure: row.departure.stop,
+    arrival: row.arrival.stop,
+    entries: [row.departure.entry, row.arrival.entry],
+    warnings: row.departure.warning ? [row.departure.warning] : [],
+    seg: row.seg,
+  }, chrome.t, chrome.is12h)
   const body = (
     <>
-      <span className="flex items-center gap-[6px] text-m-muted">
-        <Icon size={12} strokeWidth={2} className="flex-none" aria-hidden="true" />
-        <span className="truncate font-geist text-[0.65625rem] font-semibold uppercase tracking-[0.06em]">{rideText(row.carrier, row.seg)}</span>
+      <span className="min-w-0 truncate text-[0.75rem] font-semibold text-m-ink">{ride.title}</span>
+      <span className="flex min-w-0 items-center gap-[6px]">
+        <RtChip text={ride.from.chip} />
+        <RtClock end={ride.from} t={chrome.t} />
+        <span className="h-[2px] min-w-[12px] flex-1" style={RIDE_CONN} aria-hidden="true" />
+        <RtClock end={ride.to} t={chrome.t} />
+        <RtChip text={ride.to.chip} />
       </span>
-      <RideEnd row={row.departure} chrome={chrome} />
-      <RideEnd row={row.arrival} chrome={chrome} />
+      {(ride.from.placeLine || ride.to.placeLine) && (
+        <span className="flex min-w-0 justify-between gap-2 font-geist text-[0.65625rem] text-m-muted">
+          <span className="min-w-0 truncate">{ride.from.placeLine}</span>
+          <span className="min-w-0 truncate text-end">{ride.to.placeLine}</span>
+        </span>
+      )}
+      {(ride.checkIn || ride.duration) && (
+        <span className="flex flex-wrap items-center gap-[5px]">
+          {ride.checkIn && <CheckInMark checkIn={ride.checkIn} />}
+          {ride.duration && <Mark icon={<Clock size={10} strokeWidth={2} />}>{ride.duration}</Mark>}
+        </span>
+      )}
     </>
   )
-  const cls = 'my-1 flex min-w-0 flex-col gap-[7px] rounded-[16px] bg-[color:var(--m-ic)] px-[12px] py-[9px] text-start'
+  const cls = `my-1 flex min-w-0 flex-col gap-[7px] rounded-[16px] border bg-[color:var(--m-ic)] px-[11px] py-[8px] text-start ${
+    ride.checkIn?.state === 'missed' ? 'border-[color:var(--m-st-pending)]' : 'border-transparent'
+  }`
   return (
     <div className="grid items-center gap-x-[10px] py-1" style={{ gridTemplateColumns: '34px 1fr' }}>
       <span className="flex justify-center">

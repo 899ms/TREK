@@ -19,7 +19,7 @@ import {
 import type { ScheduleEntry, ScheduleWarning } from './roadtripModel'
 import type { BookendPhase, NightBookend, RoadtripDay, RoadtripStop, RouteSegment } from '@trek/shared/roadtrip'
 
-// FE-RTROW-001 to FE-RTROW-066
+// FE-RTROW-001 to FE-RTROW-067
 
 function stop(name: string, over: Partial<RoadtripStop> = {}): RoadtripStop {
   return {
@@ -231,19 +231,47 @@ describe('roadtripRows stop detail', () => {
   })
 
   it('FE-RTROW-011: a stop shows only its own findings, and only the strongest of them', () => {
+    // Where each finding really comes from: being late from the schedule, the drive's
+    // limits from `driveWarnings`.
     const rows = stopRows(
       roadtripRows(
         day([stop('A'), stop('B')], {
           driveWarnings: [
             { index: 0, code: 'overnight' },
             { index: 1, code: 'leg', overMinutes: 20 },
-            { index: 1, code: 'late', minutes: 15 },
           ],
+          schedule: { entries: [entry(null), entry(null)], warnings: [{ index: 1, code: 'late', minutes: 15 }] },
         }),
       ),
     )
     expect(rows[0].warning).toEqual({ index: 0, code: 'overnight' })
     expect(rows[1].warning).toEqual({ index: 1, code: 'late', minutes: 15 })
+  })
+
+  it('FE-RTROW-067: being late, or leaving after the time set, reaches the row from the schedule, a terminal\'s included', () => {
+    const terminal = stop('HAM', {
+      carrier: { reservationId: 78, type: 'flight', role: 'departure', title: 'LH 2078', code: 'HAM', at: '15:15' },
+    })
+    const rows = stopRows(
+      roadtripRows(
+        day([stop('A'), stop('B'), terminal], {
+          schedule: {
+            entries: [entry('09:00'), entry('10:00'), entry('14:15')],
+            warnings: [
+              { index: 1, code: 'missedLeave', minutes: 20 },
+              { index: 2, code: 'late', minutes: 579 },
+              // Only the lateness is read from the schedule, not the day it changes on.
+              { index: 0, code: 'overnight' },
+            ],
+          },
+        }),
+      ),
+    )
+    expect(rows.map(r => r.warning)).toEqual([
+      null,
+      { index: 1, code: 'missedLeave', minutes: 20 },
+      { index: 2, code: 'late', minutes: 579 },
+    ])
   })
 
   it('FE-RTROW-012: dwell and the walk in from the road pass through, absent means null', () => {
@@ -746,6 +774,7 @@ describe('a booked night at the edge of the day', () => {
       variant: 'checkOut',
       name: 'Hotel Alpenblick',
       until: '10:00',
+      from: null,
       reservationId: 41,
       accommodationId: 5,
       placeId: 900,
@@ -756,7 +785,11 @@ describe('a booked night at the edge of the day', () => {
     const stayed = day([stop('Hotel Alpenblick', { lat: 45, lng: 7, night: true }), stop('Lookout'), hotel('evening', { checkingIn: true })])
     expect(bookendReading(stayed, 2)?.variant).toBe('back')
     const transfer = day([hotel('morning', { checkingOut: true }), hotel('evening', { checkingIn: true }, { name: 'Wallinga', lat: 46 })])
-    expect(bookendReading(transfer, 1)).toMatchObject({ variant: 'checkIn', name: 'Wallinga' })
+    expect(bookendReading(transfer, 1)).toMatchObject({ variant: 'checkIn', name: 'Wallinga', from: null })
+    // The hour the room is ready rides along on a check-in, as a label and nowhere else.
+    const ready = day([hotel('morning', { checkingOut: true }), hotel('evening', { checkingIn: true, checkIn: '15:00' }, { name: 'Wallinga', lat: 46 })])
+    expect(bookendReading(ready, 1)).toMatchObject({ variant: 'checkIn', from: '15:00' })
+    expect(bookendReading(ready, 0)?.from).toBeNull()
     // Nothing to read on an ordinary stop, or past the end.
     expect(bookendReading(loop(), 1)).toBeNull()
     expect(bookendReading(loop(), 9)).toBeNull()

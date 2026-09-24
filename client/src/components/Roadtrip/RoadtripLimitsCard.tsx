@@ -20,6 +20,7 @@ import SettingsHint from './SettingsHint'
 import { dayWindow } from './dayWindow'
 import { BOOKEND_ICON } from './nightBookend'
 import { useHotelBookends } from './useHotelBookends'
+import FigureBadge from './FigureBadge'
 
 /**
  * Everything that decides when the rail speaks up about the driving.
@@ -397,7 +398,10 @@ export default function RoadtripLimitsCard({ onSave, onResetDayBoundaries, loadi
     avoiding.length && canAvoid
       ? { key: 'avoid', Icon: AVOID_ROWS.find(r => r.cls === avoiding[0])!.icon, text: t('roadtrip.avoid.badge', { count: avoiding.length }) }
       : null,
-  ].filter(Boolean) as { key: string; Icon: typeof Clock; text: string }[]
+    // A switch has no figure, so its badge is the sign alone and its words are the tooltip.
+    // Without it a trip whose days start and end at the stay said "None set" on the button.
+    bookends.on ? { key: 'bookends', Icon: BOOKEND_ICON, label: t('roadtrip.line.hotelBookends') } : null,
+  ].filter(Boolean) as { key: string; Icon: typeof Clock; text?: string; label?: string }[]
 
   return (
     <>
@@ -421,21 +425,13 @@ export default function RoadtripLimitsCard({ onSave, onResetDayBoundaries, loadi
           </span>
           {badges.length ? (
             <span className="flex flex-wrap items-center gap-1">
-              {badges.map(({ key, Icon, text }) => (
-                <span
+              {badges.map(({ key, Icon, text, label }) => (
+                <FigureBadge
                   key={key}
-                  className="inline-flex h-[16px] items-stretch overflow-hidden rounded border border-edge"
-                >
-                  <span className="flex items-center bg-surface-tertiary px-1 text-content-faint">
-                    <Icon size={9} aria-hidden />
-                  </span>
-                  <span
-                    className="flex items-center border-s border-edge bg-surface-card px-1.5 font-semibold tabular-nums text-content-secondary"
-                    style={{ fontSize: FS.label }}
-                  >
-                    {text}
-                  </span>
-                </span>
+                  lead={label ? <Icon size={9} aria-label={label} /> : <Icon size={9} aria-hidden />}
+                  value={text}
+                  tooltip={label}
+                />
               ))}
             </span>
           ) : (
